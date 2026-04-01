@@ -14,10 +14,40 @@
       <!-- LinuxDo Connect OAuth 登录 -->
       <LinuxDoOAuthSection v-if="linuxdoOAuthEnabled && !backendModeEnabled" :disabled="isLoading" />
 
+      <!-- Login Mode -->
+      <div v-if="invitationCodeEnabled" class="grid grid-cols-2 gap-2 rounded-xl bg-gray-100 p-1 dark:bg-dark-800">
+        <button
+          type="button"
+          class="rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+          :class="
+            loginMode === 'password'
+              ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
+              : 'text-gray-600 hover:text-gray-900 dark:text-dark-300 dark:hover:text-white'
+          "
+          :disabled="isLoading"
+          @click="loginMode = 'password'"
+        >
+          {{ t('auth.signIn') }}
+        </button>
+        <button
+          type="button"
+          class="rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+          :class="
+            loginMode === 'invite'
+              ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
+              : 'text-gray-600 hover:text-gray-900 dark:text-dark-300 dark:hover:text-white'
+          "
+          :disabled="isLoading"
+          @click="loginMode = 'invite'"
+        >
+          {{ t('auth.invitationCodeLabel') }}
+        </button>
+      </div>
+
       <!-- Login Form -->
       <form @submit.prevent="handleLogin" class="space-y-5">
         <!-- Email Input -->
-        <div>
+        <div v-if="loginMode === 'password'">
           <label for="email" class="input-label">
             {{ t('auth.emailLabel') }}
           </label>
@@ -44,7 +74,7 @@
         </div>
 
         <!-- Password Input -->
-        <div>
+        <div v-if="loginMode === 'password'">
           <label for="password" class="input-label">
             {{ t('auth.passwordLabel') }}
           </label>
@@ -78,7 +108,7 @@
             </p>
             <span v-else></span>
             <router-link
-              v-if="passwordResetEnabled && !backendModeEnabled"
+              v-if="loginMode === 'password' && passwordResetEnabled && !backendModeEnabled"
               to="/forgot-password"
               class="text-sm font-medium text-primary-600 transition-colors hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
             >
@@ -87,8 +117,37 @@
           </div>
         </div>
 
+        <!-- Invite Code Input -->
+        <div v-else>
+          <label for="invite_code" class="input-label">
+            {{ t('auth.invitationCodeLabel') }}
+          </label>
+          <div class="relative">
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+              <Icon name="key" size="md" class="text-gray-400 dark:text-dark-500" />
+            </div>
+            <input
+              id="invite_code"
+              v-model="inviteCode"
+              type="text"
+              required
+              autofocus
+              :disabled="isLoading"
+              class="input pl-11"
+              :class="{ 'input-error': errors.inviteCode }"
+              :placeholder="t('auth.invitationCodePlaceholder')"
+            />
+          </div>
+          <p v-if="errors.inviteCode" class="input-error-text">
+            {{ errors.inviteCode }}
+          </p>
+          <p v-else class="input-hint">
+            {{ t('auth.linuxdo.invitationRequired') }}
+          </p>
+        </div>
+
         <!-- Turnstile Widget -->
-        <div v-if="turnstileEnabled && turnstileSiteKey">
+        <div v-if="loginMode === 'password' && turnstileEnabled && turnstileSiteKey">
           <TurnstileWidget
             ref="turnstileRef"
             :site-key="turnstileSiteKey"
@@ -121,7 +180,7 @@
         <!-- Submit Button -->
         <button
           type="submit"
-          :disabled="isLoading || (turnstileEnabled && !turnstileToken)"
+          :disabled="isLoading || (loginMode === 'password' && turnstileEnabled && !turnstileToken)"
           class="btn btn-primary w-full"
         >
           <svg
@@ -145,7 +204,15 @@
             ></path>
           </svg>
           <Icon v-else name="login" size="md" class="mr-2" />
-          {{ isLoading ? t('auth.signingIn') : t('auth.signIn') }}
+          {{
+            isLoading
+              ? loginMode === 'invite'
+                ? t('auth.linuxdo.completing')
+                : t('auth.signingIn')
+              : loginMode === 'invite'
+                ? t('auth.linuxdo.completeRegistration')
+                : t('auth.signIn')
+          }}
         </button>
       </form>
     </div>
@@ -201,6 +268,7 @@ const appStore = useAppStore()
 const isLoading = ref<boolean>(false)
 const errorMessage = ref<string>('')
 const showPassword = ref<boolean>(false)
+const loginMode = ref<'password' | 'invite'>('password')
 
 // Public settings
 const turnstileEnabled = ref<boolean>(false)
@@ -208,6 +276,9 @@ const turnstileSiteKey = ref<string>('')
 const linuxdoOAuthEnabled = ref<boolean>(false)
 const backendModeEnabled = ref<boolean>(false)
 const passwordResetEnabled = ref<boolean>(false)
+const invitationCodeEnabled = ref<boolean>(false)
+
+const inviteCode = ref<string>('')
 
 // Turnstile
 const turnstileRef = ref<InstanceType<typeof TurnstileWidget> | null>(null)
@@ -227,6 +298,7 @@ const formData = reactive({
 const errors = reactive({
   email: '',
   password: '',
+  inviteCode: '',
   turnstile: ''
 })
 
@@ -248,6 +320,7 @@ onMounted(async () => {
     linuxdoOAuthEnabled.value = settings.linuxdo_oauth_enabled
     backendModeEnabled.value = settings.backend_mode_enabled
     passwordResetEnabled.value = settings.password_reset_enabled
+    invitationCodeEnabled.value = settings.invitation_code_enabled
   } catch (error) {
     console.error('Failed to load public settings:', error)
   }
@@ -276,9 +349,19 @@ function validateForm(): boolean {
   // Reset errors
   errors.email = ''
   errors.password = ''
+  errors.inviteCode = ''
   errors.turnstile = ''
 
   let isValid = true
+
+  if (loginMode.value === 'invite') {
+    if (!inviteCode.value.trim()) {
+      errors.inviteCode = t('auth.invitationCodeRequired')
+      isValid = false
+    }
+
+    return isValid
+  }
 
   // Email validation
   if (!formData.email.trim()) {
@@ -321,6 +404,19 @@ async function handleLogin(): Promise<void> {
   isLoading.value = true
 
   try {
+    if (loginMode.value === 'invite') {
+      const response = await authStore.inviteLogin({ code: inviteCode.value.trim() })
+      appStore.showSuccess(t('auth.loginSuccess'))
+
+      if (response.needs_profile_completion || response.needs_password_setup || response.bootstrap_login) {
+        await router.push('/profile')
+      } else {
+        const redirectTo = (router.currentRoute.value.query.redirect as string) || '/dashboard'
+        await router.push(redirectTo)
+      }
+      return
+    }
+
     // Call auth store login
     const response = await authStore.login({
       email: formData.email,
@@ -346,7 +442,7 @@ async function handleLogin(): Promise<void> {
     await router.push(redirectTo)
   } catch (error: unknown) {
     // Reset Turnstile on error
-    if (turnstileRef.value) {
+    if (loginMode.value === 'password' && turnstileRef.value) {
       turnstileRef.value.reset()
       turnstileToken.value = ''
     }

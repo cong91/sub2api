@@ -67,13 +67,22 @@ type LoginRequest struct {
 	TurnstileToken string `json:"turnstile_token"`
 }
 
+// InviteLoginRequest represents invite bootstrap login payload
+type InviteLoginRequest struct {
+	Code string `json:"code" binding:"required"`
+}
+
 // AuthResponse 认证响应格式（匹配前端期望）
 type AuthResponse struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token,omitempty"` // 新增：Refresh Token
-	ExpiresIn    int       `json:"expires_in,omitempty"`    // 新增：Access Token有效期（秒）
-	TokenType    string    `json:"token_type"`
-	User         *dto.User `json:"user"`
+	AccessToken            string                          `json:"access_token"`
+	RefreshToken           string                          `json:"refresh_token,omitempty"` // 新增：Refresh Token
+	ExpiresIn              int                             `json:"expires_in,omitempty"`    // 新增：Access Token有效期（秒）
+	TokenType              string                          `json:"token_type"`
+	User                   *dto.User                       `json:"user"`
+	BootstrapLogin         bool                            `json:"bootstrap_login,omitempty"`
+	NeedsProfileCompletion bool                            `json:"needs_profile_completion,omitempty"`
+	NeedsPasswordSetup     bool                            `json:"needs_password_setup,omitempty"`
+	BootstrapContext       *service.InviteBootstrapContext `json:"bootstrap_context,omitempty"`
 }
 
 // respondWithTokenPair 生成 Token 对并返回认证响应
@@ -101,6 +110,41 @@ func (h *AuthHandler) respondWithTokenPair(c *gin.Context, user *service.User) {
 		ExpiresIn:    tokenPair.ExpiresIn,
 		TokenType:    "Bearer",
 		User:         dto.UserFromService(user),
+	})
+}
+
+func (h *AuthHandler) respondWithTokenPairForInviteLogin(c *gin.Context, user *service.User, bootstrapContext *service.InviteBootstrapContext) {
+	tokenPair, err := h.authService.GenerateTokenPair(c.Request.Context(), user, "")
+	if err != nil {
+		slog.Error("failed to generate token pair", "error", err, "user_id", user.ID)
+		// 回退到只返回Access Token
+		token, tokenErr := h.authService.GenerateToken(user)
+		if tokenErr != nil {
+			response.InternalError(c, "Failed to generate token")
+			return
+		}
+		response.Success(c, AuthResponse{
+			AccessToken:            token,
+			TokenType:              "Bearer",
+			User:                   dto.UserFromService(user),
+			BootstrapLogin:         true,
+			NeedsProfileCompletion: true,
+			NeedsPasswordSetup:     true,
+			BootstrapContext:       bootstrapContext,
+		})
+		return
+	}
+
+	response.Success(c, AuthResponse{
+		AccessToken:            tokenPair.AccessToken,
+		RefreshToken:           tokenPair.RefreshToken,
+		ExpiresIn:              tokenPair.ExpiresIn,
+		TokenType:              "Bearer",
+		User:                   dto.UserFromService(user),
+		BootstrapLogin:         true,
+		NeedsProfileCompletion: true,
+		NeedsPasswordSetup:     true,
+		BootstrapContext:       bootstrapContext,
 	})
 }
 
@@ -201,6 +245,24 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	h.respondWithTokenPair(c, user)
+}
+
+// InviteLogin handles invite-code bootstrap login
+// POST /api/v1/auth/invite-login
+func (h *AuthHandler) InviteLogin(c *gin.Context) {
+	var req InviteLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	result, err := h.authService.InviteLogin(c.Request.Context(), req.Code)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	h.respondWithTokenPairForInviteLogin(c, result.User, &result.BootstrapContext)
 }
 
 // TotpLoginResponse represents the response when 2FA is required
