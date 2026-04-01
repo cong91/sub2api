@@ -66,6 +66,8 @@ type AuthService struct {
 	entClient          *dbent.Client
 	userRepo           UserRepository
 	redeemRepo         RedeemCodeRepository
+	groupRepo          InviteLoginGroupResolver
+	apiKeyProvisioner  InviteLoginAPIKeyProvisioner
 	refreshTokenCache  RefreshTokenCache
 	cfg                *config.Config
 	settingService     *SettingService
@@ -78,6 +80,14 @@ type AuthService struct {
 
 type DefaultSubscriptionAssigner interface {
 	AssignOrExtendSubscription(ctx context.Context, input *AssignSubscriptionInput) (*UserSubscription, bool, error)
+}
+
+type InviteLoginGroupResolver interface {
+	ListActiveByPlatform(ctx context.Context, platform string) ([]Group, error)
+}
+
+type InviteLoginAPIKeyProvisioner interface {
+	Create(ctx context.Context, userID int64, req CreateAPIKeyRequest) (*APIKey, error)
 }
 
 type InviteBootstrapModel struct {
@@ -94,6 +104,8 @@ type InviteBootstrapContext struct {
 	APIStyle     string                 `json:"api_style"`
 	Models       []InviteBootstrapModel `json:"models"`
 	DefaultModel string                 `json:"default_model"`
+	DefaultAPIKeyName string            `json:"default_api_key_name,omitempty"`
+	DefaultGroupID    int64             `json:"default_group_id,omitempty"`
 }
 
 type InviteLoginResult struct {
@@ -107,6 +119,8 @@ func NewAuthService(
 	entClient *dbent.Client,
 	userRepo UserRepository,
 	redeemRepo RedeemCodeRepository,
+	groupRepo InviteLoginGroupResolver,
+	apiKeyProvisioner InviteLoginAPIKeyProvisioner,
 	refreshTokenCache RefreshTokenCache,
 	cfg *config.Config,
 	settingService *SettingService,
@@ -120,6 +134,8 @@ func NewAuthService(
 		entClient:          entClient,
 		userRepo:           userRepo,
 		redeemRepo:         redeemRepo,
+		groupRepo:          groupRepo,
+		apiKeyProvisioner:  apiKeyProvisioner,
 		refreshTokenCache:  refreshTokenCache,
 		cfg:                cfg,
 		settingService:     settingService,
@@ -394,19 +410,82 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 		}
 	}
 
-	s.assignDefaultSubscriptions(ctx, newUser.ID)
-	s.assignInvitationBenefits(ctx, newUser.ID, redeemCode)
+	openAIGroup, err := s.ensureInviteBootstrapAPIAccess(ctx, newUser.ID)
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to provision bootstrap API access: user_id=%d err=%v", newUser.ID, err)
+		return nil, ErrServiceUnavailable
+	}
 
 	token, err := s.GenerateToken(newUser)
 	if err != nil {
 		return nil, fmt.Errorf("generate token: %w", err)
 	}
 
+	bootstrapContext := s.buildInviteBootstrapContext(ctx)
+	bootstrapContext.DefaultAPIKeyName = "default"
+	bootstrapContext.DefaultGroupID = openAIGroup.ID
+
 	return &InviteLoginResult{
 		Token:            token,
 		User:             newUser,
-		BootstrapContext: s.buildInviteBootstrapContext(ctx),
+		BootstrapContext: bootstrapContext,
 	}, nil
+}
+
+func (s *AuthService) ensureInviteBootstrapAPIAccess(ctx context.Context, userID int64) (*Group, error) {
+	if userID <= 0 {
+		return nil, fmt.Errorf("invalid user id")
+	}
+	if s.groupRepo == nil {
+		return nil, fmt.Errorf("group resolver not configured")
+	}
+	if s.apiKeyProvisioner == nil {
+		return nil, fmt.Errorf("api key provisioner not configured")
+	}
+
+	groups, err := s.groupRepo.ListActiveByPlatform(ctx, PlatformOpenAI)
+	if err != nil {
+		return nil, fmt.Errorf("resolve openai group: %w", err)
+	}
+	if len(groups) == 0 {
+		return nil, fmt.Errorf("no active openai group")
+	}
+
+	group := groups[0]
+	if group.IsSubscriptionType() {
+		if s.defaultSubAssigner == nil {
+			return nil, fmt.Errorf("subscription assigner not configured")
+		}
+		validityDays := group.DefaultValidityDays
+		if validityDays <= 0 {
+			validityDays = 30
+		}
+		if _, _, err := s.defaultSubAssigner.AssignOrExtendSubscription(ctx, &AssignSubscriptionInput{
+			UserID:       userID,
+			GroupID:      group.ID,
+			ValidityDays: validityDays,
+			Notes:        "auto assigned by invite bootstrap (openai default)",
+		}); err != nil {
+			return nil, fmt.Errorf("assign openai subscription: %w", err)
+		}
+	} else if group.IsExclusive {
+		if s.userRepo == nil {
+			return nil, fmt.Errorf("user repo not configured")
+		}
+		if err := s.userRepo.AddGroupToAllowedGroups(ctx, userID, group.ID); err != nil {
+			return nil, fmt.Errorf("grant openai group access: %w", err)
+		}
+	}
+
+	groupID := group.ID
+	if _, err := s.apiKeyProvisioner.Create(ctx, userID, CreateAPIKeyRequest{
+		Name:    "default",
+		GroupID: &groupID,
+	}); err != nil {
+		return nil, fmt.Errorf("create default api key: %w", err)
+	}
+
+	return &group, nil
 }
 
 func (s *AuthService) buildInviteBootstrapContext(ctx context.Context) InviteBootstrapContext {
