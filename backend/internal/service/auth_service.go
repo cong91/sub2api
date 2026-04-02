@@ -489,7 +489,7 @@ func (s *AuthService) ensureInviteBootstrapAPIAccess(ctx context.Context, userID
 }
 
 func (s *AuthService) buildInviteBootstrapContext(ctx context.Context) InviteBootstrapContext {
-	providerName := "Sub2API"
+	providerName := "AIAPI"
 	if s.settingService != nil {
 		if name := strings.TrimSpace(s.settingService.GetSiteName(ctx)); name != "" {
 			providerName = name
@@ -508,7 +508,7 @@ func (s *AuthService) buildInviteBootstrapContext(ctx context.Context) InviteBoo
 	}
 
 	return InviteBootstrapContext{
-		ProviderID:   "sub2api",
+		ProviderID:   "aiapi",
 		ProviderName: providerName,
 		BaseURL:      baseURL,
 		APIStyle:     "openai-completions",
