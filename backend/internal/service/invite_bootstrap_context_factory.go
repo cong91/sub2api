@@ -23,7 +23,7 @@ const (
 
 type InviteBootstrapContextBuilder interface {
 	Supports(platform string) bool
-	Build(ctx context.Context, group *Group) (InviteBootstrapContext, error)
+	BuildProviders(ctx context.Context, group *Group) ([]InviteBootstrapProvider, error)
 }
 
 type InviteBootstrapContextFactory struct {
@@ -42,18 +42,18 @@ func DefaultInviteBootstrapContextFactory(settingService *SettingService) *Invit
 	)
 }
 
-func (f *InviteBootstrapContextFactory) Build(ctx context.Context, group *Group) (InviteBootstrapContext, error) {
+func (f *InviteBootstrapContextFactory) BuildProviders(ctx context.Context, group *Group) ([]InviteBootstrapProvider, error) {
 	if group == nil {
-		return InviteBootstrapContext{}, fmt.Errorf("group is required")
+		return nil, fmt.Errorf("group is required")
 	}
 	platform := normalizeInvitePlatform(group.Platform)
 	for _, builder := range f.builders {
 		if builder == nil || !builder.Supports(platform) {
 			continue
 		}
-		return builder.Build(ctx, group)
+		return builder.BuildProviders(ctx, group)
 	}
-	return InviteBootstrapContext{}, fmt.Errorf("unsupported invite bootstrap platform: %s", group.Platform)
+	return nil, fmt.Errorf("unsupported invite bootstrap platform: %s", group.Platform)
 }
 
 type OpenAIBootstrapContextBuilder struct {
@@ -64,7 +64,7 @@ func (b *OpenAIBootstrapContextBuilder) Supports(platform string) bool {
 	return normalizeInvitePlatform(platform) == PlatformOpenAI
 }
 
-func (b *OpenAIBootstrapContextBuilder) Build(ctx context.Context, _ *Group) (InviteBootstrapContext, error) {
+func (b *OpenAIBootstrapContextBuilder) BuildProviders(ctx context.Context, _ *Group) ([]InviteBootstrapProvider, error) {
 	models := make([]InviteBootstrapModel, 0, len(openai.DefaultModels))
 	for idx, model := range openai.DefaultModels {
 		models = append(models, InviteBootstrapModel{
@@ -83,14 +83,14 @@ func (b *OpenAIBootstrapContextBuilder) Build(ctx context.Context, _ *Group) (In
 		}}
 	}
 
-	return InviteBootstrapContext{
+	return []InviteBootstrapProvider{{
 		ProviderID:   PlatformOpenAI,
 		ProviderName: "OpenAI",
 		BaseURL:      inviteBootstrapBaseURL(ctx, b.settingService),
 		APIStyle:     inviteBootstrapAPIStyleOpenAI,
 		Models:       models,
 		DefaultModel: models[0].ID,
-	}, nil
+	}}, nil
 }
 
 type AnthropicBootstrapContextBuilder struct {
@@ -101,7 +101,7 @@ func (b *AnthropicBootstrapContextBuilder) Supports(platform string) bool {
 	return normalizeInvitePlatform(platform) == PlatformAnthropic
 }
 
-func (b *AnthropicBootstrapContextBuilder) Build(ctx context.Context, _ *Group) (InviteBootstrapContext, error) {
+func (b *AnthropicBootstrapContextBuilder) BuildProviders(ctx context.Context, _ *Group) ([]InviteBootstrapProvider, error) {
 	models := make([]InviteBootstrapModel, 0, len(claude.DefaultModels))
 	for idx, model := range claude.DefaultModels {
 		models = append(models, InviteBootstrapModel{
@@ -120,14 +120,14 @@ func (b *AnthropicBootstrapContextBuilder) Build(ctx context.Context, _ *Group) 
 		}}
 	}
 
-	return InviteBootstrapContext{
+	return []InviteBootstrapProvider{{
 		ProviderID:   PlatformAnthropic,
 		ProviderName: "Anthropic",
 		BaseURL:      inviteBootstrapBaseURL(ctx, b.settingService),
 		APIStyle:     inviteBootstrapAPIStyleAnthropic,
 		Models:       models,
 		DefaultModel: models[0].ID,
-	}, nil
+	}}, nil
 }
 
 type AntigravityBootstrapContextBuilder struct {
@@ -138,10 +138,10 @@ func (b *AntigravityBootstrapContextBuilder) Supports(platform string) bool {
 	return normalizeInvitePlatform(platform) == PlatformAntigravity
 }
 
-func (b *AntigravityBootstrapContextBuilder) Build(ctx context.Context, group *Group) (InviteBootstrapContext, error) {
+func (b *AntigravityBootstrapContextBuilder) BuildProviders(ctx context.Context, group *Group) ([]InviteBootstrapProvider, error) {
 	sourceModels := antigravity.DefaultModels()
 	if len(sourceModels) == 0 {
-		return InviteBootstrapContext{}, fmt.Errorf("antigravity model catalog is empty")
+		return nil, fmt.Errorf("antigravity model catalog is empty")
 	}
 
 	claudeModels, geminiModels := splitAntigravityModels(sourceModels)
@@ -150,44 +150,54 @@ func (b *AntigravityBootstrapContextBuilder) Build(ctx context.Context, group *G
 		fallbackModel = strings.TrimSpace(b.settingService.GetFallbackModel(ctx, PlatformAntigravity))
 	}
 
-	flavor := resolveAntigravityFlavor(group, fallbackModel)
-
-	selectedSourceModels := sourceModels
-	switch flavor {
-	case antigravityFlavorClaude:
-		if len(claudeModels) > 0 {
-			selectedSourceModels = claudeModels
-		}
-	case antigravityFlavorGemini:
-		if len(geminiModels) > 0 {
-			selectedSourceModels = geminiModels
-		}
+	supportedFlavors := resolveAntigravitySupportedFlavors(group, fallbackModel)
+	if len(supportedFlavors) == 0 {
+		supportedFlavors = []string{antigravityFlavorClaude, antigravityFlavorGemini}
 	}
 
-	defaultModel := resolveAntigravityDefaultModel(selectedSourceModels, group, fallbackModel)
-	models := buildInviteBootstrapModels(selectedSourceModels, defaultModel)
+	providers := make([]InviteBootstrapProvider, 0, 2)
+	for _, flavor := range supportedFlavors {
+		source := []antigravity.ClaudeModel{}
+		providerID := ""
+		providerName := ""
+		apiStyle := inviteBootstrapAPIStyleAnthropic
 
-	providerID := PlatformAntigravity
-	providerName := "Antigravity"
-	apiStyle := inviteBootstrapAPIStyleAnthropic
-	if flavor == antigravityFlavorClaude {
-		providerID = inviteBootstrapProviderIDAntigravityClaude
-		providerName = "Antigravity Claude"
-		apiStyle = inviteBootstrapAPIStyleAnthropic
-	} else if flavor == antigravityFlavorGemini {
-		providerID = inviteBootstrapProviderIDAntigravityGemini
-		providerName = "Antigravity Gemini"
-		apiStyle = inviteBootstrapAPIStyleOpenAI
+		switch flavor {
+		case antigravityFlavorClaude:
+			source = claudeModels
+			providerID = inviteBootstrapProviderIDAntigravityClaude
+			providerName = "Antigravity Claude"
+			apiStyle = inviteBootstrapAPIStyleAnthropic
+		case antigravityFlavorGemini:
+			source = geminiModels
+			providerID = inviteBootstrapProviderIDAntigravityGemini
+			providerName = "Antigravity Gemini"
+			apiStyle = "google-native"
+		default:
+			continue
+		}
+
+		if len(source) == 0 {
+			continue
+		}
+
+		defaultModel := resolveAntigravityDefaultModel(source, group, fallbackModel)
+		models := buildInviteBootstrapModels(source, defaultModel)
+		providers = append(providers, InviteBootstrapProvider{
+			ProviderID:   providerID,
+			ProviderName: providerName,
+			BaseURL:      inviteBootstrapBaseURL(ctx, b.settingService),
+			APIStyle:     apiStyle,
+			Models:       models,
+			DefaultModel: defaultModel,
+		})
 	}
 
-	return InviteBootstrapContext{
-		ProviderID:   providerID,
-		ProviderName: providerName,
-		BaseURL:      inviteBootstrapBaseURL(ctx, b.settingService),
-		APIStyle:     apiStyle,
-		Models:       models,
-		DefaultModel: defaultModel,
-	}, nil
+	if len(providers) == 0 {
+		return nil, fmt.Errorf("antigravity bootstrap providers are empty")
+	}
+
+	return providers, nil
 }
 
 func splitAntigravityModels(source []antigravity.ClaudeModel) (claudeModels []antigravity.ClaudeModel, geminiModels []antigravity.ClaudeModel) {
@@ -216,27 +226,32 @@ func antigravityModelFlavor(modelID string) string {
 	}
 }
 
-func resolveAntigravityFlavor(group *Group, fallbackModel string) string {
-	if flavor := resolveAntigravityFlavorFromScopes(group); flavor != "" {
-		return flavor
+func resolveAntigravitySupportedFlavors(group *Group, fallbackModel string) []string {
+	hasClaude, hasGemini := antigravityScopeFlags(group)
+	if hasClaude && hasGemini {
+		return []string{antigravityFlavorClaude, antigravityFlavorGemini}
+	}
+	if hasClaude {
+		return []string{antigravityFlavorClaude}
+	}
+	if hasGemini {
+		return []string{antigravityFlavorGemini}
 	}
 	if group != nil {
 		if flavor := antigravityModelFlavor(group.DefaultMappedModel); flavor != "" {
-			return flavor
+			return []string{flavor}
 		}
 	}
 	if flavor := antigravityModelFlavor(fallbackModel); flavor != "" {
-		return flavor
+		return []string{flavor}
 	}
-	return ""
+	return []string{antigravityFlavorClaude, antigravityFlavorGemini}
 }
 
-func resolveAntigravityFlavorFromScopes(group *Group) string {
+func antigravityScopeFlags(group *Group) (hasClaude bool, hasGemini bool) {
 	if group == nil || len(group.SupportedModelScopes) == 0 {
-		return ""
+		return false, false
 	}
-	hasClaude := false
-	hasGemini := false
 	for _, scope := range group.SupportedModelScopes {
 		scope = strings.ToLower(strings.TrimSpace(scope))
 		switch scope {
@@ -246,6 +261,11 @@ func resolveAntigravityFlavorFromScopes(group *Group) string {
 			hasGemini = true
 		}
 	}
+	return hasClaude, hasGemini
+}
+
+func resolveAntigravityFlavorFromScopes(group *Group) string {
+	hasClaude, hasGemini := antigravityScopeFlags(group)
 	if hasClaude && !hasGemini {
 		return antigravityFlavorClaude
 	}

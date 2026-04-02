@@ -141,12 +141,19 @@ export interface InviteBootstrapModel {
 }
 
 export interface InviteBootstrapContext {
+	default_provider_id: string;
+	providers: InviteBootstrapProvider[];
+}
+
+export interface InviteBootstrapProvider {
 	provider_id: string;
 	provider_name: string;
 	base_url: string;
 	api_style: string;
 	models: InviteBootstrapModel[];
 	default_model: string;
+	default_api_key_name?: string;
+	default_group_id?: number;
 }
 
 export interface CurrentUserResponse extends User {

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/mail"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -97,14 +98,19 @@ type InviteBootstrapModel struct {
 }
 
 type InviteBootstrapContext struct {
-	ProviderID   string                 `json:"provider_id"`
-	ProviderName string                 `json:"provider_name"`
-	BaseURL      string                 `json:"base_url"`
-	APIStyle     string                 `json:"api_style"`
-	Models       []InviteBootstrapModel `json:"models"`
-	DefaultModel string                 `json:"default_model"`
-	DefaultAPIKeyName string            `json:"default_api_key_name,omitempty"`
-	DefaultGroupID    int64             `json:"default_group_id,omitempty"`
+	DefaultProviderID string                    `json:"default_provider_id"`
+	Providers         []InviteBootstrapProvider `json:"providers"`
+}
+
+type InviteBootstrapProvider struct {
+	ProviderID        string                 `json:"provider_id"`
+	ProviderName      string                 `json:"provider_name"`
+	BaseURL           string                 `json:"base_url"`
+	APIStyle          string                 `json:"api_style"`
+	Models            []InviteBootstrapModel `json:"models"`
+	DefaultModel      string                 `json:"default_model"`
+	DefaultAPIKeyName string                 `json:"default_api_key_name,omitempty"`
+	DefaultGroupID    int64                  `json:"default_group_id,omitempty"`
 }
 
 type InviteLoginResult struct {
@@ -410,7 +416,13 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 		}
 	}
 
-	bootstrapGroup, err := s.ensureInviteBootstrapAPIAccess(ctx, newUser.ID)
+	bootstrapTargets, err := s.resolveInviteBootstrapTargets(ctx)
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to resolve invite bootstrap targets: user_id=%d err=%v", newUser.ID, err)
+		return nil, ErrServiceUnavailable
+	}
+
+	bootstrapProviders, err := s.ensureInviteBootstrapAPIAccess(ctx, newUser.ID, bootstrapTargets)
 	if err != nil {
 		logger.LegacyPrintf("service.auth", "[Auth] Failed to provision bootstrap API access: user_id=%d err=%v", newUser.ID, err)
 		return nil, ErrServiceUnavailable
@@ -421,13 +433,11 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 		return nil, fmt.Errorf("generate token: %w", err)
 	}
 
-	bootstrapContext, err := s.buildInviteBootstrapContext(ctx, bootstrapGroup)
+	bootstrapContext, err := s.buildInviteBootstrapContext(bootstrapProviders)
 	if err != nil {
 		logger.LegacyPrintf("service.auth", "[Auth] Failed to build invite bootstrap context: user_id=%d err=%v", newUser.ID, err)
 		return nil, ErrServiceUnavailable
 	}
-	bootstrapContext.DefaultAPIKeyName = "default"
-	bootstrapContext.DefaultGroupID = bootstrapGroup.ID
 
 	return &InviteLoginResult{
 		Token:            token,
@@ -436,77 +446,168 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 	}, nil
 }
 
-func (s *AuthService) ensureInviteBootstrapAPIAccess(ctx context.Context, userID int64) (*Group, error) {
+type inviteBootstrapTarget struct {
+	Group    Group
+	Provider InviteBootstrapProvider
+}
+
+func (s *AuthService) ensureInviteBootstrapAPIAccess(ctx context.Context, userID int64, targets []inviteBootstrapTarget) ([]InviteBootstrapProvider, error) {
 	if userID <= 0 {
 		return nil, fmt.Errorf("invalid user id")
 	}
-	if s.groupRepo == nil {
-		return nil, fmt.Errorf("group resolver not configured")
+	if len(targets) == 0 {
+		return nil, fmt.Errorf("invite bootstrap targets are empty")
 	}
 	if s.apiKeyProvisioner == nil {
 		return nil, fmt.Errorf("api key provisioner not configured")
 	}
 
-	group, err := s.resolveInviteBootstrapGroup(ctx)
+	entitledGroups := make(map[int64]struct{}, len(targets))
+	providers := make([]InviteBootstrapProvider, 0, len(targets))
+
+	for _, target := range targets {
+		group := target.Group
+		if _, ok := entitledGroups[group.ID]; !ok {
+			if group.IsSubscriptionType() {
+				if s.defaultSubAssigner == nil {
+					return nil, fmt.Errorf("subscription assigner not configured")
+				}
+				validityDays := group.DefaultValidityDays
+				if validityDays <= 0 {
+					validityDays = 30
+				}
+				if _, _, err := s.defaultSubAssigner.AssignOrExtendSubscription(ctx, &AssignSubscriptionInput{
+					UserID:       userID,
+					GroupID:      group.ID,
+					ValidityDays: validityDays,
+					Notes:        fmt.Sprintf("auto assigned by invite bootstrap (%s default)", group.Platform),
+				}); err != nil {
+					return nil, fmt.Errorf("assign %s subscription: %w", group.Platform, err)
+				}
+			} else if group.IsExclusive {
+				if s.userRepo == nil {
+					return nil, fmt.Errorf("user repo not configured")
+				}
+				if err := s.userRepo.AddGroupToAllowedGroups(ctx, userID, group.ID); err != nil {
+					return nil, fmt.Errorf("grant %s group access: %w", group.Platform, err)
+				}
+			}
+			entitledGroups[group.ID] = struct{}{}
+		}
+
+		keyName := "default-" + target.Provider.ProviderID
+		groupID := group.ID
+		if _, err := s.apiKeyProvisioner.Create(ctx, userID, CreateAPIKeyRequest{
+			Name:    keyName,
+			GroupID: &groupID,
+		}); err != nil {
+			return nil, fmt.Errorf("create %s api key: %w", target.Provider.ProviderID, err)
+		}
+
+		provider := target.Provider
+		provider.DefaultAPIKeyName = keyName
+		provider.DefaultGroupID = group.ID
+		providers = append(providers, provider)
+	}
+
+	return providers, nil
+}
+
+func (s *AuthService) resolveInviteBootstrapTargets(ctx context.Context) ([]inviteBootstrapTarget, error) {
+	if s.groupRepo == nil {
+		return nil, fmt.Errorf("group resolver not configured")
+	}
+
+	representativeGroups, err := s.resolveInviteBootstrapRepresentativeGroups(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if group.IsSubscriptionType() {
-		if s.defaultSubAssigner == nil {
-			return nil, fmt.Errorf("subscription assigner not configured")
+
+	targets := make([]inviteBootstrapTarget, 0, len(representativeGroups))
+	for i := range representativeGroups {
+		group := representativeGroups[i]
+		providers, err := s.buildInviteBootstrapProviders(ctx, &group)
+		if err != nil {
+			return nil, err
 		}
-		validityDays := group.DefaultValidityDays
-		if validityDays <= 0 {
-			validityDays = 30
-		}
-		if _, _, err := s.defaultSubAssigner.AssignOrExtendSubscription(ctx, &AssignSubscriptionInput{
-			UserID:       userID,
-			GroupID:      group.ID,
-			ValidityDays: validityDays,
-			Notes:        fmt.Sprintf("auto assigned by invite bootstrap (%s default)", group.Platform),
-		}); err != nil {
-			return nil, fmt.Errorf("assign %s subscription: %w", group.Platform, err)
-		}
-	} else if group.IsExclusive {
-		if s.userRepo == nil {
-			return nil, fmt.Errorf("user repo not configured")
-		}
-		if err := s.userRepo.AddGroupToAllowedGroups(ctx, userID, group.ID); err != nil {
-			return nil, fmt.Errorf("grant %s group access: %w", group.Platform, err)
+		for _, provider := range providers {
+			targets = append(targets, inviteBootstrapTarget{
+				Group:    group,
+				Provider: provider,
+			})
 		}
 	}
 
-	groupID := group.ID
-	if _, err := s.apiKeyProvisioner.Create(ctx, userID, CreateAPIKeyRequest{
-		Name:    "default",
-		GroupID: &groupID,
-	}); err != nil {
-		return nil, fmt.Errorf("create default api key: %w", err)
+	if len(targets) == 0 {
+		return nil, fmt.Errorf("no active bootstrap provider targets")
 	}
 
-	return &group, nil
+	return targets, nil
 }
 
-func (s *AuthService) resolveInviteBootstrapGroup(ctx context.Context) (Group, error) {
+func (s *AuthService) resolveInviteBootstrapRepresentativeGroups(ctx context.Context) ([]Group, error) {
+	representatives := make([]Group, 0, 3)
+
 	for _, platform := range []string{PlatformOpenAI, PlatformAnthropic, PlatformAntigravity} {
 		groups, err := s.groupRepo.ListActiveByPlatform(ctx, platform)
 		if err != nil {
-			return Group{}, fmt.Errorf("resolve %s group: %w", platform, err)
+			return nil, fmt.Errorf("resolve %s group: %w", platform, err)
 		}
-		if len(groups) > 0 {
-			return groups[0], nil
+		representative, ok := selectCheapestInviteBootstrapGroup(groups)
+		if ok {
+			representatives = append(representatives, representative)
 		}
 	}
 
-	return Group{}, fmt.Errorf("no active bootstrap group for platforms: %s", strings.Join([]string{PlatformOpenAI, PlatformAnthropic, PlatformAntigravity}, ","))
+	if len(representatives) == 0 {
+		return nil, fmt.Errorf("no active bootstrap group for platforms: %s", strings.Join([]string{PlatformOpenAI, PlatformAnthropic, PlatformAntigravity}, ","))
+	}
+
+	return representatives, nil
 }
 
+func selectCheapestInviteBootstrapGroup(groups []Group) (Group, bool) {
+	candidates := make([]Group, 0, len(groups))
+	for _, group := range groups {
+		if group.IsSubscriptionType() {
+			continue
+		}
+		candidates = append(candidates, group)
+	}
+	if len(candidates) == 0 {
+		return Group{}, false
+	}
 
-func (s *AuthService) buildInviteBootstrapContext(ctx context.Context, group *Group) (InviteBootstrapContext, error) {
+	sort.Slice(candidates, func(i, j int) bool {
+		left := candidates[i]
+		right := candidates[j]
+		if left.RateMultiplier != right.RateMultiplier {
+			return left.RateMultiplier < right.RateMultiplier
+		}
+		if left.SortOrder != right.SortOrder {
+			return left.SortOrder < right.SortOrder
+		}
+		return left.ID < right.ID
+	})
+
+	return candidates[0], true
+}
+
+func (s *AuthService) buildInviteBootstrapProviders(ctx context.Context, group *Group) ([]InviteBootstrapProvider, error) {
 	if s.bootstrapContextFactory == nil {
 		s.bootstrapContextFactory = DefaultInviteBootstrapContextFactory(s.settingService)
 	}
-	return s.bootstrapContextFactory.Build(ctx, group)
+	return s.bootstrapContextFactory.BuildProviders(ctx, group)
+}
+
+func (s *AuthService) buildInviteBootstrapContext(providers []InviteBootstrapProvider) (InviteBootstrapContext, error) {
+	if len(providers) == 0 {
+		return InviteBootstrapContext{}, fmt.Errorf("invite bootstrap providers are empty")
+	}
+	return InviteBootstrapContext{
+		DefaultProviderID: providers[0].ProviderID,
+		Providers:         providers,
+	}, nil
 }
 
 func (s *AuthService) buildInviteBootstrapIdentity() (email string, username string, password string, err error) {

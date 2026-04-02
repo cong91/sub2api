@@ -50,16 +50,29 @@ type inviteAPIKeyProvisionerStub struct {
 	calls int
 	createdForUserID int64
 	lastReq CreateAPIKeyRequest
+	reqs []CreateAPIKeyRequest
 }
 
 func (s *inviteAPIKeyProvisionerStub) Create(_ context.Context, userID int64, req CreateAPIKeyRequest) (*APIKey, error) {
 	s.calls++
 	s.createdForUserID = userID
 	s.lastReq = req
+	s.reqs = append(s.reqs, req)
 	if s.err != nil {
 		return nil, s.err
 	}
 	return &APIKey{ID: 1, UserID: userID, GroupID: req.GroupID, Name: req.Name, Status: StatusActive}, nil
+}
+
+func findInviteProviderByID(t *testing.T, providers []InviteBootstrapProvider, id string) InviteBootstrapProvider {
+	t.Helper()
+	for _, provider := range providers {
+		if provider.ProviderID == id {
+			return provider
+		}
+	}
+	require.FailNow(t, "provider not found", "provider id=%s", id)
+	return InviteBootstrapProvider{}
 }
 
 type inviteAwareUserRepoStub struct {
@@ -336,11 +349,32 @@ func (s *inviteRedeemRepoStub) SumPositiveBalanceByUser(ctx context.Context, use
 
 func TestAuthService_InviteLogin_ValidCodeCreatesUserAndConsumesCode(t *testing.T) {
 	userRepo := &userRepoStub{nextID: 42}
-	groupResolver := &inviteGroupResolverStub{groups: []Group{
-		{ID: 77, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true},
-		{ID: 88, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true},
+	groupResolver := &inviteGroupResolverStub{groupsByPlatform: map[string][]Group{
+		PlatformOpenAI: {
+			{ID: 88, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true, SubscriptionType: SubscriptionTypeSubscription, RateMultiplier: 0.5, SortOrder: 1, DefaultValidityDays: 10},
+			{ID: 77, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true, SubscriptionType: SubscriptionTypeStandard, RateMultiplier: 1.0, SortOrder: 9},
+			{ID: 79, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true, SubscriptionType: SubscriptionTypeStandard, RateMultiplier: 1.0, SortOrder: 9},
+		},
+		PlatformAnthropic: {
+			{ID: 301, Platform: PlatformAnthropic, Status: StatusActive, Hydrated: true, SubscriptionType: SubscriptionTypeStandard, IsExclusive: true, RateMultiplier: 0.7, SortOrder: 3},
+		},
+		PlatformAntigravity: {
+			{
+				ID:                   401,
+				Platform:             PlatformAntigravity,
+				Status:               StatusActive,
+				Hydrated:             true,
+				SubscriptionType:     SubscriptionTypeStandard,
+				RateMultiplier:       0.9,
+				SortOrder:            4,
+				SupportedModelScopes: []string{"claude", "gemini_text"},
+				DefaultMappedModel:   "claude-opus-4-6-thinking",
+			},
+		},
 	}}
 	apiKeyProvisioner := &inviteAPIKeyProvisionerStub{}
+	subAssigner := &defaultSubscriptionAssignerStub{}
+	inviteAwareRepo := &inviteAwareUserRepoStub{userRepoStub: userRepoStub{nextID: 42}}
 	redeemRepo := &inviteRedeemRepoStub{
 		codeByCode: map[string]*RedeemCode{
 			"INVITE-OK": {
@@ -356,9 +390,11 @@ func TestAuthService_InviteLogin_ValidCodeCreatesUserAndConsumesCode(t *testing.
 		SettingKeyInvitationCodeEnabled:  "true",
 		SettingKeyAPIBaseURL:             "https://api.sub2api.dev",
 	}, nil)
+	service.userRepo = inviteAwareRepo
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
 	service.apiKeyProvisioner = apiKeyProvisioner
+	service.defaultSubAssigner = subAssigner
 
 	result, err := service.InviteLogin(context.Background(), "INVITE-OK")
 	require.NoError(t, err)
@@ -373,24 +409,57 @@ func TestAuthService_InviteLogin_ValidCodeCreatesUserAndConsumesCode(t *testing.
 	require.Equal(t, 1, redeemRepo.useCalls)
 	require.Equal(t, int64(99), redeemRepo.usedID)
 	require.Equal(t, int64(42), redeemRepo.usedByUserID)
-	require.Equal(t, 1, groupResolver.calls)
-	require.Equal(t, PlatformOpenAI, groupResolver.lastPlatform)
-	require.Equal(t, 1, apiKeyProvisioner.calls)
+	require.Equal(t, 3, groupResolver.calls)
+	require.Equal(t, PlatformAntigravity, groupResolver.lastPlatform)
+	require.Equal(t, 4, apiKeyProvisioner.calls)
 	require.Equal(t, int64(42), apiKeyProvisioner.createdForUserID)
-	require.Equal(t, "default", apiKeyProvisioner.lastReq.Name)
-	require.NotNil(t, apiKeyProvisioner.lastReq.GroupID)
-	require.Equal(t, int64(77), *apiKeyProvisioner.lastReq.GroupID)
+
+	providerKeys := map[string]int64{}
+	for _, req := range apiKeyProvisioner.reqs {
+		require.NotNil(t, req.GroupID)
+		providerKeys[req.Name] = *req.GroupID
+	}
+	require.Equal(t, map[string]int64{
+		"default-openai":              77,
+		"default-anthropic":           301,
+		"default-antigravity-claude":  401,
+		"default-antigravity-gemini":  401,
+	}, providerKeys)
+
+	require.Len(t, subAssigner.calls, 0)
+	require.Equal(t, 1, inviteAwareRepo.addAllowedGroupCalls)
+	require.Equal(t, int64(301), inviteAwareRepo.lastAddAllowedGroupID)
 	require.Contains(t, user.Email, "@bootstrap.local")
 	require.NotEmpty(t, user.Username)
-	require.Equal(t, PlatformOpenAI, result.BootstrapContext.ProviderID)
-	require.Equal(t, "OpenAI", result.BootstrapContext.ProviderName)
-	require.Equal(t, "https://api.sub2api.dev", result.BootstrapContext.BaseURL)
-	require.Equal(t, "openai-completions", result.BootstrapContext.APIStyle)
-	require.NotEmpty(t, result.BootstrapContext.Models)
-	require.Equal(t, openai.DefaultModels[0].ID, result.BootstrapContext.DefaultModel)
-	require.Equal(t, openai.DefaultModels[0].ID, result.BootstrapContext.Models[0].ID)
-	require.Equal(t, "default", result.BootstrapContext.DefaultAPIKeyName)
-	require.Equal(t, int64(77), result.BootstrapContext.DefaultGroupID)
+	require.Equal(t, PlatformOpenAI, result.BootstrapContext.DefaultProviderID)
+	require.Len(t, result.BootstrapContext.Providers, 4)
+
+	openAIProvider := findInviteProviderByID(t, result.BootstrapContext.Providers, PlatformOpenAI)
+	require.Equal(t, "OpenAI", openAIProvider.ProviderName)
+	require.Equal(t, "https://api.sub2api.dev", openAIProvider.BaseURL)
+	require.Equal(t, "openai-responses", openAIProvider.APIStyle)
+	require.NotEmpty(t, openAIProvider.Models)
+	require.Equal(t, openai.DefaultModels[0].ID, openAIProvider.DefaultModel)
+	require.Equal(t, "default-openai", openAIProvider.DefaultAPIKeyName)
+	require.Equal(t, int64(77), openAIProvider.DefaultGroupID)
+
+	anthropicProvider := findInviteProviderByID(t, result.BootstrapContext.Providers, PlatformAnthropic)
+	require.Equal(t, "Anthropic", anthropicProvider.ProviderName)
+	require.Equal(t, "anthropic-messages", anthropicProvider.APIStyle)
+	require.Equal(t, "default-anthropic", anthropicProvider.DefaultAPIKeyName)
+	require.Equal(t, int64(301), anthropicProvider.DefaultGroupID)
+
+	antigravityClaude := findInviteProviderByID(t, result.BootstrapContext.Providers, "antigravity-claude")
+	require.Equal(t, "Antigravity Claude", antigravityClaude.ProviderName)
+	require.Equal(t, "anthropic-messages", antigravityClaude.APIStyle)
+	require.Equal(t, "default-antigravity-claude", antigravityClaude.DefaultAPIKeyName)
+	require.Equal(t, int64(401), antigravityClaude.DefaultGroupID)
+
+	antigravityGemini := findInviteProviderByID(t, result.BootstrapContext.Providers, "antigravity-gemini")
+	require.Equal(t, "Antigravity Gemini", antigravityGemini.ProviderName)
+	require.Equal(t, "google-native", antigravityGemini.APIStyle)
+	require.Equal(t, "default-antigravity-gemini", antigravityGemini.DefaultAPIKeyName)
+	require.Equal(t, int64(401), antigravityGemini.DefaultGroupID)
 }
 
 func TestAuthService_InviteLogin_ProvisionFailsReturnsUnavailable(t *testing.T) {
@@ -481,13 +550,17 @@ func TestAuthService_InviteLogin_AnthropicGroupBuildsAnthropicBootstrapContext(t
 	require.NoError(t, err)
 	require.Equal(t, 2, groupResolver.calls)
 	require.Equal(t, PlatformAnthropic, groupResolver.lastPlatform)
-	require.Equal(t, PlatformAnthropic, result.BootstrapContext.ProviderID)
-	require.Equal(t, "Anthropic", result.BootstrapContext.ProviderName)
-	require.Equal(t, "anthropic-messages", result.BootstrapContext.APIStyle)
-	require.NotEmpty(t, result.BootstrapContext.Models)
-	require.Equal(t, claude.DefaultModels[0].ID, result.BootstrapContext.Models[0].ID)
-	require.Equal(t, claude.DefaultModels[0].ID, result.BootstrapContext.DefaultModel)
-	require.Equal(t, int64(301), result.BootstrapContext.DefaultGroupID)
+	require.Equal(t, PlatformAnthropic, result.BootstrapContext.DefaultProviderID)
+	require.Len(t, result.BootstrapContext.Providers, 1)
+	provider := result.BootstrapContext.Providers[0]
+	require.Equal(t, PlatformAnthropic, provider.ProviderID)
+	require.Equal(t, "Anthropic", provider.ProviderName)
+	require.Equal(t, "anthropic-messages", provider.APIStyle)
+	require.NotEmpty(t, provider.Models)
+	require.Equal(t, claude.DefaultModels[0].ID, provider.Models[0].ID)
+	require.Equal(t, claude.DefaultModels[0].ID, provider.DefaultModel)
+	require.Equal(t, int64(301), provider.DefaultGroupID)
+	require.Equal(t, "default-anthropic", provider.DefaultAPIKeyName)
 }
 
 func TestAuthService_InviteLogin_AntigravityGroupBuildsAntigravityBootstrapContext(t *testing.T) {
@@ -521,13 +594,17 @@ func TestAuthService_InviteLogin_AntigravityGroupBuildsAntigravityBootstrapConte
 	require.NoError(t, err)
 	require.Equal(t, 3, groupResolver.calls)
 	require.Equal(t, PlatformAntigravity, groupResolver.lastPlatform)
-	require.Equal(t, "antigravity-gemini", result.BootstrapContext.ProviderID)
-	require.Equal(t, "Antigravity Gemini", result.BootstrapContext.ProviderName)
-	require.Equal(t, "openai-completions", result.BootstrapContext.APIStyle)
-	require.NotEmpty(t, result.BootstrapContext.Models)
-	require.True(t, strings.HasPrefix(result.BootstrapContext.Models[0].ID, "gemini-"))
-	require.True(t, strings.HasPrefix(result.BootstrapContext.DefaultModel, "gemini-"))
-	require.Equal(t, int64(401), result.BootstrapContext.DefaultGroupID)
+	require.Equal(t, "antigravity-gemini", result.BootstrapContext.DefaultProviderID)
+	require.Len(t, result.BootstrapContext.Providers, 1)
+	provider := result.BootstrapContext.Providers[0]
+	require.Equal(t, "antigravity-gemini", provider.ProviderID)
+	require.Equal(t, "Antigravity Gemini", provider.ProviderName)
+	require.Equal(t, "google-native", provider.APIStyle)
+	require.NotEmpty(t, provider.Models)
+	require.True(t, strings.HasPrefix(provider.Models[0].ID, "gemini-"))
+	require.True(t, strings.HasPrefix(provider.DefaultModel, "gemini-"))
+	require.Equal(t, int64(401), provider.DefaultGroupID)
+	require.Equal(t, "default-antigravity-gemini", provider.DefaultAPIKeyName)
 }
 
 func TestAuthService_InviteLogin_AntigravityClaudeScopeBuildsClaudeFlavorBootstrapContext(t *testing.T) {
@@ -567,15 +644,19 @@ func TestAuthService_InviteLogin_AntigravityClaudeScopeBuildsClaudeFlavorBootstr
 
 	result, err := service.InviteLogin(context.Background(), "INVITE-ANTI-CLAUDE")
 	require.NoError(t, err)
-	require.Equal(t, "antigravity-claude", result.BootstrapContext.ProviderID)
-	require.Equal(t, "Antigravity Claude", result.BootstrapContext.ProviderName)
-	require.Equal(t, "anthropic-messages", result.BootstrapContext.APIStyle)
-	require.NotEmpty(t, result.BootstrapContext.Models)
-	for _, m := range result.BootstrapContext.Models {
+	require.Equal(t, "antigravity-claude", result.BootstrapContext.DefaultProviderID)
+	require.Len(t, result.BootstrapContext.Providers, 1)
+	provider := result.BootstrapContext.Providers[0]
+	require.Equal(t, "antigravity-claude", provider.ProviderID)
+	require.Equal(t, "Antigravity Claude", provider.ProviderName)
+	require.Equal(t, "anthropic-messages", provider.APIStyle)
+	require.NotEmpty(t, provider.Models)
+	for _, m := range provider.Models {
 		require.True(t, strings.HasPrefix(m.ID, "claude-"))
 	}
-	require.Equal(t, "claude-opus-4-6-thinking", result.BootstrapContext.DefaultModel)
-	require.Equal(t, int64(402), result.BootstrapContext.DefaultGroupID)
+	require.Equal(t, "claude-opus-4-6-thinking", provider.DefaultModel)
+	require.Equal(t, int64(402), provider.DefaultGroupID)
+	require.Equal(t, "default-antigravity-claude", provider.DefaultAPIKeyName)
 }
 
 func TestAuthService_InviteLogin_AntigravityGeminiScopeUsesFallbackDefaultModel(t *testing.T) {
@@ -614,27 +695,29 @@ func TestAuthService_InviteLogin_AntigravityGeminiScopeUsesFallbackDefaultModel(
 
 	result, err := service.InviteLogin(context.Background(), "INVITE-ANTI-GEMINI")
 	require.NoError(t, err)
-	require.Equal(t, "antigravity-gemini", result.BootstrapContext.ProviderID)
-	require.Equal(t, "Antigravity Gemini", result.BootstrapContext.ProviderName)
-	require.Equal(t, "openai-completions", result.BootstrapContext.APIStyle)
-	require.NotEmpty(t, result.BootstrapContext.Models)
-	for _, m := range result.BootstrapContext.Models {
+	require.Equal(t, "antigravity-gemini", result.BootstrapContext.DefaultProviderID)
+	require.Len(t, result.BootstrapContext.Providers, 1)
+	provider := result.BootstrapContext.Providers[0]
+	require.Equal(t, "antigravity-gemini", provider.ProviderID)
+	require.Equal(t, "Antigravity Gemini", provider.ProviderName)
+	require.Equal(t, "google-native", provider.APIStyle)
+	require.NotEmpty(t, provider.Models)
+	for _, m := range provider.Models {
 		require.True(t, strings.HasPrefix(m.ID, "gemini-"))
 	}
-	require.Equal(t, "gemini-3-flash", result.BootstrapContext.DefaultModel)
-	require.Equal(t, int64(403), result.BootstrapContext.DefaultGroupID)
+	require.Equal(t, "gemini-3-flash", provider.DefaultModel)
+	require.Equal(t, int64(403), provider.DefaultGroupID)
+	require.Equal(t, "default-antigravity-gemini", provider.DefaultAPIKeyName)
 }
 
-func TestAuthService_InviteLogin_SubscriptionGroupAssignsSubscription(t *testing.T) {
+func TestAuthService_InviteLogin_SubscriptionGroupsAreIgnoredForBootstrapSelection(t *testing.T) {
 	userRepo := &userRepoStub{nextID: 103}
-	groupResolver := &inviteGroupResolverStub{groups: []Group{{
-		ID:                 91,
-		Platform:           PlatformOpenAI,
-		Status:             StatusActive,
-		Hydrated:           true,
-		SubscriptionType:   SubscriptionTypeSubscription,
-		DefaultValidityDays: 15,
-	}}}
+	groupResolver := &inviteGroupResolverStub{groupsByPlatform: map[string][]Group{
+		PlatformOpenAI: {
+			{ID: 91, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true, SubscriptionType: SubscriptionTypeSubscription, DefaultValidityDays: 15},
+			{ID: 92, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true, SubscriptionType: SubscriptionTypeStandard, RateMultiplier: 1.0, SortOrder: 1},
+		},
+	}}
 	apiKeyProvisioner := &inviteAPIKeyProvisionerStub{}
 	subAssigner := &defaultSubscriptionAssignerStub{}
 	redeemRepo := &inviteRedeemRepoStub{
@@ -660,11 +743,13 @@ func TestAuthService_InviteLogin_SubscriptionGroupAssignsSubscription(t *testing
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Equal(t, 1, apiKeyProvisioner.calls)
-	require.Len(t, subAssigner.calls, 1)
-	require.Equal(t, int64(103), subAssigner.calls[0].UserID)
-	require.Equal(t, int64(91), subAssigner.calls[0].GroupID)
-	require.Equal(t, 15, subAssigner.calls[0].ValidityDays)
-	require.Contains(t, subAssigner.calls[0].Notes, "invite bootstrap")
+	require.Equal(t, "default-openai", apiKeyProvisioner.lastReq.Name)
+	require.NotNil(t, apiKeyProvisioner.lastReq.GroupID)
+	require.Equal(t, int64(92), *apiKeyProvisioner.lastReq.GroupID)
+	require.Len(t, subAssigner.calls, 0)
+	require.Equal(t, PlatformOpenAI, result.BootstrapContext.DefaultProviderID)
+	require.Len(t, result.BootstrapContext.Providers, 1)
+	require.Equal(t, int64(92), result.BootstrapContext.Providers[0].DefaultGroupID)
 }
 
 func TestAuthService_InviteLogin_ExclusiveStandardGroupAddsAllowedGroup(t *testing.T) {
