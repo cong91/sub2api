@@ -133,6 +133,8 @@ func newAuthService(repo *userRepoStub, settings map[string]string, emailCache E
 		nil, // entClient
 		repo,
 		nil, // redeemRepo
+		nil, // groupRepo
+		nil, // apiKeyProvisioner
 		nil, // refreshTokenCache
 		cfg,
 		settingService,

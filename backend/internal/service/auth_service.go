@@ -14,10 +14,8 @@ import (
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -76,6 +74,7 @@ type AuthService struct {
 	emailQueueService  *EmailQueueService
 	promoService       *PromoService
 	defaultSubAssigner DefaultSubscriptionAssigner
+	bootstrapContextFactory *InviteBootstrapContextFactory
 }
 
 type DefaultSubscriptionAssigner interface {
@@ -144,6 +143,7 @@ func NewAuthService(
 		emailQueueService:  emailQueueService,
 		promoService:       promoService,
 		defaultSubAssigner: defaultSubAssigner,
+		bootstrapContextFactory: DefaultInviteBootstrapContextFactory(settingService),
 	}
 }
 
@@ -410,7 +410,7 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 		}
 	}
 
-	openAIGroup, err := s.ensureInviteBootstrapAPIAccess(ctx, newUser.ID)
+	bootstrapGroup, err := s.ensureInviteBootstrapAPIAccess(ctx, newUser.ID)
 	if err != nil {
 		logger.LegacyPrintf("service.auth", "[Auth] Failed to provision bootstrap API access: user_id=%d err=%v", newUser.ID, err)
 		return nil, ErrServiceUnavailable
@@ -421,9 +421,13 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 		return nil, fmt.Errorf("generate token: %w", err)
 	}
 
-	bootstrapContext := s.buildInviteBootstrapContext(ctx)
+	bootstrapContext, err := s.buildInviteBootstrapContext(ctx, bootstrapGroup)
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to build invite bootstrap context: user_id=%d err=%v", newUser.ID, err)
+		return nil, ErrServiceUnavailable
+	}
 	bootstrapContext.DefaultAPIKeyName = "default"
-	bootstrapContext.DefaultGroupID = openAIGroup.ID
+	bootstrapContext.DefaultGroupID = bootstrapGroup.ID
 
 	return &InviteLoginResult{
 		Token:            token,
@@ -443,15 +447,10 @@ func (s *AuthService) ensureInviteBootstrapAPIAccess(ctx context.Context, userID
 		return nil, fmt.Errorf("api key provisioner not configured")
 	}
 
-	groups, err := s.groupRepo.ListActiveByPlatform(ctx, PlatformOpenAI)
+	group, err := s.resolveInviteBootstrapGroup(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("resolve openai group: %w", err)
+		return nil, err
 	}
-	if len(groups) == 0 {
-		return nil, fmt.Errorf("no active openai group")
-	}
-
-	group := groups[0]
 	if group.IsSubscriptionType() {
 		if s.defaultSubAssigner == nil {
 			return nil, fmt.Errorf("subscription assigner not configured")
@@ -464,16 +463,16 @@ func (s *AuthService) ensureInviteBootstrapAPIAccess(ctx context.Context, userID
 			UserID:       userID,
 			GroupID:      group.ID,
 			ValidityDays: validityDays,
-			Notes:        "auto assigned by invite bootstrap (openai default)",
+			Notes:        fmt.Sprintf("auto assigned by invite bootstrap (%s default)", group.Platform),
 		}); err != nil {
-			return nil, fmt.Errorf("assign openai subscription: %w", err)
+			return nil, fmt.Errorf("assign %s subscription: %w", group.Platform, err)
 		}
 	} else if group.IsExclusive {
 		if s.userRepo == nil {
 			return nil, fmt.Errorf("user repo not configured")
 		}
 		if err := s.userRepo.AddGroupToAllowedGroups(ctx, userID, group.ID); err != nil {
-			return nil, fmt.Errorf("grant openai group access: %w", err)
+			return nil, fmt.Errorf("grant %s group access: %w", group.Platform, err)
 		}
 	}
 
@@ -488,56 +487,26 @@ func (s *AuthService) ensureInviteBootstrapAPIAccess(ctx context.Context, userID
 	return &group, nil
 }
 
-func (s *AuthService) buildInviteBootstrapContext(ctx context.Context) InviteBootstrapContext {
-	providerName := "AIAPI"
-	if s.settingService != nil {
-		if name := strings.TrimSpace(s.settingService.GetSiteName(ctx)); name != "" {
-			providerName = name
+func (s *AuthService) resolveInviteBootstrapGroup(ctx context.Context) (Group, error) {
+	for _, platform := range []string{PlatformOpenAI, PlatformAnthropic, PlatformAntigravity} {
+		groups, err := s.groupRepo.ListActiveByPlatform(ctx, platform)
+		if err != nil {
+			return Group{}, fmt.Errorf("resolve %s group: %w", platform, err)
+		}
+		if len(groups) > 0 {
+			return groups[0], nil
 		}
 	}
 
-	baseURL := ""
-	if s.settingService != nil {
-		baseURL = strings.TrimSpace(s.settingService.GetAPIBaseURL(ctx))
-	}
-
-	models := buildInviteBootstrapModelsFromClaudeDefaults()
-	defaultModel := ""
-	if len(models) > 0 {
-		defaultModel = models[0].ID
-	}
-
-	return InviteBootstrapContext{
-		ProviderID:   "aiapi",
-		ProviderName: providerName,
-		BaseURL:      baseURL,
-		APIStyle:     "openai-completions",
-		Models:       models,
-		DefaultModel: defaultModel,
-	}
+	return Group{}, fmt.Errorf("no active bootstrap group for platforms: %s", strings.Join([]string{PlatformOpenAI, PlatformAnthropic, PlatformAntigravity}, ","))
 }
 
-func buildInviteBootstrapModelsFromClaudeDefaults() []InviteBootstrapModel {
-	models := make([]InviteBootstrapModel, 0, len(claude.DefaultModels))
-	for idx, m := range claude.DefaultModels {
-		models = append(models, InviteBootstrapModel{
-			ID:          m.ID,
-			Name:        m.DisplayName,
-			Reasoning:   true,
-			Recommended: idx == 0,
-		})
+
+func (s *AuthService) buildInviteBootstrapContext(ctx context.Context, group *Group) (InviteBootstrapContext, error) {
+	if s.bootstrapContextFactory == nil {
+		s.bootstrapContextFactory = DefaultInviteBootstrapContextFactory(s.settingService)
 	}
-	if len(models) == 0 {
-		return []InviteBootstrapModel{
-			{
-				ID:          openai.DefaultTestModel,
-				Name:        openai.DefaultTestModel,
-				Reasoning:   true,
-				Recommended: true,
-			},
-		}
-	}
-	return models
+	return s.bootstrapContextFactory.Build(ctx, group)
 }
 
 func (s *AuthService) buildInviteBootstrapIdentity() (email string, username string, password string, err error) {
