@@ -500,6 +500,11 @@ export default {
 		namePlaceholder: "API Key của tôi",
 		groupLabel: "Nhóm",
 		selectGroup: "Chọn nhóm",
+		defaultGroupHint:
+			"Nhóm mặc định sẽ được dùng để định tuyến và cấu hình nhanh.",
+		accessGroupsLabel: "Các nhóm có thể truy cập",
+		accessGroupsHint:
+			"API Key này có thể truy cập tất cả nhóm đã chọn. Hãy giữ một nhóm mặc định.",
 		statusLabel: "Trạng thái",
 		selectStatus: "Chọn trạng thái",
 		saving: "Đang lưu...",
@@ -728,6 +733,11 @@ export default {
 		updating: "Đang cập nhật...",
 		updateSuccess: "Cập nhật hồ sơ thành công",
 		updateFailed: "Cập nhật hồ sơ thất bại",
+		bootstrapAccessTitle: "Thiết lập truy cập ban đầu",
+		bootstrapAccessDescription:
+			"Các mặc định provider/nhóm này được tạo trong luồng mời đăng nhập và được dùng làm gợi ý khi tạo API Key.",
+		bootstrapDefaultProvider: "Provider mặc định",
+		bootstrapDefaultGroup: "Nhóm mặc định #{id}",
 		changePassword: "Đổi mật khẩu",
 		currentPassword: "Mật khẩu hiện tại",
 		newPassword: "Mật khẩu mới",

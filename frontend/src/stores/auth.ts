@@ -8,6 +8,7 @@ import { computed, readonly, ref } from "vue";
 import { authAPI, isTotp2FARequired, type LoginResponse } from "@/api";
 import type {
 	AuthResponse,
+	InviteBootstrapContext,
 	InviteLoginRequest,
 	LoginRequest,
 	RegisterRequest,
@@ -18,6 +19,7 @@ const AUTH_TOKEN_KEY = "auth_token";
 const AUTH_USER_KEY = "auth_user";
 const REFRESH_TOKEN_KEY = "refresh_token";
 const TOKEN_EXPIRES_AT_KEY = "token_expires_at"; // 存储过期时间戳而非有效期
+const BOOTSTRAP_CONTEXT_KEY = "invite_bootstrap_context";
 const AUTO_REFRESH_INTERVAL = 60 * 1000; // 60 seconds for user data refresh
 const TOKEN_REFRESH_BUFFER = 120 * 1000; // 120 seconds before expiry to refresh token
 
@@ -28,6 +30,7 @@ export const useAuthStore = defineStore("auth", () => {
 	const token = ref<string | null>(null);
 	const refreshTokenValue = ref<string | null>(null);
 	const tokenExpiresAt = ref<number | null>(null); // 过期时间戳（毫秒）
+	const bootstrapContext = ref<InviteBootstrapContext | null>(null);
 	const runMode = ref<"standard" | "simple">("standard");
 	let refreshIntervalId: ReturnType<typeof setInterval> | null = null;
 	let tokenRefreshTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -56,6 +59,7 @@ export const useAuthStore = defineStore("auth", () => {
 		const savedUser = localStorage.getItem(AUTH_USER_KEY);
 		const savedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 		const savedExpiresAt = localStorage.getItem(TOKEN_EXPIRES_AT_KEY);
+		const savedBootstrapContext = localStorage.getItem(BOOTSTRAP_CONTEXT_KEY);
 
 		if (savedToken && savedUser) {
 			try {
@@ -64,6 +68,9 @@ export const useAuthStore = defineStore("auth", () => {
 				refreshTokenValue.value = savedRefreshToken;
 				tokenExpiresAt.value = savedExpiresAt
 					? parseInt(savedExpiresAt, 10)
+					: null;
+				bootstrapContext.value = savedBootstrapContext
+					? JSON.parse(savedBootstrapContext)
 					: null;
 
 				// Immediately refresh user data from backend (async, don't block)
@@ -255,6 +262,16 @@ export const useAuthStore = defineStore("auth", () => {
 		localStorage.setItem(AUTH_TOKEN_KEY, response.access_token);
 		localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData));
 
+		bootstrapContext.value = response.bootstrap_context || null;
+		if (bootstrapContext.value) {
+			localStorage.setItem(
+				BOOTSTRAP_CONTEXT_KEY,
+				JSON.stringify(bootstrapContext.value),
+			);
+		} else {
+			localStorage.removeItem(BOOTSTRAP_CONTEXT_KEY);
+		}
+
 		// Start auto-refresh interval for user data
 		startAutoRefresh();
 
@@ -410,6 +427,8 @@ export const useAuthStore = defineStore("auth", () => {
 		localStorage.removeItem(AUTH_USER_KEY);
 		localStorage.removeItem(REFRESH_TOKEN_KEY);
 		localStorage.removeItem(TOKEN_EXPIRES_AT_KEY);
+		localStorage.removeItem(BOOTSTRAP_CONTEXT_KEY);
+		bootstrapContext.value = null;
 	}
 
 	// ==================== Return Store API ====================
@@ -418,6 +437,7 @@ export const useAuthStore = defineStore("auth", () => {
 		// State
 		user,
 		token,
+		bootstrapContext: readonly(bootstrapContext),
 		runMode: readonly(runMode),
 
 		// Computed

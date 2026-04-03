@@ -1,0 +1,24 @@
+{
+  "workflow_graph_version": "v1",
+  "entry_node": "slice-1",
+  "nodes": [
+    { "id": "slice-1", "task_id": "sub2api-r1h.1", "title": "Backend foundation for multi-group API keys", "terminal": false },
+    { "id": "slice-2", "task_id": "sub2api-r1h.2", "title": "Invite-login bootstrap + provider-catalog aggregation for multi-group keys", "terminal": false },
+    { "id": "slice-3", "task_id": "sub2api-r1h.3", "title": "Frontend UX/UI update for multi-access API keys", "terminal": true }
+  ],
+  "dependencies": [
+    { "from": "slice-1", "to": "slice-2", "type": "success_prerequisite" },
+    { "from": "slice-2", "to": "slice-3", "type": "success_prerequisite" }
+  ],
+  "success_transition": {
+    "slice-1": "slice-2",
+    "slice-2": "slice-3",
+    "slice-3": null
+  },
+  "failure_transition": {
+    "slice-1": "halt_and_notify",
+    "slice-2": "halt_and_notify",
+    "slice-3": null
+  },
+  "terminal_nodes": ["slice-3", "halt_and_notify"]
+}

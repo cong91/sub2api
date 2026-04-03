@@ -49,7 +49,7 @@ type AdminService interface {
 	UpdateGroupSortOrders(ctx context.Context, updates []GroupSortOrderUpdate) error
 
 	// API Key management (admin)
-	AdminUpdateAPIKeyGroupID(ctx context.Context, keyID int64, groupID *int64) (*AdminUpdateAPIKeyGroupIDResult, error)
+	AdminUpdateAPIKeyGroupID(ctx context.Context, keyID int64, input AdminUpdateAPIKeyGroupUpdateInput) (*AdminUpdateAPIKeyGroupIDResult, error)
 
 	// ReplaceUserGroup 替换用户的专属分组：授予新分组权限、迁移 Key、移除旧分组权限
 	ReplaceUserGroup(ctx context.Context, userID, oldGroupID, newGroupID int64) (*ReplaceUserGroupResult, error)
@@ -266,6 +266,16 @@ type AdminUpdateAPIKeyGroupIDResult struct {
 	AutoGrantedGroupAccess bool   // true if a new exclusive group permission was auto-added
 	GrantedGroupID         *int64 // the group ID that was auto-granted
 	GrantedGroupName       string // the group name that was auto-granted
+}
+
+// AdminUpdateAPIKeyGroupUpdateInput defines admin API key group update payload.
+// Compatibility:
+//   - Legacy flow still uses GroupID only (single-group binding/unbind).
+//   - Multi-group flow uses GrantedGroupIDs + optional DefaultGroupID.
+type AdminUpdateAPIKeyGroupUpdateInput struct {
+	GroupID         *int64
+	GrantedGroupIDs *[]int64
+	DefaultGroupID  *int64
 }
 
 // ReplaceUserGroupResult 分组替换操作的结果
@@ -1287,55 +1297,129 @@ func (s *adminServiceImpl) UpdateGroupSortOrders(ctx context.Context, updates []
 
 // AdminUpdateAPIKeyGroupID 管理员修改 API Key 分组绑定
 // groupID: nil=不修改, 指向0=解绑, 指向正整数=绑定到目标分组
-func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID int64, groupID *int64) (*AdminUpdateAPIKeyGroupIDResult, error) {
+func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID int64, input AdminUpdateAPIKeyGroupUpdateInput) (*AdminUpdateAPIKeyGroupIDResult, error) {
 	apiKey, err := s.apiKeyRepo.GetByID(ctx, keyID)
 	if err != nil {
 		return nil, err
 	}
 
-	if groupID == nil {
+	targetGroupID := input.GroupID
+	if input.DefaultGroupID != nil {
+		if input.GroupID != nil && *input.GroupID != *input.DefaultGroupID {
+			return nil, infraerrors.BadRequest("GROUP_ID_MISMATCH", "group_id and default_group_id must be the same when both are provided")
+		}
+		targetGroupID = input.DefaultGroupID
+	}
+
+	requestedGrantedIDs := []int64(nil)
+	if input.GrantedGroupIDs != nil {
+		requestedGrantedIDs = make([]int64, 0, len(*input.GrantedGroupIDs))
+		seen := make(map[int64]struct{}, len(*input.GrantedGroupIDs)+1)
+		for _, gid := range *input.GrantedGroupIDs {
+			if gid <= 0 {
+				return nil, infraerrors.BadRequest("INVALID_GROUP_ID", "granted_group_ids must contain positive group IDs")
+			}
+			if _, ok := seen[gid]; ok {
+				continue
+			}
+			seen[gid] = struct{}{}
+			requestedGrantedIDs = append(requestedGrantedIDs, gid)
+		}
+	}
+
+	if targetGroupID != nil {
+		if *targetGroupID < 0 {
+			return nil, infraerrors.BadRequest("INVALID_GROUP_ID", "group_id must be non-negative")
+		}
+		if *targetGroupID == 0 && len(requestedGrantedIDs) > 0 {
+			return nil, infraerrors.BadRequest("INVALID_GROUP_ID", "default_group_id cannot be 0 when granted_group_ids is provided")
+		}
+	}
+
+	if targetGroupID == nil && input.GrantedGroupIDs == nil {
 		// nil 表示不修改，直接返回
 		return &AdminUpdateAPIKeyGroupIDResult{APIKey: apiKey}, nil
 	}
 
-	if *groupID < 0 {
-		return nil, infraerrors.BadRequest("INVALID_GROUP_ID", "group_id must be non-negative")
+	resolveGrantedGroups := func(groupIDs []int64) ([]*Group, error) {
+		groups := make([]*Group, 0, len(groupIDs))
+		for _, gid := range groupIDs {
+			group, err := s.groupRepo.GetByID(ctx, gid)
+			if err != nil {
+				return nil, err
+			}
+			if group.Status != StatusActive {
+				return nil, infraerrors.BadRequest("GROUP_NOT_ACTIVE", "target group is not active")
+			}
+			if group.IsSubscriptionType() {
+				if s.userSubRepo == nil {
+					return nil, infraerrors.InternalServer("SUBSCRIPTION_REPOSITORY_UNAVAILABLE", "subscription repository is not configured")
+				}
+				if _, err := s.userSubRepo.GetActiveByUserIDAndGroupID(ctx, apiKey.UserID, gid); err != nil {
+					if errors.Is(err, ErrSubscriptionNotFound) {
+						return nil, infraerrors.BadRequest("SUBSCRIPTION_REQUIRED", "user does not have an active subscription for this group")
+					}
+					return nil, err
+				}
+			}
+			groups = append(groups, group)
+		}
+		return groups, nil
 	}
 
 	result := &AdminUpdateAPIKeyGroupIDResult{}
 
-	if *groupID == 0 {
+	if targetGroupID != nil && *targetGroupID == 0 {
 		// 0 表示解绑分组（不修改 user_allowed_groups，避免影响用户其他 Key）
 		apiKey.GroupID = nil
 		apiKey.Group = nil
+		apiKey.GrantedGroups = nil
 	} else {
-		// 验证目标分组存在且状态为 active
-		group, err := s.groupRepo.GetByID(ctx, *groupID)
-		if err != nil {
-			return nil, err
-		}
-		if group.Status != StatusActive {
-			return nil, infraerrors.BadRequest("GROUP_NOT_ACTIVE", "target group is not active")
-		}
-		// 订阅类型分组：用户须持有该分组的有效订阅才可绑定
-		if group.IsSubscriptionType() {
-			if s.userSubRepo == nil {
-				return nil, infraerrors.InternalServer("SUBSCRIPTION_REPOSITORY_UNAVAILABLE", "subscription repository is not configured")
-			}
-			if _, err := s.userSubRepo.GetActiveByUserIDAndGroupID(ctx, apiKey.UserID, *groupID); err != nil {
-				if errors.Is(err, ErrSubscriptionNotFound) {
-					return nil, infraerrors.BadRequest("SUBSCRIPTION_REQUIRED", "user does not have an active subscription for this group")
-				}
+		var group *Group
+		if targetGroupID != nil {
+			resolved, err := resolveGrantedGroups([]int64{*targetGroupID})
+			if err != nil {
 				return nil, err
 			}
+			group = resolved[0]
+
+			gid := *targetGroupID
+			apiKey.GroupID = &gid
+			apiKey.Group = group
+
+			if input.GrantedGroupIDs == nil {
+				// 兼容旧行为：仅 group_id 请求表示单分组 key。
+				apiKey.GrantedGroups = []*Group{group}
+			}
 		}
 
-		gid := *groupID
-		apiKey.GroupID = &gid
-		apiKey.Group = group
+		if input.GrantedGroupIDs != nil {
+			if targetGroupID != nil && *targetGroupID > 0 {
+				found := false
+				for _, gid := range requestedGrantedIDs {
+					if gid == *targetGroupID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					requestedGrantedIDs = append([]int64{*targetGroupID}, requestedGrantedIDs...)
+				}
+			}
+			resolved, err := resolveGrantedGroups(requestedGrantedIDs)
+			if err != nil {
+				return nil, err
+			}
+			apiKey.GrantedGroups = resolved
+			if apiKey.Group == nil && len(resolved) > 0 {
+				apiKey.Group = resolved[0]
+				gid := resolved[0].ID
+				apiKey.GroupID = &gid
+			}
+		}
 
 		// 专属标准分组：使用事务保证「添加分组权限」与「更新 API Key」的原子性
-		if group.IsExclusive && !group.IsSubscriptionType() {
+		if group != nil && group.IsExclusive && !group.IsSubscriptionType() {
 			opCtx := ctx
 			var tx *dbent.Tx
 			if s.entClient == nil {
@@ -1350,7 +1434,7 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 				opCtx = dbent.NewTxContext(ctx, tx)
 			}
 
-			if addErr := s.userRepo.AddGroupToAllowedGroups(opCtx, apiKey.UserID, gid); addErr != nil {
+			if addErr := s.userRepo.AddGroupToAllowedGroups(opCtx, apiKey.UserID, group.ID); addErr != nil {
 				return nil, fmt.Errorf("add group to user allowed groups: %w", addErr)
 			}
 			if err := s.apiKeyRepo.Update(opCtx, apiKey); err != nil {
@@ -1363,7 +1447,7 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 			}
 
 			result.AutoGrantedGroupAccess = true
-			result.GrantedGroupID = &gid
+			result.GrantedGroupID = &group.ID
 			result.GrantedGroupName = group.Name
 
 			// 失效认证缓存（在事务提交后执行）

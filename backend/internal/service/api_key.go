@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
@@ -28,14 +29,18 @@ func IsWindowExpired(windowStart *time.Time, duration time.Duration) bool {
 }
 
 type APIKey struct {
-	ID          int64
-	UserID      int64
-	Key         string
-	Name        string
-	GroupID     *int64
-	Status      string
-	IPWhitelist []string
-	IPBlacklist []string
+	ID      int64
+	UserID  int64
+	Key     string
+	Name    string
+	GroupID *int64
+	// GrantedGroups contains all groups this key can access.
+	// Compatibility note: legacy call paths still use GroupID/Group as the
+	// effective/default group until full multi-group routing lands.
+	GrantedGroups []*Group
+	Status        string
+	IPWhitelist   []string
+	IPBlacklist   []string
 	// 预编译的 IP 规则，用于认证热路径避免重复 ParseIP/ParseCIDR。
 	CompiledIPWhitelist *ip.CompiledIPRules `json:"-"`
 	CompiledIPBlacklist *ip.CompiledIPRules `json:"-"`
@@ -60,6 +65,46 @@ type APIKey struct {
 	Window5hStart *time.Time // Start of current 5h window
 	Window1dStart *time.Time // Start of current 1d window
 	Window7dStart *time.Time // Start of current 7d window
+}
+
+// EffectiveGroup returns the legacy effective/default group for compatibility.
+func (k *APIKey) EffectiveGroup() *Group {
+	if k == nil {
+		return nil
+	}
+	if k.Group != nil {
+		return k.Group
+	}
+	for _, granted := range k.GrantedGroups {
+		if granted != nil {
+			return granted
+		}
+	}
+	return nil
+}
+
+// GroupForPlatform returns a granted group matching the requested platform when
+// available, otherwise it falls back to EffectiveGroup.
+func (k *APIKey) GroupForPlatform(platform string) *Group {
+	if k == nil {
+		return nil
+	}
+	platform = strings.TrimSpace(platform)
+	if platform == "" {
+		return k.EffectiveGroup()
+	}
+	if k.Group != nil && strings.EqualFold(strings.TrimSpace(k.Group.Platform), platform) {
+		return k.Group
+	}
+	for _, granted := range k.GrantedGroups {
+		if granted == nil {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(granted.Platform), platform) {
+			return granted
+		}
+	}
+	return k.EffectiveGroup()
 }
 
 func (k *APIKey) IsActive() bool {

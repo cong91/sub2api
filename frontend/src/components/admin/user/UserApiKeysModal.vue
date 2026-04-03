@@ -26,13 +26,16 @@
                 class="-mx-1 -my-0.5 flex cursor-pointer items-center gap-1 rounded-md px-1 py-0.5 transition-colors hover:bg-gray-100 dark:hover:bg-dark-700"
                 :disabled="updatingKeyIds.has(key.id)"
               >
-                <GroupBadge
-                  v-if="key.group_id && key.group"
-                  :name="key.group.name"
-                  :platform="key.group.platform"
-                  :subscription-type="key.group.subscription_type"
-                  :rate-multiplier="key.group.rate_multiplier"
-                />
+                <div v-if="getKeyGroups(key).length > 0" class="flex flex-wrap items-center gap-1">
+                  <GroupBadge
+                    v-for="group in getKeyGroups(key)"
+                    :key="group.id"
+                    :name="group.name"
+                    :platform="group.platform"
+                    :subscription-type="group.subscription_type"
+                    :rate-multiplier="group.rate_multiplier"
+                  />
+                </div>
                 <span v-else class="text-gray-400 italic">{{ t('admin.users.none') }}</span>
                 <svg v-if="updatingKeyIds.has(key.id)" class="h-3 w-3 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 <svg v-else class="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
@@ -59,14 +62,14 @@
           @click="changeGroup(selectedKeyForGroup!, null)"
           :class="[
             'flex w-full items-center rounded-lg px-3 py-2 text-sm transition-colors',
-            !selectedKeyForGroup?.group_id
+            !getDefaultGroupId(selectedKeyForGroup)
               ? 'bg-primary-50 dark:bg-primary-900/20'
               : 'hover:bg-gray-100 dark:hover:bg-dark-700'
           ]"
         >
           <span class="text-gray-500 italic">{{ t('admin.users.none') }}</span>
           <svg
-            v-if="!selectedKeyForGroup?.group_id"
+            v-if="!getDefaultGroupId(selectedKeyForGroup)"
             class="ml-auto h-4 w-4 shrink-0 text-primary-600 dark:text-primary-400"
             fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"
           ><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
@@ -78,7 +81,7 @@
           @click="changeGroup(selectedKeyForGroup!, group.id)"
           :class="[
             'flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors',
-            selectedKeyForGroup?.group_id === group.id
+            getDefaultGroupId(selectedKeyForGroup) === group.id
               ? 'bg-primary-50 dark:bg-primary-900/20'
               : 'hover:bg-gray-100 dark:hover:bg-dark-700'
           ]"
@@ -89,7 +92,7 @@
             :subscription-type="group.subscription_type"
             :rate-multiplier="group.rate_multiplier"
             :description="group.description"
-            :selected="selectedKeyForGroup?.group_id === group.id"
+            :selected="getDefaultGroupId(selectedKeyForGroup) === group.id"
           />
         </button>
       </div>
@@ -103,7 +106,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
 import { formatDateTime } from '@/utils/format'
-import type { AdminUser, AdminGroup, ApiKey } from '@/types'
+import type { AdminUser, AdminGroup, ApiKey, Group } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
@@ -127,6 +130,36 @@ const selectedKeyForGroup = computed(() => {
   if (groupSelectorKeyId.value === null) return null
   return apiKeys.value.find((k) => k.id === groupSelectorKeyId.value) || null
 })
+
+const normalizeGroupIds = (groupIds?: number[] | null, fallbackGroupId?: number | null): number[] => {
+  if (groupIds && groupIds.length > 0) {
+    return Array.from(new Set(groupIds))
+  }
+  if (typeof fallbackGroupId === 'number') {
+    return [fallbackGroupId]
+  }
+  return []
+}
+
+const getKeyGroups = (key: ApiKey | null | undefined): Group[] => {
+  if (!key) return []
+  if (key.granted_groups && key.granted_groups.length > 0) {
+    return key.granted_groups
+  }
+  const ids = normalizeGroupIds(key.granted_group_ids, key.group_id)
+  if (ids.length === 0) return []
+  return ids.flatMap((id) => {
+    const group = allGroups.value.find((item) => item.id === id)
+    return group ? [group] : []
+  })
+}
+
+const getDefaultGroupId = (key: ApiKey | null | undefined): number | null => {
+  if (!key) return null
+  if (typeof key.default_group_id === 'number') return key.default_group_id
+  if (typeof key.group_id === 'number') return key.group_id
+  return key.granted_group_ids?.[0] ?? null
+}
 
 const setGroupButtonRef = (keyId: number, el: Element | ComponentPublicInstance | null) => {
   if (el instanceof HTMLElement) {
@@ -196,11 +229,22 @@ const closeGroupSelector = () => {
 
 const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
   closeGroupSelector()
-  if (key.group_id === newGroupId || (!key.group_id && newGroupId === null)) return
+  if (getDefaultGroupId(key) === newGroupId) return
+
+  const nextGranted = new Set<number>(normalizeGroupIds(key.granted_group_ids, key.group_id))
+  if (newGroupId === null) {
+    nextGranted.clear()
+  } else {
+    nextGranted.add(newGroupId)
+  }
 
   updatingKeyIds.value.add(key.id)
   try {
-    const result = await adminAPI.apiKeys.updateApiKeyGroup(key.id, newGroupId)
+    const result = await adminAPI.apiKeys.updateApiKeyGroups(key.id, {
+      group_id: newGroupId,
+      default_group_id: newGroupId,
+      granted_group_ids: Array.from(nextGranted)
+    })
     // Update local data
     const idx = apiKeys.value.findIndex((k) => k.id === key.id)
     if (idx !== -1) {

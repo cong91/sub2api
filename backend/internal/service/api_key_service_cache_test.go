@@ -226,6 +226,49 @@ func TestAPIKeyService_GetByKey_UsesL2Cache(t *testing.T) {
 	require.Equal(t, map[string][]int64{"claude-opus-*": {1, 2}}, apiKey.Group.ModelRouting)
 }
 
+func TestAPIKeyService_GetByKey_UsesGrantedGroupsFallbackFromL2Cache(t *testing.T) {
+	cache := &authCacheStub{}
+	repo := &authRepoStub{
+		getByKeyForAuth: func(ctx context.Context, key string) (*APIKey, error) {
+			return nil, errors.New("unexpected repo call")
+		},
+	}
+	cfg := &config.Config{
+		APIKeyAuth: config.APIKeyAuthCacheConfig{
+			L2TTLSeconds:       60,
+			NegativeTTLSeconds: 30,
+		},
+	}
+	svc := NewAPIKeyService(repo, nil, nil, nil, nil, cache, cfg)
+
+	grantedID := int64(19)
+	cache.getAuthCache = func(ctx context.Context, key string) (*APIKeyAuthCacheEntry, error) {
+		return &APIKeyAuthCacheEntry{Snapshot: &APIKeyAuthSnapshot{
+			APIKeyID: 33,
+			UserID:   2,
+			Status:   StatusActive,
+			User:     APIKeyAuthUserSnapshot{ID: 2, Status: StatusActive, Role: RoleUser, Balance: 10, Concurrency: 3},
+			GrantedGroups: []APIKeyAuthGroupSnapshot{{
+				ID:               grantedID,
+				Name:             "g19",
+				Platform:         PlatformOpenAI,
+				Status:           StatusActive,
+				SubscriptionType: SubscriptionTypeStandard,
+				RateMultiplier:   1,
+			}},
+		}}, nil
+	}
+
+	apiKey, err := svc.GetByKey(context.Background(), "k-granted")
+	require.NoError(t, err)
+	require.NotNil(t, apiKey.Group)
+	require.NotNil(t, apiKey.GroupID)
+	require.Equal(t, grantedID, *apiKey.GroupID)
+	require.Len(t, apiKey.GrantedGroups, 1)
+	require.Equal(t, grantedID, apiKey.Group.ID)
+	require.Equal(t, PlatformOpenAI, apiKey.Group.Platform)
+}
+
 func TestAPIKeyService_GetByKey_NegativeCache(t *testing.T) {
 	cache := &authCacheStub{}
 	repo := &authRepoStub{

@@ -17,11 +17,11 @@ import (
 )
 
 type inviteRedeemRepoStub struct {
-	codeByCode map[string]*RedeemCode
+	codeByCode   map[string]*RedeemCode
 	getErrByCode map[string]error
-	useErr error
-	useCalls int
-	usedID int64
+	useErr       error
+	useCalls     int
+	usedID       int64
 	usedByUserID int64
 }
 
@@ -29,8 +29,8 @@ type inviteGroupResolverStub struct {
 	groups           []Group
 	groupsByPlatform map[string][]Group
 	err              error
-	lastPlatform string
-	calls int
+	lastPlatform     string
+	calls            int
 }
 
 func (s *inviteGroupResolverStub) ListActiveByPlatform(_ context.Context, platform string) ([]Group, error) {
@@ -46,11 +46,11 @@ func (s *inviteGroupResolverStub) ListActiveByPlatform(_ context.Context, platfo
 }
 
 type inviteAPIKeyProvisionerStub struct {
-	err error
-	calls int
+	err              error
+	calls            int
 	createdForUserID int64
-	lastReq CreateAPIKeyRequest
-	reqs []CreateAPIKeyRequest
+	lastReq          CreateAPIKeyRequest
+	reqs             []CreateAPIKeyRequest
 }
 
 func (s *inviteAPIKeyProvisionerStub) Create(_ context.Context, userID int64, req CreateAPIKeyRequest) (*APIKey, error) {
@@ -77,10 +77,10 @@ func findInviteProviderByID(t *testing.T, providers []InviteBootstrapProvider, i
 
 type inviteAwareUserRepoStub struct {
 	userRepoStub
-	addAllowedGroupCalls int
-	lastAddAllowedUserID int64
+	addAllowedGroupCalls  int
+	lastAddAllowedUserID  int64
 	lastAddAllowedGroupID int64
-	addAllowedErr error
+	addAllowedErr         error
 }
 
 func (s *inviteAwareUserRepoStub) AddGroupToAllowedGroups(_ context.Context, userID int64, groupID int64) error {
@@ -378,17 +378,17 @@ func TestAuthService_InviteLogin_ValidCodeCreatesUserAndConsumesCode(t *testing.
 	redeemRepo := &inviteRedeemRepoStub{
 		codeByCode: map[string]*RedeemCode{
 			"INVITE-OK": {
-				ID: 99,
-				Code: "INVITE-OK",
-				Type: RedeemTypeInvitation,
+				ID:     99,
+				Code:   "INVITE-OK",
+				Type:   RedeemTypeInvitation,
 				Status: StatusUnused,
 			},
 		},
 	}
 	service := newAuthService(userRepo, map[string]string{
-		SettingKeyRegistrationEnabled:    "true",
-		SettingKeyInvitationCodeEnabled:  "true",
-		SettingKeyAPIBaseURL:             "https://api.sub2api.dev",
+		SettingKeyRegistrationEnabled:   "true",
+		SettingKeyInvitationCodeEnabled: "true",
+		SettingKeyAPIBaseURL:            "https://api.sub2api.dev",
 	}, nil)
 	service.userRepo = inviteAwareRepo
 	service.redeemRepo = redeemRepo
@@ -415,16 +415,22 @@ func TestAuthService_InviteLogin_ValidCodeCreatesUserAndConsumesCode(t *testing.
 	require.Equal(t, int64(42), apiKeyProvisioner.createdForUserID)
 
 	providerKeys := map[string]int64{}
+	providerGrantedGroups := map[string][]int64{}
 	for _, req := range apiKeyProvisioner.reqs {
 		require.NotNil(t, req.GroupID)
 		providerKeys[req.Name] = *req.GroupID
+		providerGrantedGroups[req.Name] = append([]int64(nil), req.GrantedGroupIDs...)
 	}
 	require.Equal(t, map[string]int64{
-		"default-openai":              77,
-		"default-anthropic":           301,
-		"default-antigravity-claude":  401,
-		"default-antigravity-gemini":  401,
+		"default-openai":             77,
+		"default-anthropic":          301,
+		"default-antigravity-claude": 401,
+		"default-antigravity-gemini": 401,
 	}, providerKeys)
+	require.ElementsMatch(t, []int64{77}, providerGrantedGroups["default-openai"])
+	require.ElementsMatch(t, []int64{77, 301}, providerGrantedGroups["default-anthropic"])
+	require.ElementsMatch(t, []int64{77, 301, 401}, providerGrantedGroups["default-antigravity-claude"])
+	require.ElementsMatch(t, []int64{77, 301, 401}, providerGrantedGroups["default-antigravity-gemini"])
 
 	require.Len(t, subAssigner.calls, 0)
 	require.Equal(t, 1, inviteAwareRepo.addAllowedGroupCalls)
@@ -469,9 +475,9 @@ func TestAuthService_InviteLogin_ProvisionFailsReturnsUnavailable(t *testing.T) 
 	redeemRepo := &inviteRedeemRepoStub{
 		codeByCode: map[string]*RedeemCode{
 			"INVITE-FAIL": {
-				ID: 103,
-				Code: "INVITE-FAIL",
-				Type: RedeemTypeInvitation,
+				ID:     103,
+				Code:   "INVITE-FAIL",
+				Type:   RedeemTypeInvitation,
 				Status: StatusUnused,
 			},
 		},
@@ -842,8 +848,8 @@ func TestAuthService_InviteLogin_InvalidCodeFailsCleanly(t *testing.T) {
 		},
 	}
 	service := newAuthService(userRepo, map[string]string{
-		SettingKeyRegistrationEnabled:    "true",
-		SettingKeyInvitationCodeEnabled:  "true",
+		SettingKeyRegistrationEnabled:   "true",
+		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
 	service.redeemRepo = redeemRepo
 
@@ -858,16 +864,16 @@ func TestAuthService_InviteLogin_UsedCodeFailsCleanly(t *testing.T) {
 	redeemRepo := &inviteRedeemRepoStub{
 		codeByCode: map[string]*RedeemCode{
 			"USED": {
-				ID: 100,
-				Code: "USED",
-				Type: RedeemTypeInvitation,
+				ID:     100,
+				Code:   "USED",
+				Type:   RedeemTypeInvitation,
 				Status: StatusUsed,
 			},
 		},
 	}
 	service := newAuthService(userRepo, map[string]string{
-		SettingKeyRegistrationEnabled:    "true",
-		SettingKeyInvitationCodeEnabled:  "true",
+		SettingKeyRegistrationEnabled:   "true",
+		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
 	service.redeemRepo = redeemRepo
 
@@ -882,17 +888,17 @@ func TestAuthService_InviteLogin_ConsumeRaceReturnsInvalid(t *testing.T) {
 	redeemRepo := &inviteRedeemRepoStub{
 		codeByCode: map[string]*RedeemCode{
 			"RACE": {
-				ID: 101,
-				Code: "RACE",
-				Type: RedeemTypeInvitation,
+				ID:     101,
+				Code:   "RACE",
+				Type:   RedeemTypeInvitation,
 				Status: StatusUnused,
 			},
 		},
 		useErr: ErrRedeemCodeUsed,
 	}
 	service := newAuthService(userRepo, map[string]string{
-		SettingKeyRegistrationEnabled:    "true",
-		SettingKeyInvitationCodeEnabled:  "true",
+		SettingKeyRegistrationEnabled:   "true",
+		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
 	service.redeemRepo = redeemRepo
 
@@ -905,8 +911,8 @@ func TestAuthService_InviteLogin_Disabled(t *testing.T) {
 	userRepo := &userRepoStub{}
 	redeemRepo := &inviteRedeemRepoStub{}
 	service := newAuthService(userRepo, map[string]string{
-		SettingKeyRegistrationEnabled:    "true",
-		SettingKeyInvitationCodeEnabled:  "false",
+		SettingKeyRegistrationEnabled:   "true",
+		SettingKeyInvitationCodeEnabled: "false",
 	}, nil)
 	service.redeemRepo = redeemRepo
 
@@ -919,16 +925,16 @@ func TestAuthService_InviteLogin_CreateFailureReturnsUnavailable(t *testing.T) {
 	redeemRepo := &inviteRedeemRepoStub{
 		codeByCode: map[string]*RedeemCode{
 			"INVITE": {
-				ID: 102,
-				Code: "INVITE",
-				Type: RedeemTypeInvitation,
+				ID:     102,
+				Code:   "INVITE",
+				Type:   RedeemTypeInvitation,
 				Status: StatusUnused,
 			},
 		},
 	}
 	service := newAuthService(userRepo, map[string]string{
-		SettingKeyRegistrationEnabled:    "true",
-		SettingKeyInvitationCodeEnabled:  "true",
+		SettingKeyRegistrationEnabled:   "true",
+		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
 	service.redeemRepo = redeemRepo
 

@@ -1,0 +1,15 @@
+{
+  "workflow_graph_version": "v1",
+  "entry_node": "task1",
+  "nodes": [
+    { "id": "task1", "task_id": "sub2api-oej.1", "title": "Implement provider-catalog endpoint for linkto-provider", "terminal": true }
+  ],
+  "dependencies": [],
+  "success_transition": {
+    "task1": null
+  },
+  "failure_transition": {
+    "task1": "halt_and_notify"
+  },
+  "terminal_nodes": ["task1", "halt_and_notify"]
+}

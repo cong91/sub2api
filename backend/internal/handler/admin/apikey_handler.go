@@ -24,7 +24,9 @@ func NewAdminAPIKeyHandler(adminService service.AdminService) *AdminAPIKeyHandle
 
 // AdminUpdateAPIKeyGroupRequest represents the request to update an API key's group
 type AdminUpdateAPIKeyGroupRequest struct {
-	GroupID *int64 `json:"group_id"` // nil=不修改, 0=解绑, >0=绑定到目标分组
+	GroupID         *int64   `json:"group_id"`          // nil=不修改, 0=解绑, >0=绑定到目标分组
+	GrantedGroupIDs *[]int64 `json:"granted_group_ids"` // nil=沿用旧语义；提供则按多分组更新
+	DefaultGroupID  *int64   `json:"default_group_id"`  // 兼容前端术语，映射到 legacy group_id
 }
 
 // UpdateGroup handles updating an API key's group binding
@@ -42,7 +44,11 @@ func (h *AdminAPIKeyHandler) UpdateGroup(c *gin.Context) {
 		return
 	}
 
-	result, err := h.adminService.AdminUpdateAPIKeyGroupID(c.Request.Context(), keyID, req.GroupID)
+	result, err := h.adminService.AdminUpdateAPIKeyGroupID(c.Request.Context(), keyID, service.AdminUpdateAPIKeyGroupUpdateInput{
+		GroupID:         req.GroupID,
+		GrantedGroupIDs: req.GrantedGroupIDs,
+		DefaultGroupID:  req.DefaultGroupID,
+	})
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

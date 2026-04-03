@@ -10,6 +10,7 @@ import (
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/apikeygroup"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
@@ -20,7 +21,7 @@ import (
 )
 
 func TestAuthServiceInviteLogin_ProvisionBootstrapRuntimeRows(t *testing.T) {
-	t.Run("exclusive standard openai group creates user api_key and allowed_group", func(t *testing.T) {
+	t.Run("multi-provider bootstrap creates per-provider api keys", func(t *testing.T) {
 		ctx := context.Background()
 		client := testEntClient(t)
 		cleanupInviteLoginTables(t, ctx, client)
@@ -34,7 +35,23 @@ func TestAuthServiceInviteLogin_ProvisionBootstrapRuntimeRows(t *testing.T) {
 			Status:           service.StatusActive,
 			SubscriptionType: service.SubscriptionTypeStandard,
 			IsExclusive:      true,
-			SortOrder:        -100,
+			RateMultiplier:   1.0,
+		})
+
+		anthropicGroup := mustCreateGroup(t, client, &service.Group{
+			Name:             inviteLoginUniqueTestValue(t, "invite-anthropic-standard"),
+			Platform:         service.PlatformAnthropic,
+			Status:           service.StatusActive,
+			SubscriptionType: service.SubscriptionTypeStandard,
+			RateMultiplier:   0.8,
+		})
+
+		antigravityGroup := mustCreateGroup(t, client, &service.Group{
+			Name:             inviteLoginUniqueTestValue(t, "invite-antigravity-standard"),
+			Platform:         service.PlatformAntigravity,
+			Status:           service.StatusActive,
+			SubscriptionType: service.SubscriptionTypeStandard,
+			RateMultiplier:   0.9,
 		})
 
 		inviteCode := mustCreateRedeemCode(t, client, &service.RedeemCode{
@@ -47,20 +64,59 @@ func TestAuthServiceInviteLogin_ProvisionBootstrapRuntimeRows(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		require.NotNil(t, result.User)
-		require.Equal(t, openAIGroup.ID, result.BootstrapContext.DefaultGroupID)
+		require.Equal(t, service.PlatformOpenAI, result.BootstrapContext.DefaultProviderID)
+		require.Len(t, result.BootstrapContext.Providers, 4)
 
 		createdUser, err := client.User.Get(ctx, result.User.ID)
 		require.NoError(t, err)
 		require.Equal(t, service.StatusActive, createdUser.Status)
 
-		createdKey, err := client.APIKey.Query().
+		createdKeys, err := client.APIKey.Query().
 			Where(
 				apikey.UserIDEQ(result.User.ID),
 				apikey.DeletedAtIsNil(),
 			).
-			Only(ctx)
+			All(ctx)
 		require.NoError(t, err)
-		require.Equal(t, openAIGroup.ID, createdKey.GroupID)
+		require.Len(t, createdKeys, 4)
+
+		keysByName := make(map[string]int64, len(createdKeys))
+		keysByNameToID := make(map[string]int64, len(createdKeys))
+		for _, key := range createdKeys {
+			require.NotNil(t, key.GroupID)
+			keysByName[key.Name] = *key.GroupID
+			keysByNameToID[key.Name] = key.ID
+		}
+		require.Equal(t, map[string]int64{
+			"default-openai":             openAIGroup.ID,
+			"default-anthropic":          anthropicGroup.ID,
+			"default-antigravity-claude": antigravityGroup.ID,
+			"default-antigravity-gemini": antigravityGroup.ID,
+		}, keysByName)
+
+		type expectedGrant struct {
+			name     string
+			groupIDs []int64
+		}
+		expectedGrants := []expectedGrant{
+			{name: "default-openai", groupIDs: []int64{openAIGroup.ID}},
+			{name: "default-anthropic", groupIDs: []int64{openAIGroup.ID, anthropicGroup.ID}},
+			{name: "default-antigravity-claude", groupIDs: []int64{openAIGroup.ID, anthropicGroup.ID, antigravityGroup.ID}},
+			{name: "default-antigravity-gemini", groupIDs: []int64{openAIGroup.ID, anthropicGroup.ID, antigravityGroup.ID}},
+		}
+		for _, expected := range expectedGrants {
+			keyID, ok := keysByNameToID[expected.name]
+			require.True(t, ok, "missing key %s", expected.name)
+			links, err := client.APIKeyGroup.Query().
+				Where(apikeygroup.APIKeyIDEQ(keyID)).
+				All(ctx)
+			require.NoError(t, err)
+			actualIDs := make([]int64, 0, len(links))
+			for _, link := range links {
+				actualIDs = append(actualIDs, link.GroupID)
+			}
+			require.ElementsMatch(t, expected.groupIDs, actualIDs)
+		}
 
 		allowedCount, err := client.UserAllowedGroup.Query().
 			Where(
@@ -71,17 +127,26 @@ func TestAuthServiceInviteLogin_ProvisionBootstrapRuntimeRows(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, allowedCount)
 
+		anthropicAllowedCount, err := client.UserAllowedGroup.Query().
+			Where(
+				userallowedgroup.UserIDEQ(result.User.ID),
+				userallowedgroup.GroupIDEQ(anthropicGroup.ID),
+			).
+			Count(ctx)
+		require.NoError(t, err)
+		require.Equal(t, 0, anthropicAllowedCount)
+
 		subCount, err := client.UserSubscription.Query().
 			Where(
 				usersubscription.UserIDEQ(result.User.ID),
-				usersubscription.GroupIDEQ(openAIGroup.ID),
+				usersubscription.GroupIDIn(openAIGroup.ID, anthropicGroup.ID, antigravityGroup.ID),
 			).
 			Count(ctx)
 		require.NoError(t, err)
 		require.Equal(t, 0, subCount)
 	})
 
-	t.Run("subscription openai group creates user api_key and subscription", func(t *testing.T) {
+	t.Run("subscription groups are ignored by invite bootstrap selection", func(t *testing.T) {
 		ctx := context.Background()
 		client := testEntClient(t)
 		cleanupInviteLoginTables(t, ctx, client)
@@ -89,13 +154,21 @@ func TestAuthServiceInviteLogin_ProvisionBootstrapRuntimeRows(t *testing.T) {
 		cfg := newInviteLoginIntegrationConfig()
 		authService := newInviteLoginIntegrationAuthService(t, client, cfg)
 
-		openAIGroup := mustCreateGroup(t, client, &service.Group{
+		_ = mustCreateGroup(t, client, &service.Group{
 			Name:                inviteLoginUniqueTestValue(t, "invite-openai-sub"),
 			Platform:            service.PlatformOpenAI,
 			Status:              service.StatusActive,
 			SubscriptionType:    service.SubscriptionTypeSubscription,
 			DefaultValidityDays: 7,
-			SortOrder:           -100,
+			RateMultiplier:      0.5,
+		})
+
+		openAIStandardGroup := mustCreateGroup(t, client, &service.Group{
+			Name:             inviteLoginUniqueTestValue(t, "invite-openai-std"),
+			Platform:         service.PlatformOpenAI,
+			Status:           service.StatusActive,
+			SubscriptionType: service.SubscriptionTypeStandard,
+			RateMultiplier:   1.2,
 		})
 
 		inviteCode := mustCreateRedeemCode(t, client, &service.RedeemCode{
@@ -108,7 +181,9 @@ func TestAuthServiceInviteLogin_ProvisionBootstrapRuntimeRows(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		require.NotNil(t, result.User)
-		require.Equal(t, openAIGroup.ID, result.BootstrapContext.DefaultGroupID)
+		require.Equal(t, service.PlatformOpenAI, result.BootstrapContext.DefaultProviderID)
+		require.Len(t, result.BootstrapContext.Providers, 1)
+		require.Equal(t, openAIStandardGroup.ID, result.BootstrapContext.Providers[0].DefaultGroupID)
 
 		_, err = client.User.Get(ctx, result.User.ID)
 		require.NoError(t, err)
@@ -120,17 +195,18 @@ func TestAuthServiceInviteLogin_ProvisionBootstrapRuntimeRows(t *testing.T) {
 			).
 			Only(ctx)
 		require.NoError(t, err)
-		require.Equal(t, openAIGroup.ID, createdKey.GroupID)
+		require.NotNil(t, createdKey.GroupID)
+		require.Equal(t, openAIStandardGroup.ID, *createdKey.GroupID)
+		require.Equal(t, "default-openai", createdKey.Name)
 
-		sub, err := client.UserSubscription.Query().
+		subCount, err := client.UserSubscription.Query().
 			Where(
 				usersubscription.UserIDEQ(result.User.ID),
-				usersubscription.GroupIDEQ(openAIGroup.ID),
 				usersubscription.StatusEQ(service.SubscriptionStatusActive),
 			).
-			Only(ctx)
+			Count(ctx)
 		require.NoError(t, err)
-		require.True(t, sub.ExpiresAt.After(time.Now()))
+		require.Equal(t, 0, subCount)
 	})
 }
 

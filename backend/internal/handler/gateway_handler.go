@@ -895,6 +895,70 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	})
 }
 
+// ProviderCatalog returns normalized provider metadata for plugin consumption.
+// GET /api/v1/provider-catalog
+// NOTE: This is the primary metadata source for provider discovery.
+// /v1/models remains a fallback/live-availability signal.
+func (h *GatewayHandler) ProviderCatalog(c *gin.Context) {
+	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
+	if !ok || apiKey == nil {
+		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
+		return
+	}
+
+	forcedPlatform := ""
+	if p, ok := middleware2.GetForcePlatformFromContext(c); ok {
+		forcedPlatform = strings.TrimSpace(p)
+	}
+
+	grantedGroups := collectCatalogGroups(apiKey, forcedPlatform)
+	if len(grantedGroups) == 0 {
+		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
+		return
+	}
+
+	resp, err := h.gatewayService.BuildProviderCatalogForGroups(c.Request.Context(), grantedGroups, forcedPlatform)
+	if err != nil {
+		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to build provider catalog")
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func collectCatalogGroups(apiKey *service.APIKey, forcedPlatform string) []*service.Group {
+	if apiKey == nil {
+		return nil
+	}
+
+	seen := make(map[int64]struct{})
+	out := make([]*service.Group, 0, len(apiKey.GrantedGroups)+1)
+	forced := strings.TrimSpace(forcedPlatform)
+
+	appendGroup := func(group *service.Group) {
+		if group == nil {
+			return
+		}
+		if forced != "" && !strings.EqualFold(strings.TrimSpace(group.Platform), forced) {
+			return
+		}
+		if _, exists := seen[group.ID]; exists {
+			return
+		}
+		seen[group.ID] = struct{}{}
+		out = append(out, group)
+	}
+
+	for _, group := range apiKey.GrantedGroups {
+		appendGroup(group)
+	}
+
+	// Legacy one-group compatibility when GrantedGroups is empty or partial.
+	appendGroup(apiKey.Group)
+
+	return out
+}
+
 // AntigravityModels 返回 Antigravity 支持的全部模型
 // GET /antigravity/models
 func (h *GatewayHandler) AntigravityModels(c *gin.Context) {

@@ -118,7 +118,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				Concurrency: apiKey.User.Concurrency,
 			})
 			c.Set(string(ContextKeyUserRole), apiKey.User.Role)
-			setGroupContext(c, apiKey.Group)
+			setAPIKeyGroupContext(c, apiKey)
 			_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
 			c.Next()
 			return
@@ -213,7 +213,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			Concurrency: apiKey.User.Concurrency,
 		})
 		c.Set(string(ContextKeyUserRole), apiKey.User.Role)
-		setGroupContext(c, apiKey.Group)
+		setAPIKeyGroupContext(c, apiKey)
 		_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
 
 		c.Next()
@@ -249,4 +249,44 @@ func setGroupContext(c *gin.Context, group *service.Group) {
 	}
 	ctx := context.WithValue(c.Request.Context(), ctxkey.Group, group)
 	c.Request = c.Request.WithContext(ctx)
+}
+
+func setGrantedGroupsContext(c *gin.Context, groups []*service.Group) {
+	if len(groups) == 0 {
+		return
+	}
+	granted := make([]*service.Group, 0, len(groups))
+	seen := make(map[int64]struct{}, len(groups))
+	for _, group := range groups {
+		if !service.IsGroupContextValid(group) {
+			continue
+		}
+		if _, ok := seen[group.ID]; ok {
+			continue
+		}
+		seen[group.ID] = struct{}{}
+		granted = append(granted, group)
+	}
+	if len(granted) == 0 {
+		return
+	}
+	ctx := context.WithValue(c.Request.Context(), ctxkey.GrantedGroups, granted)
+	c.Request = c.Request.WithContext(ctx)
+}
+
+func setAPIKeyGroupContext(c *gin.Context, apiKey *service.APIKey) {
+	if apiKey == nil {
+		return
+	}
+	setGrantedGroupsContext(c, apiKey.GrantedGroups)
+	setGroupContext(c, apiKey.EffectiveGroup())
+}
+
+func GetGrantedGroupsFromRequestContext(c *gin.Context) ([]*service.Group, bool) {
+	value := c.Request.Context().Value(ctxkey.GrantedGroups)
+	groups, ok := value.([]*service.Group)
+	if !ok || len(groups) == 0 {
+		return nil, false
+	}
+	return groups, true
 }

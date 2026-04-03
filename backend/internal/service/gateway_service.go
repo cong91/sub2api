@@ -23,9 +23,11 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
@@ -570,6 +572,27 @@ type GatewayService struct {
 	resolver              *ModelPricingResolver
 	debugGatewayBodyFile  atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
 	tlsFPProfileService   *TLSFingerprintProfileService
+}
+
+type ProviderCatalogResponse struct {
+	Object    string                    `json:"object"`
+	Providers []ProviderCatalogProvider `json:"providers"`
+}
+
+type ProviderCatalogProvider struct {
+	ProviderID   string                 `json:"provider_id"`
+	ProviderName string                 `json:"provider_name"`
+	APIStyle     string                 `json:"api_style"`
+	BaseURL      string                 `json:"base_url"`
+	DefaultModel string                 `json:"default_model"`
+	Models       []ProviderCatalogModel `json:"models"`
+}
+
+type ProviderCatalogModel struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Reasoning bool     `json:"reasoning"`
+	Input     []string `json:"input,omitempty"`
 }
 
 // NewGatewayService creates a new GatewayService
@@ -8605,6 +8628,145 @@ func (s *GatewayService) InvalidateAvailableModelsCache(groupID *int64, platform
 			continue
 		}
 		s.modelsListCache.Delete(key)
+	}
+}
+
+// BuildProviderCatalog returns normalized provider metadata for plugin consumption.
+// This endpoint contract is intentionally separate from /v1/models.
+func (s *GatewayService) BuildProviderCatalog(ctx context.Context, group *Group, forcedPlatform string) (ProviderCatalogResponse, error) {
+	if group == nil {
+		resp := ProviderCatalogResponse{Object: "provider_catalog", Providers: []ProviderCatalogProvider{}}
+		return resp, fmt.Errorf("group is required")
+	}
+	return s.BuildProviderCatalogForGroups(ctx, []*Group{group}, forcedPlatform)
+}
+
+// BuildProviderCatalogForGroups returns normalized provider metadata aggregated
+// across granted groups for plugin consumption.
+func (s *GatewayService) BuildProviderCatalogForGroups(ctx context.Context, groups []*Group, forcedPlatform string) (ProviderCatalogResponse, error) {
+	resp := ProviderCatalogResponse{Object: "provider_catalog", Providers: []ProviderCatalogProvider{}}
+	if len(groups) == 0 {
+		return resp, fmt.Errorf("group is required")
+	}
+
+	forced := strings.TrimSpace(forcedPlatform)
+	factory := DefaultInviteBootstrapContextFactory(s.settingService)
+	seen := make(map[string]struct{})
+	var firstErr error
+
+	for _, group := range groups {
+		if group == nil {
+			continue
+		}
+
+		effectiveGroup := *group
+		if forced != "" {
+			if !strings.EqualFold(strings.TrimSpace(effectiveGroup.Platform), forced) {
+				continue
+			}
+			effectiveGroup.Platform = forced
+		}
+
+		providers, err := factory.BuildProviders(ctx, &effectiveGroup)
+		var mapped []ProviderCatalogProvider
+		if err == nil {
+			mapped = mapInviteProvidersToCatalog(providers)
+		} else {
+			mapped = fallbackProviderCatalogByPlatform(&effectiveGroup, s.settingService, ctx)
+			if len(mapped) == 0 && firstErr == nil {
+				firstErr = err
+			}
+		}
+
+		for _, provider := range mapped {
+			providerKey := strings.ToLower(strings.TrimSpace(provider.ProviderID)) + "|" + strings.TrimSpace(provider.BaseURL)
+			if _, ok := seen[providerKey]; ok {
+				continue
+			}
+			seen[providerKey] = struct{}{}
+			resp.Providers = append(resp.Providers, provider)
+		}
+	}
+
+	if len(resp.Providers) > 0 {
+		return resp, nil
+	}
+
+	if firstErr != nil {
+		return resp, firstErr
+	}
+
+	return resp, fmt.Errorf("group is required")
+}
+
+func mapInviteProvidersToCatalog(source []InviteBootstrapProvider) []ProviderCatalogProvider {
+	out := make([]ProviderCatalogProvider, 0, len(source))
+	for _, provider := range source {
+		models := make([]ProviderCatalogModel, 0, len(provider.Models))
+		for _, model := range provider.Models {
+			models = append(models, ProviderCatalogModel{
+				ID:        model.ID,
+				Name:      model.Name,
+				Reasoning: model.Reasoning,
+				Input:     []string{"text", "image"},
+			})
+		}
+		out = append(out, ProviderCatalogProvider{
+			ProviderID:   provider.ProviderID,
+			ProviderName: provider.ProviderName,
+			APIStyle:     provider.APIStyle,
+			BaseURL:      provider.BaseURL,
+			DefaultModel: provider.DefaultModel,
+			Models:       models,
+		})
+	}
+	return out
+}
+
+func fallbackProviderCatalogByPlatform(group *Group, settingService *SettingService, ctx context.Context) []ProviderCatalogProvider {
+	if group == nil {
+		return nil
+	}
+	baseURL := inviteBootstrapBaseURL(ctx, settingService)
+	platform := strings.ToLower(strings.TrimSpace(group.Platform))
+	switch platform {
+	case PlatformOpenAI:
+		models := make([]ProviderCatalogModel, 0, len(openai.DefaultModels))
+		for _, model := range openai.DefaultModels {
+			models = append(models, ProviderCatalogModel{ID: model.ID, Name: model.DisplayName, Reasoning: true, Input: []string{"text", "image"}})
+		}
+		defaultModel := openai.DefaultTestModel
+		if len(models) > 0 {
+			defaultModel = models[0].ID
+		}
+		return []ProviderCatalogProvider{{
+			ProviderID:   PlatformOpenAI,
+			ProviderName: "OpenAI",
+			APIStyle:     "openai-responses",
+			BaseURL:      baseURL,
+			DefaultModel: defaultModel,
+			Models:       models,
+		}}
+	case PlatformAntigravity:
+		sourceModels := antigravity.DefaultModels()
+		models := make([]ProviderCatalogModel, 0, len(sourceModels))
+		for _, model := range sourceModels {
+			models = append(models, ProviderCatalogModel{ID: model.ID, Name: model.DisplayName, Reasoning: true, Input: []string{"text", "image"}})
+		}
+		defaultModel := ""
+		if len(models) > 0 {
+			defaultModel = models[0].ID
+		}
+		return []ProviderCatalogProvider{{
+			ProviderID:   PlatformAntigravity,
+			ProviderName: "Antigravity",
+			APIStyle:     "anthropic-messages",
+			BaseURL:      baseURL,
+			DefaultModel: defaultModel,
+			Models:       models,
+		}}
+	default:
+		return nil
 	}
 }
 

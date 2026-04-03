@@ -220,6 +220,41 @@ func (s *APIKeyService) snapshotFromAPIKey(apiKey *APIKey) *APIKeyAuthSnapshot {
 			Concurrency: apiKey.User.Concurrency,
 		},
 	}
+	if len(apiKey.GrantedGroups) > 0 {
+		snapshot.GrantedGroups = make([]APIKeyAuthGroupSnapshot, 0, len(apiKey.GrantedGroups))
+		for _, granted := range apiKey.GrantedGroups {
+			if granted == nil {
+				continue
+			}
+			snapshot.GrantedGroups = append(snapshot.GrantedGroups, APIKeyAuthGroupSnapshot{
+				ID:                              granted.ID,
+				Name:                            granted.Name,
+				Platform:                        granted.Platform,
+				Status:                          granted.Status,
+				SubscriptionType:                granted.SubscriptionType,
+				RateMultiplier:                  granted.RateMultiplier,
+				DailyLimitUSD:                   granted.DailyLimitUSD,
+				WeeklyLimitUSD:                  granted.WeeklyLimitUSD,
+				MonthlyLimitUSD:                 granted.MonthlyLimitUSD,
+				ImagePrice1K:                    granted.ImagePrice1K,
+				ImagePrice2K:                    granted.ImagePrice2K,
+				ImagePrice4K:                    granted.ImagePrice4K,
+				SoraImagePrice360:               granted.SoraImagePrice360,
+				SoraImagePrice540:               granted.SoraImagePrice540,
+				SoraVideoPricePerRequest:        granted.SoraVideoPricePerRequest,
+				SoraVideoPricePerRequestHD:      granted.SoraVideoPricePerRequestHD,
+				ClaudeCodeOnly:                  granted.ClaudeCodeOnly,
+				FallbackGroupID:                 granted.FallbackGroupID,
+				FallbackGroupIDOnInvalidRequest: granted.FallbackGroupIDOnInvalidRequest,
+				ModelRouting:                    granted.ModelRouting,
+				ModelRoutingEnabled:             granted.ModelRoutingEnabled,
+				MCPXMLInject:                    granted.MCPXMLInject,
+				SupportedModelScopes:            granted.SupportedModelScopes,
+				AllowMessagesDispatch:           granted.AllowMessagesDispatch,
+				DefaultMappedModel:              granted.DefaultMappedModel,
+			})
+		}
+	}
 	if apiKey.Group != nil {
 		snapshot.Group = &APIKeyAuthGroupSnapshot{
 			ID:                              apiKey.Group.ID,
@@ -299,6 +334,45 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			AllowMessagesDispatch:           snapshot.Group.AllowMessagesDispatch,
 			DefaultMappedModel:              snapshot.Group.DefaultMappedModel,
 		}
+	}
+	if len(snapshot.GrantedGroups) > 0 {
+		apiKey.GrantedGroups = make([]*Group, 0, len(snapshot.GrantedGroups))
+		for _, granted := range snapshot.GrantedGroups {
+			granted := granted
+			apiKey.GrantedGroups = append(apiKey.GrantedGroups, &Group{
+				ID:                              granted.ID,
+				Name:                            granted.Name,
+				Platform:                        granted.Platform,
+				Status:                          granted.Status,
+				Hydrated:                        true,
+				SubscriptionType:                granted.SubscriptionType,
+				RateMultiplier:                  granted.RateMultiplier,
+				DailyLimitUSD:                   granted.DailyLimitUSD,
+				WeeklyLimitUSD:                  granted.WeeklyLimitUSD,
+				MonthlyLimitUSD:                 granted.MonthlyLimitUSD,
+				ImagePrice1K:                    granted.ImagePrice1K,
+				ImagePrice2K:                    granted.ImagePrice2K,
+				ImagePrice4K:                    granted.ImagePrice4K,
+				SoraImagePrice360:               granted.SoraImagePrice360,
+				SoraImagePrice540:               granted.SoraImagePrice540,
+				SoraVideoPricePerRequest:        granted.SoraVideoPricePerRequest,
+				SoraVideoPricePerRequestHD:      granted.SoraVideoPricePerRequestHD,
+				ClaudeCodeOnly:                  granted.ClaudeCodeOnly,
+				FallbackGroupID:                 granted.FallbackGroupID,
+				FallbackGroupIDOnInvalidRequest: granted.FallbackGroupIDOnInvalidRequest,
+				ModelRouting:                    granted.ModelRouting,
+				ModelRoutingEnabled:             granted.ModelRoutingEnabled,
+				MCPXMLInject:                    granted.MCPXMLInject,
+				SupportedModelScopes:            granted.SupportedModelScopes,
+				AllowMessagesDispatch:           granted.AllowMessagesDispatch,
+				DefaultMappedModel:              granted.DefaultMappedModel,
+			})
+		}
+	}
+	if apiKey.Group == nil && len(apiKey.GrantedGroups) > 0 {
+		apiKey.Group = apiKey.GrantedGroups[0]
+		gid := apiKey.Group.ID
+		apiKey.GroupID = &gid
 	}
 	s.compileAPIKeyIPRules(apiKey)
 	return apiKey

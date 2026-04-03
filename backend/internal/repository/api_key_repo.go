@@ -62,6 +62,9 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		key.LastUsedAt = created.LastUsedAt
 		key.CreatedAt = created.CreatedAt
 		key.UpdatedAt = created.UpdatedAt
+		if syncErr := r.syncGrantedGroups(ctx, key.ID, key.GroupID, grantedGroupIDs(key)); syncErr != nil {
+			return syncErr
+		}
 	}
 	return translatePersistenceError(err, nil, service.ErrAPIKeyExists)
 }
@@ -71,6 +74,7 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 		Where(apikey.IDEQ(id)).
 		WithUser().
 		WithGroup().
+		WithGrantedGroups().
 		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
@@ -105,6 +109,7 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 		Where(apikey.KeyEQ(key)).
 		WithUser().
 		WithGroup().
+		WithGrantedGroups().
 		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
@@ -155,6 +160,35 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				group.FieldImagePrice1k,
 				group.FieldImagePrice2k,
 				group.FieldImagePrice4k,
+				group.FieldClaudeCodeOnly,
+				group.FieldFallbackGroupID,
+				group.FieldFallbackGroupIDOnInvalidRequest,
+				group.FieldModelRoutingEnabled,
+				group.FieldModelRouting,
+				group.FieldMcpXMLInject,
+				group.FieldSupportedModelScopes,
+				group.FieldAllowMessagesDispatch,
+				group.FieldDefaultMappedModel,
+			)
+		}).
+		WithGrantedGroups(func(q *dbent.GroupQuery) {
+			q.Select(
+				group.FieldID,
+				group.FieldName,
+				group.FieldPlatform,
+				group.FieldStatus,
+				group.FieldSubscriptionType,
+				group.FieldRateMultiplier,
+				group.FieldDailyLimitUsd,
+				group.FieldWeeklyLimitUsd,
+				group.FieldMonthlyLimitUsd,
+				group.FieldImagePrice1k,
+				group.FieldImagePrice2k,
+				group.FieldImagePrice4k,
+				group.FieldSoraImagePrice360,
+				group.FieldSoraImagePrice540,
+				group.FieldSoraVideoPricePerRequest,
+				group.FieldSoraVideoPricePerRequestHd,
 				group.FieldClaudeCodeOnly,
 				group.FieldFallbackGroupID,
 				group.FieldFallbackGroupIDOnInvalidRequest,
@@ -248,6 +282,10 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) erro
 		return service.ErrAPIKeyNotFound
 	}
 
+	if err := r.syncGrantedGroups(ctx, key.ID, key.GroupID, grantedGroupIDs(key)); err != nil {
+		return err
+	}
+
 	// 使用同一时间戳回填，避免并发删除导致二次查询失败。
 	key.UpdatedAt = now
 	return nil
@@ -311,6 +349,7 @@ func (r *apiKeyRepository) ListByUserID(ctx context.Context, userID int64, param
 
 	keys, err := q.
 		WithGroup().
+		WithGrantedGroups().
 		Offset(params.Offset()).
 		Limit(params.Limit()).
 		Order(dbent.Desc(apikey.FieldID)).
@@ -361,6 +400,7 @@ func (r *apiKeyRepository) ListByGroupID(ctx context.Context, groupID int64, par
 
 	keys, err := q.
 		WithUser().
+		WithGrantedGroups().
 		Offset(params.Offset()).
 		Limit(params.Limit()).
 		Order(dbent.Desc(apikey.FieldID)).
@@ -595,6 +635,84 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 	}
 	if m.Edges.Group != nil {
 		out.Group = groupEntityToService(m.Edges.Group)
+	}
+	if len(m.Edges.GrantedGroups) > 0 {
+		out.GrantedGroups = make([]*service.Group, 0, len(m.Edges.GrantedGroups))
+		for _, g := range m.Edges.GrantedGroups {
+			if converted := groupEntityToService(g); converted != nil {
+				out.GrantedGroups = append(out.GrantedGroups, converted)
+			}
+		}
+	}
+	if out.Group == nil && len(out.GrantedGroups) > 0 {
+		out.Group = out.GrantedGroups[0]
+		gid := out.Group.ID
+		out.GroupID = &gid
+	}
+	return out
+}
+
+func grantedGroupIDs(k *service.APIKey) []int64 {
+	if len(k.GrantedGroups) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(k.GrantedGroups))
+	for _, g := range k.GrantedGroups {
+		if g == nil || g.ID <= 0 {
+			continue
+		}
+		ids = append(ids, g.ID)
+	}
+	return ids
+}
+
+func (r *apiKeyRepository) syncGrantedGroups(ctx context.Context, apiKeyID int64, legacyGroupID *int64, requested []int64) error {
+	ids := normalizeGrantedGroupIDs(legacyGroupID, requested)
+
+	if r.sql == nil {
+		updater := r.client.APIKey.UpdateOneID(apiKeyID).ClearGrantedGroups()
+		if len(ids) > 0 {
+			updater.AddGrantedGroupIDs(ids...)
+		}
+		if err := updater.Exec(ctx); err != nil {
+			return fmt.Errorf("sync api_key_groups via ent: %w", err)
+		}
+		return nil
+	}
+
+	if _, err := r.sql.ExecContext(ctx, `DELETE FROM api_key_groups WHERE api_key_id = $1`, apiKeyID); err != nil {
+		return fmt.Errorf("reset api_key_groups: %w", err)
+	}
+	for _, gid := range ids {
+		if _, err := r.sql.ExecContext(ctx,
+			`INSERT INTO api_key_groups (api_key_id, group_id, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (api_key_id, group_id) DO NOTHING`,
+			apiKeyID,
+			gid,
+		); err != nil {
+			return fmt.Errorf("insert api_key_groups: %w", err)
+		}
+	}
+	return nil
+}
+
+func normalizeGrantedGroupIDs(legacyGroupID *int64, requested []int64) []int64 {
+	seen := make(map[int64]struct{}, len(requested)+1)
+	out := make([]int64, 0, len(requested)+1)
+	appendID := func(id int64) {
+		if id <= 0 {
+			return
+		}
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	if legacyGroupID != nil {
+		appendID(*legacyGroupID)
+	}
+	for _, id := range requested {
+		appendID(id)
 	}
 	return out
 }

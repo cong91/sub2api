@@ -418,16 +418,27 @@ func (s *stubAdminService) UpdateGroupSortOrders(ctx context.Context, updates []
 	return nil
 }
 
-func (s *stubAdminService) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID int64, groupID *int64) (*service.AdminUpdateAPIKeyGroupIDResult, error) {
+func (s *stubAdminService) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID int64, input service.AdminUpdateAPIKeyGroupUpdateInput) (*service.AdminUpdateAPIKeyGroupIDResult, error) {
 	for i := range s.apiKeys {
 		if s.apiKeys[i].ID == keyID {
 			k := s.apiKeys[i]
+			groupID := input.GroupID
+			if input.DefaultGroupID != nil {
+				groupID = input.DefaultGroupID
+			}
 			if groupID != nil {
 				if *groupID == 0 {
 					k.GroupID = nil
 				} else {
 					gid := *groupID
 					k.GroupID = &gid
+				}
+			}
+			if input.GrantedGroupIDs != nil {
+				k.GrantedGroups = make([]*service.Group, 0, len(*input.GrantedGroupIDs))
+				for _, gid := range *input.GrantedGroupIDs {
+					gid := gid
+					k.GrantedGroups = append(k.GrantedGroups, &service.Group{ID: gid})
 				}
 			}
 			return &service.AdminUpdateAPIKeyGroupIDResult{APIKey: &k}, nil
