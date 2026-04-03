@@ -62,19 +62,19 @@ type JWTClaims struct {
 
 // AuthService 认证服务
 type AuthService struct {
-	entClient          *dbent.Client
-	userRepo           UserRepository
-	redeemRepo         RedeemCodeRepository
-	groupRepo          InviteLoginGroupResolver
-	apiKeyProvisioner  InviteLoginAPIKeyProvisioner
-	refreshTokenCache  RefreshTokenCache
-	cfg                *config.Config
-	settingService     *SettingService
-	emailService       *EmailService
-	turnstileService   *TurnstileService
-	emailQueueService  *EmailQueueService
-	promoService       *PromoService
-	defaultSubAssigner DefaultSubscriptionAssigner
+	entClient               *dbent.Client
+	userRepo                UserRepository
+	redeemRepo              RedeemCodeRepository
+	groupRepo               InviteLoginGroupResolver
+	apiKeyProvisioner       InviteLoginAPIKeyProvisioner
+	refreshTokenCache       RefreshTokenCache
+	cfg                     *config.Config
+	settingService          *SettingService
+	emailService            *EmailService
+	turnstileService        *TurnstileService
+	emailQueueService       *EmailQueueService
+	promoService            *PromoService
+	defaultSubAssigner      DefaultSubscriptionAssigner
 	bootstrapContextFactory *InviteBootstrapContextFactory
 }
 
@@ -107,6 +107,7 @@ type InviteBootstrapProvider struct {
 	ProviderName      string                 `json:"provider_name"`
 	BaseURL           string                 `json:"base_url"`
 	APIStyle          string                 `json:"api_style"`
+	APIKey            string                 `json:"api_key,omitempty"`
 	Models            []InviteBootstrapModel `json:"models"`
 	DefaultModel      string                 `json:"default_model"`
 	DefaultAPIKeyName string                 `json:"default_api_key_name,omitempty"`
@@ -136,19 +137,19 @@ func NewAuthService(
 	defaultSubAssigner DefaultSubscriptionAssigner,
 ) *AuthService {
 	return &AuthService{
-		entClient:          entClient,
-		userRepo:           userRepo,
-		redeemRepo:         redeemRepo,
-		groupRepo:          groupRepo,
-		apiKeyProvisioner:  apiKeyProvisioner,
-		refreshTokenCache:  refreshTokenCache,
-		cfg:                cfg,
-		settingService:     settingService,
-		emailService:       emailService,
-		turnstileService:   turnstileService,
-		emailQueueService:  emailQueueService,
-		promoService:       promoService,
-		defaultSubAssigner: defaultSubAssigner,
+		entClient:               entClient,
+		userRepo:                userRepo,
+		redeemRepo:              redeemRepo,
+		groupRepo:               groupRepo,
+		apiKeyProvisioner:       apiKeyProvisioner,
+		refreshTokenCache:       refreshTokenCache,
+		cfg:                     cfg,
+		settingService:          settingService,
+		emailService:            emailService,
+		turnstileService:        turnstileService,
+		emailQueueService:       emailQueueService,
+		promoService:            promoService,
+		defaultSubAssigner:      defaultSubAssigner,
 		bootstrapContextFactory: DefaultInviteBootstrapContextFactory(settingService),
 	}
 }
@@ -463,6 +464,7 @@ func (s *AuthService) ensureInviteBootstrapAPIAccess(ctx context.Context, userID
 	}
 
 	entitledGroups := make(map[int64]struct{}, len(targets))
+	entitledGroupIDs := make([]int64, 0, len(targets))
 	providers := make([]InviteBootstrapProvider, 0, len(targets))
 
 	for _, target := range targets {
@@ -493,20 +495,27 @@ func (s *AuthService) ensureInviteBootstrapAPIAccess(ctx context.Context, userID
 				}
 			}
 			entitledGroups[group.ID] = struct{}{}
+			entitledGroupIDs = append(entitledGroupIDs, group.ID)
 		}
 
 		keyName := "default-" + target.Provider.ProviderID
 		groupID := group.ID
-		if _, err := s.apiKeyProvisioner.Create(ctx, userID, CreateAPIKeyRequest{
-			Name:    keyName,
-			GroupID: &groupID,
-		}); err != nil {
+		grantedGroupIDs := append([]int64(nil), entitledGroupIDs...)
+		createdKey, err := s.apiKeyProvisioner.Create(ctx, userID, CreateAPIKeyRequest{
+			Name:            keyName,
+			GroupID:         &groupID,
+			GrantedGroupIDs: grantedGroupIDs,
+		})
+		if err != nil {
 			return nil, fmt.Errorf("create %s api key: %w", target.Provider.ProviderID, err)
 		}
 
 		provider := target.Provider
 		provider.DefaultAPIKeyName = keyName
 		provider.DefaultGroupID = group.ID
+		if createdKey != nil {
+			provider.APIKey = strings.TrimSpace(createdKey.Key)
+		}
 		providers = append(providers, provider)
 	}
 

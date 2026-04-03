@@ -86,7 +86,7 @@ func (b *OpenAIBootstrapContextBuilder) BuildProviders(ctx context.Context, _ *G
 	return []InviteBootstrapProvider{{
 		ProviderID:   PlatformOpenAI,
 		ProviderName: "OpenAI",
-		BaseURL:      inviteBootstrapBaseURL(ctx, b.settingService),
+		BaseURL:      inviteBootstrapProviderBaseURL(inviteBootstrapBaseURL(ctx, b.settingService), PlatformOpenAI),
 		APIStyle:     inviteBootstrapAPIStyleOpenAI,
 		Models:       models,
 		DefaultModel: models[0].ID,
@@ -123,7 +123,7 @@ func (b *AnthropicBootstrapContextBuilder) BuildProviders(ctx context.Context, _
 	return []InviteBootstrapProvider{{
 		ProviderID:   PlatformAnthropic,
 		ProviderName: "Anthropic",
-		BaseURL:      inviteBootstrapBaseURL(ctx, b.settingService),
+		BaseURL:      inviteBootstrapProviderBaseURL(inviteBootstrapBaseURL(ctx, b.settingService), PlatformAnthropic),
 		APIStyle:     inviteBootstrapAPIStyleAnthropic,
 		Models:       models,
 		DefaultModel: models[0].ID,
@@ -186,7 +186,7 @@ func (b *AntigravityBootstrapContextBuilder) BuildProviders(ctx context.Context,
 		providers = append(providers, InviteBootstrapProvider{
 			ProviderID:   providerID,
 			ProviderName: providerName,
-			BaseURL:      inviteBootstrapBaseURL(ctx, b.settingService),
+			BaseURL:      inviteBootstrapProviderBaseURL(inviteBootstrapBaseURL(ctx, b.settingService), providerID),
 			APIStyle:     apiStyle,
 			Models:       models,
 			DefaultModel: defaultModel,
@@ -316,7 +316,33 @@ func inviteBootstrapBaseURL(ctx context.Context, settingService *SettingService)
 	if settingService == nil {
 		return ""
 	}
-	return strings.TrimSpace(settingService.GetAPIBaseURL(ctx))
+	return strings.TrimRight(strings.TrimSpace(settingService.GetAPIBaseURL(ctx)), "/")
+}
+
+func inviteBootstrapProviderBaseURL(baseURL, providerID string) string {
+	trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if trimmed == "" {
+		return ""
+	}
+	switch providerID {
+	case PlatformOpenAI, PlatformAnthropic:
+		if strings.HasSuffix(trimmed, "/v1") {
+			return trimmed
+		}
+		return trimmed + "/v1"
+	case inviteBootstrapProviderIDAntigravityClaude:
+		if strings.HasSuffix(trimmed, "/antigravity/v1") {
+			return trimmed
+		}
+		return trimmed + "/antigravity/v1"
+	case inviteBootstrapProviderIDAntigravityGemini:
+		if strings.HasSuffix(trimmed, "/antigravity/v1beta") {
+			return trimmed
+		}
+		return trimmed + "/antigravity/v1beta"
+	default:
+		return trimmed
+	}
 }
 
 func normalizeInvitePlatform(platform string) string {
