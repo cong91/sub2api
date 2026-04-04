@@ -3293,3 +3293,132 @@ func TestGatewayService_ResolveGatewayGroup_DetectsFallbackCycle(t *testing.T) {
 	require.Nil(t, gotID)
 	require.Contains(t, err.Error(), "fallback group cycle")
 }
+
+func TestGatewayService_ResolveEffectiveGroupForRequest_MultiGroupGeminiChoosesAntigravity(t *testing.T) {
+	ctx := context.Background()
+
+	openaiGroupID := int64(101)
+	antigravityGroupID := int64(202)
+
+	ctx = context.WithValue(ctx, ctxkey.GrantedGroups, []*Group{
+		{ID: openaiGroupID, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true},
+		{ID: antigravityGroupID, Platform: PlatformAntigravity, Status: StatusActive, Hydrated: true, SupportedModelScopes: []string{"gemini_text"}},
+	})
+
+	repo := &mockAccountRepoForPlatform{
+		accounts: []Account{
+			{ID: 1, Platform: PlatformOpenAI, Priority: 1, Status: StatusActive, Schedulable: true, AccountGroups: []AccountGroup{{GroupID: openaiGroupID}}},
+			{ID: 2, Platform: PlatformAntigravity, Priority: 1, Status: StatusActive, Schedulable: true, AccountGroups: []AccountGroup{{GroupID: antigravityGroupID}}},
+		},
+		accountsByID: map[int64]*Account{},
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+
+	svc := &GatewayService{accountRepo: repo, cfg: testConfig()}
+
+	group, groupID, err := svc.resolveEffectiveGroupForRequest(ctx, &openaiGroupID, "gemini-2.5-pro")
+	require.NoError(t, err)
+	require.NotNil(t, group)
+	require.NotNil(t, groupID)
+	require.Equal(t, antigravityGroupID, *groupID)
+	require.Equal(t, PlatformAntigravity, group.Platform)
+}
+
+func TestGatewayService_ResolveEffectiveGroupForRequest_MultiGroupOpenAIRemainsOpenAI(t *testing.T) {
+	ctx := context.Background()
+
+	openaiGroupID := int64(101)
+	antigravityGroupID := int64(202)
+
+	ctx = context.WithValue(ctx, ctxkey.GrantedGroups, []*Group{
+		{ID: openaiGroupID, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true},
+		{ID: antigravityGroupID, Platform: PlatformAntigravity, Status: StatusActive, Hydrated: true},
+	})
+
+	repo := &mockAccountRepoForPlatform{
+		accounts: []Account{
+			{ID: 1, Platform: PlatformOpenAI, Priority: 1, Status: StatusActive, Schedulable: true, AccountGroups: []AccountGroup{{GroupID: openaiGroupID}}},
+			{ID: 2, Platform: PlatformAntigravity, Priority: 1, Status: StatusActive, Schedulable: true, AccountGroups: []AccountGroup{{GroupID: antigravityGroupID}}},
+		},
+		accountsByID: map[int64]*Account{},
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+
+	svc := &GatewayService{accountRepo: repo, cfg: testConfig()}
+
+	group, groupID, err := svc.resolveEffectiveGroupForRequest(ctx, &openaiGroupID, "gpt-4.1")
+	require.NoError(t, err)
+	require.NotNil(t, group)
+	require.NotNil(t, groupID)
+	require.Equal(t, openaiGroupID, *groupID)
+	require.Equal(t, PlatformOpenAI, group.Platform)
+}
+
+func TestGatewayService_ResolveEffectiveGroupForRequest_NoAccountAcrossGrantedGroups(t *testing.T) {
+	ctx := context.Background()
+
+	openaiGroupID := int64(101)
+	antigravityGroupID := int64(202)
+
+	ctx = context.WithValue(ctx, ctxkey.GrantedGroups, []*Group{
+		{ID: openaiGroupID, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true},
+		{ID: antigravityGroupID, Platform: PlatformAntigravity, Status: StatusActive, Hydrated: true, SupportedModelScopes: []string{"gemini_text"}},
+	})
+
+	repo := &mockAccountRepoForPlatform{
+		accounts: []Account{
+			{ID: 1, Platform: PlatformOpenAI, Priority: 1, Status: StatusActive, Schedulable: true, AccountGroups: []AccountGroup{{GroupID: openaiGroupID}}},
+		},
+		accountsByID: map[int64]*Account{},
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+
+	svc := &GatewayService{accountRepo: repo, cfg: testConfig()}
+
+	_, err := svc.SelectAccountForModelWithExclusions(ctx, &openaiGroupID, "", "gemini-2.5-pro", nil)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrNoAvailableAccounts)
+}
+
+func TestGatewayService_SelectAccountForModelWithExclusions_MultiGroupRoutesByModel(t *testing.T) {
+	ctx := context.Background()
+
+	openaiGroupID := int64(101)
+	antigravityGroupID := int64(202)
+
+	ctx = context.WithValue(ctx, ctxkey.GrantedGroups, []*Group{
+		{ID: openaiGroupID, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true},
+		{ID: antigravityGroupID, Platform: PlatformAntigravity, Status: StatusActive, Hydrated: true, SupportedModelScopes: []string{"gemini_text"}},
+	})
+
+	repo := &mockAccountRepoForPlatform{
+		accounts: []Account{
+			{ID: 1, Platform: PlatformOpenAI, Priority: 1, Status: StatusActive, Schedulable: true, AccountGroups: []AccountGroup{{GroupID: openaiGroupID}}},
+			{ID: 2, Platform: PlatformAntigravity, Priority: 1, Status: StatusActive, Schedulable: true, AccountGroups: []AccountGroup{{GroupID: antigravityGroupID}}},
+		},
+		accountsByID: map[int64]*Account{},
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+
+	svc := &GatewayService{accountRepo: repo, cfg: testConfig()}
+
+	openaiAcc, err := svc.SelectAccountForModelWithExclusions(ctx, &openaiGroupID, "", "gpt-4.1", nil)
+	require.NoError(t, err)
+	require.NotNil(t, openaiAcc)
+	require.Equal(t, int64(1), openaiAcc.ID)
+	require.Equal(t, PlatformOpenAI, openaiAcc.Platform)
+
+	geminiAcc, err := svc.SelectAccountForModelWithExclusions(ctx, &openaiGroupID, "", "gemini-2.5-pro", nil)
+	require.NoError(t, err)
+	require.NotNil(t, geminiAcc)
+	require.Equal(t, int64(2), geminiAcc.ID)
+	require.Equal(t, PlatformAntigravity, geminiAcc.Platform)
+}

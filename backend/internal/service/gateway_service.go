@@ -1185,17 +1185,26 @@ func (s *GatewayService) SelectAccountForModel(ctx context.Context, groupID *int
 
 // SelectAccountForModelWithExclusions selects an account supporting the requested model while excluding specified accounts.
 func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*Account, error) {
+	resolvedGroup, resolvedGroupID, err := s.resolveEffectiveGroupForRequest(ctx, groupID, requestedModel)
+	if err != nil {
+		return nil, err
+	}
+	groupID = resolvedGroupID
+	ctx = s.withGroupContext(ctx, resolvedGroup)
+
 	// 优先检查 context 中的强制平台（/antigravity 路由）
 	var platform string
 	forcePlatform, hasForcePlatform := ctx.Value(ctxkey.ForcePlatform).(string)
 	if hasForcePlatform && forcePlatform != "" {
 		platform = forcePlatform
+	} else if resolvedGroup != nil {
+		platform = resolvedGroup.Platform
 	} else if groupID != nil {
-		group, resolvedGroupID, err := s.resolveGatewayGroup(ctx, groupID)
+		group, gid, err := s.resolveGatewayGroup(ctx, groupID)
 		if err != nil {
 			return nil, err
 		}
-		groupID = resolvedGroupID
+		groupID = gid
 		ctx = s.withGroupContext(ctx, group)
 		platform = group.Platform
 	} else {
@@ -1241,8 +1250,8 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 
 	cfg := s.schedulingConfig()
 
-	// 检查 Claude Code 客户端限制（可能会替换 groupID 为降级分组）
-	group, groupID, err := s.checkClaudeCodeRestriction(ctx, groupID)
+	// 解析请求级有效分组（多分组 Key 场景会按模型/平台/可调度性选择）
+	group, groupID, err := s.resolveEffectiveGroupForRequest(ctx, groupID, requestedModel)
 	if err != nil {
 		return nil, err
 	}
@@ -1814,6 +1823,154 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		}, nil
 	}
 	return nil, ErrNoAvailableAccounts
+}
+
+func (s *GatewayService) resolveEffectiveGroupForRequest(ctx context.Context, groupID *int64, requestedModel string) (*Group, *int64, error) {
+	granted := grantedGroupsFromContext(ctx)
+	if len(granted) == 0 {
+		return s.checkClaudeCodeRestriction(ctx, groupID)
+	}
+
+	forcePlatform, hasForcePlatform := ctx.Value(ctxkey.ForcePlatform).(string)
+	if hasForcePlatform && strings.TrimSpace(forcePlatform) == "" {
+		hasForcePlatform = false
+	}
+
+	candidates := make([]*Group, 0, len(granted))
+	seen := make(map[int64]struct{}, len(granted))
+	for _, g := range granted {
+		if !IsGroupContextValid(g) {
+			continue
+		}
+		if _, ok := seen[g.ID]; ok {
+			continue
+		}
+		seen[g.ID] = struct{}{}
+		if hasForcePlatform && !strings.EqualFold(strings.TrimSpace(g.Platform), strings.TrimSpace(forcePlatform)) {
+			continue
+		}
+		if !groupMatchesRequestedModel(g, requestedModel) {
+			continue
+		}
+		candidates = append(candidates, g)
+	}
+
+	if len(candidates) == 0 {
+		return s.checkClaudeCodeRestriction(ctx, groupID)
+	}
+
+	preferID := int64(0)
+	if groupID != nil {
+		preferID = *groupID
+	}
+	if preferID > 0 {
+		for _, candidate := range candidates {
+			if candidate.ID != preferID {
+				continue
+			}
+			if s.groupHasEligibleAccounts(ctx, &candidate.ID, requestedModel, candidate.Platform, hasForcePlatform) {
+				gid := candidate.ID
+				return candidate, &gid, nil
+			}
+			break
+		}
+	}
+
+	for _, candidate := range candidates {
+		if s.groupHasEligibleAccounts(ctx, &candidate.ID, requestedModel, candidate.Platform, hasForcePlatform) {
+			gid := candidate.ID
+			return candidate, &gid, nil
+		}
+	}
+
+	if len(candidates) == 1 {
+		gid := candidates[0].ID
+		return candidates[0], &gid, nil
+	}
+
+	return s.checkClaudeCodeRestriction(ctx, groupID)
+}
+
+func grantedGroupsFromContext(ctx context.Context) []*Group {
+	if ctx == nil {
+		return nil
+	}
+	groups, ok := ctx.Value(ctxkey.GrantedGroups).([]*Group)
+	if !ok || len(groups) == 0 {
+		return nil
+	}
+	return groups
+}
+
+func groupMatchesRequestedModel(group *Group, requestedModel string) bool {
+	if group == nil || requestedModel == "" {
+		return group != nil
+	}
+	model := strings.ToLower(strings.TrimSpace(requestedModel))
+	platform := strings.ToLower(strings.TrimSpace(group.Platform))
+
+	switch {
+	case strings.HasPrefix(model, "gpt"), strings.HasPrefix(model, "o1"), strings.HasPrefix(model, "o3"), strings.HasPrefix(model, "o4"):
+		return platform == PlatformOpenAI
+	case strings.HasPrefix(model, "claude"):
+		return platform == PlatformAnthropic || platform == PlatformAntigravity
+	case strings.HasPrefix(model, "gemini"):
+		if platform == PlatformGemini {
+			return true
+		}
+		if platform != PlatformAntigravity {
+			return false
+		}
+		if len(group.SupportedModelScopes) == 0 {
+			return true
+		}
+		for _, scope := range group.SupportedModelScopes {
+			s := strings.ToLower(strings.TrimSpace(scope))
+			if s == "gemini_text" || s == "gemini_image" {
+				return true
+			}
+		}
+		return false
+	default:
+		return true
+	}
+}
+
+func (s *GatewayService) groupHasEligibleAccounts(ctx context.Context, groupID *int64, requestedModel string, platform string, hasForcePlatform bool) bool {
+	if s == nil {
+		return false
+	}
+	accounts, useMixed, err := s.listSchedulableAccounts(ctx, groupID, platform, hasForcePlatform)
+	if err != nil || len(accounts) == 0 {
+		return false
+	}
+
+	ctx = s.withWindowCostPrefetch(ctx, accounts)
+	ctx = s.withRPMPrefetch(ctx, accounts)
+
+	for i := range accounts {
+		acc := &accounts[i]
+		if !s.isAccountAllowedForPlatform(acc, platform, useMixed) {
+			continue
+		}
+		if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, acc, requestedModel) {
+			continue
+		}
+		if !s.isAccountSchedulableForModelSelection(ctx, acc, requestedModel) {
+			continue
+		}
+		if !s.isAccountSchedulableForQuota(acc) {
+			continue
+		}
+		if !s.isAccountSchedulableForWindowCost(ctx, acc, false) {
+			continue
+		}
+		if !s.isAccountSchedulableForRPM(ctx, acc, false) {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 func (s *GatewayService) tryAcquireByLegacyOrder(ctx context.Context, candidates []*Account, groupID *int64, sessionHash string, preferOAuth bool) (*AccountSelectionResult, bool) {
