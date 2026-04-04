@@ -1891,6 +1891,14 @@ func (s *GatewayService) resolveEffectiveGroupForRequest(ctx context.Context, gr
 	return s.checkClaudeCodeRestriction(ctx, groupID)
 }
 
+// ResolveEffectiveGroupForRequest resolves the request-time effective group.
+// For multi-group keys, routing derives the group dynamically from
+// granted groups + model/platform + schedulability. groupID is treated as a
+// compatibility preference/fallback only.
+func (s *GatewayService) ResolveEffectiveGroupForRequest(ctx context.Context, groupID *int64, requestedModel string) (*Group, *int64, error) {
+	return s.resolveEffectiveGroupForRequest(ctx, groupID, requestedModel)
+}
+
 func grantedGroupsFromContext(ctx context.Context) []*Group {
 	if ctx == nil {
 		return nil

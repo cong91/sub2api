@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/cespare/xxhash/v2"
 	"github.com/gin-gonic/gin"
@@ -879,6 +880,56 @@ func TestOpenAISelectAccountWithLoadAwareness_PreferNeverUsed(t *testing.T) {
 	if selection == nil || selection.Account == nil || selection.Account.ID != 2 {
 		t.Fatalf("expected account 2")
 	}
+}
+
+func TestOpenAIGatewayService_ResolveEffectiveGroupForRequest_MultiGroupRoutesByModel(t *testing.T) {
+	openaiGroupID := int64(101)
+	antigravityGroupID := int64(202)
+
+	ctx := context.WithValue(context.Background(), ctxkey.GrantedGroups, []*Group{
+		{ID: openaiGroupID, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true},
+		{ID: antigravityGroupID, Platform: PlatformAntigravity, Status: StatusActive, Hydrated: true, SupportedModelScopes: []string{"gemini_text"}},
+	})
+
+	svc := &OpenAIGatewayService{
+		accountRepo: stubOpenAIAccountRepo{accounts: []Account{
+			{ID: 1, Platform: PlatformOpenAI, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 1, AccountGroups: []AccountGroup{{GroupID: openaiGroupID}}},
+			{ID: 2, Platform: PlatformOpenAI, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 1, AccountGroups: []AccountGroup{{GroupID: antigravityGroupID}}},
+		}},
+		cfg: &config.Config{},
+	}
+
+	group, groupID, err := svc.ResolveEffectiveGroupForRequest(ctx, &openaiGroupID, "gemini-2.5-pro")
+	require.NoError(t, err)
+	require.NotNil(t, group)
+	require.NotNil(t, groupID)
+	require.Equal(t, antigravityGroupID, *groupID)
+	require.Equal(t, PlatformAntigravity, group.Platform)
+}
+
+func TestOpenAIGatewayService_ResolveEffectiveGroupForRequest_DefaultFallbackWhenAmbiguous(t *testing.T) {
+	openaiGroupID := int64(101)
+	antigravityGroupID := int64(202)
+
+	ctx := context.WithValue(context.Background(), ctxkey.GrantedGroups, []*Group{
+		{ID: openaiGroupID, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true},
+		{ID: antigravityGroupID, Platform: PlatformAntigravity, Status: StatusActive, Hydrated: true},
+	})
+
+	svc := &OpenAIGatewayService{
+		accountRepo: stubOpenAIAccountRepo{accounts: []Account{
+			{ID: 1, Platform: PlatformOpenAI, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 1, AccountGroups: []AccountGroup{{GroupID: openaiGroupID}}},
+			{ID: 2, Platform: PlatformOpenAI, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 1, AccountGroups: []AccountGroup{{GroupID: antigravityGroupID}}},
+		}},
+		cfg: &config.Config{},
+	}
+
+	group, groupID, err := svc.ResolveEffectiveGroupForRequest(ctx, &openaiGroupID, "")
+	require.NoError(t, err)
+	require.NotNil(t, group)
+	require.NotNil(t, groupID)
+	require.Equal(t, openaiGroupID, *groupID)
+	require.Equal(t, PlatformOpenAI, group.Platform)
 }
 
 func TestOpenAIStreamingTimeout(t *testing.T) {

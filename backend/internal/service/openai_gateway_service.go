@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
@@ -1636,6 +1637,85 @@ func (s *OpenAIGatewayService) SelectAccountWithLoadAwareness(ctx context.Contex
 	}
 
 	return nil, ErrNoAvailableAccounts
+}
+
+// ResolveEffectiveGroupForRequest resolves request-time routing group for OpenAI gateway paths.
+// For multi-group keys, group selection is derived from granted groups + model +
+// schedulability. groupID is treated as compatibility preference/fallback.
+func (s *OpenAIGatewayService) ResolveEffectiveGroupForRequest(ctx context.Context, groupID *int64, requestedModel string) (*Group, *int64, error) {
+	granted, ok := ctx.Value(ctxkey.GrantedGroups).([]*Group)
+	if !ok || len(granted) == 0 {
+		return nil, groupID, nil
+	}
+
+	candidates := make([]*Group, 0, len(granted))
+	seen := make(map[int64]struct{}, len(granted))
+	for _, g := range granted {
+		if !IsGroupContextValid(g) {
+			continue
+		}
+		if _, exists := seen[g.ID]; exists {
+			continue
+		}
+		seen[g.ID] = struct{}{}
+		if !groupMatchesRequestedModel(g, requestedModel) {
+			continue
+		}
+		candidates = append(candidates, g)
+	}
+
+	if len(candidates) == 0 {
+		return nil, groupID, nil
+	}
+
+	preferID := int64(0)
+	if groupID != nil {
+		preferID = *groupID
+	}
+	if preferID > 0 {
+		for _, candidate := range candidates {
+			if candidate.ID != preferID {
+				continue
+			}
+			if s.groupHasEligibleOpenAIAccounts(ctx, candidate.ID, requestedModel) {
+				gid := candidate.ID
+				return candidate, &gid, nil
+			}
+			break
+		}
+	}
+
+	for _, candidate := range candidates {
+		if s.groupHasEligibleOpenAIAccounts(ctx, candidate.ID, requestedModel) {
+			gid := candidate.ID
+			return candidate, &gid, nil
+		}
+	}
+
+	if len(candidates) == 1 {
+		gid := candidates[0].ID
+		return candidates[0], &gid, nil
+	}
+
+	return nil, groupID, nil
+}
+
+func (s *OpenAIGatewayService) groupHasEligibleOpenAIAccounts(ctx context.Context, groupID int64, requestedModel string) bool {
+	accounts, err := s.listSchedulableAccounts(ctx, &groupID)
+	if err != nil || len(accounts) == 0 {
+		return false
+	}
+	for i := range accounts {
+		acc := &accounts[i]
+		if !acc.IsSchedulable() || !acc.IsOpenAI() {
+			continue
+		}
+		if requestedModel != "" && !acc.IsModelSupported(requestedModel) {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 func (s *OpenAIGatewayService) listSchedulableAccounts(ctx context.Context, groupID *int64) ([]Account, error) {

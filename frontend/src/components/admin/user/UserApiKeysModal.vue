@@ -231,19 +231,14 @@ const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
   closeGroupSelector()
   if (getDefaultGroupId(key) === newGroupId) return
 
-  const nextGranted = new Set<number>(normalizeGroupIds(key.granted_group_ids, key.group_id))
-  if (newGroupId === null) {
-    nextGranted.clear()
-  } else {
-    nextGranted.add(newGroupId)
-  }
+  const nextGranted = normalizeGroupIds(key.granted_group_ids, key.group_id)
 
   updatingKeyIds.value.add(key.id)
   try {
     const result = await adminAPI.apiKeys.updateApiKeyGroups(key.id, {
       group_id: newGroupId,
       default_group_id: newGroupId,
-      granted_group_ids: Array.from(nextGranted)
+      granted_group_ids: nextGranted
     })
     // Update local data
     const idx = apiKeys.value.findIndex((k) => k.id === key.id)

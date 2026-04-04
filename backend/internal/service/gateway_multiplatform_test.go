@@ -3422,3 +3422,35 @@ func TestGatewayService_SelectAccountForModelWithExclusions_MultiGroupRoutesByMo
 	require.Equal(t, int64(2), geminiAcc.ID)
 	require.Equal(t, PlatformAntigravity, geminiAcc.Platform)
 }
+
+func TestGatewayService_ResolveEffectiveGroupForRequest_DefaultFallbackWhenAmbiguous(t *testing.T) {
+	ctx := context.Background()
+
+	openaiGroupID := int64(101)
+	antigravityGroupID := int64(202)
+
+	ctx = context.WithValue(ctx, ctxkey.GrantedGroups, []*Group{
+		{ID: openaiGroupID, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true},
+		{ID: antigravityGroupID, Platform: PlatformAntigravity, Status: StatusActive, Hydrated: true},
+	})
+
+	repo := &mockAccountRepoForPlatform{
+		accounts: []Account{
+			{ID: 1, Platform: PlatformOpenAI, Priority: 1, Status: StatusActive, Schedulable: true, AccountGroups: []AccountGroup{{GroupID: openaiGroupID}}},
+			{ID: 2, Platform: PlatformAntigravity, Priority: 1, Status: StatusActive, Schedulable: true, AccountGroups: []AccountGroup{{GroupID: antigravityGroupID}}},
+		},
+		accountsByID: map[int64]*Account{},
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+
+	svc := &GatewayService{accountRepo: repo, cfg: testConfig()}
+
+	group, groupID, err := svc.resolveEffectiveGroupForRequest(ctx, &openaiGroupID, "")
+	require.NoError(t, err)
+	require.NotNil(t, group)
+	require.NotNil(t, groupID)
+	require.Equal(t, openaiGroupID, *groupID)
+	require.Equal(t, PlatformOpenAI, group.Platform)
+}

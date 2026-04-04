@@ -31,7 +31,7 @@ func NewAPIKeyHandler(apiKeyService *service.APIKeyService) *APIKeyHandler {
 // CreateAPIKeyRequest represents the create API key request payload
 type CreateAPIKeyRequest struct {
 	Name            string   `json:"name" binding:"required"`
-	GroupID         *int64   `json:"group_id"`          // nullable / compatibility default group
+	GroupID         *int64   `json:"group_id"`          // nullable / compatibility fallback default group
 	DefaultGroupID  *int64   `json:"default_group_id"`  // alias of group_id for multi-group clients
 	GrantedGroupIDs []int64  `json:"granted_group_ids"` // granted groups for multi-group key
 	CustomKey       *string  `json:"custom_key"`        // 可选的自定义key
@@ -157,6 +157,7 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 			response.BadRequest(c, "group_id and default_group_id must be the same when both are provided")
 			return
 		}
+		// default_group_id is a compatibility alias mapped to legacy group_id
 		req.GroupID = req.DefaultGroupID
 	}
 
@@ -216,6 +217,7 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 			response.BadRequest(c, "group_id and default_group_id must be the same when both are provided")
 			return
 		}
+		// default_group_id is a compatibility alias mapped to legacy group_id
 		req.GroupID = req.DefaultGroupID
 	}
 

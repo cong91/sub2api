@@ -35,8 +35,8 @@ type APIKey struct {
 	Name    string
 	GroupID *int64
 	// GrantedGroups contains all groups this key can access.
-	// Compatibility note: legacy call paths still use GroupID/Group as the
-	// effective/default group until full multi-group routing lands.
+	// Compatibility note: GroupID/Group are legacy fallback preference fields;
+	// request-time routing for multi-group keys derives effective group dynamically.
 	GrantedGroups []*Group
 	Status        string
 	IPWhitelist   []string

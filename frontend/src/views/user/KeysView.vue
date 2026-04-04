@@ -95,7 +95,7 @@
                 :ref="(el) => setGroupButtonRef(row.id, el)"
                 @click="openGroupSelector(row)"
                 class="-mx-2 -my-1 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-dark-700"
-                :title="t('keys.clickToChangeGroup')"
+                :title="t('keys.clickToChangeDefaultGroup')"
               >
                 <div v-if="getKeyGroups(row).length > 0" class="flex flex-wrap items-center gap-1.5">
                   <GroupBadge
@@ -109,7 +109,7 @@
                   />
                 </div>
                 <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{ t('keys.noGroup') }}</span>
-                <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('keys.selectGroup') }}</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('keys.selectDefaultGroup') }}</span>
                 <svg
                   class="h-3.5 w-3.5 text-gray-400 opacity-60 transition-opacity group-hover/dropdown:opacity-100"
                   fill="none"
@@ -398,11 +398,11 @@
         </div>
 
         <div>
-          <label class="input-label">{{ t('keys.groupLabel') }}</label>
+          <label class="input-label">{{ t('keys.defaultGroupLabel') }}</label>
           <Select
             v-model="formData.group_id"
             :options="groupOptions"
-            :placeholder="t('keys.selectGroup')"
+              :placeholder="t('keys.selectDefaultGroup')"
             :searchable="true"
             :search-placeholder="t('keys.searchGroup')"
             data-tour="key-form-group"
@@ -416,7 +416,7 @@
                 :rate-multiplier="(option as unknown as GroupOption).rate"
                 :user-rate-multiplier="(option as unknown as GroupOption).userRate"
               />
-              <span v-else class="text-gray-400">{{ t('keys.selectGroup') }}</span>
+              <span v-else class="text-gray-400">{{ t('keys.selectDefaultGroup') }}</span>
             </template>
             <template #option="{ option, selected }">
               <GroupOptionItem
@@ -1033,7 +1033,7 @@
         <!-- Group list -->
         <div class="max-h-80 overflow-y-auto p-1.5">
           <button
-            v-for="option in filteredGroupOptions"
+            v-for="option in filteredDefaultGroupOptions"
             :key="option.value ?? 'null'"
             @click="changeGroup(selectedKeyForGroup!, option.value)"
             :class="[
@@ -1060,7 +1060,7 @@
             />
           </button>
           <!-- Empty state when search has no results -->
-          <div v-if="filteredGroupOptions.length === 0" class="py-4 text-center text-sm text-gray-400 dark:text-gray-500">
+          <div v-if="filteredDefaultGroupOptions.length === 0" class="py-4 text-center text-sm text-gray-400 dark:text-gray-500">
             {{ t('keys.noGroupFound') }}
           </div>
         </div>
@@ -1326,14 +1326,27 @@ const groupOptions = computed(() =>
 
 // Group dropdown search
 const groupSearchQuery = ref('')
-const filteredGroupOptions = computed(() => {
-  const query = groupSearchQuery.value.trim().toLowerCase()
-  if (!query) return groupOptions.value
-  return groupOptions.value.filter((opt) => {
-    return opt.label.toLowerCase().includes(query) ||
-      (opt.description && opt.description.toLowerCase().includes(query))
+  const defaultGroupOptions = computed(() => {
+    const keyGroups = getKeyGroups(selectedKeyForGroup.value)
+    return keyGroups.map((group) => ({
+      value: group.id,
+      label: group.name,
+      description: group.description,
+      rate: group.rate_multiplier,
+      userRate: userGroupRates.value[group.id] ?? null,
+      subscriptionType: group.subscription_type,
+      platform: group.platform
+    }))
   })
-})
+
+  const filteredDefaultGroupOptions = computed(() => {
+    const query = groupSearchQuery.value.trim().toLowerCase()
+    if (!query) return defaultGroupOptions.value
+    return defaultGroupOptions.value.filter((opt) => {
+      return opt.label.toLowerCase().includes(query) ||
+        (opt.description && opt.description.toLowerCase().includes(query))
+    })
+  })
 
 const maskKey = (key: string): string => {
   if (key.length <= 12) return key
@@ -1542,29 +1555,23 @@ const openGroupSelector = (key: ApiKey) => {
   }
 }
 
-const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
+  const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
   groupSelectorKeyId.value = null
   dropdownPosition.value = null
   if (getDefaultGroupId(key) === newGroupId) return
 
-  const nextGranted = new Set<number>(normalizeGroupIds(key.granted_group_ids, key.group_id))
-
-  if (newGroupId === null) {
-    nextGranted.clear()
-  } else {
-    nextGranted.add(newGroupId)
-  }
+  const nextGranted = normalizeGroupIds(key.granted_group_ids, key.group_id)
 
   try {
     await keysAPI.update(key.id, {
       group_id: newGroupId,
       default_group_id: newGroupId,
-      granted_group_ids: Array.from(nextGranted)
+      granted_group_ids: nextGranted
     })
-    appStore.showSuccess(t('keys.groupChangedSuccess'))
+    appStore.showSuccess(t('keys.defaultGroupUpdatedSuccess'))
     loadApiKeys()
   } catch (error) {
-    appStore.showError(t('keys.failedToChangeGroup'))
+    appStore.showError(t('keys.failedToUpdateDefaultGroup'))
   }
 }
 
