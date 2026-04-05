@@ -15336,27 +15336,29 @@ func (m *ProxyMutation) ResetEdge(name string) error {
 // RedeemCodeMutation represents an operation that mutates the RedeemCode nodes in the graph.
 type RedeemCodeMutation struct {
 	config
-	op               Op
-	typ              string
-	id               *int64
-	code             *string
-	_type            *string
-	value            *float64
-	addvalue         *float64
-	status           *string
-	used_at          *time.Time
-	notes            *string
-	created_at       *time.Time
-	validity_days    *int
-	addvalidity_days *int
-	clearedFields    map[string]struct{}
-	user             *int64
-	cleareduser      bool
-	group            *int64
-	clearedgroup     bool
-	done             bool
-	oldValue         func(context.Context) (*RedeemCode, error)
-	predicates       []predicate.RedeemCode
+	op                   Op
+	typ                  string
+	id                   *int64
+	code                 *string
+	_type                *string
+	value                *float64
+	addvalue             *float64
+	bootstrap_balance    *float64
+	addbootstrap_balance *float64
+	status               *string
+	used_at              *time.Time
+	notes                *string
+	created_at           *time.Time
+	validity_days        *int
+	addvalidity_days     *int
+	clearedFields        map[string]struct{}
+	user                 *int64
+	cleareduser          bool
+	group                *int64
+	clearedgroup         bool
+	done                 bool
+	oldValue             func(context.Context) (*RedeemCode, error)
+	predicates           []predicate.RedeemCode
 }
 
 var _ ent.Mutation = (*RedeemCodeMutation)(nil)
@@ -15583,6 +15585,76 @@ func (m *RedeemCodeMutation) AddedValue() (r float64, exists bool) {
 func (m *RedeemCodeMutation) ResetValue() {
 	m.value = nil
 	m.addvalue = nil
+}
+
+// SetBootstrapBalance sets the "bootstrap_balance" field.
+func (m *RedeemCodeMutation) SetBootstrapBalance(f float64) {
+	m.bootstrap_balance = &f
+	m.addbootstrap_balance = nil
+}
+
+// BootstrapBalance returns the value of the "bootstrap_balance" field in the mutation.
+func (m *RedeemCodeMutation) BootstrapBalance() (r float64, exists bool) {
+	v := m.bootstrap_balance
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBootstrapBalance returns the old "bootstrap_balance" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldBootstrapBalance(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBootstrapBalance is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBootstrapBalance requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBootstrapBalance: %w", err)
+	}
+	return oldValue.BootstrapBalance, nil
+}
+
+// AddBootstrapBalance adds f to the "bootstrap_balance" field.
+func (m *RedeemCodeMutation) AddBootstrapBalance(f float64) {
+	if m.addbootstrap_balance != nil {
+		*m.addbootstrap_balance += f
+	} else {
+		m.addbootstrap_balance = &f
+	}
+}
+
+// AddedBootstrapBalance returns the value that was added to the "bootstrap_balance" field in this mutation.
+func (m *RedeemCodeMutation) AddedBootstrapBalance() (r float64, exists bool) {
+	v := m.addbootstrap_balance
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearBootstrapBalance clears the value of the "bootstrap_balance" field.
+func (m *RedeemCodeMutation) ClearBootstrapBalance() {
+	m.bootstrap_balance = nil
+	m.addbootstrap_balance = nil
+	m.clearedFields[redeemcode.FieldBootstrapBalance] = struct{}{}
+}
+
+// BootstrapBalanceCleared returns if the "bootstrap_balance" field was cleared in this mutation.
+func (m *RedeemCodeMutation) BootstrapBalanceCleared() bool {
+	_, ok := m.clearedFields[redeemcode.FieldBootstrapBalance]
+	return ok
+}
+
+// ResetBootstrapBalance resets all changes to the "bootstrap_balance" field.
+func (m *RedeemCodeMutation) ResetBootstrapBalance() {
+	m.bootstrap_balance = nil
+	m.addbootstrap_balance = nil
+	delete(m.clearedFields, redeemcode.FieldBootstrapBalance)
 }
 
 // SetStatus sets the "status" field.
@@ -16010,7 +16082,7 @@ func (m *RedeemCodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RedeemCodeMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 11)
 	if m.code != nil {
 		fields = append(fields, redeemcode.FieldCode)
 	}
@@ -16019,6 +16091,9 @@ func (m *RedeemCodeMutation) Fields() []string {
 	}
 	if m.value != nil {
 		fields = append(fields, redeemcode.FieldValue)
+	}
+	if m.bootstrap_balance != nil {
+		fields = append(fields, redeemcode.FieldBootstrapBalance)
 	}
 	if m.status != nil {
 		fields = append(fields, redeemcode.FieldStatus)
@@ -16055,6 +16130,8 @@ func (m *RedeemCodeMutation) Field(name string) (ent.Value, bool) {
 		return m.GetType()
 	case redeemcode.FieldValue:
 		return m.Value()
+	case redeemcode.FieldBootstrapBalance:
+		return m.BootstrapBalance()
 	case redeemcode.FieldStatus:
 		return m.Status()
 	case redeemcode.FieldUsedBy:
@@ -16084,6 +16161,8 @@ func (m *RedeemCodeMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldType(ctx)
 	case redeemcode.FieldValue:
 		return m.OldValue(ctx)
+	case redeemcode.FieldBootstrapBalance:
+		return m.OldBootstrapBalance(ctx)
 	case redeemcode.FieldStatus:
 		return m.OldStatus(ctx)
 	case redeemcode.FieldUsedBy:
@@ -16127,6 +16206,13 @@ func (m *RedeemCodeMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetValue(v)
+		return nil
+	case redeemcode.FieldBootstrapBalance:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBootstrapBalance(v)
 		return nil
 	case redeemcode.FieldStatus:
 		v, ok := value.(string)
@@ -16188,6 +16274,9 @@ func (m *RedeemCodeMutation) AddedFields() []string {
 	if m.addvalue != nil {
 		fields = append(fields, redeemcode.FieldValue)
 	}
+	if m.addbootstrap_balance != nil {
+		fields = append(fields, redeemcode.FieldBootstrapBalance)
+	}
 	if m.addvalidity_days != nil {
 		fields = append(fields, redeemcode.FieldValidityDays)
 	}
@@ -16201,6 +16290,8 @@ func (m *RedeemCodeMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case redeemcode.FieldValue:
 		return m.AddedValue()
+	case redeemcode.FieldBootstrapBalance:
+		return m.AddedBootstrapBalance()
 	case redeemcode.FieldValidityDays:
 		return m.AddedValidityDays()
 	}
@@ -16219,6 +16310,13 @@ func (m *RedeemCodeMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddValue(v)
 		return nil
+	case redeemcode.FieldBootstrapBalance:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBootstrapBalance(v)
+		return nil
 	case redeemcode.FieldValidityDays:
 		v, ok := value.(int)
 		if !ok {
@@ -16234,6 +16332,9 @@ func (m *RedeemCodeMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *RedeemCodeMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(redeemcode.FieldBootstrapBalance) {
+		fields = append(fields, redeemcode.FieldBootstrapBalance)
+	}
 	if m.FieldCleared(redeemcode.FieldUsedBy) {
 		fields = append(fields, redeemcode.FieldUsedBy)
 	}
@@ -16260,6 +16361,9 @@ func (m *RedeemCodeMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *RedeemCodeMutation) ClearField(name string) error {
 	switch name {
+	case redeemcode.FieldBootstrapBalance:
+		m.ClearBootstrapBalance()
+		return nil
 	case redeemcode.FieldUsedBy:
 		m.ClearUsedBy()
 		return nil
@@ -16288,6 +16392,9 @@ func (m *RedeemCodeMutation) ResetField(name string) error {
 		return nil
 	case redeemcode.FieldValue:
 		m.ResetValue()
+		return nil
+	case redeemcode.FieldBootstrapBalance:
+		m.ResetBootstrapBalance()
 		return nil
 	case redeemcode.FieldStatus:
 		m.ResetStatus()

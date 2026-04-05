@@ -405,7 +405,7 @@ func TestAuthService_InviteLogin_ValidCodeCreatesUserAndConsumesCode(t *testing.
 	require.Equal(t, int64(42), user.ID)
 	require.Equal(t, RoleUser, user.Role)
 	require.Equal(t, StatusActive, user.Status)
-	require.Len(t, userRepo.created, 1)
+	require.Len(t, inviteAwareRepo.created, 1)
 	require.Equal(t, 1, redeemRepo.useCalls)
 	require.Equal(t, int64(99), redeemRepo.usedID)
 	require.Equal(t, int64(42), redeemRepo.usedByUserID)
@@ -442,7 +442,7 @@ func TestAuthService_InviteLogin_ValidCodeCreatesUserAndConsumesCode(t *testing.
 
 	openAIProvider := findInviteProviderByID(t, result.BootstrapContext.Providers, PlatformOpenAI)
 	require.Equal(t, "OpenAI", openAIProvider.ProviderName)
-	require.Equal(t, "https://api.sub2api.dev", openAIProvider.BaseURL)
+	require.Equal(t, "https://api.sub2api.dev/v1", openAIProvider.BaseURL)
 	require.Equal(t, "openai-responses", openAIProvider.APIStyle)
 	require.NotEmpty(t, openAIProvider.Models)
 	require.Equal(t, openai.DefaultModels[0].ID, openAIProvider.DefaultModel)
@@ -554,8 +554,8 @@ func TestAuthService_InviteLogin_AnthropicGroupBuildsAnthropicBootstrapContext(t
 
 	result, err := service.InviteLogin(context.Background(), "INVITE-ANTHROPIC")
 	require.NoError(t, err)
-	require.Equal(t, 2, groupResolver.calls)
-	require.Equal(t, PlatformAnthropic, groupResolver.lastPlatform)
+	require.Equal(t, 3, groupResolver.calls)
+	require.Equal(t, PlatformAntigravity, groupResolver.lastPlatform)
 	require.Equal(t, PlatformAnthropic, result.BootstrapContext.DefaultProviderID)
 	require.Len(t, result.BootstrapContext.Providers, 1)
 	provider := result.BootstrapContext.Providers[0]
@@ -761,14 +761,16 @@ func TestAuthService_InviteLogin_SubscriptionGroupsAreIgnoredForBootstrapSelecti
 func TestAuthService_InviteLogin_ExclusiveStandardGroupAddsAllowedGroup(t *testing.T) {
 	userRepo := &inviteAwareUserRepoStub{userRepoStub: userRepoStub{nextID: 104}}
 	baseUserRepo := &userRepoStub{nextID: 104}
-	groupResolver := &inviteGroupResolverStub{groups: []Group{{
-		ID:               201,
-		Platform:         PlatformOpenAI,
-		Status:           StatusActive,
-		Hydrated:         true,
-		IsExclusive:      true,
-		SubscriptionType: SubscriptionTypeStandard,
-	}}}
+	groupResolver := &inviteGroupResolverStub{groupsByPlatform: map[string][]Group{
+		PlatformOpenAI: {{
+			ID:               201,
+			Platform:         PlatformOpenAI,
+			Status:           StatusActive,
+			Hydrated:         true,
+			IsExclusive:      true,
+			SubscriptionType: SubscriptionTypeStandard,
+		}},
+	}}
 	apiKeyProvisioner := &inviteAPIKeyProvisionerStub{}
 	redeemRepo := &inviteRedeemRepoStub{
 		codeByCode: map[string]*RedeemCode{
@@ -795,6 +797,8 @@ func TestAuthService_InviteLogin_ExclusiveStandardGroupAddsAllowedGroup(t *testi
 	require.Equal(t, 1, userRepo.addAllowedGroupCalls)
 	require.Equal(t, int64(104), userRepo.lastAddAllowedUserID)
 	require.Equal(t, int64(201), userRepo.lastAddAllowedGroupID)
+	require.Equal(t, 3, groupResolver.calls)
+	require.Equal(t, PlatformAntigravity, groupResolver.lastPlatform)
 	require.Equal(t, 1, apiKeyProvisioner.calls)
 	require.NotNil(t, apiKeyProvisioner.lastReq.GroupID)
 	require.Equal(t, int64(201), *apiKeyProvisioner.lastReq.GroupID)
@@ -806,14 +810,16 @@ func TestAuthService_InviteLogin_ExclusiveStandardGroupAddAllowedGroupFails(t *t
 		addAllowedErr: errors.New("grant failed"),
 	}
 	baseUserRepo := &userRepoStub{nextID: 105}
-	groupResolver := &inviteGroupResolverStub{groups: []Group{{
-		ID:               202,
-		Platform:         PlatformOpenAI,
-		Status:           StatusActive,
-		Hydrated:         true,
-		IsExclusive:      true,
-		SubscriptionType: SubscriptionTypeStandard,
-	}}}
+	groupResolver := &inviteGroupResolverStub{groupsByPlatform: map[string][]Group{
+		PlatformOpenAI: {{
+			ID:               202,
+			Platform:         PlatformOpenAI,
+			Status:           StatusActive,
+			Hydrated:         true,
+			IsExclusive:      true,
+			SubscriptionType: SubscriptionTypeStandard,
+		}},
+	}}
 	apiKeyProvisioner := &inviteAPIKeyProvisionerStub{}
 	redeemRepo := &inviteRedeemRepoStub{
 		codeByCode: map[string]*RedeemCode{
@@ -941,6 +947,106 @@ func TestAuthService_InviteLogin_CreateFailureReturnsUnavailable(t *testing.T) {
 	_, err := service.InviteLogin(context.Background(), "INVITE")
 	require.ErrorIs(t, err, ErrServiceUnavailable)
 	require.Equal(t, 0, redeemRepo.useCalls)
+}
+
+func TestAuthService_InviteLogin_BalancePrecedence_CodeBootstrapBalanceOverridesInvitationDefault(t *testing.T) {
+	userRepo := &userRepoStub{nextID: 150}
+	groupResolver := &inviteGroupResolverStub{groupsByPlatform: map[string][]Group{
+		PlatformOpenAI: {
+			{ID: 77, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true, SubscriptionType: SubscriptionTypeStandard},
+		},
+	}}
+	apiKeyProvisioner := &inviteAPIKeyProvisionerStub{}
+	bootstrapBalance := 9.25
+	redeemRepo := &inviteRedeemRepoStub{
+		codeByCode: map[string]*RedeemCode{
+			"INVITE-BAL-CODE": {
+				ID:               301,
+				Code:             "INVITE-BAL-CODE",
+				Type:             RedeemTypeInvitation,
+				Status:           StatusUnused,
+				BootstrapBalance: &bootstrapBalance,
+			},
+		},
+	}
+	service := newAuthService(userRepo, map[string]string{
+		SettingKeyRegistrationEnabled:      "true",
+		SettingKeyInvitationCodeEnabled:    "true",
+		SettingKeyDefaultInvitationBalance: "5.50",
+	}, nil)
+	service.redeemRepo = redeemRepo
+	service.groupRepo = groupResolver
+	service.apiKeyProvisioner = apiKeyProvisioner
+
+	result, err := service.InviteLogin(context.Background(), "INVITE-BAL-CODE")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 9.25, result.User.Balance)
+}
+
+func TestAuthService_InviteLogin_BalancePrecedence_InvitationDefaultOverridesConfigDefault(t *testing.T) {
+	userRepo := &userRepoStub{nextID: 151}
+	groupResolver := &inviteGroupResolverStub{groupsByPlatform: map[string][]Group{
+		PlatformOpenAI: {
+			{ID: 77, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true, SubscriptionType: SubscriptionTypeStandard},
+		},
+	}}
+	apiKeyProvisioner := &inviteAPIKeyProvisionerStub{}
+	redeemRepo := &inviteRedeemRepoStub{
+		codeByCode: map[string]*RedeemCode{
+			"INVITE-BAL-SETTING": {
+				ID:     302,
+				Code:   "INVITE-BAL-SETTING",
+				Type:   RedeemTypeInvitation,
+				Status: StatusUnused,
+			},
+		},
+	}
+	service := newAuthService(userRepo, map[string]string{
+		SettingKeyRegistrationEnabled:      "true",
+		SettingKeyInvitationCodeEnabled:    "true",
+		SettingKeyDefaultInvitationBalance: "5.50",
+	}, nil)
+	service.redeemRepo = redeemRepo
+	service.groupRepo = groupResolver
+	service.apiKeyProvisioner = apiKeyProvisioner
+
+	result, err := service.InviteLogin(context.Background(), "INVITE-BAL-SETTING")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 5.5, result.User.Balance)
+}
+
+func TestAuthService_InviteLogin_BalancePrecedence_ConfigDefaultUsedWhenNoOverrides(t *testing.T) {
+	userRepo := &userRepoStub{nextID: 152}
+	groupResolver := &inviteGroupResolverStub{groupsByPlatform: map[string][]Group{
+		PlatformOpenAI: {
+			{ID: 77, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true, SubscriptionType: SubscriptionTypeStandard},
+		},
+	}}
+	apiKeyProvisioner := &inviteAPIKeyProvisionerStub{}
+	redeemRepo := &inviteRedeemRepoStub{
+		codeByCode: map[string]*RedeemCode{
+			"INVITE-BAL-CONFIG": {
+				ID:     303,
+				Code:   "INVITE-BAL-CONFIG",
+				Type:   RedeemTypeInvitation,
+				Status: StatusUnused,
+			},
+		},
+	}
+	service := newAuthService(userRepo, map[string]string{
+		SettingKeyRegistrationEnabled:   "true",
+		SettingKeyInvitationCodeEnabled: "true",
+	}, nil)
+	service.redeemRepo = redeemRepo
+	service.groupRepo = groupResolver
+	service.apiKeyProvisioner = apiKeyProvisioner
+
+	result, err := service.InviteLogin(context.Background(), "INVITE-BAL-CONFIG")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 3.5, result.User.Balance)
 }
 
 func TestAuthService_RegisterWithVerification_InvitationConsumeRaceRollsBackUser(t *testing.T) {

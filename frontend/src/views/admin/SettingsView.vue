@@ -1056,6 +1056,22 @@
               </div>
               <div>
                 <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.defaults.defaultInvitationBalance') }}
+                </label>
+                <input
+                  v-model.number="form.default_invitation_balance"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input"
+                  placeholder="0.00"
+                />
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.defaults.defaultInvitationBalanceHint') }}
+                </p>
+              </div>
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.settings.defaults.defaultConcurrency') }}
                 </label>
                 <input
@@ -2087,6 +2103,7 @@ const form = reactive<SettingsForm>({
   totp_enabled: false,
   totp_encryption_key_configured: false,
   default_balance: 0,
+  default_invitation_balance: 0,
   default_concurrency: 1,
   default_subscriptions: [],
   site_name: 'Sub2API',
@@ -2410,6 +2427,7 @@ async function saveSettings() {
       password_reset_enabled: form.password_reset_enabled,
       totp_enabled: form.totp_enabled,
       default_balance: form.default_balance,
+      default_invitation_balance: form.default_invitation_balance,
       default_concurrency: form.default_concurrency,
       default_subscriptions: normalizedDefaultSubscriptions,
       site_name: form.site_name,

@@ -317,8 +317,9 @@ type RedeemCode struct {
 	UsedAt    *time.Time `json:"used_at"`
 	CreatedAt time.Time  `json:"created_at"`
 
-	GroupID      *int64 `json:"group_id"`
-	ValidityDays int    `json:"validity_days"`
+	GroupID          *int64   `json:"group_id"`
+	ValidityDays     int      `json:"validity_days"`
+	BootstrapBalance *float64 `json:"bootstrap_balance,omitempty"`
 
 	// Notes is only populated for admin_balance/admin_concurrency types
 	// so users can see why they were charged or credited

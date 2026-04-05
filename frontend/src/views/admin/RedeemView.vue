@@ -102,6 +102,13 @@
             </span>
           </template>
 
+          <template #cell-bootstrap_balance="{ value, row }">
+            <span class="text-sm text-gray-500 dark:text-dark-400">
+              <template v-if="row.type === 'invitation'">{{ value ?? 0 }}</template>
+              <template v-else>-</template>
+            </span>
+          </template>
+
           <template #cell-status="{ value }">
             <span
               :class="[
@@ -232,6 +239,21 @@
             <div v-if="generateForm.type === 'invitation'" class="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
               <p class="text-sm text-blue-700 dark:text-blue-300">
                 {{ t('admin.redeem.invitationHint') }}
+              </p>
+            </div>
+            <div v-if="generateForm.type === 'invitation'">
+              <label class="input-label">
+                {{ t('admin.redeem.bootstrapBalance') }}
+              </label>
+              <input
+                v-model.number="generateForm.bootstrap_balance"
+                type="number"
+                step="0.01"
+                min="0"
+                class="input"
+              />
+              <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.redeem.bootstrapBalanceHint') }}
               </p>
             </div>
             <!-- 订阅类型：显示分组选择和有效天数 -->
@@ -495,6 +517,7 @@ const columns = computed<Column[]>(() => [
   { key: 'code', label: t('admin.redeem.columns.code') },
   { key: 'type', label: t('admin.redeem.columns.type'), sortable: true },
   { key: 'value', label: t('admin.redeem.columns.value'), sortable: true },
+  { key: 'bootstrap_balance', label: t('admin.redeem.columns.bootstrapBalance'), sortable: true },
   { key: 'status', label: t('admin.redeem.columns.status'), sortable: true },
   { key: 'used_by', label: t('admin.redeem.columns.usedBy') },
   { key: 'used_at', label: t('admin.redeem.columns.usedAt'), sortable: true },
@@ -548,6 +571,7 @@ const copiedCode = ref<string | null>(null)
 const generateForm = reactive({
   type: 'balance' as RedeemCodeType,
   value: 10,
+  bootstrap_balance: 0,
   count: 1,
   group_id: null as number | null,
   validity_days: 30
@@ -643,12 +667,14 @@ const handleGenerateCodes = async () => {
       generateForm.type,
       generateForm.value,
       generateForm.type === 'subscription' ? generateForm.group_id : undefined,
-      generateForm.type === 'subscription' ? generateForm.validity_days : undefined
+      generateForm.type === 'subscription' ? generateForm.validity_days : undefined,
+      generateForm.type === 'invitation' ? generateForm.bootstrap_balance : undefined
     )
     showGenerateDialog.value = false
     generatedCodes.value = result
     showResultDialog.value = true
     // 重置表单
+    generateForm.bootstrap_balance = 0
     generateForm.group_id = null
     generateForm.validity_days = 30
     loadCodes()

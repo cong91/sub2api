@@ -25,6 +25,8 @@ type RedeemCode struct {
 	Type string `json:"type,omitempty"`
 	// Value holds the value of the "value" field.
 	Value float64 `json:"value,omitempty"`
+	// BootstrapBalance holds the value of the "bootstrap_balance" field.
+	BootstrapBalance *float64 `json:"bootstrap_balance,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// UsedBy holds the value of the "used_by" field.
@@ -83,7 +85,7 @@ func (*RedeemCode) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case redeemcode.FieldValue:
+		case redeemcode.FieldValue, redeemcode.FieldBootstrapBalance:
 			values[i] = new(sql.NullFloat64)
 		case redeemcode.FieldID, redeemcode.FieldUsedBy, redeemcode.FieldGroupID, redeemcode.FieldValidityDays:
 			values[i] = new(sql.NullInt64)
@@ -129,6 +131,13 @@ func (_m *RedeemCode) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field value", values[i])
 			} else if value.Valid {
 				_m.Value = value.Float64
+			}
+		case redeemcode.FieldBootstrapBalance:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field bootstrap_balance", values[i])
+			} else if value.Valid {
+				_m.BootstrapBalance = new(float64)
+				*_m.BootstrapBalance = value.Float64
 			}
 		case redeemcode.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -230,6 +239,11 @@ func (_m *RedeemCode) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("value=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Value))
+	builder.WriteString(", ")
+	if v := _m.BootstrapBalance; v != nil {
+		builder.WriteString("bootstrap_balance=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)

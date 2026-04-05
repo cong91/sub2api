@@ -58,6 +58,20 @@ func (_c *RedeemCodeCreate) SetNillableValue(v *float64) *RedeemCodeCreate {
 	return _c
 }
 
+// SetBootstrapBalance sets the "bootstrap_balance" field.
+func (_c *RedeemCodeCreate) SetBootstrapBalance(v float64) *RedeemCodeCreate {
+	_c.mutation.SetBootstrapBalance(v)
+	return _c
+}
+
+// SetNillableBootstrapBalance sets the "bootstrap_balance" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableBootstrapBalance(v *float64) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetBootstrapBalance(*v)
+	}
+	return _c
+}
+
 // SetStatus sets the "status" field.
 func (_c *RedeemCodeCreate) SetStatus(v string) *RedeemCodeCreate {
 	_c.mutation.SetStatus(v)
@@ -311,6 +325,10 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 		_spec.SetField(redeemcode.FieldValue, field.TypeFloat64, value)
 		_node.Value = value
 	}
+	if value, ok := _c.mutation.BootstrapBalance(); ok {
+		_spec.SetField(redeemcode.FieldBootstrapBalance, field.TypeFloat64, value)
+		_node.BootstrapBalance = &value
+	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(redeemcode.FieldStatus, field.TypeString, value)
 		_node.Status = value
@@ -456,6 +474,30 @@ func (u *RedeemCodeUpsert) UpdateValue() *RedeemCodeUpsert {
 // AddValue adds v to the "value" field.
 func (u *RedeemCodeUpsert) AddValue(v float64) *RedeemCodeUpsert {
 	u.Add(redeemcode.FieldValue, v)
+	return u
+}
+
+// SetBootstrapBalance sets the "bootstrap_balance" field.
+func (u *RedeemCodeUpsert) SetBootstrapBalance(v float64) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldBootstrapBalance, v)
+	return u
+}
+
+// UpdateBootstrapBalance sets the "bootstrap_balance" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateBootstrapBalance() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldBootstrapBalance)
+	return u
+}
+
+// AddBootstrapBalance adds v to the "bootstrap_balance" field.
+func (u *RedeemCodeUpsert) AddBootstrapBalance(v float64) *RedeemCodeUpsert {
+	u.Add(redeemcode.FieldBootstrapBalance, v)
+	return u
+}
+
+// ClearBootstrapBalance clears the value of the "bootstrap_balance" field.
+func (u *RedeemCodeUpsert) ClearBootstrapBalance() *RedeemCodeUpsert {
+	u.SetNull(redeemcode.FieldBootstrapBalance)
 	return u
 }
 
@@ -652,6 +694,34 @@ func (u *RedeemCodeUpsertOne) AddValue(v float64) *RedeemCodeUpsertOne {
 func (u *RedeemCodeUpsertOne) UpdateValue() *RedeemCodeUpsertOne {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.UpdateValue()
+	})
+}
+
+// SetBootstrapBalance sets the "bootstrap_balance" field.
+func (u *RedeemCodeUpsertOne) SetBootstrapBalance(v float64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetBootstrapBalance(v)
+	})
+}
+
+// AddBootstrapBalance adds v to the "bootstrap_balance" field.
+func (u *RedeemCodeUpsertOne) AddBootstrapBalance(v float64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddBootstrapBalance(v)
+	})
+}
+
+// UpdateBootstrapBalance sets the "bootstrap_balance" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateBootstrapBalance() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateBootstrapBalance()
+	})
+}
+
+// ClearBootstrapBalance clears the value of the "bootstrap_balance" field.
+func (u *RedeemCodeUpsertOne) ClearBootstrapBalance() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearBootstrapBalance()
 	})
 }
 
@@ -1031,6 +1101,34 @@ func (u *RedeemCodeUpsertBulk) AddValue(v float64) *RedeemCodeUpsertBulk {
 func (u *RedeemCodeUpsertBulk) UpdateValue() *RedeemCodeUpsertBulk {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.UpdateValue()
+	})
+}
+
+// SetBootstrapBalance sets the "bootstrap_balance" field.
+func (u *RedeemCodeUpsertBulk) SetBootstrapBalance(v float64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetBootstrapBalance(v)
+	})
+}
+
+// AddBootstrapBalance adds v to the "bootstrap_balance" field.
+func (u *RedeemCodeUpsertBulk) AddBootstrapBalance(v float64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddBootstrapBalance(v)
+	})
+}
+
+// UpdateBootstrapBalance sets the "bootstrap_balance" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateBootstrapBalance() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateBootstrapBalance()
+	})
+}
+
+// ClearBootstrapBalance clears the value of the "bootstrap_balance" field.
+func (u *RedeemCodeUpsertBulk) ClearBootstrapBalance() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearBootstrapBalance()
 	})
 }
 

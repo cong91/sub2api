@@ -1256,6 +1256,7 @@ export interface RedeemCode {
 	code: string;
 	type: RedeemCodeType;
 	value: number;
+	bootstrap_balance?: number | null;
 	status: "active" | "used" | "expired" | "unused";
 	used_by: number | null;
 	used_at: string | null;
@@ -1271,6 +1272,7 @@ export interface GenerateRedeemCodesRequest {
 	count: number;
 	type: RedeemCodeType;
 	value: number;
+	bootstrap_balance?: number;
 	group_id?: number | null; // 订阅类型专用
 	validity_days?: number; // 订阅类型专用
 }

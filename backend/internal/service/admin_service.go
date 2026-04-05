@@ -312,11 +312,12 @@ type UpdateProxyInput struct {
 }
 
 type GenerateRedeemCodesInput struct {
-	Count        int
-	Type         string
-	Value        float64
-	GroupID      *int64 // 订阅类型专用：关联的分组ID
-	ValidityDays int    // 订阅类型专用：有效天数
+	Count            int
+	Type             string
+	Value            float64
+	GroupID          *int64   // 订阅类型专用：关联的分组ID
+	ValidityDays     int      // 订阅类型专用：有效天数
+	BootstrapBalance *float64 // 邀请码类型专用：注册后初始余额覆盖值
 }
 
 type ProxyBatchDeleteResult struct {
@@ -2170,6 +2171,15 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 			code.ValidityDays = input.ValidityDays
 			if code.ValidityDays <= 0 {
 				code.ValidityDays = 30 // 默认30天
+			}
+		}
+		if input.Type == RedeemTypeInvitation {
+			if input.BootstrapBalance != nil {
+				if *input.BootstrapBalance < 0 {
+					return nil, errors.New("bootstrap_balance must be greater than or equal to 0")
+				}
+				bootstrapBalance := *input.BootstrapBalance
+				code.BootstrapBalance = &bootstrapBalance
 			}
 		}
 		if err := s.redeemCodeRepo.Create(ctx, &code); err != nil {

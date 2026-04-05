@@ -120,9 +120,10 @@ const (
 	SettingKeyCustomEndpoints             = "custom_endpoints"              // 自定义端点列表（JSON 数组）
 
 	// 默认配置
-	SettingKeyDefaultConcurrency   = "default_concurrency"   // 新用户默认并发量
-	SettingKeyDefaultBalance       = "default_balance"       // 新用户默认余额
-	SettingKeyDefaultSubscriptions = "default_subscriptions" // 新用户默认订阅列表（JSON）
+	SettingKeyDefaultConcurrency       = "default_concurrency"        // 新用户默认并发量
+	SettingKeyDefaultBalance           = "default_balance"            // 新用户默认余额
+	SettingKeyDefaultInvitationBalance = "default_invitation_balance" // 邀请登录新用户默认余额
+	SettingKeyDefaultSubscriptions     = "default_subscriptions"      // 新用户默认订阅列表（JSON）
 
 	// 管理员 API Key
 	SettingKeyAdminAPIKey = "admin_api_key" // 全局管理员 API Key（用于外部系统集成）

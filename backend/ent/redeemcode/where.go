@@ -70,6 +70,11 @@ func Value(v float64) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldEQ(FieldValue, v))
 }
 
+// BootstrapBalance applies equality check predicate on the "bootstrap_balance" field. It's identical to BootstrapBalanceEQ.
+func BootstrapBalance(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldBootstrapBalance, v))
+}
+
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldEQ(FieldStatus, v))
@@ -273,6 +278,56 @@ func ValueLT(v float64) predicate.RedeemCode {
 // ValueLTE applies the LTE predicate on the "value" field.
 func ValueLTE(v float64) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldLTE(FieldValue, v))
+}
+
+// BootstrapBalanceEQ applies the EQ predicate on the "bootstrap_balance" field.
+func BootstrapBalanceEQ(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldBootstrapBalance, v))
+}
+
+// BootstrapBalanceNEQ applies the NEQ predicate on the "bootstrap_balance" field.
+func BootstrapBalanceNEQ(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNEQ(FieldBootstrapBalance, v))
+}
+
+// BootstrapBalanceIn applies the In predicate on the "bootstrap_balance" field.
+func BootstrapBalanceIn(vs ...float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIn(FieldBootstrapBalance, vs...))
+}
+
+// BootstrapBalanceNotIn applies the NotIn predicate on the "bootstrap_balance" field.
+func BootstrapBalanceNotIn(vs ...float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotIn(FieldBootstrapBalance, vs...))
+}
+
+// BootstrapBalanceGT applies the GT predicate on the "bootstrap_balance" field.
+func BootstrapBalanceGT(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGT(FieldBootstrapBalance, v))
+}
+
+// BootstrapBalanceGTE applies the GTE predicate on the "bootstrap_balance" field.
+func BootstrapBalanceGTE(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGTE(FieldBootstrapBalance, v))
+}
+
+// BootstrapBalanceLT applies the LT predicate on the "bootstrap_balance" field.
+func BootstrapBalanceLT(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLT(FieldBootstrapBalance, v))
+}
+
+// BootstrapBalanceLTE applies the LTE predicate on the "bootstrap_balance" field.
+func BootstrapBalanceLTE(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLTE(FieldBootstrapBalance, v))
+}
+
+// BootstrapBalanceIsNil applies the IsNil predicate on the "bootstrap_balance" field.
+func BootstrapBalanceIsNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIsNull(FieldBootstrapBalance))
+}
+
+// BootstrapBalanceNotNil applies the NotNil predicate on the "bootstrap_balance" field.
+func BootstrapBalanceNotNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotNull(FieldBootstrapBalance))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

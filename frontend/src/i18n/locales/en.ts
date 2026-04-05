@@ -3263,12 +3263,16 @@ export default {
 			invitation: "Invitation",
 			invitationHint:
 				"Invitation codes are used to restrict user registration. They are automatically marked as used after use.",
+			bootstrapBalance: "Invitation Bootstrap Balance",
+			bootstrapBalanceHint:
+				"Optional per-code initial balance for users created by this invitation.",
 			unused: "Unused",
 			used: "Used",
 			columns: {
 				code: "Code",
 				type: "Type",
 				value: "Value",
+				bootstrapBalance: "Bootstrap Balance",
 				status: "Status",
 				usedBy: "Used By",
 				usedAt: "Used At",
@@ -4492,6 +4496,9 @@ export default {
 				description: "Default values for new users",
 				defaultBalance: "Default Balance",
 				defaultBalanceHint: "Initial balance for new users",
+				defaultInvitationBalance: "Default Invitation Balance",
+				defaultInvitationBalanceHint:
+					"Initial balance for users created via invitation login",
 				defaultConcurrency: "Default Concurrency",
 				defaultConcurrencyHint: "Maximum concurrent requests for new users",
 				defaultSubscriptions: "Default Subscriptions",

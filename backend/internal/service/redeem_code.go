@@ -17,8 +17,9 @@ type RedeemCode struct {
 	Notes     string
 	CreatedAt time.Time
 
-	GroupID      *int64
-	ValidityDays int
+	GroupID          *int64
+	ValidityDays     int
+	BootstrapBalance *float64
 
 	User  *User
 	Group *Group

@@ -79,6 +79,33 @@ func (_u *RedeemCodeUpdate) AddValue(v float64) *RedeemCodeUpdate {
 	return _u
 }
 
+// SetBootstrapBalance sets the "bootstrap_balance" field.
+func (_u *RedeemCodeUpdate) SetBootstrapBalance(v float64) *RedeemCodeUpdate {
+	_u.mutation.ResetBootstrapBalance()
+	_u.mutation.SetBootstrapBalance(v)
+	return _u
+}
+
+// SetNillableBootstrapBalance sets the "bootstrap_balance" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableBootstrapBalance(v *float64) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetBootstrapBalance(*v)
+	}
+	return _u
+}
+
+// AddBootstrapBalance adds value to the "bootstrap_balance" field.
+func (_u *RedeemCodeUpdate) AddBootstrapBalance(v float64) *RedeemCodeUpdate {
+	_u.mutation.AddBootstrapBalance(v)
+	return _u
+}
+
+// ClearBootstrapBalance clears the value of the "bootstrap_balance" field.
+func (_u *RedeemCodeUpdate) ClearBootstrapBalance() *RedeemCodeUpdate {
+	_u.mutation.ClearBootstrapBalance()
+	return _u
+}
+
 // SetStatus sets the "status" field.
 func (_u *RedeemCodeUpdate) SetStatus(v string) *RedeemCodeUpdate {
 	_u.mutation.SetStatus(v)
@@ -306,6 +333,15 @@ func (_u *RedeemCodeUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	if value, ok := _u.mutation.AddedValue(); ok {
 		_spec.AddField(redeemcode.FieldValue, field.TypeFloat64, value)
 	}
+	if value, ok := _u.mutation.BootstrapBalance(); ok {
+		_spec.SetField(redeemcode.FieldBootstrapBalance, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedBootstrapBalance(); ok {
+		_spec.AddField(redeemcode.FieldBootstrapBalance, field.TypeFloat64, value)
+	}
+	if _u.mutation.BootstrapBalanceCleared() {
+		_spec.ClearField(redeemcode.FieldBootstrapBalance, field.TypeFloat64)
+	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(redeemcode.FieldStatus, field.TypeString, value)
 	}
@@ -451,6 +487,33 @@ func (_u *RedeemCodeUpdateOne) SetNillableValue(v *float64) *RedeemCodeUpdateOne
 // AddValue adds value to the "value" field.
 func (_u *RedeemCodeUpdateOne) AddValue(v float64) *RedeemCodeUpdateOne {
 	_u.mutation.AddValue(v)
+	return _u
+}
+
+// SetBootstrapBalance sets the "bootstrap_balance" field.
+func (_u *RedeemCodeUpdateOne) SetBootstrapBalance(v float64) *RedeemCodeUpdateOne {
+	_u.mutation.ResetBootstrapBalance()
+	_u.mutation.SetBootstrapBalance(v)
+	return _u
+}
+
+// SetNillableBootstrapBalance sets the "bootstrap_balance" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableBootstrapBalance(v *float64) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetBootstrapBalance(*v)
+	}
+	return _u
+}
+
+// AddBootstrapBalance adds value to the "bootstrap_balance" field.
+func (_u *RedeemCodeUpdateOne) AddBootstrapBalance(v float64) *RedeemCodeUpdateOne {
+	_u.mutation.AddBootstrapBalance(v)
+	return _u
+}
+
+// ClearBootstrapBalance clears the value of the "bootstrap_balance" field.
+func (_u *RedeemCodeUpdateOne) ClearBootstrapBalance() *RedeemCodeUpdateOne {
+	_u.mutation.ClearBootstrapBalance()
 	return _u
 }
 
@@ -710,6 +773,15 @@ func (_u *RedeemCodeUpdateOne) sqlSave(ctx context.Context) (_node *RedeemCode, 
 	}
 	if value, ok := _u.mutation.AddedValue(); ok {
 		_spec.AddField(redeemcode.FieldValue, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.BootstrapBalance(); ok {
+		_spec.SetField(redeemcode.FieldBootstrapBalance, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedBootstrapBalance(); ok {
+		_spec.AddField(redeemcode.FieldBootstrapBalance, field.TypeFloat64, value)
+	}
+	if _u.mutation.BootstrapBalanceCleared() {
+		_spec.ClearField(redeemcode.FieldBootstrapBalance, field.TypeFloat64)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(redeemcode.FieldStatus, field.TypeString, value)

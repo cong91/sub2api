@@ -3,13 +3,13 @@
  * Handles redeem code generation and management for administrators
  */
 
-import { apiClient } from '../client'
 import type {
-  RedeemCode,
-  GenerateRedeemCodesRequest,
-  RedeemCodeType,
-  PaginatedResponse
-} from '@/types'
+	GenerateRedeemCodesRequest,
+	PaginatedResponse,
+	RedeemCode,
+	RedeemCodeType,
+} from "@/types";
+import { apiClient } from "../client";
 
 /**
  * List all redeem codes with pagination
@@ -19,26 +19,29 @@ import type {
  * @returns Paginated list of redeem codes
  */
 export async function list(
-  page: number = 1,
-  pageSize: number = 20,
-  filters?: {
-    type?: RedeemCodeType
-    status?: 'active' | 'used' | 'expired' | 'unused'
-    search?: string
-  },
-  options?: {
-    signal?: AbortSignal
-  }
+	page: number = 1,
+	pageSize: number = 20,
+	filters?: {
+		type?: RedeemCodeType;
+		status?: "active" | "used" | "expired" | "unused";
+		search?: string;
+	},
+	options?: {
+		signal?: AbortSignal;
+	},
 ): Promise<PaginatedResponse<RedeemCode>> {
-  const { data } = await apiClient.get<PaginatedResponse<RedeemCode>>('/admin/redeem-codes', {
-    params: {
-      page,
-      page_size: pageSize,
-      ...filters
-    },
-    signal: options?.signal
-  })
-  return data
+	const { data } = await apiClient.get<PaginatedResponse<RedeemCode>>(
+		"/admin/redeem-codes",
+		{
+			params: {
+				page,
+				page_size: pageSize,
+				...filters,
+			},
+			signal: options?.signal,
+		},
+	);
+	return data;
 }
 
 /**
@@ -47,8 +50,8 @@ export async function list(
  * @returns Redeem code details
  */
 export async function getById(id: number): Promise<RedeemCode> {
-  const { data } = await apiClient.get<RedeemCode>(`/admin/redeem-codes/${id}`)
-  return data
+	const { data } = await apiClient.get<RedeemCode>(`/admin/redeem-codes/${id}`);
+	return data;
 }
 
 /**
@@ -61,28 +64,41 @@ export async function getById(id: number): Promise<RedeemCode> {
  * @returns Array of generated redeem codes
  */
 export async function generate(
-  count: number,
-  type: RedeemCodeType,
-  value: number,
-  groupId?: number | null,
-  validityDays?: number
+	count: number,
+	type: RedeemCodeType,
+	value: number,
+	groupId?: number | null,
+	validityDays?: number,
+	bootstrapBalance?: number,
 ): Promise<RedeemCode[]> {
-  const payload: GenerateRedeemCodesRequest = {
-    count,
-    type,
-    value
-  }
+	const payload: GenerateRedeemCodesRequest = {
+		count,
+		type,
+		value,
+	};
 
-  // 订阅类型专用字段
-  if (type === 'subscription') {
-    payload.group_id = groupId
-    if (validityDays && validityDays > 0) {
-      payload.validity_days = validityDays
-    }
-  }
+	// 订阅类型专用字段
+	if (type === "subscription") {
+		payload.group_id = groupId;
+		if (validityDays && validityDays > 0) {
+			payload.validity_days = validityDays;
+		}
+	}
 
-  const { data } = await apiClient.post<RedeemCode[]>('/admin/redeem-codes/generate', payload)
-  return data
+	// 邀请码类型专用字段
+	if (
+		type === "invitation" &&
+		typeof bootstrapBalance === "number" &&
+		bootstrapBalance >= 0
+	) {
+		payload.bootstrap_balance = bootstrapBalance;
+	}
+
+	const { data } = await apiClient.post<RedeemCode[]>(
+		"/admin/redeem-codes/generate",
+		payload,
+	);
+	return data;
 }
 
 /**
@@ -91,8 +107,10 @@ export async function generate(
  * @returns Success confirmation
  */
 export async function deleteCode(id: number): Promise<{ message: string }> {
-  const { data } = await apiClient.delete<{ message: string }>(`/admin/redeem-codes/${id}`)
-  return data
+	const { data } = await apiClient.delete<{ message: string }>(
+		`/admin/redeem-codes/${id}`,
+	);
+	return data;
 }
 
 /**
@@ -101,14 +119,14 @@ export async function deleteCode(id: number): Promise<{ message: string }> {
  * @returns Success confirmation
  */
 export async function batchDelete(ids: number[]): Promise<{
-  deleted: number
-  message: string
+	deleted: number;
+	message: string;
 }> {
-  const { data } = await apiClient.post<{
-    deleted: number
-    message: string
-  }>('/admin/redeem-codes/batch-delete', { ids })
-  return data
+	const { data } = await apiClient.post<{
+		deleted: number;
+		message: string;
+	}>("/admin/redeem-codes/batch-delete", { ids });
+	return data;
 }
 
 /**
@@ -117,8 +135,10 @@ export async function batchDelete(ids: number[]): Promise<{
  * @returns Updated redeem code
  */
 export async function expire(id: number): Promise<RedeemCode> {
-  const { data } = await apiClient.post<RedeemCode>(`/admin/redeem-codes/${id}/expire`)
-  return data
+	const { data } = await apiClient.post<RedeemCode>(
+		`/admin/redeem-codes/${id}/expire`,
+	);
+	return data;
 }
 
 /**
@@ -126,22 +146,22 @@ export async function expire(id: number): Promise<RedeemCode> {
  * @returns Statistics about redeem codes
  */
 export async function getStats(): Promise<{
-  total_codes: number
-  active_codes: number
-  used_codes: number
-  expired_codes: number
-  total_value_distributed: number
-  by_type: Record<RedeemCodeType, number>
+	total_codes: number;
+	active_codes: number;
+	used_codes: number;
+	expired_codes: number;
+	total_value_distributed: number;
+	by_type: Record<RedeemCodeType, number>;
 }> {
-  const { data } = await apiClient.get<{
-    total_codes: number
-    active_codes: number
-    used_codes: number
-    expired_codes: number
-    total_value_distributed: number
-    by_type: Record<RedeemCodeType, number>
-  }>('/admin/redeem-codes/stats')
-  return data
+	const { data } = await apiClient.get<{
+		total_codes: number;
+		active_codes: number;
+		used_codes: number;
+		expired_codes: number;
+		total_value_distributed: number;
+		by_type: Record<RedeemCodeType, number>;
+	}>("/admin/redeem-codes/stats");
+	return data;
 }
 
 /**
@@ -150,25 +170,25 @@ export async function getStats(): Promise<{
  * @returns CSV data as blob
  */
 export async function exportCodes(filters?: {
-  type?: RedeemCodeType
-  status?: 'active' | 'used' | 'expired'
+	type?: RedeemCodeType;
+	status?: "active" | "used" | "expired";
 }): Promise<Blob> {
-  const response = await apiClient.get('/admin/redeem-codes/export', {
-    params: filters,
-    responseType: 'blob'
-  })
-  return response.data
+	const response = await apiClient.get("/admin/redeem-codes/export", {
+		params: filters,
+		responseType: "blob",
+	});
+	return response.data;
 }
 
 export const redeemAPI = {
-  list,
-  getById,
-  generate,
-  delete: deleteCode,
-  batchDelete,
-  expire,
-  getStats,
-  exportCodes
-}
+	list,
+	getById,
+	generate,
+	delete: deleteCode,
+	batchDelete,
+	expire,
+	getStats,
+	exportCodes,
+};
 
-export default redeemAPI
+export default redeemAPI;

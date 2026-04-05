@@ -20,6 +20,8 @@ const (
 	FieldType = "type"
 	// FieldValue holds the string denoting the value field in the database.
 	FieldValue = "value"
+	// FieldBootstrapBalance holds the string denoting the bootstrap_balance field in the database.
+	FieldBootstrapBalance = "bootstrap_balance"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldUsedBy holds the string denoting the used_by field in the database.
@@ -62,6 +64,7 @@ var Columns = []string{
 	FieldCode,
 	FieldType,
 	FieldValue,
+	FieldBootstrapBalance,
 	FieldStatus,
 	FieldUsedBy,
 	FieldUsedAt,
@@ -121,6 +124,11 @@ func ByType(opts ...sql.OrderTermOption) OrderOption {
 // ByValue orders the results by the value field.
 func ByValue(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldValue, opts...).ToFunc()
+}
+
+// ByBootstrapBalance orders the results by the bootstrap_balance field.
+func ByBootstrapBalance(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBootstrapBalance, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

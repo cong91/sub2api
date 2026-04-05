@@ -350,8 +350,11 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 	defaultBalance := s.cfg.Default.UserBalance
 	defaultConcurrency := s.cfg.Default.UserConcurrency
 	if s.settingService != nil {
-		defaultBalance = s.settingService.GetDefaultBalance(ctx)
+		defaultBalance = s.settingService.GetDefaultInvitationBalance(ctx)
 		defaultConcurrency = s.settingService.GetDefaultConcurrency(ctx)
+	}
+	if redeemCode.BootstrapBalance != nil {
+		defaultBalance = *redeemCode.BootstrapBalance
 	}
 
 	hashedPassword, err := s.HashPassword(bootstrapPassword)
