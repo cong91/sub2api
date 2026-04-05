@@ -201,7 +201,7 @@ docker compose logs -f sub2api
 ```
 
 **スクリプトの動作内容:**
-- `docker-compose.local.yml`（`docker-compose.yml` として保存）と `.env.example` をダウンロード
+- `docker-compose.yml`（`docker-compose.yml` として保存）と `.env.example` をダウンロード
 - セキュアな認証情報（JWT_SECRET、TOTP_ENCRYPTION_KEY、POSTGRES_PASSWORD）を自動生成
 - 自動生成されたシークレットで `.env` ファイルを作成
 - データディレクトリを作成（バックアップ・移行が容易なローカルディレクトリを使用）
@@ -261,26 +261,26 @@ mkdir -p data postgres_data redis_data
 
 # 5. すべてのサービスを起動
 # オプション A: ローカルディレクトリバージョン（推奨 - 移行が容易）
-docker compose -f docker-compose.local.yml up -d
+docker compose -f docker-compose.yml up -d
 
 # オプション B: 名前付きボリュームバージョン（シンプルなセットアップ）
 docker compose up -d
 
 # 6. ステータスを確認
-docker compose -f docker-compose.local.yml ps
+docker compose -f docker-compose.yml ps
 
 # 7. ログを表示
-docker compose -f docker-compose.local.yml logs -f sub2api
+docker compose -f docker-compose.yml logs -f sub2api
 ```
 
 #### デプロイバージョン
 
 | バージョン | データストレージ | 移行 | 推奨用途 |
 |---------|-------------|-----------|----------|
-| **docker-compose.local.yml** | ローカルディレクトリ | ✅ 容易（ディレクトリ全体を tar） | 本番環境、頻繁なバックアップ |
+| **docker-compose.yml** | ローカルディレクトリ | ✅ 容易（ディレクトリ全体を tar） | 本番環境、頻繁なバックアップ |
 | **docker-compose.yml** | 名前付きボリューム | ⚠️ docker コマンドが必要 | シンプルなセットアップ |
 
-**推奨:** データ管理が容易な `docker-compose.local.yml`（スクリプトによるデプロイ）を使用してください。
+**推奨:** データ管理が容易な `docker-compose.yml`（スクリプトによるデプロイ）を使用してください。
 
 #### アクセス
 
@@ -288,24 +288,24 @@ docker compose -f docker-compose.local.yml logs -f sub2api
 
 管理者パスワードが自動生成された場合は、ログで確認できます:
 ```bash
-docker compose -f docker-compose.local.yml logs sub2api | grep "admin password"
+docker compose -f docker-compose.yml logs sub2api | grep "admin password"
 ```
 
 #### アップグレード
 
 ```bash
 # 最新イメージをプルしてコンテナを再作成
-docker compose -f docker-compose.local.yml pull
-docker compose -f docker-compose.local.yml up -d
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d
 ```
 
 #### 簡単な移行（ローカルディレクトリバージョン）
 
-`docker-compose.local.yml` を使用している場合、新しいサーバーへの移行が簡単です:
+`docker-compose.yml` を使用している場合、新しいサーバーへの移行が簡単です:
 
 ```bash
 # 移行元サーバーにて
-docker compose -f docker-compose.local.yml down
+docker compose -f docker-compose.yml down
 cd ..
 tar czf sub2api-complete.tar.gz sub2api-deploy/
 
@@ -315,23 +315,23 @@ scp sub2api-complete.tar.gz user@new-server:/path/
 # 移行先サーバーにて
 tar xzf sub2api-complete.tar.gz
 cd sub2api-deploy/
-docker compose -f docker-compose.local.yml up -d
+docker compose -f docker-compose.yml up -d
 ```
 
 #### よく使うコマンド
 
 ```bash
 # すべてのサービスを停止
-docker compose -f docker-compose.local.yml down
+docker compose -f docker-compose.yml down
 
 # 再起動
-docker compose -f docker-compose.local.yml restart
+docker compose -f docker-compose.yml restart
 
 # すべてのログを表示
-docker compose -f docker-compose.local.yml logs -f
+docker compose -f docker-compose.yml logs -f
 
 # すべてのデータを削除（注意！）
-docker compose -f docker-compose.local.yml down
+docker compose -f docker-compose.yml down
 rm -rf data/ postgres_data/ redis_data/
 ```
 

@@ -3,7 +3,7 @@
 # Sub2API Docker Deployment Preparation Script
 # =============================================================================
 # This script prepares deployment files for Sub2API:
-#   - Downloads docker-compose.local.yml and .env.example
+#   - Downloads docker-compose.yml and .env.example
 #   - Generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, POSTGRES_PASSWORD)
 #   - Creates necessary data directories
 #
@@ -75,12 +75,12 @@ main() {
         fi
     fi
 
-    # Download docker-compose.local.yml and save as docker-compose.yml
+    # Download docker-compose.yml and save as docker-compose.yml
     print_info "Downloading docker-compose.yml..."
     if command_exists curl; then
-        curl -sSL "${GITHUB_RAW_URL}/docker-compose.local.yml" -o docker-compose.yml
+        curl -sSL "${GITHUB_RAW_URL}/docker-compose.yml" -o docker-compose.yml
     elif command_exists wget; then
-        wget -q "${GITHUB_RAW_URL}/docker-compose.local.yml" -O docker-compose.yml
+        wget -q "${GITHUB_RAW_URL}/docker-compose.yml" -O docker-compose.yml
     else
         print_error "Neither curl nor wget is installed. Please install one of them."
         exit 1
