@@ -195,14 +195,13 @@ func TestAPIKeyAuthSetsGroupContext(t *testing.T) {
 		Concurrency: 3,
 	}
 	apiKey := &service.APIKey{
-		ID:     100,
-		UserID: user.ID,
-		Key:    "test-key",
-		Status: service.StatusActive,
-		User:   user,
-		Group:  group,
+		ID:            100,
+		UserID:        user.ID,
+		Key:           "test-key",
+		Status:        service.StatusActive,
+		User:          user,
+		GrantedGroups: []*service.Group{group},
 	}
-	apiKey.GroupID = &group.ID
 
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
@@ -349,14 +348,13 @@ func TestAPIKeyAuthOverwritesInvalidContextGroup(t *testing.T) {
 		Concurrency: 3,
 	}
 	apiKey := &service.APIKey{
-		ID:     100,
-		UserID: user.ID,
-		Key:    "test-key",
-		Status: service.StatusActive,
-		User:   user,
-		Group:  group,
+		ID:            100,
+		UserID:        user.ID,
+		Key:           "test-key",
+		Status:        service.StatusActive,
+		User:          user,
+		GrantedGroups: []*service.Group{group},
 	}
-	apiKey.GroupID = &group.ID
 
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
@@ -450,6 +448,14 @@ func TestAPIKeyAuthIPRestrictionDoesNotTrustSpoofedForwardHeaders(t *testing.T) 
 func TestAPIKeyAuthTouchesLastUsedOnSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
+	group := &service.Group{
+		ID:       201,
+		Name:     "g-touch-ok",
+		Status:   service.StatusActive,
+		Platform: service.PlatformAnthropic,
+		Hydrated: true,
+	}
+
 	user := &service.User{
 		ID:          7,
 		Role:        service.RoleUser,
@@ -458,11 +464,12 @@ func TestAPIKeyAuthTouchesLastUsedOnSuccess(t *testing.T) {
 		Concurrency: 3,
 	}
 	apiKey := &service.APIKey{
-		ID:     100,
-		UserID: user.ID,
-		Key:    "touch-ok",
-		Status: service.StatusActive,
-		User:   user,
+		ID:            100,
+		UserID:        user.ID,
+		Key:           "touch-ok",
+		Status:        service.StatusActive,
+		User:          user,
+		GrantedGroups: []*service.Group{group},
 	}
 
 	var touchedID int64
@@ -499,6 +506,14 @@ func TestAPIKeyAuthTouchesLastUsedOnSuccess(t *testing.T) {
 func TestAPIKeyAuthTouchLastUsedFailureDoesNotBlock(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
+	group := &service.Group{
+		ID:       202,
+		Name:     "g-touch-fail",
+		Status:   service.StatusActive,
+		Platform: service.PlatformAnthropic,
+		Hydrated: true,
+	}
+
 	user := &service.User{
 		ID:          8,
 		Role:        service.RoleUser,
@@ -507,11 +522,12 @@ func TestAPIKeyAuthTouchLastUsedFailureDoesNotBlock(t *testing.T) {
 		Concurrency: 3,
 	}
 	apiKey := &service.APIKey{
-		ID:     101,
-		UserID: user.ID,
-		Key:    "touch-fail",
-		Status: service.StatusActive,
-		User:   user,
+		ID:            101,
+		UserID:        user.ID,
+		Key:           "touch-fail",
+		Status:        service.StatusActive,
+		User:          user,
+		GrantedGroups: []*service.Group{group},
 	}
 
 	touchCalls := 0
@@ -545,6 +561,14 @@ func TestAPIKeyAuthTouchLastUsedFailureDoesNotBlock(t *testing.T) {
 func TestAPIKeyAuthTouchesLastUsedInStandardMode(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
+	group := &service.Group{
+		ID:       203,
+		Name:     "g-touch-standard",
+		Status:   service.StatusActive,
+		Platform: service.PlatformAnthropic,
+		Hydrated: true,
+	}
+
 	user := &service.User{
 		ID:          9,
 		Role:        service.RoleUser,
@@ -553,11 +577,12 @@ func TestAPIKeyAuthTouchesLastUsedInStandardMode(t *testing.T) {
 		Concurrency: 3,
 	}
 	apiKey := &service.APIKey{
-		ID:     102,
-		UserID: user.ID,
-		Key:    "touch-standard",
-		Status: service.StatusActive,
-		User:   user,
+		ID:            102,
+		UserID:        user.ID,
+		Key:           "touch-standard",
+		Status:        service.StatusActive,
+		User:          user,
+		GrantedGroups: []*service.Group{group},
 	}
 
 	touchCalls := 0
