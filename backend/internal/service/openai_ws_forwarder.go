@@ -3786,10 +3786,14 @@ func getOpenAIGroupIDFromContext(c *gin.Context) int64 {
 		return 0
 	}
 	apiKey, ok := value.(*APIKey)
-	if !ok || apiKey == nil || apiKey.GroupID == nil {
+	if !ok || apiKey == nil {
 		return 0
 	}
-	return *apiKey.GroupID
+	effective := apiKey.EffectiveGroup()
+	if effective == nil {
+		return 0
+	}
+	return effective.ID
 }
 
 // SelectAccountByPreviousResponseID 按 previous_response_id 命中账号粘连。

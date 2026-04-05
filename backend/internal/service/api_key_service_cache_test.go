@@ -261,12 +261,12 @@ func TestAPIKeyService_GetByKey_UsesGrantedGroupsFallbackFromL2Cache(t *testing.
 
 	apiKey, err := svc.GetByKey(context.Background(), "k-granted")
 	require.NoError(t, err)
-	require.NotNil(t, apiKey.Group)
-	require.NotNil(t, apiKey.GroupID)
-	require.Equal(t, grantedID, *apiKey.GroupID)
 	require.Len(t, apiKey.GrantedGroups, 1)
-	require.Equal(t, grantedID, apiKey.Group.ID)
-	require.Equal(t, PlatformOpenAI, apiKey.Group.Platform)
+	require.Nil(t, apiKey.Group, "runtime must not rehydrate legacy group from granted_groups")
+	require.Nil(t, apiKey.GroupID, "runtime must not rehydrate legacy group_id from granted_groups")
+	require.NotNil(t, apiKey.EffectiveGroup())
+	require.Equal(t, grantedID, apiKey.EffectiveGroup().ID)
+	require.Equal(t, PlatformOpenAI, apiKey.EffectiveGroup().Platform)
 }
 
 func TestAPIKeyService_GetByKey_NegativeCache(t *testing.T) {

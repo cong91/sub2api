@@ -1411,7 +1411,14 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 				return nil, err
 			}
 			apiKey.GrantedGroups = resolved
-			if apiKey.Group == nil && len(resolved) > 0 {
+			if len(resolved) == 0 {
+				apiKey.Group = nil
+				apiKey.GroupID = nil
+			} else if group != nil {
+				gid := group.ID
+				apiKey.Group = group
+				apiKey.GroupID = &gid
+			} else {
 				apiKey.Group = resolved[0]
 				gid := resolved[0].ID
 				apiKey.GroupID = &gid

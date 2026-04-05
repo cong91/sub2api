@@ -369,11 +369,6 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			})
 		}
 	}
-	if apiKey.Group == nil && len(apiKey.GrantedGroups) > 0 {
-		apiKey.Group = apiKey.GrantedGroups[0]
-		gid := apiKey.Group.ID
-		apiKey.GroupID = &gid
-	}
 	s.compileAPIKeyIPRules(apiKey)
 	return apiKey
 }

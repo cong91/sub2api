@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -123,4 +124,109 @@ func TestAPIKeyAndSubscriptionFromContext(t *testing.T) {
 	gotSub, ok := GetSubscriptionFromContext(c)
 	require.True(t, ok)
 	require.Equal(t, int64(2), gotSub.ID)
+}
+
+type requireGroupSettingRepo struct {
+	values map[string]string
+}
+
+func (r *requireGroupSettingRepo) Get(context.Context, string) (*service.Setting, error) {
+	panic("unexpected Get call")
+}
+
+func (r *requireGroupSettingRepo) GetValue(_ context.Context, key string) (string, error) {
+	v, ok := r.values[key]
+	if !ok {
+		return "", service.ErrSettingNotFound
+	}
+	return v, nil
+}
+
+func (r *requireGroupSettingRepo) Set(context.Context, string, string) error {
+	panic("unexpected Set call")
+}
+func (r *requireGroupSettingRepo) GetMultiple(context.Context, []string) (map[string]string, error) {
+	panic("unexpected GetMultiple call")
+}
+func (r *requireGroupSettingRepo) SetMultiple(context.Context, map[string]string) error {
+	panic("unexpected SetMultiple call")
+}
+func (r *requireGroupSettingRepo) GetAll(context.Context) (map[string]string, error) {
+	panic("unexpected GetAll call")
+}
+func (r *requireGroupSettingRepo) Delete(context.Context, string) error {
+	panic("unexpected Delete call")
+}
+
+func TestRequireGroupAssignment_UsesCanonicalGrantedGroups(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	settingSvc := service.NewSettingService(&requireGroupSettingRepo{values: map[string]string{
+		service.SettingKeyAllowUngroupedKeyScheduling: "false",
+	}}, &config.Config{})
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		legacyGroupID := int64(101)
+		c.Set(string(ContextKeyAPIKey), &service.APIKey{
+			GroupID: &legacyGroupID, // legacy field present but not canonical
+		})
+		c.Next()
+	})
+	r.Use(RequireGroupAssignment(settingSvc, AnthropicErrorWriter))
+	r.GET("/t", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusForbidden, w.Code)
+	require.Contains(t, w.Body.String(), "not assigned to any group")
+}
+
+func TestRequireGroupAssignment_AllowsWhenCanonicalEffectiveGroupPresent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	settingSvc := service.NewSettingService(&requireGroupSettingRepo{values: map[string]string{
+		service.SettingKeyAllowUngroupedKeyScheduling: "false",
+	}}, &config.Config{})
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		legacyGroupID := int64(101)
+		granted := &service.Group{ID: 202, Platform: service.PlatformOpenAI, Status: service.StatusActive, Hydrated: true}
+		c.Set(string(ContextKeyAPIKey), &service.APIKey{
+			GroupID:       &legacyGroupID,
+			GrantedGroups: []*service.Group{granted},
+		})
+		c.Next()
+	})
+	r.Use(RequireGroupAssignment(settingSvc, AnthropicErrorWriter))
+	r.GET("/t", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestRequireGroupAssignment_BlocksWhenSettingMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	settingSvc := service.NewSettingService(&requireGroupSettingRepo{values: map[string]string{}}, &config.Config{})
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set(string(ContextKeyAPIKey), &service.APIKey{})
+		c.Next()
+	})
+	r.Use(RequireGroupAssignment(settingSvc, AnthropicErrorWriter))
+	r.GET("/t", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusForbidden, w.Code)
 }

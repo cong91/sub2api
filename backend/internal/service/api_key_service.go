@@ -599,6 +599,7 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		}
 	}
 
+	var resolvedDefaultGroup *Group
 	if req.GroupID != nil {
 		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
 		if err != nil {
@@ -609,8 +610,14 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			return nil, ErrGroupNotAllowed
 		}
 
-		apiKey.GroupID = req.GroupID
+		gid := group.ID
+		apiKey.GroupID = &gid
 		apiKey.Group = group
+		resolvedDefaultGroup = group
+		if req.GrantedGroupIDs == nil {
+			// 兼容旧行为：仅 group_id 更新表示单分组 key。
+			apiKey.GrantedGroups = []*Group{group}
+		}
 	}
 
 	if req.GrantedGroupIDs != nil {
@@ -637,10 +644,6 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			if err := appendGrantedID(*req.GroupID); err != nil {
 				return nil, err
 			}
-		} else if apiKey.GroupID != nil && *apiKey.GroupID > 0 {
-			if err := appendGrantedID(*apiKey.GroupID); err != nil {
-				return nil, err
-			}
 		}
 
 		resolved := make([]*Group, 0, len(requestedGrantedIDs))
@@ -652,11 +655,23 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			if !s.canUserBindGroup(ctx, user, group) {
 				return nil, ErrGroupNotAllowed
 			}
+			if req.GroupID != nil && gid == *req.GroupID {
+				resolvedDefaultGroup = group
+			}
 			resolved = append(resolved, group)
 		}
 		apiKey.GrantedGroups = resolved
-		if apiKey.Group == nil && len(resolved) > 0 {
+		if len(resolved) == 0 {
+			apiKey.Group = nil
+			apiKey.GroupID = nil
+		} else if resolvedDefaultGroup != nil {
+			gid := resolvedDefaultGroup.ID
+			apiKey.Group = resolvedDefaultGroup
+			apiKey.GroupID = &gid
+		} else {
+			gid := resolved[0].ID
 			apiKey.Group = resolved[0]
+			apiKey.GroupID = &gid
 		}
 	}
 
