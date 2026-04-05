@@ -161,10 +161,11 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		zap.Int64("api_key_id", apiKey.ID),
 		zap.Any("group_id", apiKey.GroupID),
 	)
+	effectiveGroup := apiKey.EffectiveGroup()
 
 	// 检查平台：优先使用强制平台（/antigravity 路由，中间件已设置 request.Context），否则要求 gemini 分组
 	if !middleware.HasForcePlatform(c) {
-		if apiKey.Group == nil || apiKey.Group.Platform != service.PlatformGemini {
+		if !service.IsGroupContextValid(effectiveGroup) || effectiveGroup.Platform != service.PlatformGemini {
 			googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
 			return
 		}
@@ -196,7 +197,6 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	setOpsRequestContext(c, modelName, stream, body)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(stream, false)))
 
-	effectiveGroup := apiKey.EffectiveGroup()
 	var preferredGroupID *int64
 	if service.IsGroupContextValid(effectiveGroup) {
 		gid := effectiveGroup.ID

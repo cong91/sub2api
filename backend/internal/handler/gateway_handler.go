@@ -536,17 +536,18 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		}
 	}
 
-	currentAPIKey := apiKey
+	currentGroup := routingGroup
+	currentGroupID := routingGroupID
 	currentSubscription := subscription
 	var fallbackGroupID *int64
-	if apiKey.Group != nil {
-		fallbackGroupID = apiKey.Group.FallbackGroupIDOnInvalidRequest
+	if service.IsGroupContextValid(currentGroup) {
+		fallbackGroupID = currentGroup.FallbackGroupIDOnInvalidRequest
 	}
 	fallbackUsed := false
 
 	// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
 	// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
-	if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), currentAPIKey.GroupID) {
+	if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), currentGroupID) {
 		ctx := service.WithSingleAccountRetry(c.Request.Context(), true, h.metadataBridgeEnabled())
 		c.Request = c.Request.WithContext(ctx)
 	}
@@ -557,7 +558,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 		for {
 			// 选择支持该模型的账号
-			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), currentAPIKey.GroupID, sessionKey, reqModel, fs.FailedAccountIDs, parsedReq.MetadataUserID, int64(0))
+			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), currentGroupID, sessionKey, reqModel, fs.FailedAccountIDs, parsedReq.MetadataUserID, int64(0))
 			if err != nil {
 				if len(fs.FailedAccountIDs) == 0 {
 					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), streamStarted)
@@ -644,7 +645,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 				// Slot acquired: no longer waiting in queue.
 				releaseWait()
-				if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey, account.ID); err != nil {
+				if err := h.gatewayService.BindStickySession(c.Request.Context(), currentGroupID, sessionKey, account.ID); err != nil {
 					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
 			}
@@ -745,7 +746,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				var promptTooLongErr *service.PromptTooLongError
 				if errors.As(err, &promptTooLongErr) {
 					reqLog.Warn("gateway.prompt_too_long_from_antigravity",
-						zap.Any("current_group_id", currentAPIKey.GroupID),
+						zap.Any("current_group_id", currentGroupID),
 						zap.Any("fallback_group_id", fallbackGroupID),
 						zap.Bool("fallback_used", fallbackUsed),
 					)
@@ -767,8 +768,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 							_ = h.antigravityGatewayService.WriteMappedClaudeError(c, account, promptTooLongErr.StatusCode, promptTooLongErr.RequestID, promptTooLongErr.Body)
 							return
 						}
-						fallbackAPIKey := cloneAPIKeyWithGroup(apiKey, fallbackGroup)
-						if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), fallbackAPIKey.User, fallbackAPIKey, fallbackGroup, nil); err != nil {
+						if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, fallbackGroup, nil); err != nil {
 							status, code, message := billingErrorDetails(err)
 							h.handleStreamingAwareError(c, status, code, message, streamStarted)
 							return
@@ -776,7 +776,13 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						// 兜底重试按"直接请求兜底分组"处理：清除强制平台，允许按分组平台调度
 						ctx := context.WithValue(c.Request.Context(), ctxkey.ForcePlatform, "")
 						c.Request = c.Request.WithContext(ctx)
-						currentAPIKey = fallbackAPIKey
+						currentGroup = fallbackGroup
+						fallbackGroupID = nil
+						if service.IsGroupContextValid(currentGroup) {
+							gid := currentGroup.ID
+							currentGroupID = &gid
+							fallbackGroupID = currentGroup.FallbackGroupIDOnInvalidRequest
+						}
 						currentSubscription = nil
 						fallbackUsed = true
 						retryWithFallback = true
@@ -849,8 +855,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			h.submitUsageRecordTask(func(ctx context.Context) {
 				if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
 					Result:             result,
-					APIKey:             currentAPIKey,
-					User:               currentAPIKey.User,
+					APIKey:             apiKey,
+					User:               apiKey.User,
 					Account:            account,
 					Subscription:       currentSubscription,
 					InboundEndpoint:    inboundEndpoint,
@@ -865,8 +871,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					logger.L().With(
 						zap.String("component", "handler.gateway.messages"),
 						zap.Int64("user_id", subject.UserID),
-						zap.Int64("api_key_id", currentAPIKey.ID),
-						zap.Any("group_id", currentAPIKey.GroupID),
+						zap.Int64("api_key_id", apiKey.ID),
+						zap.Any("group_id", currentGroupID),
 						zap.String("model", reqModel),
 						zap.Int64("account_id", account.ID),
 					).Error("gateway.record_usage_failed", zap.Error(err))
@@ -890,9 +896,12 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	var groupID *int64
 	var platform string
 
-	if apiKey != nil && apiKey.Group != nil {
-		groupID = &apiKey.Group.ID
-		platform = apiKey.Group.Platform
+	if apiKey != nil {
+		effectiveGroup := apiKey.EffectiveGroup()
+		if service.IsGroupContextValid(effectiveGroup) {
+			groupID = &effectiveGroup.ID
+			platform = effectiveGroup.Platform
+		}
 	}
 	if forcedPlatform, ok := middleware2.GetForcePlatformFromContext(c); ok && strings.TrimSpace(forcedPlatform) != "" {
 		platform = forcedPlatform
@@ -971,7 +980,7 @@ func collectCatalogGroups(apiKey *service.APIKey, forcedPlatform string) []*serv
 	}
 
 	seen := make(map[int64]struct{})
-	out := make([]*service.Group, 0, len(apiKey.GrantedGroups)+1)
+	out := make([]*service.Group, 0, len(apiKey.GrantedGroups))
 	forced := strings.TrimSpace(forcedPlatform)
 
 	appendGroup := func(group *service.Group) {
@@ -992,9 +1001,6 @@ func collectCatalogGroups(apiKey *service.APIKey, forcedPlatform string) []*serv
 		appendGroup(group)
 	}
 
-	// Legacy one-group compatibility when GrantedGroups is empty or partial.
-	appendGroup(apiKey.Group)
-
 	return out
 }
 
@@ -1005,17 +1011,6 @@ func (h *GatewayHandler) AntigravityModels(c *gin.Context) {
 		"object": "list",
 		"data":   antigravity.DefaultModels(),
 	})
-}
-
-func cloneAPIKeyWithGroup(apiKey *service.APIKey, group *service.Group) *service.APIKey {
-	if apiKey == nil || group == nil {
-		return apiKey
-	}
-	cloned := *apiKey
-	groupID := group.ID
-	cloned.GroupID = &groupID
-	cloned.Group = group
-	return &cloned
 }
 
 func resolveGroupFromRequestContext(ctx context.Context, groupID int64) *service.Group {
@@ -1233,27 +1228,28 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 
 // usageUnrestricted 处理 unrestricted 模式的响应（向后兼容）
 func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, usageData gin.H, modelStats any) {
+	effectiveGroup := apiKey.EffectiveGroup()
 	// 订阅模式
-	if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() {
+	if service.IsGroupContextValid(effectiveGroup) && effectiveGroup.IsSubscriptionType() {
 		resp := gin.H{
 			"mode":     "unrestricted",
 			"isValid":  true,
-			"planName": apiKey.Group.Name,
+			"planName": effectiveGroup.Name,
 			"unit":     "USD",
 		}
 
 		// 订阅信息可能不在 context 中（/v1/usage 路径跳过了中间件的计费检查）
 		subscription, ok := middleware2.GetSubscriptionFromContext(c)
 		if ok {
-			remaining := h.calculateSubscriptionRemaining(apiKey.Group, subscription)
+			remaining := h.calculateSubscriptionRemaining(effectiveGroup, subscription)
 			resp["remaining"] = remaining
 			resp["subscription"] = gin.H{
 				"daily_usage_usd":   subscription.DailyUsageUSD,
 				"weekly_usage_usd":  subscription.WeeklyUsageUSD,
 				"monthly_usage_usd": subscription.MonthlyUsageUSD,
-				"daily_limit_usd":   apiKey.Group.DailyLimitUSD,
-				"weekly_limit_usd":  apiKey.Group.WeeklyLimitUSD,
-				"monthly_limit_usd": apiKey.Group.MonthlyLimitUSD,
+				"daily_limit_usd":   effectiveGroup.DailyLimitUSD,
+				"weekly_limit_usd":  effectiveGroup.WeeklyLimitUSD,
+				"monthly_limit_usd": effectiveGroup.MonthlyLimitUSD,
 				"expires_at":        subscription.ExpiresAt,
 			}
 		}

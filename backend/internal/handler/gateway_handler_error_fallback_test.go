@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Wei-Shaw/sub2api/internal/service"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,7 +69,7 @@ func TestGatewayProviderCatalog_OpenAIContract(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(http.MethodGet, "/v1/provider-catalog", nil)
 
-	apiKey := &service.APIKey{Group: &service.Group{ID: 99, Platform: service.PlatformOpenAI, Hydrated: true}}
+	apiKey := &service.APIKey{GrantedGroups: []*service.Group{{ID: 99, Platform: service.PlatformOpenAI, Hydrated: true}}}
 	c.Set(string(middleware2.ContextKeyAPIKey), apiKey)
 
 	h := &GatewayHandler{gatewayService: &service.GatewayService{}}
