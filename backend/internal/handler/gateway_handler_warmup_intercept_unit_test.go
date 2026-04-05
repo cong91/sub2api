@@ -236,10 +236,11 @@ func TestGatewayHandlerMessages_InterceptWarmup_AntigravityAccount_MixedScheduli
 	c.Request = req
 
 	apiKey := &service.APIKey{
-		ID:      3001,
-		UserID:  4001,
-		GroupID: &groupID,
-		Status:  service.StatusActive,
+		ID:            3001,
+		UserID:        4001,
+		GroupID:       &groupID,
+		GrantedGroups: []*service.Group{group},
+		Status:        service.StatusActive,
 		User: &service.User{
 			ID:          4001,
 			Concurrency: 10,
@@ -326,10 +327,11 @@ func TestGatewayHandlerMessages_InterceptWarmup_AntigravityAccount_ForcePlatform
 	c.Set(string(middleware.ContextKeyForcePlatform), service.PlatformAntigravity)
 
 	apiKey := &service.APIKey{
-		ID:      3002,
-		UserID:  4002,
-		GroupID: &groupID,
-		Status:  service.StatusActive,
+		ID:            3002,
+		UserID:        4002,
+		GroupID:       &groupID,
+		GrantedGroups: []*service.Group{group},
+		Status:        service.StatusActive,
 		User: &service.User{
 			ID:          4002,
 			Concurrency: 10,
