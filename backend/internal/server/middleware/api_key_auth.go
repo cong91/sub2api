@@ -109,6 +109,18 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			return
 		}
 
+		grantedGroups := apiKey.CanonicalGrantedGroups()
+		if len(grantedGroups) == 0 {
+			AbortWithError(c, 403, "GROUP_NOT_ASSIGNED", "API key has no granted groups")
+			return
+		}
+
+		effectiveGroup := apiKey.EffectiveGroup()
+		if !service.IsGroupContextValid(effectiveGroup) {
+			AbortWithError(c, 403, "GROUP_NOT_ASSIGNED", "API key has no effective group")
+			return
+		}
+
 		// ── 4. SimpleMode → early return ─────────────────────────────
 
 		if cfg.RunMode == config.RunModeSimple {
@@ -130,13 +142,13 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		skipBilling := c.Request.URL.Path == "/v1/usage"
 
 		var subscription *service.UserSubscription
-		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+		isSubscriptionType := effectiveGroup.IsSubscriptionType()
 
 		if isSubscriptionType && subscriptionService != nil {
 			sub, subErr := subscriptionService.GetActiveSubscription(
 				c.Request.Context(),
 				apiKey.User.ID,
-				apiKey.Group.ID,
+				effectiveGroup.ID,
 			)
 			if subErr != nil {
 				if !skipBilling {
@@ -174,7 +186,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 			// 订阅模式：验证订阅限额
 			if subscription != nil {
-				needsMaintenance, validateErr := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
+				needsMaintenance, validateErr := subscriptionService.ValidateAndCheckLimits(subscription, effectiveGroup)
 				if validateErr != nil {
 					code := "SUBSCRIPTION_INVALID"
 					status := 403
@@ -278,7 +290,7 @@ func setAPIKeyGroupContext(c *gin.Context, apiKey *service.APIKey) {
 	if apiKey == nil {
 		return
 	}
-	setGrantedGroupsContext(c, apiKey.GrantedGroups)
+	setGrantedGroupsContext(c, apiKey.CanonicalGrantedGroups())
 	setGroupContext(c, apiKey.EffectiveGroup())
 }
 

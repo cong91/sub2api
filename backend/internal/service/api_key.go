@@ -67,20 +67,40 @@ type APIKey struct {
 	Window7dStart *time.Time // Start of current 7d window
 }
 
-// EffectiveGroup returns the legacy effective/default group for compatibility.
+// EffectiveGroup returns the canonical effective/default group from granted_groups.
+// Runtime semantics must not fallback to legacy Group/GroupID fields.
 func (k *APIKey) EffectiveGroup() *Group {
 	if k == nil {
 		return nil
 	}
-	if k.Group != nil {
-		return k.Group
+	canonical := k.CanonicalGrantedGroups()
+	if len(canonical) == 0 {
+		return nil
 	}
+	return canonical[0]
+}
+
+// CanonicalGrantedGroups returns runtime-usable granted groups (hydrated, valid, deduplicated).
+func (k *APIKey) CanonicalGrantedGroups() []*Group {
+	if k == nil || len(k.GrantedGroups) == 0 {
+		return nil
+	}
+	seen := make(map[int64]struct{}, len(k.GrantedGroups))
+	out := make([]*Group, 0, len(k.GrantedGroups))
 	for _, granted := range k.GrantedGroups {
-		if granted != nil {
-			return granted
+		if !IsGroupContextValid(granted) {
+			continue
 		}
+		if _, ok := seen[granted.ID]; ok {
+			continue
+		}
+		seen[granted.ID] = struct{}{}
+		out = append(out, granted)
 	}
-	return nil
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // GroupForPlatform returns a granted group matching the requested platform when
@@ -89,22 +109,20 @@ func (k *APIKey) GroupForPlatform(platform string) *Group {
 	if k == nil {
 		return nil
 	}
+	canonical := k.CanonicalGrantedGroups()
+	if len(canonical) == 0 {
+		return nil
+	}
 	platform = strings.TrimSpace(platform)
 	if platform == "" {
-		return k.EffectiveGroup()
+		return canonical[0]
 	}
-	if k.Group != nil && strings.EqualFold(strings.TrimSpace(k.Group.Platform), platform) {
-		return k.Group
-	}
-	for _, granted := range k.GrantedGroups {
-		if granted == nil {
-			continue
-		}
+	for _, granted := range canonical {
 		if strings.EqualFold(strings.TrimSpace(granted.Platform), platform) {
 			return granted
 		}
 	}
-	return k.EffectiveGroup()
+	return canonical[0]
 }
 
 func (k *APIKey) IsActive() bool {

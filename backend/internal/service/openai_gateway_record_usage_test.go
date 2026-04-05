@@ -263,6 +263,44 @@ func TestOpenAIGatewayServiceRecordUsage_IncludesEndpointMetadata(t *testing.T) 
 	require.Equal(t, "/v1/responses", *usageRepo.lastLog.UpstreamEndpoint)
 }
 
+func TestOpenAIGatewayServiceRecordUsage_FailsWithoutGrantedEffectiveGroup(t *testing.T) {
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	userRepo := &openAIRecordUsageUserRepoStub{}
+	subRepo := &openAIRecordUsageSubRepoStub{}
+	rateRepo := &openAIUserGroupRateRepoStub{}
+	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, rateRepo)
+	legacyGroupID := int64(88)
+
+	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+		Result: &OpenAIForwardResult{
+			RequestID: "resp_missing_effective_group",
+			Usage: OpenAIUsage{
+				InputTokens:  8,
+				OutputTokens: 2,
+			},
+			Model:    "gpt-5.1",
+			Duration: time.Second,
+		},
+		APIKey: &APIKey{
+			ID:      1002,
+			GroupID: &legacyGroupID,
+			Group: &Group{
+				ID:       legacyGroupID,
+				Status:   StatusActive,
+				Platform: PlatformOpenAI,
+				Hydrated: true,
+			},
+		},
+		User:    &User{ID: 2002},
+		Account: &Account{ID: 3002},
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "GROUP_NOT_ASSIGNED")
+	require.Equal(t, 0, usageRepo.calls)
+	require.Equal(t, 0, userRepo.deductCalls)
+}
+
 func TestOpenAIGatewayServiceRecordUsage_FallsBackToGroupDefaultRateOnResolverError(t *testing.T) {
 	groupID := int64(12)
 	groupRate := 1.6

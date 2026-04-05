@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
@@ -76,17 +77,34 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
 
-	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), apiKey.GroupID, reqModel)
+	effectiveGroup := apiKey.EffectiveGroup()
+	var preferredGroupID *int64
+	if service.IsGroupContextValid(effectiveGroup) {
+		gid := effectiveGroup.ID
+		preferredGroupID = &gid
+	}
+
+	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), preferredGroupID, reqModel)
 	if err != nil {
 		h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), streamStarted)
 		return
 	}
-	if resolvedGroup != nil {
-		apiKey = cloneAPIKeyWithGroup(apiKey, resolvedGroup)
+	routingGroup := resolvedGroup
+	routingGroupID := resolvedGroupID
+	if routingGroup == nil && routingGroupID != nil {
+		routingGroup = resolveGroupFromRequestContext(c.Request.Context(), *routingGroupID)
 	}
-	routingGroupID := apiKey.GroupID
-	if resolvedGroupID != nil {
-		routingGroupID = resolvedGroupID
+	if routingGroupID == nil && service.IsGroupContextValid(routingGroup) {
+		gid := routingGroup.ID
+		routingGroupID = &gid
+	}
+	if routingGroupID == nil || *routingGroupID <= 0 {
+		h.handleStreamingAwareError(c, http.StatusForbidden, "permission_error", "No effective group resolved for this request", streamStarted)
+		return
+	}
+	if !service.IsGroupContextValid(routingGroup) || routingGroup.ID != *routingGroupID {
+		h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No effective group resolved for this request", streamStarted)
+		return
 	}
 
 	setOpsRequestContext(c, reqModel, reqStream, body)
@@ -112,7 +130,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 		defer userReleaseFunc()
 	}
 
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, routingGroup, subscription); err != nil {
 		reqLog.Info("openai_chat_completions.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message := billingErrorDetails(err)
 		h.handleStreamingAwareError(c, status, code, message, streamStarted)
@@ -147,16 +165,14 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 			)
 			if len(failedAccountIDs) == 0 {
 				defaultModel := ""
-				if apiKey.Group != nil {
-					defaultModel = apiKey.Group.DefaultMappedModel
-				}
+				defaultModel = strings.TrimSpace(routingGroup.DefaultMappedModel)
 				if defaultModel != "" && defaultModel != reqModel {
 					reqLog.Info("openai_chat_completions.fallback_to_default_model",
 						zap.String("default_mapped_model", defaultModel),
 					)
 					selection, scheduleDecision, err = h.gatewayService.SelectAccountWithScheduler(
 						c.Request.Context(),
-						apiKey.GroupID,
+						routingGroupID,
 						"",
 						sessionHash,
 						defaultModel,
@@ -198,12 +214,21 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 		service.SetOpsLatencyMs(c, service.OpsRoutingLatencyMsKey, time.Since(routingStart).Milliseconds())
 		forwardStart := time.Now()
 
+<<<<<<< HEAD
 		defaultMappedModel := resolveOpenAIForwardDefaultMappedModel(apiKey, c.GetString("openai_chat_completions_fallback_model"))
 		forwardBody := body
 		if channelMapping.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
 		result, err := h.gatewayService.ForwardAsChatCompletions(c.Request.Context(), c, account, forwardBody, promptCacheKey, defaultMappedModel)
+=======
+		defaultMappedModel := resolveOpenAIForwardDefaultMappedModel(routingGroup, c.GetString("openai_chat_completions_fallback_model"))
+		forwardBody := body
+		if channelMapping.Mapped {
+			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
+		}
+		result, err := h.gatewayService.ForwardAsChatCompletions(c.Request.Context(), c, account, forwardBody, promptCacheKey, defaultMappedModel)
+>>>>>>> 31ed79f4 (refactor(runtime): enforce granted_groups-only billing and routing semantics)
 
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		if accountReleaseFunc != nil {

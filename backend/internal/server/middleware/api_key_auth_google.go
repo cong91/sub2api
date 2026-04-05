@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -55,6 +56,18 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			return
 		}
 
+		grantedGroups := apiKey.CanonicalGrantedGroups()
+		if len(grantedGroups) == 0 {
+			abortWithGoogleError(c, http.StatusForbidden, "API key has no granted groups")
+			return
+		}
+
+		effectiveGroup := apiKey.EffectiveGroup()
+		if !service.IsGroupContextValid(effectiveGroup) {
+			abortWithGoogleError(c, http.StatusForbidden, "API key has no effective group")
+			return
+		}
+
 		// 简易模式：跳过余额和订阅检查
 		if cfg.RunMode == config.RunModeSimple {
 			c.Set(string(ContextKeyAPIKey), apiKey)
@@ -69,19 +82,19 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			return
 		}
 
-		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+		isSubscriptionType := effectiveGroup.IsSubscriptionType()
 		if isSubscriptionType && subscriptionService != nil {
 			subscription, err := subscriptionService.GetActiveSubscription(
 				c.Request.Context(),
 				apiKey.User.ID,
-				apiKey.Group.ID,
+				effectiveGroup.ID,
 			)
 			if err != nil {
 				abortWithGoogleError(c, 403, "No active subscription found for this group")
 				return
 			}
 
-			needsMaintenance, err := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
+			needsMaintenance, err := subscriptionService.ValidateAndCheckLimits(subscription, effectiveGroup)
 			if err != nil {
 				status := 403
 				if errors.Is(err, service.ErrDailyLimitExceeded) ||

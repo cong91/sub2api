@@ -4321,6 +4321,11 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	user := input.User
 	account := input.Account
 	subscription := input.Subscription
+	billingScope, err := ResolveRequestBillingScope(apiKey, subscription)
+	if err != nil {
+		return err
+	}
+	billingGroup := billingScope.BillingGroup
 
 	// 计算实际的新输入token（减去缓存读取的token）
 	// 因为 input_tokens 包含了 cache_read_tokens，而缓存读取的token不应按输入价格计费
@@ -4343,12 +4348,19 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if s.cfg != nil {
 		multiplier = s.cfg.Default.RateMultiplier
 	}
-	if apiKey.GroupID != nil && apiKey.Group != nil {
+	if billingScope.BillingGroupID != nil {
 		resolver := s.userGroupRateResolver
 		if resolver == nil {
 			resolver = newUserGroupRateResolver(nil, nil, resolveUserGroupRateCacheTTL(s.cfg), nil, "service.openai_gateway")
 		}
-		multiplier = resolver.Resolve(ctx, user.ID, *apiKey.GroupID, apiKey.Group.RateMultiplier)
+		groupDefaultRate := 1.0
+		if s.cfg != nil {
+			groupDefaultRate = s.cfg.Default.RateMultiplier
+		}
+		if billingGroup != nil {
+			groupDefaultRate = billingGroup.RateMultiplier
+		}
+		multiplier = resolver.Resolve(ctx, user.ID, *billingScope.BillingGroupID, groupDefaultRate)
 	}
 
 	var cost *CostBreakdown
@@ -4387,11 +4399,8 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 
 	// Determine billing type
-	isSubscriptionBilling := subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
-	billingType := BillingTypeBalance
-	if isSubscriptionBilling {
-		billingType = BillingTypeSubscription
-	}
+	isSubscriptionBilling := billingScope.BillingType == BillingTypeSubscription && billingScope.Subscription != nil
+	billingType := billingScope.BillingType
 
 	// Create usage log
 	durationMs := int(result.Duration.Milliseconds())
@@ -4460,11 +4469,11 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		usageLog.IPAddress = &input.IPAddress
 	}
 
-	if apiKey.GroupID != nil {
-		usageLog.GroupID = apiKey.GroupID
+	if billingScope.BillingGroupID != nil {
+		usageLog.GroupID = billingScope.BillingGroupID
 	}
-	if subscription != nil {
-		usageLog.SubscriptionID = &subscription.ID
+	if billingScope.Subscription != nil {
+		usageLog.SubscriptionID = &billingScope.Subscription.ID
 	}
 
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
@@ -4480,7 +4489,8 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 			User:                  user,
 			APIKey:                apiKey,
 			Account:               account,
-			Subscription:          subscription,
+			BillingScope:          billingScope,
+			Subscription:          billingScope.Subscription,
 			RequestPayloadHash:    resolveUsageBillingPayloadFingerprint(ctx, input.RequestPayloadHash),
 			IsSubscriptionBill:    isSubscriptionBilling,
 			AccountRateMultiplier: accountRateMultiplier,

@@ -189,7 +189,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		return
 	}
 
-	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), apiKey.GroupID, reqModel)
+	effectiveGroup := apiKey.EffectiveGroup()
+	var preferredGroupID *int64
+	if service.IsGroupContextValid(effectiveGroup) {
+		gid := effectiveGroup.ID
+		preferredGroupID = &gid
+	}
+
+	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), preferredGroupID, reqModel)
 	if err != nil {
 		if errors.Is(err, service.ErrClaudeCodeOnly) {
 			h.errorResponse(c, http.StatusForbidden, "permission_error", "This group is restricted to Claude Code clients")
@@ -198,12 +205,27 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), false)
 		return
 	}
-	if resolvedGroup != nil {
-		apiKey = cloneAPIKeyWithGroup(apiKey, resolvedGroup)
+	routingGroup := resolvedGroup
+	routingGroupID := resolvedGroupID
+	if routingGroup == nil && routingGroupID != nil {
+		resolvedRoutingGroup, resolveErr := h.gatewayService.ResolveGroupByID(c.Request.Context(), *routingGroupID)
+		if resolveErr != nil {
+			h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No effective group resolved for this request", false)
+			return
+		}
+		routingGroup = resolvedRoutingGroup
 	}
-	routingGroupID := apiKey.GroupID
-	if resolvedGroupID != nil {
-		routingGroupID = resolvedGroupID
+	if routingGroupID == nil && service.IsGroupContextValid(routingGroup) {
+		gid := routingGroup.ID
+		routingGroupID = &gid
+	}
+	if routingGroupID == nil || *routingGroupID <= 0 {
+		h.handleStreamingAwareError(c, http.StatusForbidden, "permission_error", "No effective group resolved for this request", false)
+		return
+	}
+	if !service.IsGroupContextValid(routingGroup) || routingGroup.ID != *routingGroupID {
+		h.handleStreamingAwareError(c, http.StatusForbidden, "permission_error", "No effective group resolved for this request", false)
+		return
 	}
 
 	// Track if we've started streaming (for error handling)
@@ -258,7 +280,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	}
 
 	// 2. 【新增】Wait后二次检查余额/订阅
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, routingGroup, subscription); err != nil {
 		reqLog.Info("gateway.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message := billingErrorDetails(err)
 		h.handleStreamingAwareError(c, status, code, message, streamStarted)
@@ -277,8 +299,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	platform := ""
 	if forcePlatform, ok := middleware2.GetForcePlatformFromContext(c); ok {
 		platform = forcePlatform
-	} else if apiKey.Group != nil {
-		platform = apiKey.Group.Platform
+	} else {
+		platform = routingGroup.Platform
 	}
 	sessionKey := sessionHash
 	if platform == service.PlatformGemini && sessionHash != "" {
@@ -996,6 +1018,28 @@ func cloneAPIKeyWithGroup(apiKey *service.APIKey, group *service.Group) *service
 	return &cloned
 }
 
+func resolveGroupFromRequestContext(ctx context.Context, groupID int64) *service.Group {
+	if ctx == nil || groupID <= 0 {
+		return nil
+	}
+	if group, ok := ctx.Value(ctxkey.Group).(*service.Group); ok && service.IsGroupContextValid(group) && group.ID == groupID {
+		return group
+	}
+	granted, ok := ctx.Value(ctxkey.GrantedGroups).([]*service.Group)
+	if !ok || len(granted) == 0 {
+		return nil
+	}
+	for _, group := range granted {
+		if !service.IsGroupContextValid(group) {
+			continue
+		}
+		if group.ID == groupID {
+			return group
+		}
+	}
+	return nil
+}
+
 // Usage handles getting account balance and usage statistics for CC Switch integration
 // GET /v1/usage
 //
@@ -1507,17 +1551,39 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 		return
 	}
 
-	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), apiKey.GroupID, parsedReq.Model)
+	effectiveGroup := apiKey.EffectiveGroup()
+	var preferredGroupID *int64
+	if service.IsGroupContextValid(effectiveGroup) {
+		gid := effectiveGroup.ID
+		preferredGroupID = &gid
+	}
+
+	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), preferredGroupID, parsedReq.Model)
 	if err != nil {
 		h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error())
 		return
 	}
-	if resolvedGroup != nil {
-		apiKey = cloneAPIKeyWithGroup(apiKey, resolvedGroup)
+	routingGroup := resolvedGroup
+	routingGroupID := resolvedGroupID
+	if routingGroup == nil && routingGroupID != nil {
+		resolvedRoutingGroup, resolveErr := h.gatewayService.ResolveGroupByID(c.Request.Context(), *routingGroupID)
+		if resolveErr != nil {
+			h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "No effective group resolved for this request")
+			return
+		}
+		routingGroup = resolvedRoutingGroup
 	}
-	routingGroupID := apiKey.GroupID
-	if resolvedGroupID != nil {
-		routingGroupID = resolvedGroupID
+	if routingGroupID == nil && service.IsGroupContextValid(routingGroup) {
+		gid := routingGroup.ID
+		routingGroupID = &gid
+	}
+	if routingGroupID == nil || *routingGroupID <= 0 {
+		h.errorResponse(c, http.StatusForbidden, "permission_error", "No effective group resolved for this request")
+		return
+	}
+	if !service.IsGroupContextValid(routingGroup) || routingGroup.ID != *routingGroupID {
+		h.errorResponse(c, http.StatusForbidden, "permission_error", "No effective group resolved for this request")
+		return
 	}
 
 	setOpsRequestContext(c, parsedReq.Model, parsedReq.Stream, body)
@@ -1528,7 +1594,7 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 
 	// 校验 billing eligibility（订阅/余额）
 	// 【注意】不计算并发，但需要校验订阅/余额
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, routingGroup, subscription); err != nil {
 		status, code, message := billingErrorDetails(err)
 		h.errorResponse(c, status, code, message)
 		return

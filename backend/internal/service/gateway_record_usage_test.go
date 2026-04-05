@@ -165,6 +165,40 @@ func TestGatewayServiceRecordUsage_BillingFingerprintFallsBackToContextRequestID
 	require.Equal(t, "local:req-local-123", billingRepo.lastCmd.RequestPayloadHash)
 }
 
+func TestGatewayServiceRecordUsage_FailsWithoutGrantedEffectiveGroup(t *testing.T) {
+	usageRepo := &openAIRecordUsageLogRepoStub{}
+	svc := newGatewayRecordUsageServiceForTest(usageRepo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{})
+	legacyGroupID := int64(42)
+
+	err := svc.RecordUsage(context.Background(), &RecordUsageInput{
+		Result: &ForwardResult{
+			RequestID: "gateway_missing_effective_group",
+			Usage: ClaudeUsage{
+				InputTokens:  10,
+				OutputTokens: 6,
+			},
+			Model:    "claude-sonnet-4",
+			Duration: time.Second,
+		},
+		APIKey: &APIKey{
+			ID:      501,
+			GroupID: &legacyGroupID,
+			Group: &Group{
+				ID:       42,
+				Status:   StatusActive,
+				Platform: PlatformAnthropic,
+				Hydrated: true,
+			},
+		},
+		User:    &User{ID: 601},
+		Account: &Account{ID: 701},
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "GROUP_NOT_ASSIGNED")
+	require.Equal(t, 0, usageRepo.calls)
+}
+
 func TestGatewayServiceRecordUsage_PreservesRequestedAndUpstreamModels(t *testing.T) {
 	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
 	svc := newGatewayRecordUsageServiceForTest(usageRepo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{})

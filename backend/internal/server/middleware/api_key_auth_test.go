@@ -235,7 +235,7 @@ func TestAPIKeyAuthSetsGroupContext(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestAPIKeyAuthSetsGrantedGroupsContextAndKeepsLegacyGroup(t *testing.T) {
+func TestAPIKeyAuthSetsGrantedGroupsContextFromCanonicalEffectiveGroup(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	legacyGroup := &service.Group{ID: 101, Name: "legacy", Status: service.StatusActive, Platform: service.PlatformAnthropic, Hydrated: true}
@@ -276,6 +276,12 @@ func TestAPIKeyAuthSetsGrantedGroupsContextAndKeepsLegacyGroup(t *testing.T) {
 		require.Len(t, granted, 2)
 		require.Equal(t, legacyGroup.ID, granted[0].ID)
 		require.Equal(t, grantedB.ID, granted[1].ID)
+
+		apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
+		require.True(t, ok)
+		require.NotNil(t, apiKeyFromCtx)
+		require.Equal(t, legacyGroup.ID, apiKeyFromCtx.Group.ID)
+		require.Equal(t, legacyGroup.ID, *apiKeyFromCtx.GroupID)
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
@@ -285,6 +291,44 @@ func TestAPIKeyAuthSetsGrantedGroupsContextAndKeepsLegacyGroup(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestAPIKeyAuthRejectsLegacyOnlyGroupWithoutGrantedGroups(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	legacyGroup := &service.Group{ID: 101, Name: "legacy", Status: service.StatusActive, Platform: service.PlatformAnthropic, Hydrated: true}
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive, Balance: 10, Concurrency: 3}
+	apiKey := &service.APIKey{
+		ID:     100,
+		UserID: user.ID,
+		Key:    "test-key-legacy-only",
+		Status: service.StatusActive,
+		User:   user,
+		Group:  legacyGroup,
+	}
+	apiKey.GroupID = &legacyGroup.ID
+
+	apiKeyRepo := &stubApiKeyRepo{getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
+		if key != apiKey.Key {
+			return nil, service.ErrAPIKeyNotFound
+		}
+		clone := *apiKey
+		return &clone, nil
+	}}
+
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, nil, cfg)))
+	router.GET("/t", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"ok": true}) })
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	req.Header.Set("x-api-key", apiKey.Key)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusForbidden, w.Code)
+	require.Contains(t, w.Body.String(), "GROUP_NOT_ASSIGNED")
 }
 
 func TestAPIKeyAuthOverwritesInvalidContextGroup(t *testing.T) {

@@ -77,17 +77,39 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	reqStream := gjson.GetBytes(body, "stream").Bool()
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
 
-	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), apiKey.GroupID, reqModel)
+	effectiveGroup := apiKey.EffectiveGroup()
+	var preferredGroupID *int64
+	if service.IsGroupContextValid(effectiveGroup) {
+		gid := effectiveGroup.ID
+		preferredGroupID = &gid
+	}
+
+	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), preferredGroupID, reqModel)
 	if err != nil {
 		h.responsesErrorResponse(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error())
 		return
 	}
-	if resolvedGroup != nil {
-		apiKey = cloneAPIKeyWithGroup(apiKey, resolvedGroup)
+	routingGroup := resolvedGroup
+	routingGroupID := resolvedGroupID
+	if routingGroup == nil && routingGroupID != nil {
+		resolvedRoutingGroup, resolveErr := h.gatewayService.ResolveGroupByID(c.Request.Context(), *routingGroupID)
+		if resolveErr != nil {
+			h.responsesErrorResponse(c, http.StatusServiceUnavailable, "api_error", "No effective group resolved for this request")
+			return
+		}
+		routingGroup = resolvedRoutingGroup
 	}
-	routingGroupID := apiKey.GroupID
-	if resolvedGroupID != nil {
-		routingGroupID = resolvedGroupID
+	if routingGroupID == nil && service.IsGroupContextValid(routingGroup) {
+		gid := routingGroup.ID
+		routingGroupID = &gid
+	}
+	if routingGroupID == nil || *routingGroupID <= 0 {
+		h.responsesErrorResponse(c, http.StatusForbidden, "permission_error", "No effective group resolved for this request")
+		return
+	}
+	if !service.IsGroupContextValid(routingGroup) || routingGroup.ID != *routingGroupID {
+		h.responsesErrorResponse(c, http.StatusForbidden, "permission_error", "No effective group resolved for this request")
+		return
 	}
 
 	setOpsRequestContext(c, reqModel, reqStream, body)
@@ -102,7 +124,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	// The existing service-layer checkClaudeCodeRestriction handles degradation
 	// to fallback groups when the Forward path calls SelectAccountForModelWithExclusions.
 	// Here we just reject at handler level since /v1/responses clients can't be Claude Code.
-	if apiKey.Group != nil && apiKey.Group.ClaudeCodeOnly {
+	if routingGroup.ClaudeCodeOnly {
 		h.responsesErrorResponse(c, http.StatusForbidden, "permission_error",
 			"This group is restricted to Claude Code clients (/v1/messages only)")
 		return
@@ -152,7 +174,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 2. Re-check billing
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, routingGroup, subscription); err != nil {
 		reqLog.Info("gateway.responses.billing_check_failed", zap.Error(err))
 		status, code, message := billingErrorDetails(err)
 		h.responsesErrorResponse(c, status, code, message)

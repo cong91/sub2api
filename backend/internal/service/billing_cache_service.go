@@ -644,8 +644,8 @@ func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user 
 		return ErrBillingServiceUnavailable
 	}
 
-	// 判断计费模式
-	isSubscriptionMode := group != nil && group.IsSubscriptionType() && subscription != nil
+	// 判断计费模式（以 effective/billing group 为准）
+	isSubscriptionMode := group != nil && group.IsSubscriptionType()
 
 	if isSubscriptionMode {
 		if err := s.checkSubscriptionEligibility(ctx, user.ID, group, subscription); err != nil {

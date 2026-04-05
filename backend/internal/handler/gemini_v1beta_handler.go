@@ -38,9 +38,14 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		googleError(c, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
+	effectiveGroup := apiKey.EffectiveGroup()
+	if !service.IsGroupContextValid(effectiveGroup) {
+		googleError(c, http.StatusForbidden, "No effective group resolved for this request")
+		return
+	}
 	// 检查平台：优先使用强制平台（/antigravity 路由），否则要求 gemini 分组
 	forcePlatform, hasForcePlatform := middleware.GetForcePlatformFromContext(c)
-	if !hasForcePlatform && (apiKey.Group == nil || apiKey.Group.Platform != service.PlatformGemini) {
+	if !hasForcePlatform && effectiveGroup.Platform != service.PlatformGemini {
 		googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
 		return
 	}
@@ -51,10 +56,11 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		return
 	}
 
-	account, err := h.geminiCompatService.SelectAccountForAIStudioEndpoints(c.Request.Context(), apiKey.GroupID)
+	groupID := effectiveGroup.ID
+	account, err := h.geminiCompatService.SelectAccountForAIStudioEndpoints(c.Request.Context(), &groupID)
 	if err != nil {
 		// 没有 gemini 账户，检查是否有 antigravity 账户可用
-		hasAntigravity, _ := h.geminiCompatService.HasAntigravityAccounts(c.Request.Context(), apiKey.GroupID)
+		hasAntigravity, _ := h.geminiCompatService.HasAntigravityAccounts(c.Request.Context(), &groupID)
 		if hasAntigravity {
 			// antigravity 账户使用静态模型列表
 			c.JSON(http.StatusOK, gemini.FallbackModelsList())
@@ -84,9 +90,14 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 		googleError(c, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
+	effectiveGroup := apiKey.EffectiveGroup()
+	if !service.IsGroupContextValid(effectiveGroup) {
+		googleError(c, http.StatusForbidden, "No effective group resolved for this request")
+		return
+	}
 	// 检查平台：优先使用强制平台（/antigravity 路由），否则要求 gemini 分组
 	forcePlatform, hasForcePlatform := middleware.GetForcePlatformFromContext(c)
-	if !hasForcePlatform && (apiKey.Group == nil || apiKey.Group.Platform != service.PlatformGemini) {
+	if !hasForcePlatform && effectiveGroup.Platform != service.PlatformGemini {
 		googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
 		return
 	}
@@ -103,10 +114,11 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 		return
 	}
 
-	account, err := h.geminiCompatService.SelectAccountForAIStudioEndpoints(c.Request.Context(), apiKey.GroupID)
+	groupID := effectiveGroup.ID
+	account, err := h.geminiCompatService.SelectAccountForAIStudioEndpoints(c.Request.Context(), &groupID)
 	if err != nil {
 		// 没有 gemini 账户，检查是否有 antigravity 账户可用
-		hasAntigravity, _ := h.geminiCompatService.HasAntigravityAccounts(c.Request.Context(), apiKey.GroupID)
+		hasAntigravity, _ := h.geminiCompatService.HasAntigravityAccounts(c.Request.Context(), &groupID)
 		if hasAntigravity {
 			// antigravity 账户使用静态模型信息
 			c.JSON(http.StatusOK, gemini.FallbackModel(modelName))
@@ -184,17 +196,39 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	setOpsRequestContext(c, modelName, stream, body)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(stream, false)))
 
-	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), apiKey.GroupID, modelName)
+	effectiveGroup := apiKey.EffectiveGroup()
+	var preferredGroupID *int64
+	if service.IsGroupContextValid(effectiveGroup) {
+		gid := effectiveGroup.ID
+		preferredGroupID = &gid
+	}
+
+	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), preferredGroupID, modelName)
 	if err != nil {
 		googleError(c, http.StatusServiceUnavailable, "No available accounts: "+err.Error())
 		return
 	}
-	if resolvedGroup != nil {
-		apiKey = cloneAPIKeyWithGroup(apiKey, resolvedGroup)
+	routingGroup := resolvedGroup
+	routingGroupID := resolvedGroupID
+	if routingGroup == nil && routingGroupID != nil {
+		resolvedRoutingGroup, resolveErr := h.gatewayService.ResolveGroupByID(c.Request.Context(), *routingGroupID)
+		if resolveErr != nil {
+			googleError(c, http.StatusServiceUnavailable, "No effective group resolved for this request")
+			return
+		}
+		routingGroup = resolvedRoutingGroup
 	}
-	routingGroupID := apiKey.GroupID
-	if resolvedGroupID != nil {
-		routingGroupID = resolvedGroupID
+	if routingGroupID == nil && service.IsGroupContextValid(routingGroup) {
+		gid := routingGroup.ID
+		routingGroupID = &gid
+	}
+	if routingGroupID == nil || *routingGroupID <= 0 {
+		googleError(c, http.StatusForbidden, "No effective group resolved for this request")
+		return
+	}
+	if !service.IsGroupContextValid(routingGroup) || routingGroup.ID != *routingGroupID {
+		googleError(c, http.StatusForbidden, "No effective group resolved for this request")
+		return
 	}
 
 	// 解析渠道级模型映射
@@ -252,7 +286,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	}
 
 	// 2) billing eligibility check (after wait)
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, routingGroup, subscription); err != nil {
 		reqLog.Info("gemini.billing_eligibility_check_failed", zap.Error(err))
 		status, _, message := billingErrorDetails(err)
 		googleError(c, status, message)
@@ -312,8 +346,8 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				userAgent := c.GetHeader("User-Agent")
 				clientIP := ip.GetClientIP(c)
 				platform := ""
-				if apiKey.Group != nil {
-					platform = apiKey.Group.Platform
+				if service.IsGroupContextValid(routingGroup) {
+					platform = routingGroup.Platform
 				}
 				geminiPrefixHash = service.GenerateGeminiPrefixHash(
 					authSubject.UserID,

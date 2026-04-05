@@ -320,6 +320,68 @@ func TestApiKeyAuthWithSubscriptionGoogleSetsGroupContext(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 }
 
+func TestApiKeyAuthWithSubscriptionGoogleRejectsLegacyOnlyGroupWithoutGrantedGroups(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	legacyGroup := &service.Group{
+		ID:       99,
+		Name:     "legacy",
+		Status:   service.StatusActive,
+		Platform: service.PlatformGemini,
+		Hydrated: true,
+	}
+	user := &service.User{
+		ID:          7,
+		Role:        service.RoleUser,
+		Status:      service.StatusActive,
+		Balance:     10,
+		Concurrency: 3,
+	}
+	apiKey := &service.APIKey{
+		ID:     100,
+		UserID: user.ID,
+		Key:    "test-key-legacy-only-google",
+		Status: service.StatusActive,
+		User:   user,
+		Group:  legacyGroup,
+	}
+	apiKey.GroupID = &legacyGroup.ID
+
+	apiKeyService := service.NewAPIKeyService(
+		fakeAPIKeyRepo{
+			getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
+				if key != apiKey.Key {
+					return nil, service.ErrAPIKeyNotFound
+				}
+				clone := *apiKey
+				return &clone, nil
+			},
+		},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		&config.Config{RunMode: config.RunModeSimple},
+	)
+
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	r := gin.New()
+	r.Use(APIKeyAuthWithSubscriptionGoogle(apiKeyService, nil, cfg))
+	r.GET("/v1beta/test", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"ok": true}) })
+
+	req := httptest.NewRequest(http.MethodGet, "/v1beta/test", nil)
+	req.Header.Set("x-api-key", apiKey.Key)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	var resp googleErrorResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	require.Equal(t, "PERMISSION_DENIED", resp.Error.Status)
+	require.Contains(t, resp.Error.Message, "no granted groups")
+}
+
 func TestApiKeyAuthWithSubscriptionGoogle_QueryKeyAllowedOnV1Beta(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

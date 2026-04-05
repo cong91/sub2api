@@ -7370,6 +7370,7 @@ type postUsageBillingParams struct {
 	User                  *User
 	APIKey                *APIKey
 	Account               *Account
+	BillingScope          *RequestBillingScope
 	Subscription          *UserSubscription
 	RequestPayloadHash    string
 	IsSubscriptionBill    bool
@@ -7402,11 +7403,13 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 
 	// 1. 订阅 / 余额扣费
 	if p.IsSubscriptionBill {
-		if cost.TotalCost > 0 {
+		if cost.TotalCost > 0 && p.Subscription != nil {
 			if err := deps.userSubRepo.IncrementUsage(billingCtx, p.Subscription.ID, cost.TotalCost); err != nil {
 				slog.Error("increment subscription usage failed", "subscription_id", p.Subscription.ID, "error", err)
 			}
-			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, cost.TotalCost)
+			if p.BillingScope != nil && p.BillingScope.BillingGroupID != nil {
+				deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.BillingScope.BillingGroupID, cost.TotalCost)
+			}
 		}
 	} else {
 		if cost.ActualCost > 0 {
@@ -7565,8 +7568,8 @@ func finalizePostUsageBilling(p *postUsageBillingParams, deps *billingDeps) {
 	}
 
 	if p.IsSubscriptionBill {
-		if p.Cost.TotalCost > 0 && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil {
-			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Cost.TotalCost)
+		if p.Cost.TotalCost > 0 && p.User != nil && p.BillingScope != nil && p.BillingScope.BillingGroupID != nil {
+			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.BillingScope.BillingGroupID, p.Cost.TotalCost)
 		}
 	} else if p.Cost.ActualCost > 0 && p.User != nil {
 		deps.billingCacheService.QueueDeductBalance(p.User.ID, p.Cost.ActualCost)
@@ -7745,6 +7748,11 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	user := input.User
 	account := input.Account
 	subscription := input.Subscription
+	billingScope, err := ResolveRequestBillingScope(apiKey, subscription)
+	if err != nil {
+		return err
+	}
+	billingGroup := billingScope.BillingGroup
 
 	// 强制缓存计费：将 input_tokens 转为 cache_read_input_tokens
 	// 用于粘性会话切换时的特殊计费处理
@@ -7767,9 +7775,9 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	if s.cfg != nil {
 		multiplier = s.cfg.Default.RateMultiplier
 	}
-	if apiKey.GroupID != nil && apiKey.Group != nil {
-		groupDefault := apiKey.Group.RateMultiplier
-		multiplier = s.getUserGroupRateMultiplier(ctx, user.ID, *apiKey.GroupID, groupDefault)
+	if billingScope.BillingGroupID != nil && billingGroup != nil {
+		groupDefault := billingGroup.RateMultiplier
+		multiplier = s.getUserGroupRateMultiplier(ctx, user.ID, *billingScope.BillingGroupID, groupDefault)
 	}
 
 	// 确定计费模型
@@ -7791,11 +7799,8 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	cost := s.calculateRecordUsageCost(ctx, result, apiKey, billingModel, multiplier, opts)
 
 	// 判断计费方式：订阅模式 vs 余额模式
-	isSubscriptionBilling := subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
-	billingType := BillingTypeBalance
-	if isSubscriptionBilling {
-		billingType = BillingTypeSubscription
-	}
+	isSubscriptionBilling := billingScope.BillingType == BillingTypeSubscription && billingScope.Subscription != nil
+	billingType := billingScope.BillingType
 
 	// 创建使用日志
 	accountRateMultiplier := account.BillingRateMultiplier()

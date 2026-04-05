@@ -37,14 +37,14 @@ type OpenAIGatewayHandler struct {
 	cfg                     *config.Config
 }
 
-func resolveOpenAIForwardDefaultMappedModel(apiKey *service.APIKey, fallbackModel string) string {
+func resolveOpenAIForwardDefaultMappedModel(group *service.Group, fallbackModel string) string {
 	if fallbackModel = strings.TrimSpace(fallbackModel); fallbackModel != "" {
 		return fallbackModel
 	}
-	if apiKey == nil || apiKey.Group == nil {
+	if group == nil {
 		return ""
 	}
-	return strings.TrimSpace(apiKey.Group.DefaultMappedModel)
+	return strings.TrimSpace(group.DefaultMappedModel)
 }
 
 // NewOpenAIGatewayHandler creates a new OpenAIGatewayHandler
@@ -166,17 +166,34 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	reqStream := streamResult.Bool()
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
 
-	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), apiKey.GroupID, reqModel)
+	effectiveGroup := apiKey.EffectiveGroup()
+	var preferredGroupID *int64
+	if service.IsGroupContextValid(effectiveGroup) {
+		gid := effectiveGroup.ID
+		preferredGroupID = &gid
+	}
+
+	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), preferredGroupID, reqModel)
 	if err != nil {
 		h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), streamStarted)
 		return
 	}
-	if resolvedGroup != nil {
-		apiKey = cloneAPIKeyWithGroup(apiKey, resolvedGroup)
+	routingGroup := resolvedGroup
+	routingGroupID := resolvedGroupID
+	if routingGroup == nil && routingGroupID != nil {
+		routingGroup = resolveGroupFromRequestContext(c.Request.Context(), *routingGroupID)
 	}
-	routingGroupID := apiKey.GroupID
-	if resolvedGroupID != nil {
-		routingGroupID = resolvedGroupID
+	if routingGroupID == nil && service.IsGroupContextValid(routingGroup) {
+		gid := routingGroup.ID
+		routingGroupID = &gid
+	}
+	if routingGroupID == nil || *routingGroupID <= 0 {
+		h.handleStreamingAwareError(c, http.StatusForbidden, "permission_error", "No effective group resolved for this request", streamStarted)
+		return
+	}
+	if !service.IsGroupContextValid(routingGroup) || routingGroup.ID != *routingGroupID {
+		h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No effective group resolved for this request", streamStarted)
+		return
 	}
 	previousResponseID := strings.TrimSpace(gjson.GetBytes(body, "previous_response_id").String())
 	if previousResponseID != "" {
@@ -227,7 +244,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 2. Re-check billing eligibility after wait
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, routingGroup, subscription); err != nil {
 		reqLog.Info("openai.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message := billingErrorDetails(err)
 		h.handleStreamingAwareError(c, status, code, message, streamStarted)
@@ -528,7 +545,12 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	)
 
 	// 检查分组是否允许 /v1/messages 调度
-	if apiKey.Group != nil && !apiKey.Group.AllowMessagesDispatch {
+	effectiveGroup := apiKey.EffectiveGroup()
+	if !service.IsGroupContextValid(effectiveGroup) {
+		h.anthropicErrorResponse(c, http.StatusForbidden, "permission_error", "No effective group resolved for this request")
+		return
+	}
+	if !effectiveGroup.AllowMessagesDispatch {
 		h.anthropicErrorResponse(c, http.StatusForbidden, "permission_error",
 			"This group does not allow /v1/messages dispatch")
 		return
@@ -568,17 +590,33 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
 
-	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), apiKey.GroupID, routingModel)
+	var preferredGroupID *int64
+	if service.IsGroupContextValid(effectiveGroup) {
+		gid := effectiveGroup.ID
+		preferredGroupID = &gid
+	}
+
+	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), preferredGroupID, routingModel)
 	if err != nil {
 		h.anthropicStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), streamStarted)
 		return
 	}
-	if resolvedGroup != nil {
-		apiKey = cloneAPIKeyWithGroup(apiKey, resolvedGroup)
+	routingGroup := resolvedGroup
+	routingGroupID := resolvedGroupID
+	if routingGroup == nil && routingGroupID != nil {
+		routingGroup = resolveGroupFromRequestContext(c.Request.Context(), *routingGroupID)
 	}
-	routingGroupID := apiKey.GroupID
-	if resolvedGroupID != nil {
-		routingGroupID = resolvedGroupID
+	if routingGroupID == nil && service.IsGroupContextValid(routingGroup) {
+		gid := routingGroup.ID
+		routingGroupID = &gid
+	}
+	if routingGroupID == nil || *routingGroupID <= 0 {
+		h.anthropicStreamingAwareError(c, http.StatusForbidden, "permission_error", "No effective group resolved for this request", streamStarted)
+		return
+	}
+	if !service.IsGroupContextValid(routingGroup) || routingGroup.ID != *routingGroupID {
+		h.anthropicStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No effective group resolved for this request", streamStarted)
+		return
 	}
 
 	setOpsRequestContext(c, reqModel, reqStream, body)
@@ -605,7 +643,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		defer userReleaseFunc()
 	}
 
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, routingGroup, subscription); err != nil {
 		reqLog.Info("openai_messages.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message := billingErrorDetails(err)
 		h.anthropicStreamingAwareError(c, status, code, message, streamStarted)
@@ -657,9 +695,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			// 首次调度失败 + 有默认映射模型 → 用默认模型重试
 			if len(failedAccountIDs) == 0 {
 				defaultModel := ""
-				if apiKey.Group != nil {
-					defaultModel = apiKey.Group.DefaultMappedModel
-				}
+				defaultModel = strings.TrimSpace(routingGroup.DefaultMappedModel)
 				if defaultModel != "" && defaultModel != routingModel {
 					reqLog.Info("openai_messages.fallback_to_default_model",
 						zap.String("default_mapped_model", defaultModel),
@@ -710,6 +746,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 		// Forward 层需要始终拿到 group 默认映射模型，这样未命中账号级映射的
 		// Claude 兼容模型才不会在后续 Codex 规范化中意外退化到 gpt-5.1。
+<<<<<<< HEAD
 		defaultMappedModel := resolveOpenAIForwardDefaultMappedModel(apiKey, c.GetString("openai_messages_fallback_model"))
 		// 应用渠道模型映射到请求体
 		forwardBody := body
@@ -717,6 +754,15 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMappingMsg.MappedModel)
 		}
 		result, err := h.gatewayService.ForwardAsAnthropic(c.Request.Context(), c, account, forwardBody, promptCacheKey, defaultMappedModel)
+=======
+		defaultMappedModel := resolveOpenAIForwardDefaultMappedModel(routingGroup, c.GetString("openai_messages_fallback_model"))
+		// 应用渠道模型映射到请求体
+		forwardBody := body
+		if channelMappingMsg.Mapped {
+			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMappingMsg.MappedModel)
+		}
+		result, err := h.gatewayService.ForwardAsAnthropic(c.Request.Context(), c, account, forwardBody, promptCacheKey, defaultMappedModel)
+>>>>>>> 31ed79f4 (refactor(runtime): enforce granted_groups-only billing and routing semantics)
 
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		if accountReleaseFunc != nil {
@@ -1131,17 +1177,34 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		return
 	}
 
-	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), apiKey.GroupID, reqModel)
+	effectiveGroup := apiKey.EffectiveGroup()
+	var preferredGroupID *int64
+	if service.IsGroupContextValid(effectiveGroup) {
+		gid := effectiveGroup.ID
+		preferredGroupID = &gid
+	}
+
+	resolvedGroup, resolvedGroupID, err := h.gatewayService.ResolveEffectiveGroupForRequest(c.Request.Context(), preferredGroupID, reqModel)
 	if err != nil {
 		closeOpenAIClientWS(wsConn, coderws.StatusTryAgainLater, "no available account")
 		return
 	}
-	if resolvedGroup != nil {
-		apiKey = cloneAPIKeyWithGroup(apiKey, resolvedGroup)
+	routingGroup := resolvedGroup
+	routingGroupID := resolvedGroupID
+	if routingGroup == nil && routingGroupID != nil {
+		routingGroup = resolveGroupFromRequestContext(c.Request.Context(), *routingGroupID)
 	}
-	routingGroupID := apiKey.GroupID
-	if resolvedGroupID != nil {
-		routingGroupID = resolvedGroupID
+	if routingGroupID == nil && service.IsGroupContextValid(routingGroup) {
+		gid := routingGroup.ID
+		routingGroupID = &gid
+	}
+	if routingGroupID == nil || *routingGroupID <= 0 {
+		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "no effective group")
+		return
+	}
+	if !service.IsGroupContextValid(routingGroup) || routingGroup.ID != *routingGroupID {
+		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "no effective group")
+		return
 	}
 
 	previousResponseID := strings.TrimSpace(gjson.GetBytes(firstMessage, "previous_response_id").String())
@@ -1190,7 +1253,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	currentUserRelease = wrapReleaseOnDone(ctx, userReleaseFunc)
 
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
-	if err := h.billingCacheService.CheckBillingEligibility(ctx, apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(ctx, apiKey.User, apiKey, routingGroup, subscription); err != nil {
 		reqLog.Info("openai.websocket_billing_eligibility_check_failed", zap.Error(err))
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "billing check failed")
 		return
