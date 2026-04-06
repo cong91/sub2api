@@ -300,6 +300,9 @@ export default {
 		verifying: "Verifying...",
 		processing: "Processing...",
 		contactSupport: "Contact Support",
+		goBack: "Go Back",
+		goToDashboard: "Go to Dashboard",
+		needHelp: "Need help?",
 		add: "Add",
 		invalidEmail: "Please enter a valid email address",
 		optional: "optional",
@@ -978,6 +981,7 @@ export default {
 	errors: {
 		somethingWentWrong: "Something went wrong",
 		pageNotFound: "Page not found",
+		pageNotFoundDescription: "The page you are looking for doesn't exist or has been moved.",
 		unauthorized: "Unauthorized",
 		forbidden: "Forbidden",
 		serverError: "Server error",
@@ -1456,8 +1460,6 @@ export default {
 			failedToLoadApiKeys: "Failed to load user API keys",
 			emailRequired: "Please enter email",
 			concurrencyMin: "Concurrency must be at least 1",
-			soraStorageQuota: "Sora Storage Quota",
-			soraStorageQuotaHint: "In GB, 0 means use group or system default quota",
 			amountRequired: "Please enter a valid amount",
 			insufficientBalance: "Insufficient balance",
 			deleteConfirm:
@@ -1734,18 +1736,6 @@ export default {
 				title: "Image Generation Pricing",
 				description:
 					"Configure pricing for image generation models. Leave empty to use default prices.",
-			},
-			soraPricing: {
-				title: "Sora Per-Request Pricing",
-				description:
-					"Configure per-request pricing for Sora image/video generation. Leave empty to disable billing.",
-				image360: "Image 360px ($)",
-				image540: "Image 540px ($)",
-				video: "Video (standard) ($)",
-				videoHd: "Video (Pro-HD) ($)",
-				storageQuota: "Storage Quota",
-				storageQuotaHint:
-					"In GB, set the Sora storage quota for users in this group. 0 means use system default",
 			},
 			claudeCode: {
 				title: "Claude Code Client Restriction",
@@ -2627,6 +2617,8 @@ export default {
 				step3EnterCode: "Enter the Authorization Code",
 				authCodeDesc:
 					"After authorization is complete, the page will display an Authorization Code. Copy and paste it below:",
+				callbackTitle: "OAuth Callback",
+				callbackDescription: "Copy the code (and state if needed) back to the admin authorization flow.",
 				authCode: "Authorization Code",
 				authCodePlaceholder: "Paste the Authorization Code from Claude page...",
 				authCodeHint:

@@ -2,10 +2,9 @@
   <div class="min-h-screen bg-gray-50 px-4 py-10 dark:bg-dark-900">
     <div class="mx-auto max-w-2xl">
       <div class="card p-6">
-        <h1 class="text-lg font-semibold text-gray-900 dark:text-white">OAuth Callback</h1>
+        <h1 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('auth.oauth.callbackTitle') }}</h1>
         <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Copy the <code>code</code> (and <code>state</code> if needed) back to the admin
-          authorization flow.
+          {{ t('auth.oauth.callbackDescription') }}
         </p>
 
         <div class="mt-6 space-y-4">
@@ -14,7 +13,7 @@
             <div class="flex gap-2">
               <input class="input flex-1 font-mono text-sm" :value="code" readonly />
               <button class="btn btn-secondary" type="button" :disabled="!code" @click="copy(code)">
-                Copy
+                {{ t('common.copy') }}
               </button>
             </div>
           </div>
@@ -29,7 +28,7 @@
                 :disabled="!state"
                 @click="copy(state)"
               >
-                Copy
+                {{ t('common.copy') }}
               </button>
             </div>
           </div>
@@ -44,7 +43,7 @@
                 :disabled="!fullUrl"
                 @click="copy(fullUrl)"
               >
-                Copy
+                {{ t('common.copy') }}
               </button>
             </div>
           </div>
@@ -84,6 +83,6 @@ const fullUrl = computed(() => {
 
 const copy = (value: string) => {
   if (!value) return
-  copyToClipboard(value, 'Copied')
+  copyToClipboard(value, t('common.copied'))
 }
 </script>
