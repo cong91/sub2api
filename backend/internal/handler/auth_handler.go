@@ -113,20 +113,20 @@ func (h *AuthHandler) respondWithTokenPair(c *gin.Context, user *service.User) {
 	})
 }
 
-func (h *AuthHandler) respondWithTokenPairForInviteLogin(c *gin.Context, user *service.User, bootstrapContext *service.InviteBootstrapContext) {
-	tokenPair, err := h.authService.GenerateTokenPair(c.Request.Context(), user, "")
-	if err != nil {
-		slog.Error("failed to generate token pair", "error", err, "user_id", user.ID)
-		// 回退到只返回Access Token
-		token, tokenErr := h.authService.GenerateToken(user)
-		if tokenErr != nil {
-			response.InternalError(c, "Failed to generate token")
-			return
-		}
+func (h *AuthHandler) respondWithTokenPairForInviteLogin(c *gin.Context, result *service.InviteLoginResult) {
+	if result == nil || result.User == nil {
+		response.InternalError(c, "Failed to complete invite login")
+		return
+	}
+
+	bootstrapContext := &result.BootstrapContext
+	if result.TokenPair != nil {
 		response.Success(c, AuthResponse{
-			AccessToken:            token,
+			AccessToken:            result.TokenPair.AccessToken,
+			RefreshToken:           result.TokenPair.RefreshToken,
+			ExpiresIn:              result.TokenPair.ExpiresIn,
 			TokenType:              "Bearer",
-			User:                   dto.UserFromService(user),
+			User:                   dto.UserFromService(result.User),
 			BootstrapLogin:         true,
 			NeedsProfileCompletion: true,
 			NeedsPasswordSetup:     true,
@@ -135,12 +135,15 @@ func (h *AuthHandler) respondWithTokenPairForInviteLogin(c *gin.Context, user *s
 		return
 	}
 
+	if strings.TrimSpace(result.Token) == "" {
+		response.InternalError(c, "Failed to generate token")
+		return
+	}
+
 	response.Success(c, AuthResponse{
-		AccessToken:            tokenPair.AccessToken,
-		RefreshToken:           tokenPair.RefreshToken,
-		ExpiresIn:              tokenPair.ExpiresIn,
+		AccessToken:            result.Token,
 		TokenType:              "Bearer",
-		User:                   dto.UserFromService(user),
+		User:                   dto.UserFromService(result.User),
 		BootstrapLogin:         true,
 		NeedsProfileCompletion: true,
 		NeedsPasswordSetup:     true,
@@ -262,7 +265,7 @@ func (h *AuthHandler) InviteLogin(c *gin.Context) {
 		return
 	}
 
-	h.respondWithTokenPairForInviteLogin(c, result.User, &result.BootstrapContext)
+	h.respondWithTokenPairForInviteLogin(c, result)
 }
 
 // TotpLoginResponse represents the response when 2FA is required

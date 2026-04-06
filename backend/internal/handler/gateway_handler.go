@@ -959,7 +959,7 @@ func (h *GatewayHandler) ProviderCatalog(c *gin.Context) {
 		forcedPlatform = strings.TrimSpace(p)
 	}
 
-	grantedGroups := collectCatalogGroups(apiKey, forcedPlatform)
+	grantedGroups := collectCatalogGroups(c, apiKey, forcedPlatform)
 	if len(grantedGroups) == 0 {
 		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
 		return
@@ -974,7 +974,7 @@ func (h *GatewayHandler) ProviderCatalog(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func collectCatalogGroups(apiKey *service.APIKey, forcedPlatform string) []*service.Group {
+func collectCatalogGroups(c *gin.Context, apiKey *service.APIKey, forcedPlatform string) []*service.Group {
 	if apiKey == nil {
 		return nil
 	}
@@ -995,6 +995,20 @@ func collectCatalogGroups(apiKey *service.APIKey, forcedPlatform string) []*serv
 		}
 		seen[group.ID] = struct{}{}
 		out = append(out, group)
+	}
+
+	// Discovery should aggregate the full granted-group union for this request.
+	// Routing semantics remain unchanged and still rely on effective group.
+	if c != nil {
+		if ctxGranted, ok := middleware2.GetGrantedGroupsFromRequestContext(c); ok {
+			for _, group := range ctxGranted {
+				appendGroup(group)
+			}
+		}
+	}
+
+	for _, group := range apiKey.CanonicalGrantedGroups() {
+		appendGroup(group)
 	}
 
 	for _, group := range apiKey.GrantedGroups {

@@ -26,6 +26,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/gemini"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
@@ -579,13 +580,36 @@ type ProviderCatalogResponse struct {
 	Providers []ProviderCatalogProvider `json:"providers"`
 }
 
+type ProviderCatalogSourceCompatibility struct {
+	Protocols []string `json:"protocols,omitempty"`
+}
+
+type ProviderCatalogSource struct {
+	SourcePlatform   string                             `json:"source_platform"`
+	SourceLabel      string                             `json:"source_label"`
+	ProtocolRole     string                             `json:"protocol_role"`
+	SupportsFamilies []string                           `json:"supports_families,omitempty"`
+	NativePlatforms  []string                           `json:"native_platforms,omitempty"`
+	Compatibility    ProviderCatalogSourceCompatibility `json:"compatibility,omitempty"`
+}
+
+type ProviderCatalogResolution struct {
+	SourceKind                string   `json:"source_kind,omitempty"`
+	DerivedFromGroups         []int64  `json:"derived_from_groups,omitempty"`
+	DerivedFromGroupPlatforms []string `json:"derived_from_group_platforms,omitempty"`
+	DerivedFromScopes         []string `json:"derived_from_scopes,omitempty"`
+	ForcedPlatform            string   `json:"forced_platform,omitempty"`
+}
+
 type ProviderCatalogProvider struct {
-	ProviderID   string                 `json:"provider_id"`
-	ProviderName string                 `json:"provider_name"`
-	APIStyle     string                 `json:"api_style"`
-	BaseURL      string                 `json:"base_url"`
-	DefaultModel string                 `json:"default_model"`
-	Models       []ProviderCatalogModel `json:"models"`
+	ProviderID   string                    `json:"provider_id"`
+	ProviderName string                    `json:"provider_name"`
+	APIStyle     string                    `json:"api_style"`
+	BaseURL      string                    `json:"base_url"`
+	DefaultModel string                    `json:"default_model"`
+	Models       []ProviderCatalogModel    `json:"models"`
+	Sources      []ProviderCatalogSource   `json:"sources,omitempty"`
+	Resolution   ProviderCatalogResolution `json:"resolution,omitempty"`
 }
 
 type ProviderCatalogModel struct {
@@ -593,6 +617,22 @@ type ProviderCatalogModel struct {
 	Name      string   `json:"name"`
 	Reasoning bool     `json:"reasoning"`
 	Input     []string `json:"input,omitempty"`
+	Family    string   `json:"family,omitempty"`
+}
+
+type providerCatalogLaneCandidate struct {
+	LaneID         string
+	ProviderName   string
+	APIStyle       string
+	BaseURL        string
+	DefaultModel   string
+	Models         []ProviderCatalogModel
+	Sources        []ProviderCatalogSource
+	GroupIDs       []int64
+	GroupPlatforms []string
+	Scopes         []string
+	HasNative      bool
+	HasCompat      bool
 }
 
 // NewGatewayService creates a new GatewayService
@@ -8820,53 +8860,470 @@ func (s *GatewayService) BuildProviderCatalogForGroups(ctx context.Context, grou
 	}
 
 	forced := strings.TrimSpace(forcedPlatform)
-	factory := DefaultInviteBootstrapContextFactory(s.settingService)
-	seen := make(map[string]struct{})
-	var firstErr error
+	candidates := buildProviderCatalogLaneCandidates(ctx, groups, forced, s.settingService)
+	if len(candidates) == 0 {
+		return resp, fmt.Errorf("group is required")
+	}
+
+	resp.Providers = materializeProviderCatalogProviders(candidates, forced)
+	if len(resp.Providers) == 0 {
+		return resp, fmt.Errorf("group is required")
+	}
+	return resp, nil
+}
+
+func buildProviderCatalogLaneCandidates(ctx context.Context, groups []*Group, forcedPlatform string, settingService *SettingService) map[string]*providerCatalogLaneCandidate {
+	baseURL := inviteBootstrapBaseURL(ctx, settingService)
+	forced := normalizeInvitePlatform(forcedPlatform)
+	lanes := make(map[string]*providerCatalogLaneCandidate, 3)
 
 	for _, group := range groups {
 		if group == nil {
 			continue
 		}
 
-		effectiveGroup := *group
-		if forced != "" {
-			if !strings.EqualFold(strings.TrimSpace(effectiveGroup.Platform), forced) {
-				continue
-			}
-			effectiveGroup.Platform = forced
+		platform := normalizeInvitePlatform(group.Platform)
+		if platform == PlatformOpenAI {
+			mergeProviderCatalogLaneCandidate(lanes, buildOpenAILaneCandidate(ctx, group, settingService, baseURL))
 		}
-
-		providers, err := factory.BuildProviders(ctx, &effectiveGroup)
-		var mapped []ProviderCatalogProvider
-		if err == nil {
-			mapped = mapInviteProvidersToCatalog(providers)
-		} else {
-			mapped = fallbackProviderCatalogByPlatform(&effectiveGroup, s.settingService, ctx)
-			if len(mapped) == 0 && firstErr == nil {
-				firstErr = err
-			}
+		if contributesAnthropicLane(group) {
+			sourcePlatform := anthropicLaneSourcePlatform(group)
+			mergeProviderCatalogLaneCandidate(lanes, buildAnthropicLaneCandidate(ctx, group, settingService, sourcePlatform, baseURL))
 		}
-
-		for _, provider := range mapped {
-			providerKey := strings.ToLower(strings.TrimSpace(provider.ProviderID)) + "|" + strings.TrimSpace(provider.BaseURL)
-			if _, ok := seen[providerKey]; ok {
-				continue
-			}
-			seen[providerKey] = struct{}{}
-			resp.Providers = append(resp.Providers, provider)
+		if contributesGeminiLane(group) {
+			sourcePlatform := geminiLaneSourcePlatform(group)
+			mergeProviderCatalogLaneCandidate(lanes, buildGeminiLaneCandidate(ctx, group, settingService, sourcePlatform, baseURL))
 		}
 	}
 
-	if len(resp.Providers) > 0 {
-		return resp, nil
+	if forced == PlatformOpenAI || forced == PlatformAnthropic || forced == PlatformGemini {
+		for laneID := range lanes {
+			if laneID != forced {
+				delete(lanes, laneID)
+			}
+		}
 	}
 
-	if firstErr != nil {
-		return resp, firstErr
+	return lanes
+}
+
+func materializeProviderCatalogProviders(candidates map[string]*providerCatalogLaneCandidate, forcedPlatform string) []ProviderCatalogProvider {
+	orderedLaneIDs := []string{PlatformOpenAI, PlatformAnthropic, PlatformGemini}
+	out := make([]ProviderCatalogProvider, 0, len(candidates))
+	for _, laneID := range orderedLaneIDs {
+		candidate := candidates[laneID]
+		if candidate == nil {
+			continue
+		}
+
+		sourceKind := "native"
+		switch {
+		case candidate.HasNative && candidate.HasCompat:
+			sourceKind = "mixed"
+		case candidate.HasCompat:
+			sourceKind = "via_compat"
+		}
+
+		out = append(out, ProviderCatalogProvider{
+			ProviderID:   candidate.LaneID,
+			ProviderName: candidate.ProviderName,
+			APIStyle:     candidate.APIStyle,
+			BaseURL:      candidate.BaseURL,
+			DefaultModel: candidate.DefaultModel,
+			Models:       candidate.Models,
+			Sources:      candidate.Sources,
+			Resolution: ProviderCatalogResolution{
+				SourceKind:                sourceKind,
+				DerivedFromGroups:         candidate.GroupIDs,
+				DerivedFromGroupPlatforms: candidate.GroupPlatforms,
+				DerivedFromScopes:         candidate.Scopes,
+				ForcedPlatform:            strings.TrimSpace(forcedPlatform),
+			},
+		})
+	}
+	return out
+}
+
+func buildOpenAILaneCandidate(ctx context.Context, group *Group, settingService *SettingService, baseURL string) *providerCatalogLaneCandidate {
+	models := make([]ProviderCatalogModel, 0, len(openai.DefaultModels))
+	for _, model := range openai.DefaultModels {
+		models = append(models, ProviderCatalogModel{ID: model.ID, Name: model.DisplayName, Reasoning: true, Input: []string{"text", "image"}, Family: "openai"})
+	}
+	defaultModel := resolveProviderCatalogDefaultModel(PlatformOpenAI, group, settingService, models)
+	return &providerCatalogLaneCandidate{
+		LaneID:       PlatformOpenAI,
+		ProviderName: "OpenAI",
+		APIStyle:     inviteBootstrapAPIStyleOpenAI,
+		BaseURL:      inviteBootstrapProviderBaseURL(baseURL, PlatformOpenAI),
+		DefaultModel: defaultModel,
+		Models:       models,
+		Sources: []ProviderCatalogSource{{
+			SourcePlatform:   PlatformOpenAI,
+			SourceLabel:      "OpenAI",
+			ProtocolRole:     "native",
+			SupportsFamilies: []string{"openai"},
+			NativePlatforms:  []string{PlatformOpenAI},
+			Compatibility:    ProviderCatalogSourceCompatibility{Protocols: []string{inviteBootstrapAPIStyleOpenAI}},
+		}},
+		GroupIDs:       providerCatalogGroupIDs(group),
+		GroupPlatforms: providerCatalogGroupPlatforms(group),
+		HasNative:      true,
+	}
+}
+
+func buildAnthropicLaneCandidate(ctx context.Context, group *Group, settingService *SettingService, sourcePlatform, baseURL string) *providerCatalogLaneCandidate {
+	models := make([]ProviderCatalogModel, 0, len(claude.DefaultModels))
+	for _, model := range claude.DefaultModels {
+		models = append(models, ProviderCatalogModel{ID: model.ID, Name: model.DisplayName, Reasoning: true, Input: []string{"text", "image"}, Family: "claude"})
+	}
+	defaultModel := resolveProviderCatalogDefaultModel(PlatformAnthropic, group, settingService, models)
+	source := ProviderCatalogSource{
+		SourcePlatform:   sourcePlatform,
+		SourceLabel:      providerCatalogSourceLabel(sourcePlatform, PlatformAnthropic),
+		SupportsFamilies: []string{"claude"},
+		Compatibility:    ProviderCatalogSourceCompatibility{Protocols: []string{inviteBootstrapAPIStyleAnthropic}},
+	}
+	if sourcePlatform == PlatformAnthropic {
+		source.ProtocolRole = "native"
+		source.NativePlatforms = []string{PlatformAnthropic}
+	} else {
+		source.ProtocolRole = "compatible"
+	}
+	return &providerCatalogLaneCandidate{
+		LaneID:         PlatformAnthropic,
+		ProviderName:   "Anthropic",
+		APIStyle:       inviteBootstrapAPIStyleAnthropic,
+		BaseURL:        providerCatalogLaneBaseURL(baseURL, PlatformAnthropic, sourcePlatform),
+		DefaultModel:   defaultModel,
+		Models:         models,
+		Sources:        []ProviderCatalogSource{source},
+		GroupIDs:       providerCatalogGroupIDs(group),
+		GroupPlatforms: providerCatalogGroupPlatforms(group),
+		Scopes:         providerCatalogNormalizedScopes(group),
+		HasNative:      sourcePlatform == PlatformAnthropic,
+		HasCompat:      sourcePlatform != PlatformAnthropic,
+	}
+}
+
+func buildGeminiLaneCandidate(ctx context.Context, group *Group, settingService *SettingService, sourcePlatform, baseURL string) *providerCatalogLaneCandidate {
+	sourceModels := gemini.DefaultModels()
+	models := make([]ProviderCatalogModel, 0, len(sourceModels))
+	for _, model := range sourceModels {
+		id := strings.TrimPrefix(model.Name, "models/")
+		models = append(models, ProviderCatalogModel{ID: id, Name: providerCatalogGeminiModelName(model), Reasoning: true, Input: []string{"text", "image"}, Family: "gemini"})
+	}
+	defaultModel := resolveProviderCatalogDefaultModel(PlatformGemini, group, settingService, models)
+	source := ProviderCatalogSource{
+		SourcePlatform:   sourcePlatform,
+		SourceLabel:      providerCatalogSourceLabel(sourcePlatform, PlatformGemini),
+		ProtocolRole:     "native",
+		SupportsFamilies: []string{"gemini"},
+		NativePlatforms:  []string{PlatformGemini},
+		Compatibility:    ProviderCatalogSourceCompatibility{Protocols: []string{"google-native"}},
+	}
+	if sourcePlatform != PlatformGemini {
+		source.ProtocolRole = "compatible"
+		source.NativePlatforms = nil
+	}
+	return &providerCatalogLaneCandidate{
+		LaneID:         PlatformGemini,
+		ProviderName:   "Gemini",
+		APIStyle:       "google-native",
+		BaseURL:        providerCatalogLaneBaseURL(baseURL, PlatformGemini, sourcePlatform),
+		DefaultModel:   defaultModel,
+		Models:         models,
+		Sources:        []ProviderCatalogSource{source},
+		GroupIDs:       providerCatalogGroupIDs(group),
+		GroupPlatforms: providerCatalogGroupPlatforms(group),
+		Scopes:         providerCatalogNormalizedScopes(group),
+		HasNative:      sourcePlatform == PlatformGemini,
+		HasCompat:      sourcePlatform != PlatformGemini,
+	}
+}
+
+func mergeProviderCatalogLaneCandidate(dest map[string]*providerCatalogLaneCandidate, candidate *providerCatalogLaneCandidate) {
+	if candidate == nil {
+		return
+	}
+	existing := dest[candidate.LaneID]
+	if existing == nil {
+		dest[candidate.LaneID] = candidate
+		return
 	}
 
-	return resp, fmt.Errorf("group is required")
+	existing.Models = mergeProviderCatalogModels(existing.Models, candidate.Models)
+	existing.Sources = mergeProviderCatalogSources(existing.Sources, candidate.Sources)
+	existing.GroupIDs = mergeProviderCatalogInt64s(existing.GroupIDs, candidate.GroupIDs)
+	existing.GroupPlatforms = mergeProviderCatalogStrings(existing.GroupPlatforms, candidate.GroupPlatforms)
+	existing.Scopes = mergeProviderCatalogStrings(existing.Scopes, candidate.Scopes)
+	existing.HasNative = existing.HasNative || candidate.HasNative
+	existing.HasCompat = existing.HasCompat || candidate.HasCompat
+	if existing.DefaultModel == "" || !providerCatalogModelsContain(existing.Models, existing.DefaultModel) {
+		existing.DefaultModel = candidate.DefaultModel
+	}
+}
+
+func mergeProviderCatalogModels(existing, incoming []ProviderCatalogModel) []ProviderCatalogModel {
+	if len(existing) == 0 {
+		return append([]ProviderCatalogModel(nil), incoming...)
+	}
+	seen := make(map[string]struct{}, len(existing))
+	out := append([]ProviderCatalogModel(nil), existing...)
+	for _, model := range out {
+		seen[strings.TrimSpace(model.ID)] = struct{}{}
+	}
+	for _, model := range incoming {
+		key := strings.TrimSpace(model.ID)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, model)
+	}
+	return out
+}
+
+func mergeProviderCatalogSources(existing, incoming []ProviderCatalogSource) []ProviderCatalogSource {
+	if len(existing) == 0 {
+		return append([]ProviderCatalogSource(nil), incoming...)
+	}
+	seen := make(map[string]struct{}, len(existing))
+	out := append([]ProviderCatalogSource(nil), existing...)
+	for _, source := range out {
+		seen[strings.TrimSpace(source.SourcePlatform)+"|"+strings.TrimSpace(source.SourceLabel)] = struct{}{}
+	}
+	for _, source := range incoming {
+		key := strings.TrimSpace(source.SourcePlatform) + "|" + strings.TrimSpace(source.SourceLabel)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, source)
+	}
+	return out
+}
+
+func mergeProviderCatalogStrings(existing, incoming []string) []string {
+	seen := make(map[string]struct{}, len(existing))
+	out := make([]string, 0, len(existing)+len(incoming))
+	for _, value := range existing {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		out = append(out, trimmed)
+	}
+	for _, value := range incoming {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
+}
+
+func mergeProviderCatalogInt64s(existing, incoming []int64) []int64 {
+	seen := make(map[int64]struct{}, len(existing))
+	out := make([]int64, 0, len(existing)+len(incoming))
+	for _, value := range existing {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	for _, value := range incoming {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
+}
+
+func providerCatalogModelsContain(models []ProviderCatalogModel, modelID string) bool {
+	for _, model := range models {
+		if model.ID == modelID {
+			return true
+		}
+	}
+	return false
+}
+
+func providerCatalogGroupIDs(group *Group) []int64 {
+	if group == nil || group.ID == 0 {
+		return nil
+	}
+	return []int64{group.ID}
+}
+
+func providerCatalogGroupPlatforms(group *Group) []string {
+	if group == nil {
+		return nil
+	}
+	platform := normalizeInvitePlatform(group.Platform)
+	if platform == "" {
+		return nil
+	}
+	return []string{platform}
+}
+
+func providerCatalogNormalizedScopes(group *Group) []string {
+	if group == nil {
+		return nil
+	}
+	return mergeProviderCatalogStrings(nil, group.SupportedModelScopes)
+}
+
+func providerCatalogLaneBaseURL(baseURL, laneID, sourcePlatform string) string {
+	if laneID == PlatformGemini {
+		if sourcePlatform == PlatformAntigravity {
+			return inviteBootstrapProviderBaseURL(baseURL, inviteBootstrapProviderIDAntigravityGemini)
+		}
+		return strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	}
+	if laneID == PlatformAnthropic && sourcePlatform == PlatformAntigravity {
+		return inviteBootstrapProviderBaseURL(baseURL, inviteBootstrapProviderIDAntigravityClaude)
+	}
+	return inviteBootstrapProviderBaseURL(baseURL, laneID)
+}
+
+func providerCatalogSourceLabel(sourcePlatform, laneID string) string {
+	switch sourcePlatform {
+	case PlatformOpenAI:
+		return "OpenAI"
+	case PlatformAnthropic:
+		return "Anthropic"
+	case PlatformGemini:
+		return "Gemini"
+	case PlatformAntigravity:
+		if laneID == PlatformGemini {
+			return "Antigravity Gemini"
+		}
+		return "Antigravity Claude"
+	default:
+		return strings.Title(sourcePlatform)
+	}
+}
+
+func providerCatalogGeminiModelName(model gemini.Model) string {
+	if strings.TrimSpace(model.DisplayName) != "" {
+		return model.DisplayName
+	}
+	return strings.TrimPrefix(model.Name, "models/")
+}
+
+func resolveProviderCatalogDefaultModel(laneID string, group *Group, settingService *SettingService, models []ProviderCatalogModel) string {
+	if group != nil {
+		candidate := strings.TrimSpace(group.DefaultMappedModel)
+		if candidate != "" && providerCatalogModelMatchesLane(candidate, laneID) && providerCatalogModelsContain(models, candidate) {
+			return candidate
+		}
+	}
+	if settingService != nil {
+		candidate := strings.TrimSpace(settingService.GetFallbackModel(context.Background(), laneID))
+		candidate = strings.TrimPrefix(candidate, "models/")
+		if candidate != "" && providerCatalogModelsContain(models, candidate) {
+			return candidate
+		}
+	}
+	if len(models) > 0 {
+		return models[0].ID
+	}
+	return ""
+}
+
+func providerCatalogModelMatchesLane(modelID, laneID string) bool {
+	family := providerCatalogModelFamily(modelID)
+	switch laneID {
+	case PlatformOpenAI:
+		return family == "openai"
+	case PlatformAnthropic:
+		return family == "claude"
+	case PlatformGemini:
+		return family == "gemini"
+	default:
+		return false
+	}
+}
+
+func providerCatalogModelFamily(modelID string) string {
+	trimmed := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(modelID, "models/")))
+	switch {
+	case strings.HasPrefix(trimmed, "claude-"):
+		return "claude"
+	case strings.HasPrefix(trimmed, "gemini-"):
+		return "gemini"
+	case strings.HasPrefix(trimmed, "gpt-") || strings.HasPrefix(trimmed, "o"):
+		return "openai"
+	default:
+		return ""
+	}
+}
+
+func contributesAnthropicLane(group *Group) bool {
+	if group == nil {
+		return false
+	}
+	if normalizeInvitePlatform(group.Platform) == PlatformAnthropic {
+		return true
+	}
+	if hasScope(group, "claude") {
+		return true
+	}
+	return providerCatalogModelMatchesLane(group.DefaultMappedModel, PlatformAnthropic)
+}
+
+func contributesGeminiLane(group *Group) bool {
+	if group == nil {
+		return false
+	}
+	if normalizeInvitePlatform(group.Platform) == PlatformGemini {
+		return true
+	}
+	if hasScope(group, "gemini_text") || hasScope(group, "gemini_image") {
+		return true
+	}
+	return providerCatalogModelMatchesLane(group.DefaultMappedModel, PlatformGemini)
+}
+
+func anthropicLaneSourcePlatform(group *Group) string {
+	if normalizeInvitePlatform(group.Platform) == PlatformAnthropic && !hasScope(group, "claude") && !providerCatalogModelMatchesLane(group.DefaultMappedModel, PlatformGemini) {
+		return PlatformAnthropic
+	}
+	if normalizeInvitePlatform(group.Platform) == PlatformAnthropic && (hasScope(group, "claude") || providerCatalogModelMatchesLane(group.DefaultMappedModel, PlatformAnthropic)) {
+		return PlatformAntigravity
+	}
+	return PlatformAntigravity
+}
+
+func geminiLaneSourcePlatform(group *Group) string {
+	if normalizeInvitePlatform(group.Platform) == PlatformGemini {
+		return PlatformGemini
+	}
+	return PlatformAntigravity
+}
+
+func hasScope(group *Group, target string) bool {
+	if group == nil {
+		return false
+	}
+	for _, scope := range group.SupportedModelScopes {
+		if strings.EqualFold(strings.TrimSpace(scope), target) {
+			return true
+		}
+	}
+	return false
 }
 
 func mapInviteProvidersToCatalog(source []InviteBootstrapProvider) []ProviderCatalogProvider {

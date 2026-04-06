@@ -22,6 +22,8 @@ type userRepoStub struct {
 	nextID     int64
 	created    []*User
 	deletedIDs []int64
+
+	updatedBalance []float64
 }
 
 func (s *userRepoStub) Create(ctx context.Context, user *User) error {
@@ -71,7 +73,11 @@ func (s *userRepoStub) ListWithFilters(ctx context.Context, params pagination.Pa
 }
 
 func (s *userRepoStub) UpdateBalance(ctx context.Context, id int64, amount float64) error {
-	panic("unexpected UpdateBalance call")
+	s.updatedBalance = append(s.updatedBalance, amount)
+	if s.user != nil && s.user.ID == id {
+		s.user.Balance += amount
+	}
+	return nil
 }
 
 func (s *userRepoStub) DeductBalance(ctx context.Context, id int64, amount float64) error {

@@ -129,13 +129,15 @@ func newAuthService(repo *userRepoStub, settings map[string]string, emailCache E
 		emailService = NewEmailService(&settingRepoStub{values: settings}, emailCache)
 	}
 
+	refreshTokenCache := &oauthRefreshTokenCacheStub{}
+
 	return NewAuthService(
 		nil, // entClient
 		repo,
 		nil, // redeemRepo
 		nil, // groupRepo
 		nil, // apiKeyProvisioner
-		nil, // refreshTokenCache
+		refreshTokenCache,
 		cfg,
 		settingService,
 		emailService,

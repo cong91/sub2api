@@ -1,12 +1,13 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -109,7 +110,7 @@ func TestGatewayProviderCatalog_MultiGroupAggregatesProviders(t *testing.T) {
 	apiKey := &service.APIKey{
 		GrantedGroups: []*service.Group{
 			{ID: 99, Platform: service.PlatformOpenAI, Hydrated: true},
-			{ID: 100, Platform: service.PlatformAntigravity, Hydrated: true, SupportedModelScopes: []string{"claude"}},
+			{ID: 100, Platform: service.PlatformAntigravity, Hydrated: true, SupportedModelScopes: []string{"claude", "gemini_text", "gemini_image"}},
 		},
 	}
 	c.Set(string(middleware2.ContextKeyAPIKey), apiKey)
@@ -127,20 +128,63 @@ func TestGatewayProviderCatalog_MultiGroupAggregatesProviders(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &payload))
 	require.Equal(t, "provider_catalog", payload.Object)
-	require.GreaterOrEqual(t, len(payload.Providers), 2)
+	require.Len(t, payload.Providers, 3)
 
 	ids := map[string]struct{}{}
 	for _, p := range payload.Providers {
 		ids[p.ProviderID] = struct{}{}
 	}
 	_, hasOpenAI := ids[service.PlatformOpenAI]
-	hasAntigravity := false
-	for providerID := range ids {
-		if providerID == service.PlatformAntigravity || strings.Contains(providerID, service.PlatformAntigravity) {
-			hasAntigravity = true
-			break
-		}
-	}
+	_, hasAnthropic := ids[service.PlatformAnthropic]
+	_, hasGemini := ids[service.PlatformGemini]
 	require.True(t, hasOpenAI)
-	require.True(t, hasAntigravity)
+	require.True(t, hasAnthropic)
+	require.True(t, hasGemini)
+}
+
+func TestGatewayProviderCatalog_UsesGrantedGroupUnionFromRequestContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/provider-catalog", nil)
+
+	apiKey := &service.APIKey{
+		GrantedGroups: []*service.Group{
+			{ID: 99, Platform: service.PlatformOpenAI, Hydrated: true},
+		},
+	}
+	c.Set(string(middleware2.ContextKeyAPIKey), apiKey)
+
+	ctxGranted := []*service.Group{
+		{ID: 99, Platform: service.PlatformOpenAI, Hydrated: true},
+		{ID: 100, Platform: service.PlatformAntigravity, Hydrated: true, SupportedModelScopes: []string{"claude", "gemini_text", "gemini_image"}},
+	}
+	ctx := context.WithValue(c.Request.Context(), ctxkey.GrantedGroups, ctxGranted)
+	c.Request = c.Request.WithContext(ctx)
+
+	h := &GatewayHandler{gatewayService: &service.GatewayService{}}
+	h.ProviderCatalog(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var payload struct {
+		Object    string `json:"object"`
+		Providers []struct {
+			ProviderID string `json:"provider_id"`
+		} `json:"providers"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &payload))
+	require.Equal(t, "provider_catalog", payload.Object)
+	require.Len(t, payload.Providers, 3)
+
+	ids := map[string]struct{}{}
+	for _, p := range payload.Providers {
+		ids[p.ProviderID] = struct{}{}
+	}
+	_, hasOpenAI := ids[service.PlatformOpenAI]
+	_, hasAnthropic := ids[service.PlatformAnthropic]
+	_, hasGemini := ids[service.PlatformGemini]
+	require.True(t, hasOpenAI)
+	require.True(t, hasAnthropic)
+	require.True(t, hasGemini)
 }

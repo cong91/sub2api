@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -40,7 +41,7 @@ func newJWTTestEnv(users map[int64]*service.User) (*gin.Engine, *service.AuthSer
 	cfg.JWT.AccessTokenExpireMinutes = 60
 
 	userRepo := &stubJWTUserRepo{users: users}
-	authSvc := service.NewAuthService(nil, userRepo, nil, nil, nil, nil, cfg, nil, nil, nil, nil, nil, nil)
+	authSvc := service.NewAuthService(nil, userRepo, nil, nil, nil, &serviceAuthRefreshTokenCacheStub{}, cfg, nil, nil, nil, nil, nil, nil)
 	userSvc := service.NewUserService(userRepo, nil, nil)
 	mw := NewJWTAuthMiddleware(authSvc, userSvc)
 
@@ -55,6 +56,48 @@ func newJWTTestEnv(users map[int64]*service.User) (*gin.Engine, *service.AuthSer
 		})
 	})
 	return r, authSvc
+}
+
+type serviceAuthRefreshTokenCacheStub struct{}
+
+func (s *serviceAuthRefreshTokenCacheStub) StoreRefreshToken(ctx context.Context, tokenHash string, data *service.RefreshTokenData, ttl time.Duration) error {
+	return nil
+}
+
+func (s *serviceAuthRefreshTokenCacheStub) GetRefreshToken(ctx context.Context, tokenHash string) (*service.RefreshTokenData, error) {
+	return nil, errors.New("not found")
+}
+
+func (s *serviceAuthRefreshTokenCacheStub) DeleteRefreshToken(ctx context.Context, tokenHash string) error {
+	return nil
+}
+
+func (s *serviceAuthRefreshTokenCacheStub) DeleteUserRefreshTokens(ctx context.Context, userID int64) error {
+	return nil
+}
+
+func (s *serviceAuthRefreshTokenCacheStub) DeleteTokenFamily(ctx context.Context, familyID string) error {
+	return nil
+}
+
+func (s *serviceAuthRefreshTokenCacheStub) AddToUserTokenSet(ctx context.Context, userID int64, tokenHash string, ttl time.Duration) error {
+	return nil
+}
+
+func (s *serviceAuthRefreshTokenCacheStub) AddToFamilyTokenSet(ctx context.Context, familyID string, tokenHash string, ttl time.Duration) error {
+	return nil
+}
+
+func (s *serviceAuthRefreshTokenCacheStub) GetUserTokenHashes(ctx context.Context, userID int64) ([]string, error) {
+	return nil, nil
+}
+
+func (s *serviceAuthRefreshTokenCacheStub) GetFamilyTokenHashes(ctx context.Context, familyID string) ([]string, error) {
+	return nil, nil
+}
+
+func (s *serviceAuthRefreshTokenCacheStub) IsTokenInFamily(ctx context.Context, familyID string, tokenHash string) (bool, error) {
+	return false, nil
 }
 
 func TestJWTAuth_ValidToken(t *testing.T) {
