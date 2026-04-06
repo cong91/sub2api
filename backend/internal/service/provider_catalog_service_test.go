@@ -87,6 +87,25 @@ func TestBuildProviderCatalogForGroups_AnthropicPlatformDoesNotMaterializeGemini
 	require.Equal(t, PlatformAnthropic, resp.Providers[0].ProviderID)
 	require.Len(t, resp.Providers[0].Sources, 1)
 	require.Equal(t, PlatformAnthropic, resp.Providers[0].Sources[0].SourcePlatform)
+	require.Equal(t, []string{"claude", "gemini_text", "gemini_image"}, resp.Providers[0].Resolution.DerivedFromScopes)
+}
+
+func TestBuildProviderCatalogForGroups_AnthropicPlatformSemanticallySupportsClaudeOnly(t *testing.T) {
+	svc := &GatewayService{}
+	groups := []*Group{
+		{ID: 304, Platform: PlatformAnthropic, Hydrated: true, SupportedModelScopes: []string{"gemini_text", "gemini_image"}},
+	}
+
+	resp, err := svc.BuildProviderCatalogForGroups(context.Background(), groups, "")
+	require.NoError(t, err)
+	require.Equal(t, "provider_catalog", resp.Object)
+	require.Len(t, resp.Providers, 1)
+	provider := resp.Providers[0]
+	require.Equal(t, PlatformAnthropic, provider.ProviderID)
+	require.Equal(t, PlatformAnthropic, provider.Sources[0].SourcePlatform)
+	for _, model := range provider.Models {
+		require.Equal(t, "claude", model.Family)
+	}
 }
 
 func TestBuildProviderCatalogForGroups_ForcedPlatformFilters(t *testing.T) {
