@@ -143,3 +143,32 @@ func TestBuildProviderCatalogForGroups_NativeAnthropicAndAntigravityClaudeMergeI
 	require.Equal(t, "mixed", provider.Resolution.SourceKind)
 	require.ElementsMatch(t, []int64{301, 302}, provider.Resolution.DerivedFromGroups)
 }
+
+func TestBuildProviderCatalogForGroups_AntigravityGeminiLaneUsesAntigravityModelSet(t *testing.T) {
+	svc := &GatewayService{}
+	groups := []*Group{
+		{ID: 401, Platform: PlatformAntigravity, Hydrated: true, SupportedModelScopes: []string{"gemini_text", "gemini_image"}},
+	}
+
+	resp, err := svc.BuildProviderCatalogForGroups(context.Background(), groups, "")
+	require.NoError(t, err)
+	require.Equal(t, "provider_catalog", resp.Object)
+	require.Len(t, resp.Providers, 1)
+
+	provider := resp.Providers[0]
+	require.Equal(t, PlatformGemini, provider.ProviderID)
+	require.Len(t, provider.Sources, 1)
+	require.Equal(t, PlatformAntigravity, provider.Sources[0].SourcePlatform)
+	require.Equal(t, "Antigravity Gemini", provider.Sources[0].SourceLabel)
+	require.Equal(t, "compatible", provider.Sources[0].ProtocolRole)
+	require.NotEmpty(t, provider.Models)
+
+	modelIDs := make([]string, 0, len(provider.Models))
+	for _, model := range provider.Models {
+		modelIDs = append(modelIDs, model.ID)
+		require.Equal(t, "gemini", model.Family)
+	}
+	require.Contains(t, modelIDs, "gemini-3-flash")
+	require.Contains(t, modelIDs, "gemini-3-pro-high")
+	require.NotContains(t, modelIDs, "gemini-2.0-flash")
+}

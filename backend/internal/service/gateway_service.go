@@ -9006,11 +9006,21 @@ func buildAnthropicLaneCandidate(ctx context.Context, group *Group, settingServi
 }
 
 func buildGeminiLaneCandidate(ctx context.Context, group *Group, settingService *SettingService, sourcePlatform, baseURL string) *providerCatalogLaneCandidate {
-	sourceModels := gemini.DefaultModels()
-	models := make([]ProviderCatalogModel, 0, len(sourceModels))
-	for _, model := range sourceModels {
-		id := strings.TrimPrefix(model.Name, "models/")
-		models = append(models, ProviderCatalogModel{ID: id, Name: providerCatalogGeminiModelName(model), Reasoning: true, Input: []string{"text", "image"}, Family: "gemini"})
+	models := make([]ProviderCatalogModel, 0)
+	if sourcePlatform == PlatformAntigravity {
+		sourceModels := antigravity.DefaultGeminiModels()
+		models = make([]ProviderCatalogModel, 0, len(sourceModels))
+		for _, model := range sourceModels {
+			id := strings.TrimPrefix(model.Name, "models/")
+			models = append(models, ProviderCatalogModel{ID: id, Name: model.DisplayName, Reasoning: true, Input: []string{"text", "image"}, Family: "gemini"})
+		}
+	} else {
+		sourceModels := gemini.DefaultModels()
+		models = make([]ProviderCatalogModel, 0, len(sourceModels))
+		for _, model := range sourceModels {
+			id := strings.TrimPrefix(model.Name, "models/")
+			models = append(models, ProviderCatalogModel{ID: id, Name: providerCatalogGeminiModelName(model), Reasoning: true, Input: []string{"text", "image"}, Family: "gemini"})
+		}
 	}
 	defaultModel := resolveProviderCatalogDefaultModel(PlatformGemini, group, settingService, models)
 	source := ProviderCatalogSource{
