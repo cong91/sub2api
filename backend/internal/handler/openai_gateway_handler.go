@@ -746,15 +746,6 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 		// Forward 层需要始终拿到 group 默认映射模型，这样未命中账号级映射的
 		// Claude 兼容模型才不会在后续 Codex 规范化中意外退化到 gpt-5.1。
-<<<<<<< HEAD
-		defaultMappedModel := resolveOpenAIForwardDefaultMappedModel(apiKey, c.GetString("openai_messages_fallback_model"))
-		// 应用渠道模型映射到请求体
-		forwardBody := body
-		if channelMappingMsg.Mapped {
-			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMappingMsg.MappedModel)
-		}
-		result, err := h.gatewayService.ForwardAsAnthropic(c.Request.Context(), c, account, forwardBody, promptCacheKey, defaultMappedModel)
-=======
 		defaultMappedModel := resolveOpenAIForwardDefaultMappedModel(routingGroup, c.GetString("openai_messages_fallback_model"))
 		// 应用渠道模型映射到请求体
 		forwardBody := body
@@ -762,7 +753,6 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMappingMsg.MappedModel)
 		}
 		result, err := h.gatewayService.ForwardAsAnthropic(c.Request.Context(), c, account, forwardBody, promptCacheKey, defaultMappedModel)
->>>>>>> 31ed79f4 (refactor(runtime): enforce granted_groups-only billing and routing semantics)
 
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		if accountReleaseFunc != nil {

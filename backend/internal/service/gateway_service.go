@@ -9288,8 +9288,12 @@ func contributesGeminiLane(group *Group) bool {
 	if group == nil {
 		return false
 	}
-	if normalizeInvitePlatform(group.Platform) == PlatformGemini {
+	platform := normalizeInvitePlatform(group.Platform)
+	if platform == PlatformGemini {
 		return true
+	}
+	if platform != PlatformAntigravity {
+		return false
 	}
 	if hasScope(group, "gemini_text") || hasScope(group, "gemini_image") {
 		return true
@@ -9298,11 +9302,8 @@ func contributesGeminiLane(group *Group) bool {
 }
 
 func anthropicLaneSourcePlatform(group *Group) string {
-	if normalizeInvitePlatform(group.Platform) == PlatformAnthropic && !hasScope(group, "claude") && !providerCatalogModelMatchesLane(group.DefaultMappedModel, PlatformGemini) {
+	if normalizeInvitePlatform(group.Platform) == PlatformAnthropic {
 		return PlatformAnthropic
-	}
-	if normalizeInvitePlatform(group.Platform) == PlatformAnthropic && (hasScope(group, "claude") || providerCatalogModelMatchesLane(group.DefaultMappedModel, PlatformAnthropic)) {
-		return PlatformAntigravity
 	}
 	return PlatformAntigravity
 }

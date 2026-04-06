@@ -74,6 +74,21 @@ func TestBuildProviderCatalogForGroups_MultiGroupAggregates(t *testing.T) {
 	require.True(t, hasGemini)
 }
 
+func TestBuildProviderCatalogForGroups_AnthropicPlatformDoesNotMaterializeGeminiLaneFromScopesAlone(t *testing.T) {
+	svc := &GatewayService{}
+	groups := []*Group{
+		{ID: 303, Name: "Antigravity", Platform: PlatformAnthropic, Hydrated: true, SupportedModelScopes: []string{"claude", "gemini_text", "gemini_image"}},
+	}
+
+	resp, err := svc.BuildProviderCatalogForGroups(context.Background(), groups, "")
+	require.NoError(t, err)
+	require.Equal(t, "provider_catalog", resp.Object)
+	require.Len(t, resp.Providers, 1)
+	require.Equal(t, PlatformAnthropic, resp.Providers[0].ProviderID)
+	require.Len(t, resp.Providers[0].Sources, 1)
+	require.Equal(t, PlatformAnthropic, resp.Providers[0].Sources[0].SourcePlatform)
+}
+
 func TestBuildProviderCatalogForGroups_ForcedPlatformFilters(t *testing.T) {
 	svc := &GatewayService{}
 	groups := []*Group{
