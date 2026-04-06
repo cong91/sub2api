@@ -20,8 +20,50 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type inviteLoginIntegrationRefreshTokenCacheStub struct{}
+
+func (s *inviteLoginIntegrationRefreshTokenCacheStub) StoreRefreshToken(ctx context.Context, tokenHash string, data *service.RefreshTokenData, ttl time.Duration) error {
+	return nil
+}
+
+func (s *inviteLoginIntegrationRefreshTokenCacheStub) GetRefreshToken(ctx context.Context, tokenHash string) (*service.RefreshTokenData, error) {
+	return nil, fmt.Errorf("not found")
+}
+
+func (s *inviteLoginIntegrationRefreshTokenCacheStub) DeleteRefreshToken(ctx context.Context, tokenHash string) error {
+	return nil
+}
+
+func (s *inviteLoginIntegrationRefreshTokenCacheStub) DeleteUserRefreshTokens(ctx context.Context, userID int64) error {
+	return nil
+}
+
+func (s *inviteLoginIntegrationRefreshTokenCacheStub) DeleteTokenFamily(ctx context.Context, familyID string) error {
+	return nil
+}
+
+func (s *inviteLoginIntegrationRefreshTokenCacheStub) AddToUserTokenSet(ctx context.Context, userID int64, tokenHash string, ttl time.Duration) error {
+	return nil
+}
+
+func (s *inviteLoginIntegrationRefreshTokenCacheStub) AddToFamilyTokenSet(ctx context.Context, familyID string, tokenHash string, ttl time.Duration) error {
+	return nil
+}
+
+func (s *inviteLoginIntegrationRefreshTokenCacheStub) GetUserTokenHashes(ctx context.Context, userID int64) ([]string, error) {
+	return nil, nil
+}
+
+func (s *inviteLoginIntegrationRefreshTokenCacheStub) GetFamilyTokenHashes(ctx context.Context, familyID string) ([]string, error) {
+	return nil, nil
+}
+
+func (s *inviteLoginIntegrationRefreshTokenCacheStub) IsTokenInFamily(ctx context.Context, familyID string, tokenHash string) (bool, error) {
+	return false, nil
+}
+
 func TestAuthServiceInviteLogin_ProvisionBootstrapRuntimeRows(t *testing.T) {
-	t.Run("multi-provider bootstrap creates per-provider api keys", func(t *testing.T) {
+	t.Run("multi-provider bootstrap creates one canonical multi-group api key", func(t *testing.T) {
 		ctx := context.Background()
 		client := testEntClient(t)
 		cleanupInviteLoginTables(t, ctx, client)
@@ -78,44 +120,23 @@ func TestAuthServiceInviteLogin_ProvisionBootstrapRuntimeRows(t *testing.T) {
 			).
 			All(ctx)
 		require.NoError(t, err)
-		require.Len(t, createdKeys, 4)
+		require.Len(t, createdKeys, 1)
+		require.NotNil(t, createdKeys[0].GroupID)
+		require.Equal(t, "default-bootstrap", createdKeys[0].Name)
+		require.Equal(t, openAIGroup.ID, *createdKeys[0].GroupID)
 
-		keysByName := make(map[string]int64, len(createdKeys))
-		keysByNameToID := make(map[string]int64, len(createdKeys))
-		for _, key := range createdKeys {
-			require.NotNil(t, key.GroupID)
-			keysByName[key.Name] = *key.GroupID
-			keysByNameToID[key.Name] = key.ID
+		links, err := client.APIKeyGroup.Query().
+			Where(apikeygroup.APIKeyIDEQ(createdKeys[0].ID)).
+			All(ctx)
+		require.NoError(t, err)
+		actualIDs := make([]int64, 0, len(links))
+		for _, link := range links {
+			actualIDs = append(actualIDs, link.GroupID)
 		}
-		require.Equal(t, map[string]int64{
-			"default-openai":             openAIGroup.ID,
-			"default-anthropic":          anthropicGroup.ID,
-			"default-antigravity-claude": antigravityGroup.ID,
-			"default-antigravity-gemini": antigravityGroup.ID,
-		}, keysByName)
+		require.ElementsMatch(t, []int64{openAIGroup.ID, anthropicGroup.ID, antigravityGroup.ID}, actualIDs)
 
-		type expectedGrant struct {
-			name     string
-			groupIDs []int64
-		}
-		expectedGrants := []expectedGrant{
-			{name: "default-openai", groupIDs: []int64{openAIGroup.ID}},
-			{name: "default-anthropic", groupIDs: []int64{openAIGroup.ID, anthropicGroup.ID}},
-			{name: "default-antigravity-claude", groupIDs: []int64{openAIGroup.ID, anthropicGroup.ID, antigravityGroup.ID}},
-			{name: "default-antigravity-gemini", groupIDs: []int64{openAIGroup.ID, anthropicGroup.ID, antigravityGroup.ID}},
-		}
-		for _, expected := range expectedGrants {
-			keyID, ok := keysByNameToID[expected.name]
-			require.True(t, ok, "missing key %s", expected.name)
-			links, err := client.APIKeyGroup.Query().
-				Where(apikeygroup.APIKeyIDEQ(keyID)).
-				All(ctx)
-			require.NoError(t, err)
-			actualIDs := make([]int64, 0, len(links))
-			for _, link := range links {
-				actualIDs = append(actualIDs, link.GroupID)
-			}
-			require.ElementsMatch(t, expected.groupIDs, actualIDs)
+		for _, provider := range result.BootstrapContext.Providers {
+			require.Equal(t, "default-bootstrap", provider.DefaultAPIKeyName)
 		}
 
 		allowedCount, err := client.UserAllowedGroup.Query().
@@ -197,7 +218,7 @@ func TestAuthServiceInviteLogin_ProvisionBootstrapRuntimeRows(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, createdKey.GroupID)
 		require.Equal(t, openAIStandardGroup.ID, *createdKey.GroupID)
-		require.Equal(t, "default-openai", createdKey.Name)
+		require.Equal(t, "default-bootstrap", createdKey.Name)
 
 		subCount, err := client.UserSubscription.Query().
 			Where(
@@ -245,7 +266,7 @@ func newInviteLoginIntegrationAuthService(t *testing.T, client *dbent.Client, cf
 		redeemRepo,
 		groupRepo,
 		apiKeyService,
-		nil,
+		&inviteLoginIntegrationRefreshTokenCacheStub{},
 		cfg,
 		settingService,
 		nil,

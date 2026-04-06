@@ -390,6 +390,7 @@ func TestAuthService_InviteLogin_ValidCodeCreatesUserAndConsumesCode(t *testing.
 		SettingKeyInvitationCodeEnabled: "true",
 		SettingKeyAPIBaseURL:            "https://api.sub2api.dev",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.userRepo = inviteAwareRepo
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
@@ -411,26 +412,18 @@ func TestAuthService_InviteLogin_ValidCodeCreatesUserAndConsumesCode(t *testing.
 	require.Equal(t, int64(42), redeemRepo.usedByUserID)
 	require.Equal(t, 3, groupResolver.calls)
 	require.Equal(t, PlatformAntigravity, groupResolver.lastPlatform)
-	require.Equal(t, 4, apiKeyProvisioner.calls)
+	require.Equal(t, 1, apiKeyProvisioner.calls)
 	require.Equal(t, int64(42), apiKeyProvisioner.createdForUserID)
+	require.NotNil(t, result.TokenPair)
+	require.Equal(t, result.TokenPair.AccessToken, result.Token)
+	require.NotEmpty(t, result.TokenPair.RefreshToken)
+	require.True(t, result.TokenPair.ExpiresIn > 0)
 
-	providerKeys := map[string]int64{}
-	providerGrantedGroups := map[string][]int64{}
-	for _, req := range apiKeyProvisioner.reqs {
-		require.NotNil(t, req.GroupID)
-		providerKeys[req.Name] = *req.GroupID
-		providerGrantedGroups[req.Name] = append([]int64(nil), req.GrantedGroupIDs...)
-	}
-	require.Equal(t, map[string]int64{
-		"default-openai":             77,
-		"default-anthropic":          301,
-		"default-antigravity-claude": 401,
-		"default-antigravity-gemini": 401,
-	}, providerKeys)
-	require.ElementsMatch(t, []int64{77}, providerGrantedGroups["default-openai"])
-	require.ElementsMatch(t, []int64{77, 301}, providerGrantedGroups["default-anthropic"])
-	require.ElementsMatch(t, []int64{77, 301, 401}, providerGrantedGroups["default-antigravity-claude"])
-	require.ElementsMatch(t, []int64{77, 301, 401}, providerGrantedGroups["default-antigravity-gemini"])
+	require.Len(t, apiKeyProvisioner.reqs, 1)
+	require.Equal(t, "default-bootstrap", apiKeyProvisioner.lastReq.Name)
+	require.NotNil(t, apiKeyProvisioner.lastReq.GroupID)
+	require.Equal(t, int64(77), *apiKeyProvisioner.lastReq.GroupID)
+	require.ElementsMatch(t, []int64{77, 301, 401}, apiKeyProvisioner.lastReq.GrantedGroupIDs)
 
 	require.Len(t, subAssigner.calls, 0)
 	require.Equal(t, 1, inviteAwareRepo.addAllowedGroupCalls)
@@ -446,25 +439,25 @@ func TestAuthService_InviteLogin_ValidCodeCreatesUserAndConsumesCode(t *testing.
 	require.Equal(t, "openai-responses", openAIProvider.APIStyle)
 	require.NotEmpty(t, openAIProvider.Models)
 	require.Equal(t, openai.DefaultModels[0].ID, openAIProvider.DefaultModel)
-	require.Equal(t, "default-openai", openAIProvider.DefaultAPIKeyName)
+	require.Equal(t, "default-bootstrap", openAIProvider.DefaultAPIKeyName)
 	require.Equal(t, int64(77), openAIProvider.DefaultGroupID)
 
 	anthropicProvider := findInviteProviderByID(t, result.BootstrapContext.Providers, PlatformAnthropic)
 	require.Equal(t, "Anthropic", anthropicProvider.ProviderName)
 	require.Equal(t, "anthropic-messages", anthropicProvider.APIStyle)
-	require.Equal(t, "default-anthropic", anthropicProvider.DefaultAPIKeyName)
+	require.Equal(t, "default-bootstrap", anthropicProvider.DefaultAPIKeyName)
 	require.Equal(t, int64(301), anthropicProvider.DefaultGroupID)
 
 	antigravityClaude := findInviteProviderByID(t, result.BootstrapContext.Providers, "antigravity-claude")
 	require.Equal(t, "Antigravity Claude", antigravityClaude.ProviderName)
 	require.Equal(t, "anthropic-messages", antigravityClaude.APIStyle)
-	require.Equal(t, "default-antigravity-claude", antigravityClaude.DefaultAPIKeyName)
+	require.Equal(t, "default-bootstrap", antigravityClaude.DefaultAPIKeyName)
 	require.Equal(t, int64(401), antigravityClaude.DefaultGroupID)
 
 	antigravityGemini := findInviteProviderByID(t, result.BootstrapContext.Providers, "antigravity-gemini")
 	require.Equal(t, "Antigravity Gemini", antigravityGemini.ProviderName)
 	require.Equal(t, "google-native", antigravityGemini.APIStyle)
-	require.Equal(t, "default-antigravity-gemini", antigravityGemini.DefaultAPIKeyName)
+	require.Equal(t, "default-bootstrap", antigravityGemini.DefaultAPIKeyName)
 	require.Equal(t, int64(401), antigravityGemini.DefaultGroupID)
 }
 
@@ -486,6 +479,7 @@ func TestAuthService_InviteLogin_ProvisionFailsReturnsUnavailable(t *testing.T) 
 		SettingKeyRegistrationEnabled:   "true",
 		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
 	service.apiKeyProvisioner = apiKeyProvisioner
@@ -514,6 +508,7 @@ func TestAuthService_InviteLogin_NoActiveSupportedPlatformGroupFailsUnavailable(
 		SettingKeyRegistrationEnabled:   "true",
 		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
 	service.apiKeyProvisioner = apiKeyProvisioner
@@ -548,6 +543,7 @@ func TestAuthService_InviteLogin_AnthropicGroupBuildsAnthropicBootstrapContext(t
 		SettingKeyInvitationCodeEnabled: "true",
 		SettingKeyAPIBaseURL:            "https://api.sub2api.dev",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
 	service.apiKeyProvisioner = apiKeyProvisioner
@@ -566,7 +562,7 @@ func TestAuthService_InviteLogin_AnthropicGroupBuildsAnthropicBootstrapContext(t
 	require.Equal(t, claude.DefaultModels[0].ID, provider.Models[0].ID)
 	require.Equal(t, claude.DefaultModels[0].ID, provider.DefaultModel)
 	require.Equal(t, int64(301), provider.DefaultGroupID)
-	require.Equal(t, "default-anthropic", provider.DefaultAPIKeyName)
+	require.Equal(t, "default-bootstrap", provider.DefaultAPIKeyName)
 }
 
 func TestAuthService_InviteLogin_AntigravityGroupBuildsAntigravityBootstrapContext(t *testing.T) {
@@ -592,6 +588,7 @@ func TestAuthService_InviteLogin_AntigravityGroupBuildsAntigravityBootstrapConte
 		SettingKeyInvitationCodeEnabled: "true",
 		SettingKeyAPIBaseURL:            "https://api.sub2api.dev",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
 	service.apiKeyProvisioner = apiKeyProvisioner
@@ -610,7 +607,7 @@ func TestAuthService_InviteLogin_AntigravityGroupBuildsAntigravityBootstrapConte
 	require.True(t, strings.HasPrefix(provider.Models[0].ID, "gemini-"))
 	require.True(t, strings.HasPrefix(provider.DefaultModel, "gemini-"))
 	require.Equal(t, int64(401), provider.DefaultGroupID)
-	require.Equal(t, "default-antigravity-gemini", provider.DefaultAPIKeyName)
+	require.Equal(t, "default-bootstrap", provider.DefaultAPIKeyName)
 }
 
 func TestAuthService_InviteLogin_AntigravityClaudeScopeBuildsClaudeFlavorBootstrapContext(t *testing.T) {
@@ -644,6 +641,7 @@ func TestAuthService_InviteLogin_AntigravityClaudeScopeBuildsClaudeFlavorBootstr
 		SettingKeyAPIBaseURL:               "https://api.sub2api.dev",
 		SettingKeyFallbackModelAntigravity: "gemini-2.5-flash",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
 	service.apiKeyProvisioner = apiKeyProvisioner
@@ -662,7 +660,7 @@ func TestAuthService_InviteLogin_AntigravityClaudeScopeBuildsClaudeFlavorBootstr
 	}
 	require.Equal(t, "claude-opus-4-6-thinking", provider.DefaultModel)
 	require.Equal(t, int64(402), provider.DefaultGroupID)
-	require.Equal(t, "default-antigravity-claude", provider.DefaultAPIKeyName)
+	require.Equal(t, "default-bootstrap", provider.DefaultAPIKeyName)
 }
 
 func TestAuthService_InviteLogin_AntigravityGeminiScopeUsesFallbackDefaultModel(t *testing.T) {
@@ -695,6 +693,7 @@ func TestAuthService_InviteLogin_AntigravityGeminiScopeUsesFallbackDefaultModel(
 		SettingKeyAPIBaseURL:               "https://api.sub2api.dev",
 		SettingKeyFallbackModelAntigravity: "gemini-3-flash",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
 	service.apiKeyProvisioner = apiKeyProvisioner
@@ -713,7 +712,7 @@ func TestAuthService_InviteLogin_AntigravityGeminiScopeUsesFallbackDefaultModel(
 	}
 	require.Equal(t, "gemini-3-flash", provider.DefaultModel)
 	require.Equal(t, int64(403), provider.DefaultGroupID)
-	require.Equal(t, "default-antigravity-gemini", provider.DefaultAPIKeyName)
+	require.Equal(t, "default-bootstrap", provider.DefaultAPIKeyName)
 }
 
 func TestAuthService_InviteLogin_SubscriptionGroupsAreIgnoredForBootstrapSelection(t *testing.T) {
@@ -740,6 +739,7 @@ func TestAuthService_InviteLogin_SubscriptionGroupsAreIgnoredForBootstrapSelecti
 		SettingKeyRegistrationEnabled:   "true",
 		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
 	service.apiKeyProvisioner = apiKeyProvisioner
@@ -749,9 +749,10 @@ func TestAuthService_InviteLogin_SubscriptionGroupsAreIgnoredForBootstrapSelecti
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Equal(t, 1, apiKeyProvisioner.calls)
-	require.Equal(t, "default-openai", apiKeyProvisioner.lastReq.Name)
+	require.Equal(t, "default-bootstrap", apiKeyProvisioner.lastReq.Name)
 	require.NotNil(t, apiKeyProvisioner.lastReq.GroupID)
 	require.Equal(t, int64(92), *apiKeyProvisioner.lastReq.GroupID)
+	require.ElementsMatch(t, []int64{92}, apiKeyProvisioner.lastReq.GrantedGroupIDs)
 	require.Len(t, subAssigner.calls, 0)
 	require.Equal(t, PlatformOpenAI, result.BootstrapContext.DefaultProviderID)
 	require.Len(t, result.BootstrapContext.Providers, 1)
@@ -786,6 +787,7 @@ func TestAuthService_InviteLogin_ExclusiveStandardGroupAddsAllowedGroup(t *testi
 		SettingKeyRegistrationEnabled:   "true",
 		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.userRepo = userRepo
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
@@ -835,6 +837,7 @@ func TestAuthService_InviteLogin_ExclusiveStandardGroupAddAllowedGroupFails(t *t
 		SettingKeyRegistrationEnabled:   "true",
 		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.userRepo = userRepo
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
@@ -857,6 +860,7 @@ func TestAuthService_InviteLogin_InvalidCodeFailsCleanly(t *testing.T) {
 		SettingKeyRegistrationEnabled:   "true",
 		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 
 	_, err := service.InviteLogin(context.Background(), "BAD")
@@ -881,6 +885,7 @@ func TestAuthService_InviteLogin_UsedCodeFailsCleanly(t *testing.T) {
 		SettingKeyRegistrationEnabled:   "true",
 		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 
 	_, err := service.InviteLogin(context.Background(), "USED")
@@ -906,6 +911,7 @@ func TestAuthService_InviteLogin_ConsumeRaceReturnsInvalid(t *testing.T) {
 		SettingKeyRegistrationEnabled:   "true",
 		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 
 	_, err := service.InviteLogin(context.Background(), "RACE")
@@ -920,6 +926,7 @@ func TestAuthService_InviteLogin_Disabled(t *testing.T) {
 		SettingKeyRegistrationEnabled:   "true",
 		SettingKeyInvitationCodeEnabled: "false",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 
 	_, err := service.InviteLogin(context.Background(), "ANY")
@@ -942,6 +949,7 @@ func TestAuthService_InviteLogin_CreateFailureReturnsUnavailable(t *testing.T) {
 		SettingKeyRegistrationEnabled:   "true",
 		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 
 	_, err := service.InviteLogin(context.Background(), "INVITE")
@@ -974,6 +982,7 @@ func TestAuthService_InviteLogin_BalancePrecedence_CodeBootstrapBalanceOverrides
 		SettingKeyInvitationCodeEnabled:    "true",
 		SettingKeyDefaultInvitationBalance: "5.50",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
 	service.apiKeyProvisioner = apiKeyProvisioner
@@ -1007,6 +1016,7 @@ func TestAuthService_InviteLogin_BalancePrecedence_InvitationDefaultOverridesCon
 		SettingKeyInvitationCodeEnabled:    "true",
 		SettingKeyDefaultInvitationBalance: "5.50",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
 	service.apiKeyProvisioner = apiKeyProvisioner
@@ -1039,6 +1049,7 @@ func TestAuthService_InviteLogin_BalancePrecedence_ConfigDefaultUsedWhenNoOverri
 		SettingKeyRegistrationEnabled:   "true",
 		SettingKeyInvitationCodeEnabled: "true",
 	}, nil)
+	service.refreshTokenCache = &oauthRefreshTokenCacheStub{}
 	service.redeemRepo = redeemRepo
 	service.groupRepo = groupResolver
 	service.apiKeyProvisioner = apiKeyProvisioner

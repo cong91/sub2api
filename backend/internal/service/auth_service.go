@@ -116,6 +116,7 @@ type InviteBootstrapProvider struct {
 
 type InviteLoginResult struct {
 	Token            string
+	TokenPair        *TokenPair
 	User             *User
 	BootstrapContext InviteBootstrapContext
 }
@@ -397,6 +398,16 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 			return nil, ErrServiceUnavailable
 		}
 
+		if redeemCode.Value != 0 {
+			if err := s.userRepo.UpdateBalance(txCtx, newUser.ID, redeemCode.Value); err != nil {
+				logger.LegacyPrintf("service.auth", "[Auth] Failed to apply invitation value in transaction: user_id=%d value=%f err=%v", newUser.ID, redeemCode.Value, err)
+				return nil, ErrServiceUnavailable
+			}
+			newUser.Balance += redeemCode.Value
+		}
+
+		s.assignInvitationBenefits(txCtx, newUser.ID, redeemCode)
+
 		if err := tx.Commit(); err != nil {
 			logger.LegacyPrintf("service.auth", "[Auth] Failed to commit invite login transaction: %v", err)
 			return nil, ErrServiceUnavailable
@@ -418,6 +429,17 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 			logger.LegacyPrintf("service.auth", "[Auth] Failed to consume invitation code: %v", err)
 			return nil, ErrServiceUnavailable
 		}
+
+		if redeemCode.Value != 0 {
+			if err := s.userRepo.UpdateBalance(ctx, newUser.ID, redeemCode.Value); err != nil {
+				_ = s.userRepo.Delete(ctx, newUser.ID)
+				logger.LegacyPrintf("service.auth", "[Auth] Failed to apply invitation value: user_id=%d value=%f err=%v", newUser.ID, redeemCode.Value, err)
+				return nil, ErrServiceUnavailable
+			}
+			newUser.Balance += redeemCode.Value
+		}
+
+		s.assignInvitationBenefits(ctx, newUser.ID, redeemCode)
 	}
 
 	bootstrapTargets, err := s.resolveInviteBootstrapTargets(ctx)
@@ -432,9 +454,16 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 		return nil, ErrServiceUnavailable
 	}
 
-	token, err := s.GenerateToken(newUser)
+	tokenPair, err := s.GenerateTokenPair(ctx, newUser, "")
 	if err != nil {
-		return nil, fmt.Errorf("generate token: %w", err)
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to generate invite login token pair: user_id=%d err=%v", newUser.ID, err)
+		return nil, ErrServiceUnavailable
+	}
+
+	token := tokenPair.AccessToken
+	if token == "" {
+		logger.LegacyPrintf("service.auth", "[Auth] Invite login token pair missing access token: user_id=%d", newUser.ID)
+		return nil, ErrServiceUnavailable
 	}
 
 	bootstrapContext, err := s.buildInviteBootstrapContext(bootstrapProviders)
@@ -445,6 +474,7 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 
 	return &InviteLoginResult{
 		Token:            token,
+		TokenPair:        tokenPair,
 		User:             newUser,
 		BootstrapContext: bootstrapContext,
 	}, nil
@@ -469,6 +499,7 @@ func (s *AuthService) ensureInviteBootstrapAPIAccess(ctx context.Context, userID
 	entitledGroups := make(map[int64]struct{}, len(targets))
 	entitledGroupIDs := make([]int64, 0, len(targets))
 	providers := make([]InviteBootstrapProvider, 0, len(targets))
+	canonicalKeyName := "default-bootstrap"
 
 	for _, target := range targets {
 		group := target.Group
@@ -501,25 +532,33 @@ func (s *AuthService) ensureInviteBootstrapAPIAccess(ctx context.Context, userID
 			entitledGroupIDs = append(entitledGroupIDs, group.ID)
 		}
 
-		keyName := "default-" + target.Provider.ProviderID
-		groupID := group.ID
-		grantedGroupIDs := append([]int64(nil), entitledGroupIDs...)
-		createdKey, err := s.apiKeyProvisioner.Create(ctx, userID, CreateAPIKeyRequest{
-			Name:            keyName,
-			GroupID:         &groupID,
-			GrantedGroupIDs: grantedGroupIDs,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("create %s api key: %w", target.Provider.ProviderID, err)
-		}
-
 		provider := target.Provider
-		provider.DefaultAPIKeyName = keyName
 		provider.DefaultGroupID = group.ID
-		if createdKey != nil {
-			provider.APIKey = strings.TrimSpace(createdKey.Key)
-		}
 		providers = append(providers, provider)
+	}
+
+	if len(entitledGroupIDs) == 0 {
+		return nil, fmt.Errorf("invite bootstrap entitled groups are empty")
+	}
+
+	defaultGroupID := entitledGroupIDs[0]
+	grantedGroupIDs := append([]int64(nil), entitledGroupIDs...)
+	createdKey, err := s.apiKeyProvisioner.Create(ctx, userID, CreateAPIKeyRequest{
+		Name:            canonicalKeyName,
+		GroupID:         &defaultGroupID,
+		GrantedGroupIDs: grantedGroupIDs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create bootstrap api key: %w", err)
+	}
+
+	bootstrapKey := ""
+	if createdKey != nil {
+		bootstrapKey = strings.TrimSpace(createdKey.Key)
+	}
+	for i := range providers {
+		providers[i].DefaultAPIKeyName = canonicalKeyName
+		providers[i].APIKey = bootstrapKey
 	}
 
 	return providers, nil
