@@ -67,6 +67,12 @@ type LoginRequest struct {
 	TurnstileToken string `json:"turnstile_token"`
 }
 
+// InviteLoginRequest represents the invite-login request payload.
+type InviteLoginRequest struct {
+	InvitationCode string `json:"invitation_code" binding:"required"`
+	TurnstileToken string `json:"turnstile_token"`
+}
+
 // AuthResponse 认证响应格式（匹配前端期望）
 type AuthResponse struct {
 	AccessToken  string    `json:"access_token"`
@@ -201,6 +207,41 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	h.respondWithTokenPair(c, user)
+}
+
+// InviteLogin handles invitation-code-only bootstrap login.
+// POST /api/v1/auth/invite-login
+func (h *AuthHandler) InviteLogin(c *gin.Context) {
+	var req InviteLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	if err := h.authService.VerifyTurnstile(c.Request.Context(), req.TurnstileToken, ip.GetClientIP(c)); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	result, err := h.authService.InviteLogin(c.Request.Context(), req.InvitationCode)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	if h.settingSvc.IsBackendModeEnabled(c.Request.Context()) && !result.User.IsAdmin() {
+		response.Forbidden(c, "Backend mode is active. Only admin login is allowed.")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"access_token":     result.Token,
+		"refresh_token":    result.TokenPair.RefreshToken,
+		"expires_in":       result.TokenPair.ExpiresIn,
+		"token_type":       "Bearer",
+		"user":             dto.UserFromService(result.User),
+		"bootstrap_context": result.BootstrapContext,
+	})
 }
 
 // TotpLoginResponse represents the response when 2FA is required

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/mail"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -38,10 +39,13 @@ var (
 	ErrEmailSuffixNotAllowed   = infraerrors.BadRequest("EMAIL_SUFFIX_NOT_ALLOWED", "email suffix is not allowed")
 	ErrRegDisabled             = infraerrors.Forbidden("REGISTRATION_DISABLED", "registration is currently disabled")
 	ErrServiceUnavailable      = infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "service temporarily unavailable")
+	ErrInvitationCodeDisabled  = infraerrors.Forbidden("INVITATION_CODE_DISABLED", "invitation code login is disabled")
 	ErrInvitationCodeRequired  = infraerrors.BadRequest("INVITATION_CODE_REQUIRED", "invitation code is required")
 	ErrInvitationCodeInvalid   = infraerrors.BadRequest("INVITATION_CODE_INVALID", "invalid or used invitation code")
 	ErrOAuthInvitationRequired = infraerrors.Forbidden("OAUTH_INVITATION_REQUIRED", "invitation code required to complete oauth registration")
 )
+
+const inviteLoginSyntheticEmailDomain = "@invite-login.invalid"
 
 // maxTokenLength 限制 token 大小，避免超长 header 触发解析时的异常内存分配。
 const maxTokenLength = 8192
@@ -60,21 +64,62 @@ type JWTClaims struct {
 
 // AuthService 认证服务
 type AuthService struct {
-	entClient          *dbent.Client
-	userRepo           UserRepository
-	redeemRepo         RedeemCodeRepository
-	refreshTokenCache  RefreshTokenCache
-	cfg                *config.Config
-	settingService     *SettingService
-	emailService       *EmailService
-	turnstileService   *TurnstileService
-	emailQueueService  *EmailQueueService
-	promoService       *PromoService
-	defaultSubAssigner DefaultSubscriptionAssigner
+	entClient               *dbent.Client
+	userRepo                UserRepository
+	redeemRepo              RedeemCodeRepository
+	groupRepo               InviteLoginGroupResolver
+	apiKeyProvisioner       InviteLoginAPIKeyProvisioner
+	refreshTokenCache       RefreshTokenCache
+	cfg                     *config.Config
+	settingService          *SettingService
+	emailService            *EmailService
+	turnstileService        *TurnstileService
+	emailQueueService       *EmailQueueService
+	promoService            *PromoService
+	defaultSubAssigner      DefaultSubscriptionAssigner
+	bootstrapContextFactory *InviteBootstrapContextFactory
 }
 
 type DefaultSubscriptionAssigner interface {
 	AssignOrExtendSubscription(ctx context.Context, input *AssignSubscriptionInput) (*UserSubscription, bool, error)
+}
+
+type InviteLoginGroupResolver interface {
+	ListActiveByPlatform(ctx context.Context, platform string) ([]Group, error)
+}
+
+type InviteLoginAPIKeyProvisioner interface {
+	Create(ctx context.Context, userID int64, req CreateAPIKeyRequest) (*APIKey, error)
+}
+
+type InviteBootstrapModel struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Reasoning   bool   `json:"reasoning"`
+	Recommended bool   `json:"recommended"`
+}
+
+type InviteBootstrapContext struct {
+	APIKeys map[string]string `json:"apiKeys"`
+}
+
+type InviteBootstrapProvider struct {
+	ProviderID        string                 `json:"provider_id"`
+	ProviderName      string                 `json:"provider_name"`
+	BaseURL           string                 `json:"base_url"`
+	APIStyle          string                 `json:"api_style"`
+	APIKey            string                 `json:"api_key,omitempty"`
+	Models            []InviteBootstrapModel `json:"models"`
+	DefaultModel      string                 `json:"default_model"`
+	DefaultAPIKeyName string                 `json:"default_api_key_name,omitempty"`
+	DefaultGroupID    int64                  `json:"default_group_id,omitempty"`
+}
+
+type InviteLoginResult struct {
+	Token            string
+	TokenPair        *TokenPair
+	User             *User
+	BootstrapContext InviteBootstrapContext
 }
 
 // NewAuthService 创建认证服务实例
@@ -82,6 +127,8 @@ func NewAuthService(
 	entClient *dbent.Client,
 	userRepo UserRepository,
 	redeemRepo RedeemCodeRepository,
+	groupRepo InviteLoginGroupResolver,
+	apiKeyProvisioner InviteLoginAPIKeyProvisioner,
 	refreshTokenCache RefreshTokenCache,
 	cfg *config.Config,
 	settingService *SettingService,
@@ -92,17 +139,20 @@ func NewAuthService(
 	defaultSubAssigner DefaultSubscriptionAssigner,
 ) *AuthService {
 	return &AuthService{
-		entClient:          entClient,
-		userRepo:           userRepo,
-		redeemRepo:         redeemRepo,
-		refreshTokenCache:  refreshTokenCache,
-		cfg:                cfg,
-		settingService:     settingService,
-		emailService:       emailService,
-		turnstileService:   turnstileService,
-		emailQueueService:  emailQueueService,
-		promoService:       promoService,
-		defaultSubAssigner: defaultSubAssigner,
+		entClient:               entClient,
+		userRepo:                userRepo,
+		redeemRepo:              redeemRepo,
+		groupRepo:               groupRepo,
+		apiKeyProvisioner:       apiKeyProvisioner,
+		refreshTokenCache:       refreshTokenCache,
+		cfg:                     cfg,
+		settingService:          settingService,
+		emailService:            emailService,
+		turnstileService:        turnstileService,
+		emailQueueService:       emailQueueService,
+		promoService:            promoService,
+		defaultSubAssigner:      defaultSubAssigner,
+		bootstrapContextFactory: DefaultInviteBootstrapContextFactory(settingService),
 	}
 }
 
@@ -197,23 +247,60 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 		Status:       StatusActive,
 	}
 
-	if err := s.userRepo.Create(ctx, user); err != nil {
-		// 优先检查邮箱冲突错误（竞态条件下可能发生）
-		if errors.Is(err, ErrEmailExists) {
-			return "", nil, ErrEmailExists
+	if s.entClient != nil && invitationRedeemCode != nil {
+		tx, err := s.entClient.Tx(ctx)
+		if err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to begin transaction for registration: %v", err)
+			return "", nil, ErrServiceUnavailable
 		}
-		logger.LegacyPrintf("service.auth", "[Auth] Database error creating user: %v", err)
-		return "", nil, ErrServiceUnavailable
-	}
-	s.assignDefaultSubscriptions(ctx, user.ID)
+		defer func() { _ = tx.Rollback() }()
 
-	// 标记邀请码为已使用（如果使用了邀请码）
-	if invitationRedeemCode != nil {
-		if err := s.redeemRepo.Use(ctx, invitationRedeemCode.ID, user.ID); err != nil {
-			// 邀请码标记失败不影响注册，只记录日志
-			logger.LegacyPrintf("service.auth", "[Auth] Failed to mark invitation code as used for user %d: %v", user.ID, err)
+		txCtx := dbent.NewTxContext(ctx, tx)
+		if err := s.userRepo.Create(txCtx, user); err != nil {
+			if errors.Is(err, ErrEmailExists) {
+				return "", nil, ErrEmailExists
+			}
+			logger.LegacyPrintf("service.auth", "[Auth] Database error creating user: %v", err)
+			return "", nil, ErrServiceUnavailable
+		}
+
+		if err := s.redeemRepo.Use(txCtx, invitationRedeemCode.ID, user.ID); err != nil {
+			if errors.Is(err, ErrRedeemCodeUsed) {
+				return "", nil, ErrInvitationCodeInvalid
+			}
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to consume invitation code in registration transaction: %v", err)
+			return "", nil, ErrServiceUnavailable
+		}
+
+		if err := tx.Commit(); err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to commit registration transaction: %v", err)
+			return "", nil, ErrServiceUnavailable
+		}
+	} else {
+		if err := s.userRepo.Create(ctx, user); err != nil {
+			// 优先检查邮箱冲突错误（竞态条件下可能发生）
+			if errors.Is(err, ErrEmailExists) {
+				return "", nil, ErrEmailExists
+			}
+			logger.LegacyPrintf("service.auth", "[Auth] Database error creating user: %v", err)
+			return "", nil, ErrServiceUnavailable
+		}
+
+		if invitationRedeemCode != nil {
+			if err := s.redeemRepo.Use(ctx, invitationRedeemCode.ID, user.ID); err != nil {
+				if rollbackErr := s.userRepo.Delete(ctx, user.ID); rollbackErr != nil {
+					logger.LegacyPrintf("service.auth", "[Auth] Failed to rollback user after invitation consume failure: user_id=%d err=%v", user.ID, rollbackErr)
+				}
+				if errors.Is(err, ErrRedeemCodeUsed) {
+					return "", nil, ErrInvitationCodeInvalid
+				}
+				logger.LegacyPrintf("service.auth", "[Auth] Failed to consume invitation code during registration: %v", err)
+				return "", nil, ErrServiceUnavailable
+			}
 		}
 	}
+
+	s.assignDefaultSubscriptions(ctx, user.ID)
 	// 应用优惠码（如果提供且功能已启用）
 	if promoCode != "" && s.promoService != nil && s.settingService != nil && s.settingService.IsPromoCodeEnabled(ctx) {
 		if err := s.promoService.ApplyPromoCode(ctx, user.ID, promoCode); err != nil {
@@ -234,6 +321,390 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 	}
 
 	return token, user, nil
+}
+
+// InviteLogin consumes an invitation code once and bootstraps a minimal account.
+// It returns an access token, user and launcher bootstrap context; handler layer can upgrade to token pair.
+func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*InviteLoginResult, error) {
+	if s.settingService == nil || !s.settingService.IsInvitationCodeEnabled(ctx) {
+		return nil, ErrInvitationCodeDisabled
+	}
+
+	invitationCode = strings.TrimSpace(invitationCode)
+	if invitationCode == "" {
+		return nil, ErrInvitationCodeRequired
+	}
+
+	redeemCode, err := s.redeemRepo.GetByCode(ctx, invitationCode)
+	if err != nil {
+		return nil, ErrInvitationCodeInvalid
+	}
+	if redeemCode.Type != RedeemTypeInvitation || redeemCode.Status != StatusUnused {
+		return nil, ErrInvitationCodeInvalid
+	}
+
+	bootstrapEmail, bootstrapUsername, bootstrapPassword, err := s.buildInviteBootstrapIdentity()
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to generate bootstrap identity: %v", err)
+		return nil, ErrServiceUnavailable
+	}
+
+	defaultBalance := s.cfg.Default.UserBalance
+	defaultConcurrency := s.cfg.Default.UserConcurrency
+	if s.settingService != nil {
+		defaultBalance = s.settingService.GetDefaultBalance(ctx)
+		defaultConcurrency = s.settingService.GetDefaultConcurrency(ctx)
+	}
+
+	hashedPassword, err := s.HashPassword(bootstrapPassword)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+
+	newUser := &User{
+		Email:        bootstrapEmail,
+		Username:     bootstrapUsername,
+		PasswordHash: hashedPassword,
+		Role:         RoleUser,
+		Balance:      defaultBalance,
+		Concurrency:  defaultConcurrency,
+		Status:       StatusActive,
+	}
+
+	if s.entClient != nil {
+		tx, err := s.entClient.Tx(ctx)
+		if err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to begin transaction for invite login: %v", err)
+			return nil, ErrServiceUnavailable
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		txCtx := dbent.NewTxContext(ctx, tx)
+		if err := s.userRepo.Create(txCtx, newUser); err != nil {
+			if errors.Is(err, ErrEmailExists) {
+				return nil, ErrInvitationCodeInvalid
+			}
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to create bootstrap user: %v", err)
+			return nil, ErrServiceUnavailable
+		}
+
+		if err := s.redeemRepo.Use(txCtx, redeemCode.ID, newUser.ID); err != nil {
+			if errors.Is(err, ErrRedeemCodeUsed) {
+				return nil, ErrInvitationCodeInvalid
+			}
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to consume invitation code in transaction: %v", err)
+			return nil, ErrServiceUnavailable
+		}
+
+		if redeemCode.Value != 0 {
+			if err := s.userRepo.UpdateBalance(txCtx, newUser.ID, redeemCode.Value); err != nil {
+				logger.LegacyPrintf("service.auth", "[Auth] Failed to apply invitation value in transaction: user_id=%d value=%f err=%v", newUser.ID, redeemCode.Value, err)
+				return nil, ErrServiceUnavailable
+			}
+			newUser.Balance += redeemCode.Value
+		}
+
+		s.assignInvitationBenefits(txCtx, newUser.ID, redeemCode)
+
+		if err := tx.Commit(); err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to commit invite login transaction: %v", err)
+			return nil, ErrServiceUnavailable
+		}
+	} else {
+		if err := s.userRepo.Create(ctx, newUser); err != nil {
+			if errors.Is(err, ErrEmailExists) {
+				return nil, ErrInvitationCodeInvalid
+			}
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to create bootstrap user: %v", err)
+			return nil, ErrServiceUnavailable
+		}
+
+		if err := s.redeemRepo.Use(ctx, redeemCode.ID, newUser.ID); err != nil {
+			_ = s.userRepo.Delete(ctx, newUser.ID)
+			if errors.Is(err, ErrRedeemCodeUsed) {
+				return nil, ErrInvitationCodeInvalid
+			}
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to consume invitation code: %v", err)
+			return nil, ErrServiceUnavailable
+		}
+
+		if redeemCode.Value != 0 {
+			if err := s.userRepo.UpdateBalance(ctx, newUser.ID, redeemCode.Value); err != nil {
+				_ = s.userRepo.Delete(ctx, newUser.ID)
+				logger.LegacyPrintf("service.auth", "[Auth] Failed to apply invitation value: user_id=%d value=%f err=%v", newUser.ID, redeemCode.Value, err)
+				return nil, ErrServiceUnavailable
+			}
+			newUser.Balance += redeemCode.Value
+		}
+
+		s.assignInvitationBenefits(ctx, newUser.ID, redeemCode)
+	}
+
+	bootstrapTargets, err := s.resolveInviteBootstrapTargets(ctx)
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to resolve invite bootstrap targets: user_id=%d err=%v", newUser.ID, err)
+		return nil, ErrServiceUnavailable
+	}
+
+	bootstrapProviders, err := s.ensureInviteBootstrapAPIAccess(ctx, newUser.ID, bootstrapTargets)
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to provision bootstrap API access: user_id=%d err=%v", newUser.ID, err)
+		return nil, ErrServiceUnavailable
+	}
+
+	tokenPair, err := s.GenerateTokenPair(ctx, newUser, "")
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to generate invite login token pair: user_id=%d err=%v", newUser.ID, err)
+		return nil, ErrServiceUnavailable
+	}
+
+	token := tokenPair.AccessToken
+	if token == "" {
+		logger.LegacyPrintf("service.auth", "[Auth] Invite login token pair missing access token: user_id=%d", newUser.ID)
+		return nil, ErrServiceUnavailable
+	}
+
+	bootstrapContext, err := s.buildInviteBootstrapContext(bootstrapProviders)
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to build invite bootstrap context: user_id=%d err=%v", newUser.ID, err)
+		return nil, ErrServiceUnavailable
+	}
+
+	return &InviteLoginResult{
+		Token:            token,
+		TokenPair:        tokenPair,
+		User:             newUser,
+		BootstrapContext: bootstrapContext,
+	}, nil
+}
+
+type inviteBootstrapTarget struct {
+	Group    Group
+	Provider InviteBootstrapProvider
+}
+
+func (s *AuthService) ensureInviteBootstrapAPIAccess(ctx context.Context, userID int64, targets []inviteBootstrapTarget) ([]InviteBootstrapProvider, error) {
+	if userID <= 0 {
+		return nil, fmt.Errorf("invalid user id")
+	}
+	if len(targets) == 0 {
+		return nil, fmt.Errorf("invite bootstrap targets are empty")
+	}
+	if s.apiKeyProvisioner == nil {
+		return nil, fmt.Errorf("api key provisioner not configured")
+	}
+
+	entitledGroups := make(map[int64]struct{}, len(targets))
+	entitledGroupIDs := make([]int64, 0, len(targets))
+	providers := make([]InviteBootstrapProvider, 0, len(targets))
+	canonicalKeyName := "default-bootstrap"
+
+	for _, target := range targets {
+		group := target.Group
+		if _, ok := entitledGroups[group.ID]; !ok {
+			if group.IsSubscriptionType() {
+				if s.defaultSubAssigner == nil {
+					return nil, fmt.Errorf("subscription assigner not configured")
+				}
+				validityDays := group.DefaultValidityDays
+				if validityDays <= 0 {
+					validityDays = 30
+				}
+				if _, _, err := s.defaultSubAssigner.AssignOrExtendSubscription(ctx, &AssignSubscriptionInput{
+					UserID:       userID,
+					GroupID:      group.ID,
+					ValidityDays: validityDays,
+					Notes:        fmt.Sprintf("auto assigned by invite bootstrap (%s default)", group.Platform),
+				}); err != nil {
+					return nil, fmt.Errorf("assign %s subscription: %w", group.Platform, err)
+				}
+			} else if group.IsExclusive {
+				if s.userRepo == nil {
+					return nil, fmt.Errorf("user repo not configured")
+				}
+				if err := s.userRepo.AddGroupToAllowedGroups(ctx, userID, group.ID); err != nil {
+					return nil, fmt.Errorf("grant %s group access: %w", group.Platform, err)
+				}
+			}
+			entitledGroups[group.ID] = struct{}{}
+			entitledGroupIDs = append(entitledGroupIDs, group.ID)
+		}
+
+		provider := target.Provider
+		provider.DefaultGroupID = group.ID
+		providers = append(providers, provider)
+	}
+
+	if len(entitledGroupIDs) == 0 {
+		return nil, fmt.Errorf("invite bootstrap entitled groups are empty")
+	}
+
+	defaultGroupID := entitledGroupIDs[0]
+	grantedGroupIDs := append([]int64(nil), entitledGroupIDs...)
+	createdKey, err := s.apiKeyProvisioner.Create(ctx, userID, CreateAPIKeyRequest{
+		Name:            canonicalKeyName,
+		GroupID:         &defaultGroupID,
+		GrantedGroupIDs: grantedGroupIDs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create bootstrap api key: %w", err)
+	}
+
+	bootstrapKey := ""
+	if createdKey != nil {
+		bootstrapKey = strings.TrimSpace(createdKey.Key)
+	}
+	for i := range providers {
+		providers[i].DefaultAPIKeyName = canonicalKeyName
+		providers[i].APIKey = bootstrapKey
+	}
+
+	return providers, nil
+}
+
+func (s *AuthService) resolveInviteBootstrapTargets(ctx context.Context) ([]inviteBootstrapTarget, error) {
+	if s.groupRepo == nil {
+		return nil, fmt.Errorf("group resolver not configured")
+	}
+
+	representativeGroups, err := s.resolveInviteBootstrapRepresentativeGroups(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	targets := make([]inviteBootstrapTarget, 0, len(representativeGroups))
+	for i := range representativeGroups {
+		group := representativeGroups[i]
+		providers, err := s.buildInviteBootstrapProviders(ctx, &group)
+		if err != nil {
+			return nil, err
+		}
+		for _, provider := range providers {
+			targets = append(targets, inviteBootstrapTarget{
+				Group:    group,
+				Provider: provider,
+			})
+		}
+	}
+
+	if len(targets) == 0 {
+		return nil, fmt.Errorf("no active bootstrap provider targets")
+	}
+
+	return targets, nil
+}
+
+func (s *AuthService) resolveInviteBootstrapRepresentativeGroups(ctx context.Context) ([]Group, error) {
+	representatives := make([]Group, 0, 3)
+
+	for _, platform := range []string{PlatformOpenAI, PlatformAnthropic, PlatformAntigravity} {
+		groups, err := s.groupRepo.ListActiveByPlatform(ctx, platform)
+		if err != nil {
+			return nil, fmt.Errorf("resolve %s group: %w", platform, err)
+		}
+		representative, ok := selectCheapestInviteBootstrapGroup(groups)
+		if ok {
+			representatives = append(representatives, representative)
+		}
+	}
+
+	if len(representatives) == 0 {
+		return nil, fmt.Errorf("no active bootstrap group for platforms: %s", strings.Join([]string{PlatformOpenAI, PlatformAnthropic, PlatformAntigravity}, ","))
+	}
+
+	return representatives, nil
+}
+
+func selectCheapestInviteBootstrapGroup(groups []Group) (Group, bool) {
+	candidates := make([]Group, 0, len(groups))
+	for _, group := range groups {
+		if group.IsSubscriptionType() {
+			continue
+		}
+		candidates = append(candidates, group)
+	}
+	if len(candidates) == 0 {
+		return Group{}, false
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		left := candidates[i]
+		right := candidates[j]
+		if left.RateMultiplier != right.RateMultiplier {
+			return left.RateMultiplier < right.RateMultiplier
+		}
+		if left.SortOrder != right.SortOrder {
+			return left.SortOrder < right.SortOrder
+		}
+		return left.ID < right.ID
+	})
+
+	return candidates[0], true
+}
+
+func (s *AuthService) buildInviteBootstrapProviders(ctx context.Context, group *Group) ([]InviteBootstrapProvider, error) {
+	if s.bootstrapContextFactory == nil {
+		s.bootstrapContextFactory = DefaultInviteBootstrapContextFactory(s.settingService)
+	}
+	return s.bootstrapContextFactory.BuildProviders(ctx, group)
+}
+
+func (s *AuthService) buildInviteBootstrapContext(providers []InviteBootstrapProvider) (InviteBootstrapContext, error) {
+	if len(providers) == 0 {
+		return InviteBootstrapContext{}, fmt.Errorf("invite bootstrap providers are empty")
+	}
+
+	apiKeys := make(map[string]string, 4)
+	for _, provider := range providers {
+		apiKey := strings.TrimSpace(provider.APIKey)
+		if apiKey == "" {
+			continue
+		}
+		switch strings.TrimSpace(provider.ProviderID) {
+		case PlatformOpenAI:
+			apiKeys["openai"] = apiKey
+		case PlatformAnthropic:
+			apiKeys["anthropic"] = apiKey
+		case inviteBootstrapProviderIDAntigravityClaude:
+			apiKeys["antigravity"] = apiKey
+		case inviteBootstrapProviderIDAntigravityGemini:
+			apiKeys["gemini"] = apiKey
+		}
+	}
+
+	if len(apiKeys) == 0 {
+		return InviteBootstrapContext{}, fmt.Errorf("invite bootstrap api keys are empty")
+	}
+
+	return InviteBootstrapContext{APIKeys: apiKeys}, nil
+}
+
+func (s *AuthService) buildInviteBootstrapIdentity() (email string, username string, password string, err error) {
+	seed, err := randomHexString(16)
+	if err != nil {
+		return "", "", "", err
+	}
+	password, err = randomHexString(24)
+	if err != nil {
+		return "", "", "", err
+	}
+	email = fmt.Sprintf("invite-%s@bootstrap.local", seed)
+	username = fmt.Sprintf("invite_%s", seed[:12])
+	return email, username, password, nil
+}
+
+func (s *AuthService) assignInvitationBenefits(ctx context.Context, userID int64, code *RedeemCode) {
+	if s.defaultSubAssigner == nil || userID <= 0 || code == nil || code.GroupID == nil || code.ValidityDays <= 0 {
+		return
+	}
+	if _, _, err := s.defaultSubAssigner.AssignOrExtendSubscription(ctx, &AssignSubscriptionInput{
+		UserID:       userID,
+		GroupID:      *code.GroupID,
+		ValidityDays: code.ValidityDays,
+		Notes:        "assigned by invitation bootstrap",
+	}); err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to assign invitation benefits: user_id=%d group_id=%d err=%v", userID, *code.GroupID, err)
+	}
 }
 
 // SendVerifyCodeResult 发送验证码返回结果
@@ -430,6 +901,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 
 	return token, user, nil
 }
+
 
 // LoginOrRegisterOAuth 用于第三方 OAuth/SSO 登录：
 // - 如果邮箱已存在：直接登录（不需要本地密码）
@@ -645,13 +1117,18 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 						return nil, nil, ErrServiceUnavailable
 					}
 				} else {
-					user = newUser
-					s.assignDefaultSubscriptions(ctx, user.ID)
 					if invitationRedeemCode != nil {
-						if err := s.redeemRepo.Use(ctx, invitationRedeemCode.ID, user.ID); err != nil {
-							return nil, nil, ErrInvitationCodeInvalid
+						if err := s.redeemRepo.Use(ctx, invitationRedeemCode.ID, newUser.ID); err != nil {
+							_ = s.userRepo.Delete(ctx, newUser.ID)
+							if errors.Is(err, ErrRedeemCodeUsed) {
+								return nil, nil, ErrInvitationCodeInvalid
+							}
+							logger.LegacyPrintf("service.auth", "[Auth] Failed to consume invitation code during oauth registration: %v", err)
+							return nil, nil, ErrServiceUnavailable
 						}
 					}
+					user = newUser
+					s.assignDefaultSubscriptions(ctx, user.ID)
 				}
 			}
 		} else {
@@ -831,9 +1308,14 @@ func randomHexString(byteLength int) (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
+func buildInviteLoginSyntheticEmail(invitationCode string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(invitationCode)))
+	return "invite-" + hex.EncodeToString(sum[:8]) + inviteLoginSyntheticEmailDomain
+}
+
 func isReservedEmail(email string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(email))
-	return strings.HasSuffix(normalized, LinuxDoConnectSyntheticEmailDomain)
+	return strings.HasSuffix(normalized, LinuxDoConnectSyntheticEmailDomain) || strings.HasSuffix(normalized, inviteLoginSyntheticEmailDomain)
 }
 
 // GenerateToken 生成JWT access token
