@@ -10,6 +10,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/apikeygrantedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
@@ -127,6 +128,12 @@ func init() {
 	apikeyDescUsage7d := apikeyFields[16].Descriptor()
 	// apikey.DefaultUsage7d holds the default value on creation for the usage_7d field.
 	apikey.DefaultUsage7d = apikeyDescUsage7d.Default.(float64)
+	apikeygrantedgroupFields := schema.APIKeyGrantedGroup{}.Fields()
+	_ = apikeygrantedgroupFields
+	// apikeygrantedgroupDescCreatedAt is the schema descriptor for created_at field.
+	apikeygrantedgroupDescCreatedAt := apikeygrantedgroupFields[2].Descriptor()
+	// apikeygrantedgroup.DefaultCreatedAt holds the default value on creation for the created_at field.
+	apikeygrantedgroup.DefaultCreatedAt = apikeygrantedgroupDescCreatedAt.Default.(func() time.Time)
 	accountMixin := schema.Account{}.Mixin()
 	accountMixinHooks1 := accountMixin[1].Hooks()
 	account.Hooks[0] = accountMixinHooks1[0]

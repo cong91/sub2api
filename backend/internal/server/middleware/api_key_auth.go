@@ -13,6 +13,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func resolveEffectiveGroup(c *gin.Context, apiKey *service.APIKey) *service.Group {
+	if apiKey == nil {
+		return nil
+	}
+	if platform, ok := c.Request.Context().Value(ctxkey.ForcePlatform).(string); ok && strings.TrimSpace(platform) != "" {
+		if group := apiKey.GroupForPlatform(platform); service.IsGroupContextValid(group) {
+			return group
+		}
+	}
+	if group := apiKey.EffectiveGroup(); service.IsGroupContextValid(group) {
+		return group
+	}
+	if service.IsGroupContextValid(apiKey.Group) {
+		return apiKey.Group
+	}
+	return nil
+}
+
 // NewAPIKeyAuthMiddleware 创建 API Key 认证中间件
 func NewAPIKeyAuthMiddleware(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) APIKeyAuthMiddleware {
 	return APIKeyAuthMiddleware(apiKeyAuthWithSubscription(apiKeyService, subscriptionService, cfg))
@@ -111,6 +129,8 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 		// ── 4. SimpleMode → early return ─────────────────────────────
 
+		effectiveGroup := resolveEffectiveGroup(c, apiKey)
+
 		if cfg.RunMode == config.RunModeSimple {
 			c.Set(string(ContextKeyAPIKey), apiKey)
 			c.Set(string(ContextKeyUser), AuthSubject{
@@ -118,7 +138,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				Concurrency: apiKey.User.Concurrency,
 			})
 			c.Set(string(ContextKeyUserRole), apiKey.User.Role)
-			setGroupContext(c, apiKey.Group)
+			setGroupContext(c, effectiveGroup)
 			_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
 			c.Next()
 			return
@@ -130,13 +150,13 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		skipBilling := c.Request.URL.Path == "/v1/usage"
 
 		var subscription *service.UserSubscription
-		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+		isSubscriptionType := effectiveGroup != nil && effectiveGroup.IsSubscriptionType()
 
 		if isSubscriptionType && subscriptionService != nil {
 			sub, subErr := subscriptionService.GetActiveSubscription(
 				c.Request.Context(),
 				apiKey.User.ID,
-				apiKey.Group.ID,
+				effectiveGroup.ID,
 			)
 			if subErr != nil {
 				if !skipBilling {
@@ -174,7 +194,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 			// 订阅模式：验证订阅限额
 			if subscription != nil {
-				needsMaintenance, validateErr := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
+				needsMaintenance, validateErr := subscriptionService.ValidateAndCheckLimits(subscription, effectiveGroup)
 				if validateErr != nil {
 					code := "SUBSCRIPTION_INVALID"
 					status := 403
@@ -213,7 +233,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			Concurrency: apiKey.User.Concurrency,
 		})
 		c.Set(string(ContextKeyUserRole), apiKey.User.Role)
-		setGroupContext(c, apiKey.Group)
+		setGroupContext(c, effectiveGroup)
 		_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
 
 		c.Next()

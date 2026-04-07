@@ -71,6 +71,91 @@ type inviteRedeemRepoStub struct {
 	usedUserID int64
 }
 
+type inviteGroupResolverStub struct {
+	byPlatform map[string][]Group
+	err        error
+}
+
+func (s *inviteGroupResolverStub) ListActiveByPlatform(_ context.Context, platform string) ([]Group, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	groups := s.byPlatform[platform]
+	if len(groups) == 0 {
+		return nil, nil
+	}
+	out := make([]Group, len(groups))
+	copy(out, groups)
+	return out, nil
+}
+
+type inviteAPIKeyProvisionerStub struct {
+	key        string
+	lastUserID int64
+	lastReq    CreateAPIKeyRequest
+	err        error
+}
+
+func (s *inviteAPIKeyProvisionerStub) Create(_ context.Context, userID int64, req CreateAPIKeyRequest) (*APIKey, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	s.lastUserID = userID
+	s.lastReq = req
+	key := s.key
+	if key == "" {
+		key = "sk-test-bootstrap"
+	}
+	return &APIKey{
+		ID:      1,
+		UserID:  userID,
+		Key:     key,
+		GroupID: req.GroupID,
+	}, nil
+}
+
+type oauthRefreshTokenCacheStub struct{}
+
+func (s *oauthRefreshTokenCacheStub) StoreRefreshToken(context.Context, string, *RefreshTokenData, time.Duration) error {
+	return nil
+}
+
+func (s *oauthRefreshTokenCacheStub) GetRefreshToken(context.Context, string) (*RefreshTokenData, error) {
+	return nil, ErrRefreshTokenNotFound
+}
+
+func (s *oauthRefreshTokenCacheStub) DeleteRefreshToken(context.Context, string) error {
+	return nil
+}
+
+func (s *oauthRefreshTokenCacheStub) DeleteUserRefreshTokens(context.Context, int64) error {
+	return nil
+}
+
+func (s *oauthRefreshTokenCacheStub) DeleteTokenFamily(context.Context, string) error {
+	return nil
+}
+
+func (s *oauthRefreshTokenCacheStub) AddToUserTokenSet(context.Context, int64, string, time.Duration) error {
+	return nil
+}
+
+func (s *oauthRefreshTokenCacheStub) AddToFamilyTokenSet(context.Context, string, string, time.Duration) error {
+	return nil
+}
+
+func (s *oauthRefreshTokenCacheStub) GetUserTokenHashes(context.Context, int64) ([]string, error) {
+	return nil, nil
+}
+
+func (s *oauthRefreshTokenCacheStub) GetFamilyTokenHashes(context.Context, string) ([]string, error) {
+	return nil, nil
+}
+
+func (s *oauthRefreshTokenCacheStub) IsTokenInFamily(context.Context, string, string) (bool, error) {
+	return true, nil
+}
+
 func (s *defaultSubscriptionAssignerStub) AssignOrExtendSubscription(_ context.Context, input *AssignSubscriptionInput) (*UserSubscription, bool, error) {
 	if input != nil {
 		s.calls = append(s.calls, *input)
@@ -552,7 +637,7 @@ func TestAuthService_InviteLogin_Disabled(t *testing.T) {
 	service.redeemRepo = &inviteRedeemRepoStub{}
 
 	_, err := service.InviteLogin(context.Background(), "INVITE-1")
-	require.ErrorIs(t, err, ErrRegDisabled)
+	require.ErrorIs(t, err, ErrInvitationCodeDisabled)
 }
 
 func TestAuthService_InviteLogin_InvalidCode(t *testing.T) {
@@ -594,6 +679,18 @@ func TestAuthService_InviteLogin_AssignsDefaultsAndMarksCodeUsed(t *testing.T) {
 	repo := &userRepoStub{nextID: 77}
 	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{ID: 15, Type: RedeemTypeInvitation, Status: StatusUnused}}
 	assigner := &defaultSubscriptionAssignerStub{}
+	groupResolver := &inviteGroupResolverStub{
+		byPlatform: map[string][]Group{
+			PlatformOpenAI: {{
+				ID:             31,
+				Name:           "openai-bootstrap",
+				Platform:       PlatformOpenAI,
+				Status:         StatusActive,
+				RateMultiplier: 1,
+			}},
+		},
+	}
+	apiKeyProvisioner := &inviteAPIKeyProvisionerStub{key: "sk-bootstrap"}
 	service := newAuthService(repo, map[string]string{
 		SettingKeyInvitationCodeEnabled: "true",
 		SettingKeyDefaultBalance:        "9.5",
@@ -601,26 +698,32 @@ func TestAuthService_InviteLogin_AssignsDefaultsAndMarksCodeUsed(t *testing.T) {
 		SettingKeyDefaultSubscriptions:  `[{"group_id":21,"validity_days":14}]`,
 	}, nil)
 	service.redeemRepo = redeemRepo
+	service.groupRepo = groupResolver
+	service.apiKeyProvisioner = apiKeyProvisioner
 	service.defaultSubAssigner = assigner
 
-	user, err := service.InviteLogin(context.Background(), "INVITE-OK")
+	result, err := service.InviteLogin(context.Background(), "INVITE-OK")
 	require.NoError(t, err)
-	require.NotNil(t, user)
-	require.Equal(t, int64(77), user.ID)
-	require.Equal(t, RoleUser, user.Role)
-	require.Equal(t, StatusActive, user.Status)
-	require.Equal(t, 9.5, user.Balance)
-	require.Equal(t, 4, user.Concurrency)
+	require.NotNil(t, result)
+	require.NotNil(t, result.User)
+	require.Equal(t, int64(77), result.User.ID)
+	require.Equal(t, RoleUser, result.User.Role)
+	require.Equal(t, StatusActive, result.User.Status)
+	require.Equal(t, 9.5, result.User.Balance)
+	require.Equal(t, 4, result.User.Concurrency)
 	require.Len(t, repo.created, 1)
-	require.NotEmpty(t, user.PasswordHash)
-	require.NotEqual(t, "INVITE-OK", user.Email)
-	require.Contains(t, user.Email, inviteLoginSyntheticEmailDomain)
+	require.NotEmpty(t, result.User.PasswordHash)
+	require.NotEqual(t, "INVITE-OK", result.User.Email)
+	require.Contains(t, result.User.Email, "@bootstrap.local")
+	require.Equal(t, "sk-bootstrap", result.APIKey)
 	require.Equal(t, int64(15), redeemRepo.usedID)
 	require.Equal(t, int64(77), redeemRepo.usedUserID)
-	require.Len(t, assigner.calls, 1)
-	require.Equal(t, int64(77), assigner.calls[0].UserID)
-	require.Equal(t, int64(21), assigner.calls[0].GroupID)
-	require.Equal(t, 14, assigner.calls[0].ValidityDays)
+	require.Equal(t, int64(77), apiKeyProvisioner.lastUserID)
+	require.Nil(t, apiKeyProvisioner.lastReq.GroupID)
+	require.Equal(t, []int64{31}, apiKeyProvisioner.lastReq.GrantedGroupIDs)
+	// Invite-login no longer applies default subscriptions from settings in this flow.
+	// Assignment only happens when invitation/group bootstrap requires it.
+	require.Len(t, assigner.calls, 0)
 }
 
 func TestAuthService_InviteLogin_UseFailureReturnsInvalid(t *testing.T) {

@@ -106,7 +106,12 @@ func GoogleErrorWriter(c *gin.Context, status int, message string) {
 func RequireGroupAssignment(settingService *service.SettingService, writeError GatewayErrorWriter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey, ok := GetAPIKeyFromContext(c)
-		if !ok || apiKey.GroupID != nil {
+		if !ok {
+			c.Next()
+			return
+		}
+		hasGroup := apiKey.GroupID != nil || len(apiKey.CanonicalGrantedGroups()) > 0
+		if hasGroup {
 			c.Next()
 			return
 		}

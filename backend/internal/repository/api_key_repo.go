@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/apikeygrantedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/ent/user"
@@ -35,7 +37,8 @@ func (r *apiKeyRepository) activeQuery() *dbent.APIKeyQuery {
 }
 
 func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) error {
-	builder := r.client.APIKey.Create().
+	client := clientFromContext(ctx, r.client)
+	builder := client.APIKey.Create().
 		SetUserID(key.UserID).
 		SetKey(key.Key).
 		SetName(key.Name).
@@ -58,10 +61,27 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 
 	created, err := builder.Save(ctx)
 	if err == nil {
+		if e := syncAPIKeyGrantedGroups(ctx, client, created.ID, key.GrantedGroups); e != nil {
+			return e
+		}
 		key.ID = created.ID
 		key.LastUsedAt = created.LastUsedAt
 		key.CreatedAt = created.CreatedAt
 		key.UpdatedAt = created.UpdatedAt
+		if e := hydrateGrantedGroups(ctx, client, key); e != nil {
+			return e
+		}
+		if key.GroupID != nil {
+			for _, granted := range key.GrantedGroups {
+				if granted != nil && granted.ID == *key.GroupID {
+					key.Group = granted
+					break
+				}
+			}
+		}
+		if key.Group == nil {
+			key.Group = key.EffectiveGroup()
+		}
 	}
 	return translatePersistenceError(err, nil, service.ErrAPIKeyExists)
 }
@@ -71,6 +91,7 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 		Where(apikey.IDEQ(id)).
 		WithUser().
 		WithGroup().
+		WithGrantedGroups().
 		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
@@ -105,6 +126,7 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 		Where(apikey.KeyEQ(key)).
 		WithUser().
 		WithGroup().
+		WithGrantedGroups().
 		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
@@ -142,6 +164,31 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 			)
 		}).
 		WithGroup(func(q *dbent.GroupQuery) {
+			q.Select(
+				group.FieldID,
+				group.FieldName,
+				group.FieldPlatform,
+				group.FieldStatus,
+				group.FieldSubscriptionType,
+				group.FieldRateMultiplier,
+				group.FieldDailyLimitUsd,
+				group.FieldWeeklyLimitUsd,
+				group.FieldMonthlyLimitUsd,
+				group.FieldImagePrice1k,
+				group.FieldImagePrice2k,
+				group.FieldImagePrice4k,
+				group.FieldClaudeCodeOnly,
+				group.FieldFallbackGroupID,
+				group.FieldFallbackGroupIDOnInvalidRequest,
+				group.FieldModelRoutingEnabled,
+				group.FieldModelRouting,
+				group.FieldMcpXMLInject,
+				group.FieldSupportedModelScopes,
+				group.FieldAllowMessagesDispatch,
+				group.FieldDefaultMappedModel,
+			)
+		}).
+		WithGrantedGroups(func(q *dbent.GroupQuery) {
 			q.Select(
 				group.FieldID,
 				group.FieldName,
@@ -239,6 +286,10 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) erro
 		builder.ClearIPBlacklist()
 	}
 
+	if err := syncAPIKeyGrantedGroups(ctx, client, key.ID, key.GrantedGroups); err != nil {
+		return err
+	}
+
 	affected, err := builder.Save(ctx)
 	if err != nil {
 		return err
@@ -311,6 +362,7 @@ func (r *apiKeyRepository) ListByUserID(ctx context.Context, userID int64, param
 
 	keys, err := q.
 		WithGroup().
+		WithGrantedGroups().
 		Offset(params.Offset()).
 		Limit(params.Limit()).
 		Order(dbent.Desc(apikey.FieldID)).
@@ -596,7 +648,80 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 	if m.Edges.Group != nil {
 		out.Group = groupEntityToService(m.Edges.Group)
 	}
+	if len(m.Edges.GrantedGroups) > 0 {
+		out.GrantedGroups = make([]*service.Group, 0, len(m.Edges.GrantedGroups))
+		for i := range m.Edges.GrantedGroups {
+			out.GrantedGroups = append(out.GrantedGroups, groupEntityToService(m.Edges.GrantedGroups[i]))
+		}
+	}
+	if out.GroupID != nil {
+		if out.Group == nil || out.Group.ID != *out.GroupID {
+			for _, granted := range out.GrantedGroups {
+				if granted != nil && granted.ID == *out.GroupID {
+					out.Group = granted
+					break
+				}
+			}
+		}
+	} else if out.Group == nil {
+		out.Group = out.EffectiveGroup()
+	}
 	return out
+}
+
+func syncAPIKeyGrantedGroups(ctx context.Context, client *dbent.Client, apiKeyID int64, granted []*service.Group) error {
+	if apiKeyID <= 0 {
+		return nil
+	}
+	if _, err := client.APIKeyGrantedGroup.Delete().Where(apikeygrantedgroup.APIKeyIDEQ(apiKeyID)).Exec(ctx); err != nil {
+		return err
+	}
+	if len(granted) == 0 {
+		return nil
+	}
+	seen := make(map[int64]struct{}, len(granted))
+	ids := make([]int64, 0, len(granted))
+	for _, g := range granted {
+		if g == nil || g.ID <= 0 {
+			continue
+		}
+		if _, ok := seen[g.ID]; ok {
+			continue
+		}
+		seen[g.ID] = struct{}{}
+		ids = append(ids, g.ID)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	creates := make([]*dbent.APIKeyGrantedGroupCreate, 0, len(ids))
+	for _, gid := range ids {
+		creates = append(creates, client.APIKeyGrantedGroup.Create().SetAPIKeyID(apiKeyID).SetGroupID(gid))
+	}
+	return client.APIKeyGrantedGroup.CreateBulk(creates...).Exec(ctx)
+}
+
+func hydrateGrantedGroups(ctx context.Context, client *dbent.Client, key *service.APIKey) error {
+	if key == nil || key.ID <= 0 {
+		return nil
+	}
+	groups, err := client.Group.Query().
+		Where(group.HasGrantedAPIKeysWith(apikey.IDEQ(key.ID))).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+	if len(groups) == 0 {
+		key.GrantedGroups = nil
+		return nil
+	}
+	out := make([]*service.Group, 0, len(groups))
+	for _, g := range groups {
+		out = append(out, groupEntityToService(g))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	key.GrantedGroups = out
+	return nil
 }
 
 func userEntityToService(u *dbent.User) *service.User {

@@ -220,6 +220,37 @@ func (s *APIKeyService) snapshotFromAPIKey(apiKey *APIKey) *APIKeyAuthSnapshot {
 			Concurrency: apiKey.User.Concurrency,
 		},
 	}
+	if len(apiKey.GrantedGroups) > 0 {
+		snapshot.GrantedGroups = make([]APIKeyAuthGroupSnapshot, 0, len(apiKey.GrantedGroups))
+		for _, granted := range apiKey.GrantedGroups {
+			if granted == nil {
+				continue
+			}
+			snapshot.GrantedGroups = append(snapshot.GrantedGroups, APIKeyAuthGroupSnapshot{
+				ID:                              granted.ID,
+				Name:                            granted.Name,
+				Platform:                        granted.Platform,
+				Status:                          granted.Status,
+				SubscriptionType:                granted.SubscriptionType,
+				RateMultiplier:                  granted.RateMultiplier,
+				DailyLimitUSD:                   granted.DailyLimitUSD,
+				WeeklyLimitUSD:                  granted.WeeklyLimitUSD,
+				MonthlyLimitUSD:                 granted.MonthlyLimitUSD,
+				ImagePrice1K:                    granted.ImagePrice1K,
+				ImagePrice2K:                    granted.ImagePrice2K,
+				ImagePrice4K:                    granted.ImagePrice4K,
+				ClaudeCodeOnly:                  granted.ClaudeCodeOnly,
+				FallbackGroupID:                 granted.FallbackGroupID,
+				FallbackGroupIDOnInvalidRequest: granted.FallbackGroupIDOnInvalidRequest,
+				ModelRouting:                    granted.ModelRouting,
+				ModelRoutingEnabled:             granted.ModelRoutingEnabled,
+				MCPXMLInject:                    granted.MCPXMLInject,
+				SupportedModelScopes:            granted.SupportedModelScopes,
+				AllowMessagesDispatch:           granted.AllowMessagesDispatch,
+				DefaultMappedModel:              granted.DefaultMappedModel,
+			})
+		}
+	}
 	if apiKey.Group != nil {
 		snapshot.Group = &APIKeyAuthGroupSnapshot{
 			ID:                              apiKey.Group.ID,
@@ -299,6 +330,52 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			AllowMessagesDispatch:           snapshot.Group.AllowMessagesDispatch,
 			DefaultMappedModel:              snapshot.Group.DefaultMappedModel,
 		}
+	}
+	if snapshot.GroupID != nil {
+		gid := *snapshot.GroupID
+		apiKey.GroupID = &gid
+	}
+	if len(snapshot.GrantedGroups) > 0 {
+		apiKey.GrantedGroups = make([]*Group, 0, len(snapshot.GrantedGroups))
+		for i := range snapshot.GrantedGroups {
+			g := snapshot.GrantedGroups[i]
+			apiKey.GrantedGroups = append(apiKey.GrantedGroups, &Group{
+				ID:                              g.ID,
+				Name:                            g.Name,
+				Platform:                        g.Platform,
+				Status:                          g.Status,
+				Hydrated:                        true,
+				SubscriptionType:                g.SubscriptionType,
+				RateMultiplier:                  g.RateMultiplier,
+				DailyLimitUSD:                   g.DailyLimitUSD,
+				WeeklyLimitUSD:                  g.WeeklyLimitUSD,
+				MonthlyLimitUSD:                 g.MonthlyLimitUSD,
+				ImagePrice1K:                    g.ImagePrice1K,
+				ImagePrice2K:                    g.ImagePrice2K,
+				ImagePrice4K:                    g.ImagePrice4K,
+				ClaudeCodeOnly:                  g.ClaudeCodeOnly,
+				FallbackGroupID:                 g.FallbackGroupID,
+				FallbackGroupIDOnInvalidRequest: g.FallbackGroupIDOnInvalidRequest,
+				ModelRouting:                    g.ModelRouting,
+				ModelRoutingEnabled:             g.ModelRoutingEnabled,
+				MCPXMLInject:                    g.MCPXMLInject,
+				SupportedModelScopes:            g.SupportedModelScopes,
+				AllowMessagesDispatch:           g.AllowMessagesDispatch,
+				DefaultMappedModel:              g.DefaultMappedModel,
+			})
+		}
+	}
+	if apiKey.GroupID != nil {
+		if apiKey.Group == nil || apiKey.Group.ID != *apiKey.GroupID {
+			for _, granted := range apiKey.GrantedGroups {
+				if granted != nil && granted.ID == *apiKey.GroupID {
+					apiKey.Group = granted
+					break
+				}
+			}
+		}
+	} else if eff := apiKey.EffectiveGroup(); eff != nil {
+		apiKey.Group = eff
 	}
 	s.compileAPIKeyIPRules(apiKey)
 	return apiKey

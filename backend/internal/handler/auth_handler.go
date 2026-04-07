@@ -245,12 +245,12 @@ func (h *AuthHandler) InviteLogin(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{
-		"access_token":     result.Token,
-		"refresh_token":    result.TokenPair.RefreshToken,
-		"expires_in":       result.TokenPair.ExpiresIn,
-		"token_type":       "Bearer",
-		"user":             dto.UserFromService(result.User),
-		"bootstrap_context": result.BootstrapContext,
+		"access_token":  result.Token,
+		"refresh_token": result.TokenPair.RefreshToken,
+		"expires_in":    result.TokenPair.ExpiresIn,
+		"token_type":    "Bearer",
+		"user":          dto.UserFromService(result.User),
+		"api_key":       result.APIKey,
 	})
 }
 

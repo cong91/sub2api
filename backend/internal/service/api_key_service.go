@@ -351,7 +351,6 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		}
 	}
 
-	var validatedDefaultGroup *Group
 	requestedGrantedIDs := make([]int64, 0, len(req.GrantedGroupIDs)+1)
 	seenGrantedIDs := make(map[int64]struct{}, len(req.GrantedGroupIDs)+1)
 	appendGrantedID := func(id int64) {
@@ -381,28 +380,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		if !s.canUserBindGroup(ctx, user, group) {
 			return nil, ErrGroupNotAllowed
 		}
-		if req.GroupID != nil && gid == *req.GroupID {
-			validatedDefaultGroup = group
-		}
 		resolvedGrantedGroups = append(resolvedGrantedGroups, group)
-	}
-
-	// 没有显式 default group 但传入了 granted groups 时，选择第一个作为兼容 default。
-	if req.GroupID == nil && len(resolvedGrantedGroups) > 0 {
-		gid := resolvedGrantedGroups[0].ID
-		req.GroupID = &gid
-		validatedDefaultGroup = resolvedGrantedGroups[0]
-	}
-
-	if req.GroupID != nil && validatedDefaultGroup == nil {
-		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
-		if err != nil {
-			return nil, fmt.Errorf("get group: %w", err)
-		}
-		if !s.canUserBindGroup(ctx, user, group) {
-			return nil, ErrGroupNotAllowed
-		}
-		validatedDefaultGroup = group
 	}
 
 	var key string
@@ -445,7 +423,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		UserID:        userID,
 		Key:           key,
 		Name:          req.Name,
-		GroupID:       req.GroupID,
+		GroupID:       nil,
 		GrantedGroups: resolvedGrantedGroups,
 		Status:        StatusActive,
 		IPWhitelist:   req.IPWhitelist,
@@ -466,8 +444,18 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	if err := s.apiKeyRepo.Create(ctx, apiKey); err != nil {
 		return nil, fmt.Errorf("create api key: %w", err)
 	}
-	if validatedDefaultGroup != nil {
-		apiKey.Group = validatedDefaultGroup
+	if req.GroupID != nil {
+		for _, granted := range apiKey.GrantedGroups {
+			if granted != nil && granted.ID == *req.GroupID {
+				apiKey.Group = granted
+				gid := granted.ID
+				apiKey.GroupID = &gid
+				break
+			}
+		}
+	}
+	if apiKey.Group == nil {
+		apiKey.Group = apiKey.EffectiveGroup()
 	}
 
 	s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
@@ -609,10 +597,6 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		if !s.canUserBindGroup(ctx, user, group) {
 			return nil, ErrGroupNotAllowed
 		}
-
-		gid := group.ID
-		apiKey.GroupID = &gid
-		apiKey.Group = group
 		resolvedDefaultGroup = group
 		if req.GrantedGroupIDs == nil {
 			// 兼容旧行为：仅 group_id 更新表示单分组 key。
@@ -665,14 +649,23 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			apiKey.Group = nil
 			apiKey.GroupID = nil
 		} else if resolvedDefaultGroup != nil {
-			gid := resolvedDefaultGroup.ID
 			apiKey.Group = resolvedDefaultGroup
+			gid := resolvedDefaultGroup.ID
 			apiKey.GroupID = &gid
 		} else {
-			gid := resolved[0].ID
-			apiKey.Group = resolved[0]
-			apiKey.GroupID = &gid
+			apiKey.Group = apiKey.EffectiveGroup()
+			apiKey.GroupID = nil
 		}
+	}
+
+	if req.GroupID != nil {
+		if resolvedDefaultGroup == nil {
+			apiKey.GroupID = nil
+			apiKey.Group = apiKey.EffectiveGroup()
+		}
+	} else if req.GrantedGroupIDs != nil {
+		apiKey.GroupID = nil
+		apiKey.Group = apiKey.EffectiveGroup()
 	}
 
 	if req.Status != nil {

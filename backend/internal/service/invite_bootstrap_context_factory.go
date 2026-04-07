@@ -38,6 +38,7 @@ func DefaultInviteBootstrapContextFactory(settingService *SettingService) *Invit
 	return NewInviteBootstrapContextFactory(
 		&OpenAIBootstrapContextBuilder{settingService: settingService},
 		&AnthropicBootstrapContextBuilder{settingService: settingService},
+		&GeminiBootstrapContextBuilder{settingService: settingService},
 		&AntigravityBootstrapContextBuilder{settingService: settingService},
 	)
 }
@@ -125,6 +126,31 @@ func (b *AnthropicBootstrapContextBuilder) BuildProviders(ctx context.Context, _
 		ProviderName: "Anthropic",
 		BaseURL:      inviteBootstrapProviderBaseURL(inviteBootstrapBaseURL(ctx, b.settingService), PlatformAnthropic),
 		APIStyle:     inviteBootstrapAPIStyleAnthropic,
+		Models:       models,
+		DefaultModel: models[0].ID,
+	}}, nil
+}
+
+type GeminiBootstrapContextBuilder struct {
+	settingService *SettingService
+}
+
+func (b *GeminiBootstrapContextBuilder) Supports(platform string) bool {
+	return normalizeInvitePlatform(platform) == PlatformGemini
+}
+
+func (b *GeminiBootstrapContextBuilder) BuildProviders(ctx context.Context, _ *Group) ([]InviteBootstrapProvider, error) {
+	models := []InviteBootstrapModel{{
+		ID:          "gemini-2.5-pro",
+		Name:        "Gemini 2.5 Pro",
+		Reasoning:   true,
+		Recommended: true,
+	}}
+	return []InviteBootstrapProvider{{
+		ProviderID:   PlatformGemini,
+		ProviderName: "Gemini",
+		BaseURL:      inviteBootstrapProviderBaseURL(inviteBootstrapBaseURL(ctx, b.settingService), PlatformGemini),
+		APIStyle:     "google-native",
 		Models:       models,
 		DefaultModel: models[0].ID,
 	}}, nil
@@ -330,6 +356,11 @@ func inviteBootstrapProviderBaseURL(baseURL, providerID string) string {
 			return trimmed
 		}
 		return trimmed + "/v1"
+	case PlatformGemini:
+		if strings.HasSuffix(trimmed, "/v1beta") {
+			return trimmed
+		}
+		return trimmed + "/v1beta"
 	case inviteBootstrapProviderIDAntigravityClaude:
 		if strings.HasSuffix(trimmed, "/antigravity/v1") {
 			return trimmed

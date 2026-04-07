@@ -78,11 +78,15 @@ type APIKeyEdges struct {
 	User *User `json:"user,omitempty"`
 	// Group holds the value of the group edge.
 	Group *Group `json:"group,omitempty"`
+	// GrantedGroups holds the value of the granted_groups edge.
+	GrantedGroups []*Group `json:"granted_groups,omitempty"`
 	// UsageLogs holds the value of the usage_logs edge.
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
+	// APIKeyGrantedGroups holds the value of the api_key_granted_groups edge.
+	APIKeyGrantedGroups []*APIKeyGrantedGroup `json:"api_key_granted_groups,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [5]bool
 }
 
 // UserOrErr returns the User value or an error if the edge
@@ -107,13 +111,31 @@ func (e APIKeyEdges) GroupOrErr() (*Group, error) {
 	return nil, &NotLoadedError{edge: "group"}
 }
 
+// GrantedGroupsOrErr returns the GrantedGroups value or an error if the edge
+// was not loaded in eager-loading.
+func (e APIKeyEdges) GrantedGroupsOrErr() ([]*Group, error) {
+	if e.loadedTypes[2] {
+		return e.GrantedGroups, nil
+	}
+	return nil, &NotLoadedError{edge: "granted_groups"}
+}
+
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e APIKeyEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[3] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
+}
+
+// APIKeyGrantedGroupsOrErr returns the APIKeyGrantedGroups value or an error if the edge
+// was not loaded in eager-loading.
+func (e APIKeyEdges) APIKeyGrantedGroupsOrErr() ([]*APIKeyGrantedGroup, error) {
+	if e.loadedTypes[4] {
+		return e.APIKeyGrantedGroups, nil
+	}
+	return nil, &NotLoadedError{edge: "api_key_granted_groups"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -324,9 +346,19 @@ func (_m *APIKey) QueryGroup() *GroupQuery {
 	return NewAPIKeyClient(_m.config).QueryGroup(_m)
 }
 
+// QueryGrantedGroups queries the "granted_groups" edge of the APIKey entity.
+func (_m *APIKey) QueryGrantedGroups() *GroupQuery {
+	return NewAPIKeyClient(_m.config).QueryGrantedGroups(_m)
+}
+
 // QueryUsageLogs queries the "usage_logs" edge of the APIKey entity.
 func (_m *APIKey) QueryUsageLogs() *UsageLogQuery {
 	return NewAPIKeyClient(_m.config).QueryUsageLogs(_m)
+}
+
+// QueryAPIKeyGrantedGroups queries the "api_key_granted_groups" edge of the APIKey entity.
+func (_m *APIKey) QueryAPIKeyGrantedGroups() *APIKeyGrantedGroupQuery {
+	return NewAPIKeyClient(_m.config).QueryAPIKeyGrantedGroups(_m)
 }
 
 // Update returns a builder for updating this APIKey.

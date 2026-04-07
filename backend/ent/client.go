@@ -20,6 +20,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/apikeygrantedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
@@ -48,6 +49,8 @@ type Client struct {
 	Schema *migrate.Schema
 	// APIKey is the client for interacting with the APIKey builders.
 	APIKey *APIKeyClient
+	// APIKeyGrantedGroup is the client for interacting with the APIKeyGrantedGroup builders.
+	APIKeyGrantedGroup *APIKeyGrantedGroupClient
 	// Account is the client for interacting with the Account builders.
 	Account *AccountClient
 	// AccountGroup is the client for interacting with the AccountGroup builders.
@@ -102,6 +105,7 @@ func NewClient(opts ...Option) *Client {
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.APIKey = NewAPIKeyClient(c.config)
+	c.APIKeyGrantedGroup = NewAPIKeyGrantedGroupClient(c.config)
 	c.Account = NewAccountClient(c.config)
 	c.AccountGroup = NewAccountGroupClient(c.config)
 	c.Announcement = NewAnnouncementClient(c.config)
@@ -216,6 +220,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ctx:                     ctx,
 		config:                  cfg,
 		APIKey:                  NewAPIKeyClient(cfg),
+		APIKeyGrantedGroup:      NewAPIKeyGrantedGroupClient(cfg),
 		Account:                 NewAccountClient(cfg),
 		AccountGroup:            NewAccountGroupClient(cfg),
 		Announcement:            NewAnnouncementClient(cfg),
@@ -257,6 +262,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ctx:                     ctx,
 		config:                  cfg,
 		APIKey:                  NewAPIKeyClient(cfg),
+		APIKeyGrantedGroup:      NewAPIKeyGrantedGroupClient(cfg),
 		Account:                 NewAccountClient(cfg),
 		AccountGroup:            NewAccountGroupClient(cfg),
 		Announcement:            NewAnnouncementClient(cfg),
@@ -307,10 +313,10 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
-		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord, c.PromoCode,
-		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
+		c.APIKey, c.APIKeyGrantedGroup, c.Account, c.AccountGroup, c.Announcement,
+		c.AnnouncementRead, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
+		c.PromoCode, c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret,
+		c.Setting, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
 		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserSubscription,
 	} {
@@ -322,10 +328,10 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
-		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord, c.PromoCode,
-		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
+		c.APIKey, c.APIKeyGrantedGroup, c.Account, c.AccountGroup, c.Announcement,
+		c.AnnouncementRead, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
+		c.PromoCode, c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret,
+		c.Setting, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
 		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserSubscription,
 	} {
@@ -338,6 +344,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
 	case *APIKeyMutation:
 		return c.APIKey.mutate(ctx, m)
+	case *APIKeyGrantedGroupMutation:
+		return c.APIKeyGrantedGroup.mutate(ctx, m)
 	case *AccountMutation:
 		return c.Account.mutate(ctx, m)
 	case *AccountGroupMutation:
@@ -525,6 +533,22 @@ func (c *APIKeyClient) QueryGroup(_m *APIKey) *GroupQuery {
 	return query
 }
 
+// QueryGrantedGroups queries the granted_groups edge of a APIKey.
+func (c *APIKeyClient) QueryGrantedGroups(_m *APIKey) *GroupQuery {
+	query := (&GroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(apikey.Table, apikey.FieldID, id),
+			sqlgraph.To(group.Table, group.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, apikey.GrantedGroupsTable, apikey.GrantedGroupsPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryUsageLogs queries the usage_logs edge of a APIKey.
 func (c *APIKeyClient) QueryUsageLogs(_m *APIKey) *UsageLogQuery {
 	query := (&UsageLogClient{config: c.config}).Query()
@@ -534,6 +558,22 @@ func (c *APIKeyClient) QueryUsageLogs(_m *APIKey) *UsageLogQuery {
 			sqlgraph.From(apikey.Table, apikey.FieldID, id),
 			sqlgraph.To(usagelog.Table, usagelog.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, apikey.UsageLogsTable, apikey.UsageLogsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryAPIKeyGrantedGroups queries the api_key_granted_groups edge of a APIKey.
+func (c *APIKeyClient) QueryAPIKeyGrantedGroups(_m *APIKey) *APIKeyGrantedGroupQuery {
+	query := (&APIKeyGrantedGroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(apikey.Table, apikey.FieldID, id),
+			sqlgraph.To(apikeygrantedgroup.Table, apikeygrantedgroup.APIKeyColumn),
+			sqlgraph.Edge(sqlgraph.O2M, true, apikey.APIKeyGrantedGroupsTable, apikey.APIKeyGrantedGroupsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -565,6 +605,122 @@ func (c *APIKeyClient) mutate(ctx context.Context, m *APIKeyMutation) (Value, er
 		return (&APIKeyDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown APIKey mutation op: %q", m.Op())
+	}
+}
+
+// APIKeyGrantedGroupClient is a client for the APIKeyGrantedGroup schema.
+type APIKeyGrantedGroupClient struct {
+	config
+}
+
+// NewAPIKeyGrantedGroupClient returns a client for the APIKeyGrantedGroup from the given config.
+func NewAPIKeyGrantedGroupClient(c config) *APIKeyGrantedGroupClient {
+	return &APIKeyGrantedGroupClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `apikeygrantedgroup.Hooks(f(g(h())))`.
+func (c *APIKeyGrantedGroupClient) Use(hooks ...Hook) {
+	c.hooks.APIKeyGrantedGroup = append(c.hooks.APIKeyGrantedGroup, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `apikeygrantedgroup.Intercept(f(g(h())))`.
+func (c *APIKeyGrantedGroupClient) Intercept(interceptors ...Interceptor) {
+	c.inters.APIKeyGrantedGroup = append(c.inters.APIKeyGrantedGroup, interceptors...)
+}
+
+// Create returns a builder for creating a APIKeyGrantedGroup entity.
+func (c *APIKeyGrantedGroupClient) Create() *APIKeyGrantedGroupCreate {
+	mutation := newAPIKeyGrantedGroupMutation(c.config, OpCreate)
+	return &APIKeyGrantedGroupCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of APIKeyGrantedGroup entities.
+func (c *APIKeyGrantedGroupClient) CreateBulk(builders ...*APIKeyGrantedGroupCreate) *APIKeyGrantedGroupCreateBulk {
+	return &APIKeyGrantedGroupCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *APIKeyGrantedGroupClient) MapCreateBulk(slice any, setFunc func(*APIKeyGrantedGroupCreate, int)) *APIKeyGrantedGroupCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &APIKeyGrantedGroupCreateBulk{err: fmt.Errorf("calling to APIKeyGrantedGroupClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*APIKeyGrantedGroupCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &APIKeyGrantedGroupCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for APIKeyGrantedGroup.
+func (c *APIKeyGrantedGroupClient) Update() *APIKeyGrantedGroupUpdate {
+	mutation := newAPIKeyGrantedGroupMutation(c.config, OpUpdate)
+	return &APIKeyGrantedGroupUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *APIKeyGrantedGroupClient) UpdateOne(_m *APIKeyGrantedGroup) *APIKeyGrantedGroupUpdateOne {
+	mutation := newAPIKeyGrantedGroupMutation(c.config, OpUpdateOne)
+	mutation.group = &_m.GroupID
+	mutation.api_key = &_m.APIKeyID
+	return &APIKeyGrantedGroupUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for APIKeyGrantedGroup.
+func (c *APIKeyGrantedGroupClient) Delete() *APIKeyGrantedGroupDelete {
+	mutation := newAPIKeyGrantedGroupMutation(c.config, OpDelete)
+	return &APIKeyGrantedGroupDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Query returns a query builder for APIKeyGrantedGroup.
+func (c *APIKeyGrantedGroupClient) Query() *APIKeyGrantedGroupQuery {
+	return &APIKeyGrantedGroupQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAPIKeyGrantedGroup},
+		inters: c.Interceptors(),
+	}
+}
+
+// QueryAPIKey queries the api_key edge of a APIKeyGrantedGroup.
+func (c *APIKeyGrantedGroupClient) QueryAPIKey(_m *APIKeyGrantedGroup) *APIKeyQuery {
+	return c.Query().
+		Where(apikeygrantedgroup.GroupID(_m.GroupID), apikeygrantedgroup.APIKeyID(_m.APIKeyID)).
+		QueryAPIKey()
+}
+
+// QueryGroup queries the group edge of a APIKeyGrantedGroup.
+func (c *APIKeyGrantedGroupClient) QueryGroup(_m *APIKeyGrantedGroup) *GroupQuery {
+	return c.Query().
+		Where(apikeygrantedgroup.GroupID(_m.GroupID), apikeygrantedgroup.APIKeyID(_m.APIKeyID)).
+		QueryGroup()
+}
+
+// Hooks returns the client hooks.
+func (c *APIKeyGrantedGroupClient) Hooks() []Hook {
+	return c.hooks.APIKeyGrantedGroup
+}
+
+// Interceptors returns the client interceptors.
+func (c *APIKeyGrantedGroupClient) Interceptors() []Interceptor {
+	return c.inters.APIKeyGrantedGroup
+}
+
+func (c *APIKeyGrantedGroupClient) mutate(ctx context.Context, m *APIKeyGrantedGroupMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&APIKeyGrantedGroupCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&APIKeyGrantedGroupUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&APIKeyGrantedGroupUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&APIKeyGrantedGroupDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown APIKeyGrantedGroup mutation op: %q", m.Op())
 	}
 }
 
@@ -1454,6 +1610,22 @@ func (c *GroupClient) QueryAPIKeys(_m *Group) *APIKeyQuery {
 	return query
 }
 
+// QueryGrantedAPIKeys queries the granted_api_keys edge of a Group.
+func (c *GroupClient) QueryGrantedAPIKeys(_m *Group) *APIKeyQuery {
+	query := (&APIKeyClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, id),
+			sqlgraph.To(apikey.Table, apikey.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, group.GrantedAPIKeysTable, group.GrantedAPIKeysPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryRedeemCodes queries the redeem_codes edge of a Group.
 func (c *GroupClient) QueryRedeemCodes(_m *Group) *RedeemCodeQuery {
 	query := (&RedeemCodeClient{config: c.config}).Query()
@@ -1527,6 +1699,22 @@ func (c *GroupClient) QueryAllowedUsers(_m *Group) *UserQuery {
 			sqlgraph.From(group.Table, group.FieldID, id),
 			sqlgraph.To(user.Table, user.FieldID),
 			sqlgraph.Edge(sqlgraph.M2M, true, group.AllowedUsersTable, group.AllowedUsersPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryAPIKeyGrantedGroups queries the api_key_granted_groups edge of a Group.
+func (c *GroupClient) QueryAPIKeyGrantedGroups(_m *Group) *APIKeyGrantedGroupQuery {
+	query := (&APIKeyGrantedGroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, id),
+			sqlgraph.To(apikeygrantedgroup.Table, apikeygrantedgroup.GroupColumn),
+			sqlgraph.Edge(sqlgraph.O2M, true, group.APIKeyGrantedGroupsTable, group.APIKeyGrantedGroupsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -4030,18 +4218,18 @@ func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscription
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		APIKey, Account, AccountGroup, Announcement, AnnouncementRead,
-		ErrorPassthroughRule, Group, IdempotencyRecord, PromoCode, PromoCodeUsage,
-		Proxy, RedeemCode, SecuritySecret, Setting, TLSFingerprintProfile,
-		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
-		UserAttributeValue, UserSubscription []ent.Hook
+		APIKey, APIKeyGrantedGroup, Account, AccountGroup, Announcement,
+		AnnouncementRead, ErrorPassthroughRule, Group, IdempotencyRecord, PromoCode,
+		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting,
+		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
+		UserAttributeDefinition, UserAttributeValue, UserSubscription []ent.Hook
 	}
 	inters struct {
-		APIKey, Account, AccountGroup, Announcement, AnnouncementRead,
-		ErrorPassthroughRule, Group, IdempotencyRecord, PromoCode, PromoCodeUsage,
-		Proxy, RedeemCode, SecuritySecret, Setting, TLSFingerprintProfile,
-		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
-		UserAttributeValue, UserSubscription []ent.Interceptor
+		APIKey, APIKeyGrantedGroup, Account, AccountGroup, Announcement,
+		AnnouncementRead, ErrorPassthroughRule, Group, IdempotencyRecord, PromoCode,
+		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting,
+		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
+		UserAttributeDefinition, UserAttributeValue, UserSubscription []ent.Interceptor
 	}
 )
 
