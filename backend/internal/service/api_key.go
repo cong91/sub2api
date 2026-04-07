@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
@@ -28,14 +29,18 @@ func IsWindowExpired(windowStart *time.Time, duration time.Duration) bool {
 }
 
 type APIKey struct {
-	ID          int64
-	UserID      int64
-	Key         string
-	Name        string
-	GroupID     *int64
-	Status      string
-	IPWhitelist []string
-	IPBlacklist []string
+	ID      int64
+	UserID  int64
+	Key     string
+	Name    string
+	GroupID *int64
+	// GrantedGroups contains all groups this key can access.
+	// Compatibility note: GroupID/Group are legacy fallback preference fields;
+	// request-time routing for multi-group keys derives effective group dynamically.
+	GrantedGroups []*Group
+	Status        string
+	IPWhitelist   []string
+	IPBlacklist   []string
 	// 预编译的 IP 规则，用于认证热路径避免重复 ParseIP/ParseCIDR。
 	CompiledIPWhitelist *ip.CompiledIPRules `json:"-"`
 	CompiledIPBlacklist *ip.CompiledIPRules `json:"-"`
@@ -60,6 +65,64 @@ type APIKey struct {
 	Window5hStart *time.Time // Start of current 5h window
 	Window1dStart *time.Time // Start of current 1d window
 	Window7dStart *time.Time // Start of current 7d window
+}
+
+// EffectiveGroup returns the canonical effective/default group from granted_groups.
+// Runtime semantics must not fallback to legacy Group/GroupID fields.
+func (k *APIKey) EffectiveGroup() *Group {
+	if k == nil {
+		return nil
+	}
+	canonical := k.CanonicalGrantedGroups()
+	if len(canonical) == 0 {
+		return nil
+	}
+	return canonical[0]
+}
+
+// CanonicalGrantedGroups returns runtime-usable granted groups (hydrated, valid, deduplicated).
+func (k *APIKey) CanonicalGrantedGroups() []*Group {
+	if k == nil || len(k.GrantedGroups) == 0 {
+		return nil
+	}
+	seen := make(map[int64]struct{}, len(k.GrantedGroups))
+	out := make([]*Group, 0, len(k.GrantedGroups))
+	for _, granted := range k.GrantedGroups {
+		if !IsGroupContextValid(granted) {
+			continue
+		}
+		if _, ok := seen[granted.ID]; ok {
+			continue
+		}
+		seen[granted.ID] = struct{}{}
+		out = append(out, granted)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// GroupForPlatform returns a granted group matching the requested platform when
+// available, otherwise it falls back to EffectiveGroup.
+func (k *APIKey) GroupForPlatform(platform string) *Group {
+	if k == nil {
+		return nil
+	}
+	canonical := k.CanonicalGrantedGroups()
+	if len(canonical) == 0 {
+		return nil
+	}
+	platform = strings.TrimSpace(platform)
+	if platform == "" {
+		return canonical[0]
+	}
+	for _, granted := range canonical {
+		if strings.EqualFold(strings.TrimSpace(granted.Platform), platform) {
+			return granted
+		}
+	}
+	return canonical[0]
 }
 
 func (k *APIKey) IsActive() bool {

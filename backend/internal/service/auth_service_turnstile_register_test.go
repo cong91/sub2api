@@ -46,7 +46,9 @@ func newAuthServiceForRegisterTurnstileTest(settings map[string]string, verifier
 		nil, // entClient
 		&userRepoStub{},
 		nil, // redeemRepo
-		nil, // refreshTokenCache
+		nil, // groupRepo
+		nil, // apiKeyProvisioner
+		&oauthRefreshTokenCacheStub{},
 		cfg,
 		settingService,
 		nil, // emailService

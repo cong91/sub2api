@@ -80,6 +80,9 @@ func TestAPIContracts(t *testing.T) {
 					"key": "sk_custom_1234567890",
 					"name": "Key One",
 					"group_id": null,
+					"default_group_id": null,
+					"granted_group_ids": [],
+					"granted_groups": [],
 					"status": "active",
 					"ip_whitelist": null,
 					"ip_blacklist": null,
@@ -105,11 +108,27 @@ func TestAPIContracts(t *testing.T) {
 			name: "GET /api/v1/keys (paginated)",
 			setup: func(t *testing.T, deps *contractDeps) {
 				t.Helper()
+				groupID := int64(10)
 				deps.apiKeyRepo.MustSeed(&service.APIKey{
-					ID:        100,
-					UserID:    1,
-					Key:       "sk_custom_1234567890",
-					Name:      "Key One",
+					ID:      100,
+					UserID:  1,
+					Key:     "sk_custom_1234567890",
+					Name:    "Key One",
+					GroupID: &groupID,
+					GrantedGroups: []*service.Group{
+						{
+							ID:       10,
+							Name:     "Group One",
+							Platform: service.PlatformOpenAI,
+							Status:   service.StatusActive,
+						},
+						{
+							ID:       11,
+							Name:     "Group Two",
+							Platform: service.PlatformAnthropic,
+							Status:   service.StatusActive,
+						},
+					},
 					Status:    service.StatusActive,
 					CreatedAt: deps.now,
 					UpdatedAt: deps.now,
@@ -128,7 +147,23 @@ func TestAPIContracts(t *testing.T) {
 							"user_id": 1,
 							"key": "sk_custom_1234567890",
 							"name": "Key One",
-							"group_id": null,
+							"group_id": 10,
+							"default_group_id": 10,
+							"granted_group_ids": [10, 11],
+							"granted_groups": [
+								{
+									"id": 10,
+									"name": "Group One",
+									"platform": "openai",
+									"status": "active"
+								},
+								{
+									"id": 11,
+									"name": "Group Two",
+									"platform": "anthropic",
+									"status": "active"
+								}
+							],
 							"status": "active",
 							"ip_whitelist": null,
 							"ip_blacklist": null,

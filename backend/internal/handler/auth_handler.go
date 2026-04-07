@@ -69,7 +69,8 @@ type LoginRequest struct {
 
 // InviteLoginRequest represents the invite-login request payload.
 type InviteLoginRequest struct {
-	InvitationCode string `json:"invitation_code" binding:"required"`
+	InvitationCode string `json:"invitation_code"`
+	Code           string `json:"code"`
 	TurnstileToken string `json:"turnstile_token"`
 }
 
@@ -218,12 +219,21 @@ func (h *AuthHandler) InviteLogin(c *gin.Context) {
 		return
 	}
 
+	invitationCode := strings.TrimSpace(req.InvitationCode)
+	if invitationCode == "" {
+		invitationCode = strings.TrimSpace(req.Code)
+	}
+	if invitationCode == "" {
+		response.BadRequest(c, "Invalid request: invitation_code is required")
+		return
+	}
+
 	if err := h.authService.VerifyTurnstile(c.Request.Context(), req.TurnstileToken, ip.GetClientIP(c)); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 
-	result, err := h.authService.InviteLogin(c.Request.Context(), req.InvitationCode)
+	result, err := h.authService.InviteLogin(c.Request.Context(), invitationCode)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
