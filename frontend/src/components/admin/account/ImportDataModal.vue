@@ -23,7 +23,7 @@
         >
           <div class="min-w-0">
             <div class="truncate text-sm text-gray-700 dark:text-dark-200">
-              {{ fileName || t('admin.accounts.dataImportSelectFile') }}
+              {{ fileLabel || t('admin.accounts.dataImportSelectFile') }}
             </div>
             <div class="text-xs text-gray-500 dark:text-dark-400">JSON (.json)</div>
           </div>
@@ -36,6 +36,7 @@
           type="file"
           class="hidden"
           accept="application/json,.json"
+          multiple
           @change="handleFileChange"
         />
       </div>
@@ -108,11 +109,15 @@ const { t } = useI18n()
 const appStore = useAppStore()
 
 const importing = ref(false)
-const file = ref<File | null>(null)
+const files = ref<File[]>([])
 const result = ref<AdminDataImportResult | null>(null)
 
 const fileInput = ref<HTMLInputElement | null>(null)
-const fileName = computed(() => file.value?.name || '')
+const fileLabel = computed(() => {
+  if (files.value.length === 0) return ''
+  if (files.value.length === 1) return files.value[0]?.name || ''
+  return `${files.value.length} files selected`
+})
 
 const errorItems = computed(() => result.value?.errors || [])
 
@@ -120,7 +125,7 @@ watch(
   () => props.show,
   (open) => {
     if (open) {
-      file.value = null
+      files.value = []
       result.value = null
       if (fileInput.value) {
         fileInput.value.value = ''
@@ -135,7 +140,7 @@ const openFilePicker = () => {
 
 const handleFileChange = (event: Event) => {
   const target = event.target as HTMLInputElement
-  file.value = target.files?.[0] || null
+  files.value = Array.from(target.files || [])
 }
 
 const handleClose = () => {
@@ -224,17 +229,44 @@ const normalizeTokenImportFile = (value: unknown): AdminDataPayload => {
   }
 }
 
+const mergeDataPayloads = (payloads: AdminDataPayload[]): AdminDataPayload => {
+  const merged: AdminDataPayload = {
+    exported_at: new Date().toISOString(),
+    proxies: [],
+    accounts: []
+  }
+
+  const seenProxyKeys = new Set<string>()
+  for (const payload of payloads) {
+    for (const proxy of payload.proxies || []) {
+      const key = typeof proxy.proxy_key === 'string' ? proxy.proxy_key : JSON.stringify(proxy)
+      if (seenProxyKeys.has(key)) continue
+      seenProxyKeys.add(key)
+      merged.proxies.push(proxy)
+    }
+    for (const account of payload.accounts || []) {
+      merged.accounts.push(account)
+    }
+  }
+
+  return merged
+}
+
 const handleImport = async () => {
-  if (!file.value) {
+  if (files.value.length === 0) {
     appStore.showError(t('admin.accounts.dataImportSelectFile'))
     return
   }
 
   importing.value = true
   try {
-    const text = await readFileAsText(file.value)
-    const rawPayload = JSON.parse(text)
-    const dataPayload = normalizeTokenImportFile(rawPayload)
+    const payloads: AdminDataPayload[] = []
+    for (const sourceFile of files.value) {
+      const text = await readFileAsText(sourceFile)
+      const rawPayload = JSON.parse(text)
+      payloads.push(normalizeTokenImportFile(rawPayload))
+    }
+    const dataPayload = mergeDataPayloads(payloads)
 
     const res = await adminAPI.accounts.importData({
       data: dataPayload,

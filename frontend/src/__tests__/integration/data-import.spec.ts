@@ -150,4 +150,99 @@ describe('ImportDataModal', () => {
     })
     expect(showSuccess).toHaveBeenCalledWith('admin.accounts.dataImportSuccess')
   })
+
+  it('hỗ trợ import nhiều file json trong một lần', async () => {
+    const importData = vi.mocked(adminAPI.accounts.importData)
+    importData.mockResolvedValue({
+      proxy_created: 0,
+      proxy_reused: 0,
+      proxy_failed: 0,
+      account_created: 2,
+      account_failed: 0,
+      errors: []
+    })
+
+    const wrapper = mount(ImportDataModal, {
+      props: { show: true },
+      global: {
+        stubs: {
+          BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' }
+        }
+      }
+    })
+
+    const input = wrapper.find('input[type="file"]')
+    const exportedFile = new File(['exported'], 'sub2api-account.json', { type: 'application/json' })
+    Object.defineProperty(exportedFile, 'text', {
+      value: () => Promise.resolve(JSON.stringify({
+        exported_at: '2026-04-08T07:43:55Z',
+        proxies: [],
+        accounts: [
+          {
+            name: 'exported@example.com',
+            platform: 'openai',
+            type: 'oauth',
+            credentials: { access_token: 'at-exported' },
+            concurrency: 10,
+            priority: 1,
+            auto_pause_on_expired: true
+          }
+        ]
+      }))
+    })
+
+    const tokenFile = new File(['token'], 'token_xxx.json', { type: 'application/json' })
+    Object.defineProperty(tokenFile, 'text', {
+      value: () => Promise.resolve(JSON.stringify({
+        access_token: 'at-token',
+        refresh_token: 'rt-token',
+        account_id: 'acct-002',
+        email: 'token@example.com',
+        type: 'codex'
+      }))
+    })
+
+    Object.defineProperty(input.element, 'files', {
+      value: [exportedFile, tokenFile]
+    })
+
+    await input.trigger('change')
+    await wrapper.find('form').trigger('submit')
+    await Promise.resolve()
+
+    expect(importData).toHaveBeenCalledWith({
+      data: {
+        exported_at: expect.any(String),
+        proxies: [],
+        accounts: [
+          {
+            name: 'exported@example.com',
+            platform: 'openai',
+            type: 'oauth',
+            credentials: { access_token: 'at-exported' },
+            concurrency: 10,
+            priority: 1,
+            auto_pause_on_expired: true
+          },
+          {
+            name: 'token@example.com',
+            platform: 'openai',
+            type: 'oauth',
+            credentials: {
+              access_token: 'at-token',
+              refresh_token: 'rt-token',
+              email: 'token@example.com',
+              account_id: 'acct-002',
+              chatgpt_account_id: 'acct-002'
+            },
+            extra: undefined,
+            concurrency: 10,
+            priority: 1,
+            auto_pause_on_expired: true
+          }
+        ]
+      },
+      skip_default_group_bind: true
+    })
+  })
 })
