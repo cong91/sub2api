@@ -147,7 +147,7 @@
             class="channel-tab"
             :class="activeTab === 'basic' ? 'channel-tab-active' : 'channel-tab-inactive'"
           >
-            {{ t('admin.channels.form.basicSettings', '基础设置') }}
+            {{ t('admin.channels.form.basicSettings') }}
           </button>
           <!-- Platform Tabs (only enabled) -->
           <button
@@ -222,7 +222,7 @@
 
             <!-- Platform Management -->
             <div class="space-y-3">
-              <label class="input-label mb-0">{{ t('admin.channels.form.platformConfig', '平台配置') }}</label>
+              <label class="input-label mb-0">{{ t('admin.channels.form.platformConfig') }}</label>
               <div class="flex flex-wrap gap-2">
                 <label
                   v-for="p in platformOrder"
@@ -927,7 +927,7 @@ async function handleSubmit() {
       if ((entry.billing_mode === 'per_request' || entry.billing_mode === 'image') &&
           (entry.per_request_price == null || entry.per_request_price === '') &&
           (!entry.intervals || entry.intervals.length === 0)) {
-        appStore.showError(t('admin.channels.form.perRequestPriceRequired', '按次/图片计费模式必须设置默认价格或至少一个计费层级'))
+        appStore.showError(t('admin.channels.form.perRequestPriceRequired'))
         return
       }
     }
