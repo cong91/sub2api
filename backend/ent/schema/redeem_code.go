@@ -45,6 +45,20 @@ func (RedeemCode) Fields() []ent.Field {
 		field.Float("value").
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
 			Default(0),
+		field.String("benefit_type").
+			MaxLen(20).
+			Optional().
+			Nillable(),
+		field.Float("balance_amount").
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
+			Optional().
+			Nillable(),
+		field.Int64("subscription_group_id").
+			Optional().
+			Nillable(),
+		field.Int("subscription_days").
+			Optional().
+			Nillable(),
 		field.String("status").
 			MaxLen(20).
 			Default(domain.StatusUnused),
@@ -90,5 +104,6 @@ func (RedeemCode) Indexes() []ent.Index {
 		index.Fields("status"),
 		index.Fields("used_by"),
 		index.Fields("group_id"),
+		index.Fields("subscription_group_id"),
 	}
 }

@@ -79,6 +79,107 @@ func (_u *RedeemCodeUpdate) AddValue(v float64) *RedeemCodeUpdate {
 	return _u
 }
 
+// SetBenefitType sets the "benefit_type" field.
+func (_u *RedeemCodeUpdate) SetBenefitType(v string) *RedeemCodeUpdate {
+	_u.mutation.SetBenefitType(v)
+	return _u
+}
+
+// SetNillableBenefitType sets the "benefit_type" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableBenefitType(v *string) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetBenefitType(*v)
+	}
+	return _u
+}
+
+// ClearBenefitType clears the value of the "benefit_type" field.
+func (_u *RedeemCodeUpdate) ClearBenefitType() *RedeemCodeUpdate {
+	_u.mutation.ClearBenefitType()
+	return _u
+}
+
+// SetBalanceAmount sets the "balance_amount" field.
+func (_u *RedeemCodeUpdate) SetBalanceAmount(v float64) *RedeemCodeUpdate {
+	_u.mutation.ResetBalanceAmount()
+	_u.mutation.SetBalanceAmount(v)
+	return _u
+}
+
+// SetNillableBalanceAmount sets the "balance_amount" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableBalanceAmount(v *float64) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetBalanceAmount(*v)
+	}
+	return _u
+}
+
+// AddBalanceAmount adds value to the "balance_amount" field.
+func (_u *RedeemCodeUpdate) AddBalanceAmount(v float64) *RedeemCodeUpdate {
+	_u.mutation.AddBalanceAmount(v)
+	return _u
+}
+
+// ClearBalanceAmount clears the value of the "balance_amount" field.
+func (_u *RedeemCodeUpdate) ClearBalanceAmount() *RedeemCodeUpdate {
+	_u.mutation.ClearBalanceAmount()
+	return _u
+}
+
+// SetSubscriptionGroupID sets the "subscription_group_id" field.
+func (_u *RedeemCodeUpdate) SetSubscriptionGroupID(v int64) *RedeemCodeUpdate {
+	_u.mutation.ResetSubscriptionGroupID()
+	_u.mutation.SetSubscriptionGroupID(v)
+	return _u
+}
+
+// SetNillableSubscriptionGroupID sets the "subscription_group_id" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableSubscriptionGroupID(v *int64) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetSubscriptionGroupID(*v)
+	}
+	return _u
+}
+
+// AddSubscriptionGroupID adds value to the "subscription_group_id" field.
+func (_u *RedeemCodeUpdate) AddSubscriptionGroupID(v int64) *RedeemCodeUpdate {
+	_u.mutation.AddSubscriptionGroupID(v)
+	return _u
+}
+
+// ClearSubscriptionGroupID clears the value of the "subscription_group_id" field.
+func (_u *RedeemCodeUpdate) ClearSubscriptionGroupID() *RedeemCodeUpdate {
+	_u.mutation.ClearSubscriptionGroupID()
+	return _u
+}
+
+// SetSubscriptionDays sets the "subscription_days" field.
+func (_u *RedeemCodeUpdate) SetSubscriptionDays(v int) *RedeemCodeUpdate {
+	_u.mutation.ResetSubscriptionDays()
+	_u.mutation.SetSubscriptionDays(v)
+	return _u
+}
+
+// SetNillableSubscriptionDays sets the "subscription_days" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableSubscriptionDays(v *int) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetSubscriptionDays(*v)
+	}
+	return _u
+}
+
+// AddSubscriptionDays adds value to the "subscription_days" field.
+func (_u *RedeemCodeUpdate) AddSubscriptionDays(v int) *RedeemCodeUpdate {
+	_u.mutation.AddSubscriptionDays(v)
+	return _u
+}
+
+// ClearSubscriptionDays clears the value of the "subscription_days" field.
+func (_u *RedeemCodeUpdate) ClearSubscriptionDays() *RedeemCodeUpdate {
+	_u.mutation.ClearSubscriptionDays()
+	return _u
+}
+
 // SetStatus sets the "status" field.
 func (_u *RedeemCodeUpdate) SetStatus(v string) *RedeemCodeUpdate {
 	_u.mutation.SetStatus(v)
@@ -274,6 +375,11 @@ func (_u *RedeemCodeUpdate) check() error {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.type": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.BenefitType(); ok {
+		if err := redeemcode.BenefitTypeValidator(v); err != nil {
+			return &ValidationError{Name: "benefit_type", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.benefit_type": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := redeemcode.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.status": %w`, err)}
@@ -305,6 +411,39 @@ func (_u *RedeemCodeUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if value, ok := _u.mutation.AddedValue(); ok {
 		_spec.AddField(redeemcode.FieldValue, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.BenefitType(); ok {
+		_spec.SetField(redeemcode.FieldBenefitType, field.TypeString, value)
+	}
+	if _u.mutation.BenefitTypeCleared() {
+		_spec.ClearField(redeemcode.FieldBenefitType, field.TypeString)
+	}
+	if value, ok := _u.mutation.BalanceAmount(); ok {
+		_spec.SetField(redeemcode.FieldBalanceAmount, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedBalanceAmount(); ok {
+		_spec.AddField(redeemcode.FieldBalanceAmount, field.TypeFloat64, value)
+	}
+	if _u.mutation.BalanceAmountCleared() {
+		_spec.ClearField(redeemcode.FieldBalanceAmount, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.SubscriptionGroupID(); ok {
+		_spec.SetField(redeemcode.FieldSubscriptionGroupID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedSubscriptionGroupID(); ok {
+		_spec.AddField(redeemcode.FieldSubscriptionGroupID, field.TypeInt64, value)
+	}
+	if _u.mutation.SubscriptionGroupIDCleared() {
+		_spec.ClearField(redeemcode.FieldSubscriptionGroupID, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.SubscriptionDays(); ok {
+		_spec.SetField(redeemcode.FieldSubscriptionDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSubscriptionDays(); ok {
+		_spec.AddField(redeemcode.FieldSubscriptionDays, field.TypeInt, value)
+	}
+	if _u.mutation.SubscriptionDaysCleared() {
+		_spec.ClearField(redeemcode.FieldSubscriptionDays, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(redeemcode.FieldStatus, field.TypeString, value)
@@ -451,6 +590,107 @@ func (_u *RedeemCodeUpdateOne) SetNillableValue(v *float64) *RedeemCodeUpdateOne
 // AddValue adds value to the "value" field.
 func (_u *RedeemCodeUpdateOne) AddValue(v float64) *RedeemCodeUpdateOne {
 	_u.mutation.AddValue(v)
+	return _u
+}
+
+// SetBenefitType sets the "benefit_type" field.
+func (_u *RedeemCodeUpdateOne) SetBenefitType(v string) *RedeemCodeUpdateOne {
+	_u.mutation.SetBenefitType(v)
+	return _u
+}
+
+// SetNillableBenefitType sets the "benefit_type" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableBenefitType(v *string) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetBenefitType(*v)
+	}
+	return _u
+}
+
+// ClearBenefitType clears the value of the "benefit_type" field.
+func (_u *RedeemCodeUpdateOne) ClearBenefitType() *RedeemCodeUpdateOne {
+	_u.mutation.ClearBenefitType()
+	return _u
+}
+
+// SetBalanceAmount sets the "balance_amount" field.
+func (_u *RedeemCodeUpdateOne) SetBalanceAmount(v float64) *RedeemCodeUpdateOne {
+	_u.mutation.ResetBalanceAmount()
+	_u.mutation.SetBalanceAmount(v)
+	return _u
+}
+
+// SetNillableBalanceAmount sets the "balance_amount" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableBalanceAmount(v *float64) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetBalanceAmount(*v)
+	}
+	return _u
+}
+
+// AddBalanceAmount adds value to the "balance_amount" field.
+func (_u *RedeemCodeUpdateOne) AddBalanceAmount(v float64) *RedeemCodeUpdateOne {
+	_u.mutation.AddBalanceAmount(v)
+	return _u
+}
+
+// ClearBalanceAmount clears the value of the "balance_amount" field.
+func (_u *RedeemCodeUpdateOne) ClearBalanceAmount() *RedeemCodeUpdateOne {
+	_u.mutation.ClearBalanceAmount()
+	return _u
+}
+
+// SetSubscriptionGroupID sets the "subscription_group_id" field.
+func (_u *RedeemCodeUpdateOne) SetSubscriptionGroupID(v int64) *RedeemCodeUpdateOne {
+	_u.mutation.ResetSubscriptionGroupID()
+	_u.mutation.SetSubscriptionGroupID(v)
+	return _u
+}
+
+// SetNillableSubscriptionGroupID sets the "subscription_group_id" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableSubscriptionGroupID(v *int64) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetSubscriptionGroupID(*v)
+	}
+	return _u
+}
+
+// AddSubscriptionGroupID adds value to the "subscription_group_id" field.
+func (_u *RedeemCodeUpdateOne) AddSubscriptionGroupID(v int64) *RedeemCodeUpdateOne {
+	_u.mutation.AddSubscriptionGroupID(v)
+	return _u
+}
+
+// ClearSubscriptionGroupID clears the value of the "subscription_group_id" field.
+func (_u *RedeemCodeUpdateOne) ClearSubscriptionGroupID() *RedeemCodeUpdateOne {
+	_u.mutation.ClearSubscriptionGroupID()
+	return _u
+}
+
+// SetSubscriptionDays sets the "subscription_days" field.
+func (_u *RedeemCodeUpdateOne) SetSubscriptionDays(v int) *RedeemCodeUpdateOne {
+	_u.mutation.ResetSubscriptionDays()
+	_u.mutation.SetSubscriptionDays(v)
+	return _u
+}
+
+// SetNillableSubscriptionDays sets the "subscription_days" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableSubscriptionDays(v *int) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetSubscriptionDays(*v)
+	}
+	return _u
+}
+
+// AddSubscriptionDays adds value to the "subscription_days" field.
+func (_u *RedeemCodeUpdateOne) AddSubscriptionDays(v int) *RedeemCodeUpdateOne {
+	_u.mutation.AddSubscriptionDays(v)
+	return _u
+}
+
+// ClearSubscriptionDays clears the value of the "subscription_days" field.
+func (_u *RedeemCodeUpdateOne) ClearSubscriptionDays() *RedeemCodeUpdateOne {
+	_u.mutation.ClearSubscriptionDays()
 	return _u
 }
 
@@ -662,6 +902,11 @@ func (_u *RedeemCodeUpdateOne) check() error {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.type": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.BenefitType(); ok {
+		if err := redeemcode.BenefitTypeValidator(v); err != nil {
+			return &ValidationError{Name: "benefit_type", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.benefit_type": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := redeemcode.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.status": %w`, err)}
@@ -710,6 +955,39 @@ func (_u *RedeemCodeUpdateOne) sqlSave(ctx context.Context) (_node *RedeemCode, 
 	}
 	if value, ok := _u.mutation.AddedValue(); ok {
 		_spec.AddField(redeemcode.FieldValue, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.BenefitType(); ok {
+		_spec.SetField(redeemcode.FieldBenefitType, field.TypeString, value)
+	}
+	if _u.mutation.BenefitTypeCleared() {
+		_spec.ClearField(redeemcode.FieldBenefitType, field.TypeString)
+	}
+	if value, ok := _u.mutation.BalanceAmount(); ok {
+		_spec.SetField(redeemcode.FieldBalanceAmount, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedBalanceAmount(); ok {
+		_spec.AddField(redeemcode.FieldBalanceAmount, field.TypeFloat64, value)
+	}
+	if _u.mutation.BalanceAmountCleared() {
+		_spec.ClearField(redeemcode.FieldBalanceAmount, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.SubscriptionGroupID(); ok {
+		_spec.SetField(redeemcode.FieldSubscriptionGroupID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedSubscriptionGroupID(); ok {
+		_spec.AddField(redeemcode.FieldSubscriptionGroupID, field.TypeInt64, value)
+	}
+	if _u.mutation.SubscriptionGroupIDCleared() {
+		_spec.ClearField(redeemcode.FieldSubscriptionGroupID, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.SubscriptionDays(); ok {
+		_spec.SetField(redeemcode.FieldSubscriptionDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSubscriptionDays(); ok {
+		_spec.AddField(redeemcode.FieldSubscriptionDays, field.TypeInt, value)
+	}
+	if _u.mutation.SubscriptionDaysCleared() {
+		_spec.ClearField(redeemcode.FieldSubscriptionDays, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(redeemcode.FieldStatus, field.TypeString, value)

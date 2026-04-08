@@ -58,6 +58,62 @@ func (_c *RedeemCodeCreate) SetNillableValue(v *float64) *RedeemCodeCreate {
 	return _c
 }
 
+// SetBenefitType sets the "benefit_type" field.
+func (_c *RedeemCodeCreate) SetBenefitType(v string) *RedeemCodeCreate {
+	_c.mutation.SetBenefitType(v)
+	return _c
+}
+
+// SetNillableBenefitType sets the "benefit_type" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableBenefitType(v *string) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetBenefitType(*v)
+	}
+	return _c
+}
+
+// SetBalanceAmount sets the "balance_amount" field.
+func (_c *RedeemCodeCreate) SetBalanceAmount(v float64) *RedeemCodeCreate {
+	_c.mutation.SetBalanceAmount(v)
+	return _c
+}
+
+// SetNillableBalanceAmount sets the "balance_amount" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableBalanceAmount(v *float64) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetBalanceAmount(*v)
+	}
+	return _c
+}
+
+// SetSubscriptionGroupID sets the "subscription_group_id" field.
+func (_c *RedeemCodeCreate) SetSubscriptionGroupID(v int64) *RedeemCodeCreate {
+	_c.mutation.SetSubscriptionGroupID(v)
+	return _c
+}
+
+// SetNillableSubscriptionGroupID sets the "subscription_group_id" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableSubscriptionGroupID(v *int64) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetSubscriptionGroupID(*v)
+	}
+	return _c
+}
+
+// SetSubscriptionDays sets the "subscription_days" field.
+func (_c *RedeemCodeCreate) SetSubscriptionDays(v int) *RedeemCodeCreate {
+	_c.mutation.SetSubscriptionDays(v)
+	return _c
+}
+
+// SetNillableSubscriptionDays sets the "subscription_days" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableSubscriptionDays(v *int) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetSubscriptionDays(*v)
+	}
+	return _c
+}
+
 // SetStatus sets the "status" field.
 func (_c *RedeemCodeCreate) SetStatus(v string) *RedeemCodeCreate {
 	_c.mutation.SetStatus(v)
@@ -258,6 +314,11 @@ func (_c *RedeemCodeCreate) check() error {
 	if _, ok := _c.mutation.Value(); !ok {
 		return &ValidationError{Name: "value", err: errors.New(`ent: missing required field "RedeemCode.value"`)}
 	}
+	if v, ok := _c.mutation.BenefitType(); ok {
+		if err := redeemcode.BenefitTypeValidator(v); err != nil {
+			return &ValidationError{Name: "benefit_type", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.benefit_type": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "RedeemCode.status"`)}
 	}
@@ -310,6 +371,22 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Value(); ok {
 		_spec.SetField(redeemcode.FieldValue, field.TypeFloat64, value)
 		_node.Value = value
+	}
+	if value, ok := _c.mutation.BenefitType(); ok {
+		_spec.SetField(redeemcode.FieldBenefitType, field.TypeString, value)
+		_node.BenefitType = &value
+	}
+	if value, ok := _c.mutation.BalanceAmount(); ok {
+		_spec.SetField(redeemcode.FieldBalanceAmount, field.TypeFloat64, value)
+		_node.BalanceAmount = &value
+	}
+	if value, ok := _c.mutation.SubscriptionGroupID(); ok {
+		_spec.SetField(redeemcode.FieldSubscriptionGroupID, field.TypeInt64, value)
+		_node.SubscriptionGroupID = &value
+	}
+	if value, ok := _c.mutation.SubscriptionDays(); ok {
+		_spec.SetField(redeemcode.FieldSubscriptionDays, field.TypeInt, value)
+		_node.SubscriptionDays = &value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(redeemcode.FieldStatus, field.TypeString, value)
@@ -456,6 +533,96 @@ func (u *RedeemCodeUpsert) UpdateValue() *RedeemCodeUpsert {
 // AddValue adds v to the "value" field.
 func (u *RedeemCodeUpsert) AddValue(v float64) *RedeemCodeUpsert {
 	u.Add(redeemcode.FieldValue, v)
+	return u
+}
+
+// SetBenefitType sets the "benefit_type" field.
+func (u *RedeemCodeUpsert) SetBenefitType(v string) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldBenefitType, v)
+	return u
+}
+
+// UpdateBenefitType sets the "benefit_type" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateBenefitType() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldBenefitType)
+	return u
+}
+
+// ClearBenefitType clears the value of the "benefit_type" field.
+func (u *RedeemCodeUpsert) ClearBenefitType() *RedeemCodeUpsert {
+	u.SetNull(redeemcode.FieldBenefitType)
+	return u
+}
+
+// SetBalanceAmount sets the "balance_amount" field.
+func (u *RedeemCodeUpsert) SetBalanceAmount(v float64) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldBalanceAmount, v)
+	return u
+}
+
+// UpdateBalanceAmount sets the "balance_amount" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateBalanceAmount() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldBalanceAmount)
+	return u
+}
+
+// AddBalanceAmount adds v to the "balance_amount" field.
+func (u *RedeemCodeUpsert) AddBalanceAmount(v float64) *RedeemCodeUpsert {
+	u.Add(redeemcode.FieldBalanceAmount, v)
+	return u
+}
+
+// ClearBalanceAmount clears the value of the "balance_amount" field.
+func (u *RedeemCodeUpsert) ClearBalanceAmount() *RedeemCodeUpsert {
+	u.SetNull(redeemcode.FieldBalanceAmount)
+	return u
+}
+
+// SetSubscriptionGroupID sets the "subscription_group_id" field.
+func (u *RedeemCodeUpsert) SetSubscriptionGroupID(v int64) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldSubscriptionGroupID, v)
+	return u
+}
+
+// UpdateSubscriptionGroupID sets the "subscription_group_id" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateSubscriptionGroupID() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldSubscriptionGroupID)
+	return u
+}
+
+// AddSubscriptionGroupID adds v to the "subscription_group_id" field.
+func (u *RedeemCodeUpsert) AddSubscriptionGroupID(v int64) *RedeemCodeUpsert {
+	u.Add(redeemcode.FieldSubscriptionGroupID, v)
+	return u
+}
+
+// ClearSubscriptionGroupID clears the value of the "subscription_group_id" field.
+func (u *RedeemCodeUpsert) ClearSubscriptionGroupID() *RedeemCodeUpsert {
+	u.SetNull(redeemcode.FieldSubscriptionGroupID)
+	return u
+}
+
+// SetSubscriptionDays sets the "subscription_days" field.
+func (u *RedeemCodeUpsert) SetSubscriptionDays(v int) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldSubscriptionDays, v)
+	return u
+}
+
+// UpdateSubscriptionDays sets the "subscription_days" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateSubscriptionDays() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldSubscriptionDays)
+	return u
+}
+
+// AddSubscriptionDays adds v to the "subscription_days" field.
+func (u *RedeemCodeUpsert) AddSubscriptionDays(v int) *RedeemCodeUpsert {
+	u.Add(redeemcode.FieldSubscriptionDays, v)
+	return u
+}
+
+// ClearSubscriptionDays clears the value of the "subscription_days" field.
+func (u *RedeemCodeUpsert) ClearSubscriptionDays() *RedeemCodeUpsert {
+	u.SetNull(redeemcode.FieldSubscriptionDays)
 	return u
 }
 
@@ -652,6 +819,111 @@ func (u *RedeemCodeUpsertOne) AddValue(v float64) *RedeemCodeUpsertOne {
 func (u *RedeemCodeUpsertOne) UpdateValue() *RedeemCodeUpsertOne {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.UpdateValue()
+	})
+}
+
+// SetBenefitType sets the "benefit_type" field.
+func (u *RedeemCodeUpsertOne) SetBenefitType(v string) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetBenefitType(v)
+	})
+}
+
+// UpdateBenefitType sets the "benefit_type" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateBenefitType() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateBenefitType()
+	})
+}
+
+// ClearBenefitType clears the value of the "benefit_type" field.
+func (u *RedeemCodeUpsertOne) ClearBenefitType() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearBenefitType()
+	})
+}
+
+// SetBalanceAmount sets the "balance_amount" field.
+func (u *RedeemCodeUpsertOne) SetBalanceAmount(v float64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetBalanceAmount(v)
+	})
+}
+
+// AddBalanceAmount adds v to the "balance_amount" field.
+func (u *RedeemCodeUpsertOne) AddBalanceAmount(v float64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddBalanceAmount(v)
+	})
+}
+
+// UpdateBalanceAmount sets the "balance_amount" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateBalanceAmount() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateBalanceAmount()
+	})
+}
+
+// ClearBalanceAmount clears the value of the "balance_amount" field.
+func (u *RedeemCodeUpsertOne) ClearBalanceAmount() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearBalanceAmount()
+	})
+}
+
+// SetSubscriptionGroupID sets the "subscription_group_id" field.
+func (u *RedeemCodeUpsertOne) SetSubscriptionGroupID(v int64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetSubscriptionGroupID(v)
+	})
+}
+
+// AddSubscriptionGroupID adds v to the "subscription_group_id" field.
+func (u *RedeemCodeUpsertOne) AddSubscriptionGroupID(v int64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddSubscriptionGroupID(v)
+	})
+}
+
+// UpdateSubscriptionGroupID sets the "subscription_group_id" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateSubscriptionGroupID() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateSubscriptionGroupID()
+	})
+}
+
+// ClearSubscriptionGroupID clears the value of the "subscription_group_id" field.
+func (u *RedeemCodeUpsertOne) ClearSubscriptionGroupID() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearSubscriptionGroupID()
+	})
+}
+
+// SetSubscriptionDays sets the "subscription_days" field.
+func (u *RedeemCodeUpsertOne) SetSubscriptionDays(v int) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetSubscriptionDays(v)
+	})
+}
+
+// AddSubscriptionDays adds v to the "subscription_days" field.
+func (u *RedeemCodeUpsertOne) AddSubscriptionDays(v int) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddSubscriptionDays(v)
+	})
+}
+
+// UpdateSubscriptionDays sets the "subscription_days" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateSubscriptionDays() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateSubscriptionDays()
+	})
+}
+
+// ClearSubscriptionDays clears the value of the "subscription_days" field.
+func (u *RedeemCodeUpsertOne) ClearSubscriptionDays() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearSubscriptionDays()
 	})
 }
 
@@ -1031,6 +1303,111 @@ func (u *RedeemCodeUpsertBulk) AddValue(v float64) *RedeemCodeUpsertBulk {
 func (u *RedeemCodeUpsertBulk) UpdateValue() *RedeemCodeUpsertBulk {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.UpdateValue()
+	})
+}
+
+// SetBenefitType sets the "benefit_type" field.
+func (u *RedeemCodeUpsertBulk) SetBenefitType(v string) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetBenefitType(v)
+	})
+}
+
+// UpdateBenefitType sets the "benefit_type" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateBenefitType() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateBenefitType()
+	})
+}
+
+// ClearBenefitType clears the value of the "benefit_type" field.
+func (u *RedeemCodeUpsertBulk) ClearBenefitType() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearBenefitType()
+	})
+}
+
+// SetBalanceAmount sets the "balance_amount" field.
+func (u *RedeemCodeUpsertBulk) SetBalanceAmount(v float64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetBalanceAmount(v)
+	})
+}
+
+// AddBalanceAmount adds v to the "balance_amount" field.
+func (u *RedeemCodeUpsertBulk) AddBalanceAmount(v float64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddBalanceAmount(v)
+	})
+}
+
+// UpdateBalanceAmount sets the "balance_amount" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateBalanceAmount() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateBalanceAmount()
+	})
+}
+
+// ClearBalanceAmount clears the value of the "balance_amount" field.
+func (u *RedeemCodeUpsertBulk) ClearBalanceAmount() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearBalanceAmount()
+	})
+}
+
+// SetSubscriptionGroupID sets the "subscription_group_id" field.
+func (u *RedeemCodeUpsertBulk) SetSubscriptionGroupID(v int64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetSubscriptionGroupID(v)
+	})
+}
+
+// AddSubscriptionGroupID adds v to the "subscription_group_id" field.
+func (u *RedeemCodeUpsertBulk) AddSubscriptionGroupID(v int64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddSubscriptionGroupID(v)
+	})
+}
+
+// UpdateSubscriptionGroupID sets the "subscription_group_id" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateSubscriptionGroupID() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateSubscriptionGroupID()
+	})
+}
+
+// ClearSubscriptionGroupID clears the value of the "subscription_group_id" field.
+func (u *RedeemCodeUpsertBulk) ClearSubscriptionGroupID() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearSubscriptionGroupID()
+	})
+}
+
+// SetSubscriptionDays sets the "subscription_days" field.
+func (u *RedeemCodeUpsertBulk) SetSubscriptionDays(v int) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetSubscriptionDays(v)
+	})
+}
+
+// AddSubscriptionDays adds v to the "subscription_days" field.
+func (u *RedeemCodeUpsertBulk) AddSubscriptionDays(v int) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddSubscriptionDays(v)
+	})
+}
+
+// UpdateSubscriptionDays sets the "subscription_days" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateSubscriptionDays() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateSubscriptionDays()
+	})
+}
+
+// ClearSubscriptionDays clears the value of the "subscription_days" field.
+func (u *RedeemCodeUpsertBulk) ClearSubscriptionDays() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearSubscriptionDays()
 	})
 }
 

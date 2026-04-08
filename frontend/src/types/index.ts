@@ -971,6 +971,7 @@ export interface AdminDataImportResult {
 // ==================== Usage & Redeem Types ====================
 
 export type RedeemCodeType = 'balance' | 'concurrency' | 'subscription' | 'invitation'
+export type InviteBenefitType = 'balance' | 'subscription'
 export type UsageRequestType = 'unknown' | 'sync' | 'stream' | 'ws_v2'
 
 export interface UsageLog {
@@ -1090,6 +1091,10 @@ export interface RedeemCode {
   updated_at?: string
   group_id?: number | null // 订阅类型专用
   validity_days?: number // 订阅类型专用
+  benefit_type?: InviteBenefitType
+  balance_amount?: number | null
+  subscription_group_id?: number | null
+  subscription_days?: number | null
   user?: User
   group?: Group // 关联的分组
 }
@@ -1100,6 +1105,10 @@ export interface GenerateRedeemCodesRequest {
   value: number
   group_id?: number | null // 订阅类型专用
   validity_days?: number // 订阅类型专用
+  benefit_type?: InviteBenefitType
+  balance_amount?: number | null
+  subscription_group_id?: number | null
+  subscription_days?: number | null
 }
 
 export interface RedeemCodeRequest {

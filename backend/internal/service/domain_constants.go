@@ -43,6 +43,12 @@ const (
 	RedeemTypeInvitation   = domain.RedeemTypeInvitation
 )
 
+// Invite benefit type constants (for invitation redeem codes only)
+const (
+	InviteBenefitTypeBalance      = domain.InviteBenefitTypeBalance
+	InviteBenefitTypeSubscription = domain.InviteBenefitTypeSubscription
+)
+
 // PromoCode status constants
 const (
 	PromoCodeStatusActive   = domain.PromoCodeStatusActive

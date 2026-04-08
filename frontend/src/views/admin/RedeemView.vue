@@ -98,6 +98,18 @@
                   >({{ row.group.name }})</span
                 >
               </template>
+              <template v-else-if="row.type === 'invitation'">
+                <template v-if="row.benefit_type === 'balance'">
+                  ${{ (row.balance_amount ?? row.value).toFixed(2) }}
+                </template>
+                <template v-else-if="row.benefit_type === 'subscription'">
+                  {{ row.subscription_days || row.validity_days || 30 }} {{ t('admin.redeem.days') }}
+                  <span v-if="row.group" class="ml-1 text-xs text-gray-500 dark:text-gray-400"
+                    >({{ row.group.name }})</span
+                  >
+                </template>
+                <template v-else>{{ value }}</template>
+              </template>
               <template v-else>{{ value }}</template>
             </span>
           </template>
@@ -228,12 +240,73 @@
                 class="input"
               />
             </div>
-            <!-- 邀请码类型：显示提示信息 -->
-            <div v-if="generateForm.type === 'invitation'" class="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
-              <p class="text-sm text-blue-700 dark:text-blue-300">
-                {{ t('admin.redeem.invitationHint') }}
-              </p>
-            </div>
+            <!-- 邀请码类型：显示提示与权益配置 -->
+            <template v-if="generateForm.type === 'invitation'">
+              <div class="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+                <p class="text-sm text-blue-700 dark:text-blue-300">
+                  {{ t('admin.redeem.invitationHint') }}
+                </p>
+              </div>
+              <div>
+                <label class="input-label">{{ t('admin.redeem.inviteBenefitType') }}</label>
+                <Select v-model="generateForm.invite_benefit_type" :options="inviteBenefitOptions" />
+              </div>
+              <div v-if="generateForm.invite_benefit_type === 'balance'">
+                <label class="input-label">{{ t('admin.redeem.amount') }}</label>
+                <input
+                  v-model.number="generateForm.balance_amount"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  class="input"
+                />
+              </div>
+              <template v-else>
+                <div>
+                  <label class="input-label">{{ t('admin.redeem.selectGroup') }}</label>
+                  <Select
+                    v-model="generateForm.subscription_group_id"
+                    :options="subscriptionGroupOptions"
+                    :placeholder="t('admin.redeem.selectGroupPlaceholder')"
+                  >
+                    <template #selected="{ option }">
+                      <GroupBadge
+                        v-if="option"
+                        :name="(option as unknown as GroupOption).label"
+                        :platform="(option as unknown as GroupOption).platform"
+                        :subscription-type="(option as unknown as GroupOption).subscriptionType"
+                        :rate-multiplier="(option as unknown as GroupOption).rate"
+                      />
+                      <span v-else class="text-gray-400">{{
+                        t('admin.redeem.selectGroupPlaceholder')
+                      }}</span>
+                    </template>
+                    <template #option="{ option, selected }">
+                      <GroupOptionItem
+                        :name="(option as unknown as GroupOption).label"
+                        :platform="(option as unknown as GroupOption).platform"
+                        :subscription-type="(option as unknown as GroupOption).subscriptionType"
+                        :rate-multiplier="(option as unknown as GroupOption).rate"
+                        :description="(option as unknown as GroupOption).description"
+                        :selected="selected"
+                      />
+                    </template>
+                  </Select>
+                </div>
+                <div>
+                  <label class="input-label">{{ t('admin.redeem.validityDays') }}</label>
+                  <input
+                    v-model.number="generateForm.subscription_days"
+                    type="number"
+                    min="1"
+                    max="365"
+                    required
+                    class="input"
+                  />
+                </div>
+              </template>
+            </template>
             <!-- 订阅类型：显示分组选择和有效天数 -->
             <template v-if="generateForm.type === 'subscription'">
               <div>
@@ -398,7 +471,14 @@ import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { adminAPI } from '@/api/admin'
 import { formatDateTime } from '@/utils/format'
-import type { RedeemCode, RedeemCodeType, Group, GroupPlatform, SubscriptionType } from '@/types'
+import type {
+  RedeemCode,
+  RedeemCodeType,
+  InviteBenefitType,
+  Group,
+  GroupPlatform,
+  SubscriptionType
+} from '@/types'
 import type { Column } from '@/components/common/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -516,6 +596,11 @@ const filterTypeOptions = computed(() => [
   { value: 'invitation', label: t('admin.redeem.invitation') }
 ])
 
+const inviteBenefitOptions = computed(() => [
+  { value: 'balance', label: t('admin.redeem.benefitBalance') },
+  { value: 'subscription', label: t('admin.redeem.benefitSubscription') }
+])
+
 const filterStatusOptions = computed(() => [
   { value: '', label: t('admin.redeem.allStatus') },
   { value: 'unused', label: t('admin.redeem.unused') },
@@ -550,7 +635,11 @@ const generateForm = reactive({
   value: 10,
   count: 1,
   group_id: null as number | null,
-  validity_days: 30
+  validity_days: 30,
+  invite_benefit_type: 'balance' as InviteBenefitType,
+  balance_amount: 10,
+  subscription_group_id: null as number | null,
+  subscription_days: 30
 })
 
 // 监听类型变化，邀请码类型时自动设置 value 为 0
@@ -559,6 +648,7 @@ watch(
   (newType) => {
     if (newType === 'invitation') {
       generateForm.value = 0
+      generateForm.group_id = null
     } else if (generateForm.value === 0) {
       generateForm.value = 10
     }
@@ -636,6 +726,24 @@ const handleGenerateCodes = async () => {
     return
   }
 
+  if (generateForm.type === 'invitation') {
+    if (generateForm.invite_benefit_type === 'balance') {
+      if (generateForm.balance_amount <= 0) {
+        appStore.showError(t('admin.redeem.balanceAmountRequired'))
+        return
+      }
+    } else {
+      if (!generateForm.subscription_group_id) {
+        appStore.showError(t('admin.redeem.groupRequired'))
+        return
+      }
+      if (generateForm.subscription_days <= 0) {
+        appStore.showError(t('admin.redeem.subscriptionDaysRequired'))
+        return
+      }
+    }
+  }
+
   generating.value = true
   try {
     const result = await adminAPI.redeem.generate(
@@ -643,7 +751,17 @@ const handleGenerateCodes = async () => {
       generateForm.type,
       generateForm.value,
       generateForm.type === 'subscription' ? generateForm.group_id : undefined,
-      generateForm.type === 'subscription' ? generateForm.validity_days : undefined
+      generateForm.type === 'subscription' ? generateForm.validity_days : undefined,
+      generateForm.type === 'invitation' ? generateForm.invite_benefit_type : undefined,
+      generateForm.type === 'invitation' && generateForm.invite_benefit_type === 'balance'
+        ? generateForm.balance_amount
+        : undefined,
+      generateForm.type === 'invitation' && generateForm.invite_benefit_type === 'subscription'
+        ? generateForm.subscription_group_id
+        : undefined,
+      generateForm.type === 'invitation' && generateForm.invite_benefit_type === 'subscription'
+        ? generateForm.subscription_days
+        : undefined
     )
     showGenerateDialog.value = false
     generatedCodes.value = result
@@ -651,6 +769,10 @@ const handleGenerateCodes = async () => {
     // 重置表单
     generateForm.group_id = null
     generateForm.validity_days = 30
+    generateForm.invite_benefit_type = 'balance'
+    generateForm.balance_amount = 10
+    generateForm.subscription_group_id = null
+    generateForm.subscription_days = 30
     loadCodes()
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.redeem.failedToGenerate'))

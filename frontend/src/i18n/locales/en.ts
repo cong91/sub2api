@@ -3105,7 +3105,11 @@ export default {
       concurrency: 'Concurrency',
       subscription: 'Subscription',
       invitation: 'Invitation',
-      invitationHint: 'Invitation codes are used to restrict user registration. They are automatically marked as used after use.',
+      invitationHint:
+        'Invitation codes are used to restrict user registration. Users created by invitation code always get concurrency = 1. Select exactly one invite benefit: balance or subscription.',
+      inviteBenefitType: 'Invite Benefit Type',
+      benefitBalance: 'Balance Benefit',
+      benefitSubscription: 'Subscription Benefit',
       unused: 'Unused',
       used: 'Used',
       columns: {
@@ -3161,6 +3165,8 @@ export default {
       selectGroupPlaceholder: 'Choose a subscription group',
       validityDays: 'Validity Days',
       groupRequired: 'Please select a subscription group',
+      balanceAmountRequired: 'Please enter a balance amount greater than 0',
+      subscriptionDaysRequired: 'Please enter subscription days greater than 0',
       days: ' days',
       status: {
         unused: 'Unused',

@@ -311,6 +311,11 @@ type RedeemCode struct {
 	GroupID      *int64 `json:"group_id"`
 	ValidityDays int    `json:"validity_days"`
 
+	BenefitType         *string  `json:"benefit_type,omitempty"`
+	BalanceAmount       *float64 `json:"balance_amount,omitempty"`
+	SubscriptionGroupID *int64   `json:"subscription_group_id,omitempty"`
+	SubscriptionDays    *int     `json:"subscription_days,omitempty"`
+
 	// Notes is only populated for admin_balance/admin_concurrency types
 	// so users can see why they were charged or credited
 	Notes *string `json:"notes,omitempty"`

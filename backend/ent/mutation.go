@@ -15336,27 +15336,34 @@ func (m *ProxyMutation) ResetEdge(name string) error {
 // RedeemCodeMutation represents an operation that mutates the RedeemCode nodes in the graph.
 type RedeemCodeMutation struct {
 	config
-	op               Op
-	typ              string
-	id               *int64
-	code             *string
-	_type            *string
-	value            *float64
-	addvalue         *float64
-	status           *string
-	used_at          *time.Time
-	notes            *string
-	created_at       *time.Time
-	validity_days    *int
-	addvalidity_days *int
-	clearedFields    map[string]struct{}
-	user             *int64
-	cleareduser      bool
-	group            *int64
-	clearedgroup     bool
-	done             bool
-	oldValue         func(context.Context) (*RedeemCode, error)
-	predicates       []predicate.RedeemCode
+	op                       Op
+	typ                      string
+	id                       *int64
+	code                     *string
+	_type                    *string
+	value                    *float64
+	addvalue                 *float64
+	benefit_type             *string
+	balance_amount           *float64
+	addbalance_amount        *float64
+	subscription_group_id    *int64
+	addsubscription_group_id *int64
+	subscription_days        *int
+	addsubscription_days     *int
+	status                   *string
+	used_at                  *time.Time
+	notes                    *string
+	created_at               *time.Time
+	validity_days            *int
+	addvalidity_days         *int
+	clearedFields            map[string]struct{}
+	user                     *int64
+	cleareduser              bool
+	group                    *int64
+	clearedgroup             bool
+	done                     bool
+	oldValue                 func(context.Context) (*RedeemCode, error)
+	predicates               []predicate.RedeemCode
 }
 
 var _ ent.Mutation = (*RedeemCodeMutation)(nil)
@@ -15583,6 +15590,265 @@ func (m *RedeemCodeMutation) AddedValue() (r float64, exists bool) {
 func (m *RedeemCodeMutation) ResetValue() {
 	m.value = nil
 	m.addvalue = nil
+}
+
+// SetBenefitType sets the "benefit_type" field.
+func (m *RedeemCodeMutation) SetBenefitType(s string) {
+	m.benefit_type = &s
+}
+
+// BenefitType returns the value of the "benefit_type" field in the mutation.
+func (m *RedeemCodeMutation) BenefitType() (r string, exists bool) {
+	v := m.benefit_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBenefitType returns the old "benefit_type" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldBenefitType(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBenefitType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBenefitType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBenefitType: %w", err)
+	}
+	return oldValue.BenefitType, nil
+}
+
+// ClearBenefitType clears the value of the "benefit_type" field.
+func (m *RedeemCodeMutation) ClearBenefitType() {
+	m.benefit_type = nil
+	m.clearedFields[redeemcode.FieldBenefitType] = struct{}{}
+}
+
+// BenefitTypeCleared returns if the "benefit_type" field was cleared in this mutation.
+func (m *RedeemCodeMutation) BenefitTypeCleared() bool {
+	_, ok := m.clearedFields[redeemcode.FieldBenefitType]
+	return ok
+}
+
+// ResetBenefitType resets all changes to the "benefit_type" field.
+func (m *RedeemCodeMutation) ResetBenefitType() {
+	m.benefit_type = nil
+	delete(m.clearedFields, redeemcode.FieldBenefitType)
+}
+
+// SetBalanceAmount sets the "balance_amount" field.
+func (m *RedeemCodeMutation) SetBalanceAmount(f float64) {
+	m.balance_amount = &f
+	m.addbalance_amount = nil
+}
+
+// BalanceAmount returns the value of the "balance_amount" field in the mutation.
+func (m *RedeemCodeMutation) BalanceAmount() (r float64, exists bool) {
+	v := m.balance_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBalanceAmount returns the old "balance_amount" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldBalanceAmount(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBalanceAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBalanceAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBalanceAmount: %w", err)
+	}
+	return oldValue.BalanceAmount, nil
+}
+
+// AddBalanceAmount adds f to the "balance_amount" field.
+func (m *RedeemCodeMutation) AddBalanceAmount(f float64) {
+	if m.addbalance_amount != nil {
+		*m.addbalance_amount += f
+	} else {
+		m.addbalance_amount = &f
+	}
+}
+
+// AddedBalanceAmount returns the value that was added to the "balance_amount" field in this mutation.
+func (m *RedeemCodeMutation) AddedBalanceAmount() (r float64, exists bool) {
+	v := m.addbalance_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearBalanceAmount clears the value of the "balance_amount" field.
+func (m *RedeemCodeMutation) ClearBalanceAmount() {
+	m.balance_amount = nil
+	m.addbalance_amount = nil
+	m.clearedFields[redeemcode.FieldBalanceAmount] = struct{}{}
+}
+
+// BalanceAmountCleared returns if the "balance_amount" field was cleared in this mutation.
+func (m *RedeemCodeMutation) BalanceAmountCleared() bool {
+	_, ok := m.clearedFields[redeemcode.FieldBalanceAmount]
+	return ok
+}
+
+// ResetBalanceAmount resets all changes to the "balance_amount" field.
+func (m *RedeemCodeMutation) ResetBalanceAmount() {
+	m.balance_amount = nil
+	m.addbalance_amount = nil
+	delete(m.clearedFields, redeemcode.FieldBalanceAmount)
+}
+
+// SetSubscriptionGroupID sets the "subscription_group_id" field.
+func (m *RedeemCodeMutation) SetSubscriptionGroupID(i int64) {
+	m.subscription_group_id = &i
+	m.addsubscription_group_id = nil
+}
+
+// SubscriptionGroupID returns the value of the "subscription_group_id" field in the mutation.
+func (m *RedeemCodeMutation) SubscriptionGroupID() (r int64, exists bool) {
+	v := m.subscription_group_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubscriptionGroupID returns the old "subscription_group_id" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldSubscriptionGroupID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubscriptionGroupID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubscriptionGroupID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubscriptionGroupID: %w", err)
+	}
+	return oldValue.SubscriptionGroupID, nil
+}
+
+// AddSubscriptionGroupID adds i to the "subscription_group_id" field.
+func (m *RedeemCodeMutation) AddSubscriptionGroupID(i int64) {
+	if m.addsubscription_group_id != nil {
+		*m.addsubscription_group_id += i
+	} else {
+		m.addsubscription_group_id = &i
+	}
+}
+
+// AddedSubscriptionGroupID returns the value that was added to the "subscription_group_id" field in this mutation.
+func (m *RedeemCodeMutation) AddedSubscriptionGroupID() (r int64, exists bool) {
+	v := m.addsubscription_group_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSubscriptionGroupID clears the value of the "subscription_group_id" field.
+func (m *RedeemCodeMutation) ClearSubscriptionGroupID() {
+	m.subscription_group_id = nil
+	m.addsubscription_group_id = nil
+	m.clearedFields[redeemcode.FieldSubscriptionGroupID] = struct{}{}
+}
+
+// SubscriptionGroupIDCleared returns if the "subscription_group_id" field was cleared in this mutation.
+func (m *RedeemCodeMutation) SubscriptionGroupIDCleared() bool {
+	_, ok := m.clearedFields[redeemcode.FieldSubscriptionGroupID]
+	return ok
+}
+
+// ResetSubscriptionGroupID resets all changes to the "subscription_group_id" field.
+func (m *RedeemCodeMutation) ResetSubscriptionGroupID() {
+	m.subscription_group_id = nil
+	m.addsubscription_group_id = nil
+	delete(m.clearedFields, redeemcode.FieldSubscriptionGroupID)
+}
+
+// SetSubscriptionDays sets the "subscription_days" field.
+func (m *RedeemCodeMutation) SetSubscriptionDays(i int) {
+	m.subscription_days = &i
+	m.addsubscription_days = nil
+}
+
+// SubscriptionDays returns the value of the "subscription_days" field in the mutation.
+func (m *RedeemCodeMutation) SubscriptionDays() (r int, exists bool) {
+	v := m.subscription_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubscriptionDays returns the old "subscription_days" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldSubscriptionDays(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubscriptionDays is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubscriptionDays requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubscriptionDays: %w", err)
+	}
+	return oldValue.SubscriptionDays, nil
+}
+
+// AddSubscriptionDays adds i to the "subscription_days" field.
+func (m *RedeemCodeMutation) AddSubscriptionDays(i int) {
+	if m.addsubscription_days != nil {
+		*m.addsubscription_days += i
+	} else {
+		m.addsubscription_days = &i
+	}
+}
+
+// AddedSubscriptionDays returns the value that was added to the "subscription_days" field in this mutation.
+func (m *RedeemCodeMutation) AddedSubscriptionDays() (r int, exists bool) {
+	v := m.addsubscription_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSubscriptionDays clears the value of the "subscription_days" field.
+func (m *RedeemCodeMutation) ClearSubscriptionDays() {
+	m.subscription_days = nil
+	m.addsubscription_days = nil
+	m.clearedFields[redeemcode.FieldSubscriptionDays] = struct{}{}
+}
+
+// SubscriptionDaysCleared returns if the "subscription_days" field was cleared in this mutation.
+func (m *RedeemCodeMutation) SubscriptionDaysCleared() bool {
+	_, ok := m.clearedFields[redeemcode.FieldSubscriptionDays]
+	return ok
+}
+
+// ResetSubscriptionDays resets all changes to the "subscription_days" field.
+func (m *RedeemCodeMutation) ResetSubscriptionDays() {
+	m.subscription_days = nil
+	m.addsubscription_days = nil
+	delete(m.clearedFields, redeemcode.FieldSubscriptionDays)
 }
 
 // SetStatus sets the "status" field.
@@ -16010,7 +16276,7 @@ func (m *RedeemCodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RedeemCodeMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 14)
 	if m.code != nil {
 		fields = append(fields, redeemcode.FieldCode)
 	}
@@ -16019,6 +16285,18 @@ func (m *RedeemCodeMutation) Fields() []string {
 	}
 	if m.value != nil {
 		fields = append(fields, redeemcode.FieldValue)
+	}
+	if m.benefit_type != nil {
+		fields = append(fields, redeemcode.FieldBenefitType)
+	}
+	if m.balance_amount != nil {
+		fields = append(fields, redeemcode.FieldBalanceAmount)
+	}
+	if m.subscription_group_id != nil {
+		fields = append(fields, redeemcode.FieldSubscriptionGroupID)
+	}
+	if m.subscription_days != nil {
+		fields = append(fields, redeemcode.FieldSubscriptionDays)
 	}
 	if m.status != nil {
 		fields = append(fields, redeemcode.FieldStatus)
@@ -16055,6 +16333,14 @@ func (m *RedeemCodeMutation) Field(name string) (ent.Value, bool) {
 		return m.GetType()
 	case redeemcode.FieldValue:
 		return m.Value()
+	case redeemcode.FieldBenefitType:
+		return m.BenefitType()
+	case redeemcode.FieldBalanceAmount:
+		return m.BalanceAmount()
+	case redeemcode.FieldSubscriptionGroupID:
+		return m.SubscriptionGroupID()
+	case redeemcode.FieldSubscriptionDays:
+		return m.SubscriptionDays()
 	case redeemcode.FieldStatus:
 		return m.Status()
 	case redeemcode.FieldUsedBy:
@@ -16084,6 +16370,14 @@ func (m *RedeemCodeMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldType(ctx)
 	case redeemcode.FieldValue:
 		return m.OldValue(ctx)
+	case redeemcode.FieldBenefitType:
+		return m.OldBenefitType(ctx)
+	case redeemcode.FieldBalanceAmount:
+		return m.OldBalanceAmount(ctx)
+	case redeemcode.FieldSubscriptionGroupID:
+		return m.OldSubscriptionGroupID(ctx)
+	case redeemcode.FieldSubscriptionDays:
+		return m.OldSubscriptionDays(ctx)
 	case redeemcode.FieldStatus:
 		return m.OldStatus(ctx)
 	case redeemcode.FieldUsedBy:
@@ -16127,6 +16421,34 @@ func (m *RedeemCodeMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetValue(v)
+		return nil
+	case redeemcode.FieldBenefitType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBenefitType(v)
+		return nil
+	case redeemcode.FieldBalanceAmount:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBalanceAmount(v)
+		return nil
+	case redeemcode.FieldSubscriptionGroupID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubscriptionGroupID(v)
+		return nil
+	case redeemcode.FieldSubscriptionDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubscriptionDays(v)
 		return nil
 	case redeemcode.FieldStatus:
 		v, ok := value.(string)
@@ -16188,6 +16510,15 @@ func (m *RedeemCodeMutation) AddedFields() []string {
 	if m.addvalue != nil {
 		fields = append(fields, redeemcode.FieldValue)
 	}
+	if m.addbalance_amount != nil {
+		fields = append(fields, redeemcode.FieldBalanceAmount)
+	}
+	if m.addsubscription_group_id != nil {
+		fields = append(fields, redeemcode.FieldSubscriptionGroupID)
+	}
+	if m.addsubscription_days != nil {
+		fields = append(fields, redeemcode.FieldSubscriptionDays)
+	}
 	if m.addvalidity_days != nil {
 		fields = append(fields, redeemcode.FieldValidityDays)
 	}
@@ -16201,6 +16532,12 @@ func (m *RedeemCodeMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case redeemcode.FieldValue:
 		return m.AddedValue()
+	case redeemcode.FieldBalanceAmount:
+		return m.AddedBalanceAmount()
+	case redeemcode.FieldSubscriptionGroupID:
+		return m.AddedSubscriptionGroupID()
+	case redeemcode.FieldSubscriptionDays:
+		return m.AddedSubscriptionDays()
 	case redeemcode.FieldValidityDays:
 		return m.AddedValidityDays()
 	}
@@ -16219,6 +16556,27 @@ func (m *RedeemCodeMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddValue(v)
 		return nil
+	case redeemcode.FieldBalanceAmount:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBalanceAmount(v)
+		return nil
+	case redeemcode.FieldSubscriptionGroupID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSubscriptionGroupID(v)
+		return nil
+	case redeemcode.FieldSubscriptionDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSubscriptionDays(v)
+		return nil
 	case redeemcode.FieldValidityDays:
 		v, ok := value.(int)
 		if !ok {
@@ -16234,6 +16592,18 @@ func (m *RedeemCodeMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *RedeemCodeMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(redeemcode.FieldBenefitType) {
+		fields = append(fields, redeemcode.FieldBenefitType)
+	}
+	if m.FieldCleared(redeemcode.FieldBalanceAmount) {
+		fields = append(fields, redeemcode.FieldBalanceAmount)
+	}
+	if m.FieldCleared(redeemcode.FieldSubscriptionGroupID) {
+		fields = append(fields, redeemcode.FieldSubscriptionGroupID)
+	}
+	if m.FieldCleared(redeemcode.FieldSubscriptionDays) {
+		fields = append(fields, redeemcode.FieldSubscriptionDays)
+	}
 	if m.FieldCleared(redeemcode.FieldUsedBy) {
 		fields = append(fields, redeemcode.FieldUsedBy)
 	}
@@ -16260,6 +16630,18 @@ func (m *RedeemCodeMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *RedeemCodeMutation) ClearField(name string) error {
 	switch name {
+	case redeemcode.FieldBenefitType:
+		m.ClearBenefitType()
+		return nil
+	case redeemcode.FieldBalanceAmount:
+		m.ClearBalanceAmount()
+		return nil
+	case redeemcode.FieldSubscriptionGroupID:
+		m.ClearSubscriptionGroupID()
+		return nil
+	case redeemcode.FieldSubscriptionDays:
+		m.ClearSubscriptionDays()
+		return nil
 	case redeemcode.FieldUsedBy:
 		m.ClearUsedBy()
 		return nil
@@ -16288,6 +16670,18 @@ func (m *RedeemCodeMutation) ResetField(name string) error {
 		return nil
 	case redeemcode.FieldValue:
 		m.ResetValue()
+		return nil
+	case redeemcode.FieldBenefitType:
+		m.ResetBenefitType()
+		return nil
+	case redeemcode.FieldBalanceAmount:
+		m.ResetBalanceAmount()
+		return nil
+	case redeemcode.FieldSubscriptionGroupID:
+		m.ResetSubscriptionGroupID()
+		return nil
+	case redeemcode.FieldSubscriptionDays:
+		m.ResetSubscriptionDays()
 		return nil
 	case redeemcode.FieldStatus:
 		m.ResetStatus()

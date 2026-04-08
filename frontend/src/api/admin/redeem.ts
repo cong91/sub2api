@@ -7,6 +7,7 @@ import { apiClient } from '../client'
 import type {
   RedeemCode,
   GenerateRedeemCodesRequest,
+  InviteBenefitType,
   RedeemCodeType,
   PaginatedResponse
 } from '@/types'
@@ -65,7 +66,11 @@ export async function generate(
   type: RedeemCodeType,
   value: number,
   groupId?: number | null,
-  validityDays?: number
+  validityDays?: number,
+  inviteBenefitType?: InviteBenefitType,
+  balanceAmount?: number,
+  subscriptionGroupId?: number | null,
+  subscriptionDays?: number
 ): Promise<RedeemCode[]> {
   const payload: GenerateRedeemCodesRequest = {
     count,
@@ -78,6 +83,17 @@ export async function generate(
     payload.group_id = groupId
     if (validityDays && validityDays > 0) {
       payload.validity_days = validityDays
+    }
+  }
+
+  if (type === 'invitation') {
+    payload.benefit_type = inviteBenefitType
+    if (inviteBenefitType === 'balance') {
+      payload.balance_amount = balanceAmount
+    }
+    if (inviteBenefitType === 'subscription') {
+      payload.subscription_group_id = subscriptionGroupId
+      payload.subscription_days = subscriptionDays
     }
   }
 

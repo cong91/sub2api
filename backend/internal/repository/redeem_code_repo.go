@@ -24,6 +24,10 @@ func (r *redeemCodeRepository) Create(ctx context.Context, code *service.RedeemC
 		SetCode(code.Code).
 		SetType(code.Type).
 		SetValue(code.Value).
+		SetNillableBenefitType(code.BenefitType).
+		SetNillableBalanceAmount(code.BalanceAmount).
+		SetNillableSubscriptionGroupID(code.SubscriptionGroupID).
+		SetNillableSubscriptionDays(code.SubscriptionDays).
 		SetStatus(code.Status).
 		SetNotes(code.Notes).
 		SetValidityDays(code.ValidityDays).
@@ -50,6 +54,10 @@ func (r *redeemCodeRepository) CreateBatch(ctx context.Context, codes []service.
 			SetCode(c.Code).
 			SetType(c.Type).
 			SetValue(c.Value).
+			SetNillableBenefitType(c.BenefitType).
+			SetNillableBalanceAmount(c.BalanceAmount).
+			SetNillableSubscriptionGroupID(c.SubscriptionGroupID).
+			SetNillableSubscriptionDays(c.SubscriptionDays).
 			SetStatus(c.Status).
 			SetNotes(c.Notes).
 			SetValidityDays(c.ValidityDays).
@@ -144,6 +152,27 @@ func (r *redeemCodeRepository) Update(ctx context.Context, code *service.RedeemC
 		SetStatus(code.Status).
 		SetNotes(code.Notes).
 		SetValidityDays(code.ValidityDays)
+
+	if code.BenefitType != nil {
+		up.SetBenefitType(*code.BenefitType)
+	} else {
+		up.ClearBenefitType()
+	}
+	if code.BalanceAmount != nil {
+		up.SetBalanceAmount(*code.BalanceAmount)
+	} else {
+		up.ClearBalanceAmount()
+	}
+	if code.SubscriptionGroupID != nil {
+		up.SetSubscriptionGroupID(*code.SubscriptionGroupID)
+	} else {
+		up.ClearSubscriptionGroupID()
+	}
+	if code.SubscriptionDays != nil {
+		up.SetSubscriptionDays(*code.SubscriptionDays)
+	} else {
+		up.ClearSubscriptionDays()
+	}
 
 	if code.UsedBy != nil {
 		up.SetUsedBy(*code.UsedBy)
@@ -264,17 +293,21 @@ func redeemCodeEntityToService(m *dbent.RedeemCode) *service.RedeemCode {
 		return nil
 	}
 	out := &service.RedeemCode{
-		ID:           m.ID,
-		Code:         m.Code,
-		Type:         m.Type,
-		Value:        m.Value,
-		Status:       m.Status,
-		UsedBy:       m.UsedBy,
-		UsedAt:       m.UsedAt,
-		Notes:        derefString(m.Notes),
-		CreatedAt:    m.CreatedAt,
-		GroupID:      m.GroupID,
-		ValidityDays: m.ValidityDays,
+		ID:                  m.ID,
+		Code:                m.Code,
+		Type:                m.Type,
+		Value:               m.Value,
+		BenefitType:         m.BenefitType,
+		BalanceAmount:       m.BalanceAmount,
+		SubscriptionGroupID: m.SubscriptionGroupID,
+		SubscriptionDays:    m.SubscriptionDays,
+		Status:              m.Status,
+		UsedBy:              m.UsedBy,
+		UsedAt:              m.UsedAt,
+		Notes:               derefString(m.Notes),
+		CreatedAt:           m.CreatedAt,
+		GroupID:             m.GroupID,
+		ValidityDays:        m.ValidityDays,
 	}
 	if m.Edges.User != nil {
 		out.User = userEntityToService(m.Edges.User)

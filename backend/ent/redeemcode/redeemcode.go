@@ -20,6 +20,14 @@ const (
 	FieldType = "type"
 	// FieldValue holds the string denoting the value field in the database.
 	FieldValue = "value"
+	// FieldBenefitType holds the string denoting the benefit_type field in the database.
+	FieldBenefitType = "benefit_type"
+	// FieldBalanceAmount holds the string denoting the balance_amount field in the database.
+	FieldBalanceAmount = "balance_amount"
+	// FieldSubscriptionGroupID holds the string denoting the subscription_group_id field in the database.
+	FieldSubscriptionGroupID = "subscription_group_id"
+	// FieldSubscriptionDays holds the string denoting the subscription_days field in the database.
+	FieldSubscriptionDays = "subscription_days"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldUsedBy holds the string denoting the used_by field in the database.
@@ -62,6 +70,10 @@ var Columns = []string{
 	FieldCode,
 	FieldType,
 	FieldValue,
+	FieldBenefitType,
+	FieldBalanceAmount,
+	FieldSubscriptionGroupID,
+	FieldSubscriptionDays,
 	FieldStatus,
 	FieldUsedBy,
 	FieldUsedAt,
@@ -90,6 +102,8 @@ var (
 	TypeValidator func(string) error
 	// DefaultValue holds the default value on creation for the "value" field.
 	DefaultValue float64
+	// BenefitTypeValidator is a validator for the "benefit_type" field. It is called by the builders before save.
+	BenefitTypeValidator func(string) error
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -121,6 +135,26 @@ func ByType(opts ...sql.OrderTermOption) OrderOption {
 // ByValue orders the results by the value field.
 func ByValue(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldValue, opts...).ToFunc()
+}
+
+// ByBenefitType orders the results by the benefit_type field.
+func ByBenefitType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBenefitType, opts...).ToFunc()
+}
+
+// ByBalanceAmount orders the results by the balance_amount field.
+func ByBalanceAmount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBalanceAmount, opts...).ToFunc()
+}
+
+// BySubscriptionGroupID orders the results by the subscription_group_id field.
+func BySubscriptionGroupID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSubscriptionGroupID, opts...).ToFunc()
+}
+
+// BySubscriptionDays orders the results by the subscription_days field.
+func BySubscriptionDays(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSubscriptionDays, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

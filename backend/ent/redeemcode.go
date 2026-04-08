@@ -25,6 +25,14 @@ type RedeemCode struct {
 	Type string `json:"type,omitempty"`
 	// Value holds the value of the "value" field.
 	Value float64 `json:"value,omitempty"`
+	// BenefitType holds the value of the "benefit_type" field.
+	BenefitType *string `json:"benefit_type,omitempty"`
+	// BalanceAmount holds the value of the "balance_amount" field.
+	BalanceAmount *float64 `json:"balance_amount,omitempty"`
+	// SubscriptionGroupID holds the value of the "subscription_group_id" field.
+	SubscriptionGroupID *int64 `json:"subscription_group_id,omitempty"`
+	// SubscriptionDays holds the value of the "subscription_days" field.
+	SubscriptionDays *int `json:"subscription_days,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// UsedBy holds the value of the "used_by" field.
@@ -83,11 +91,11 @@ func (*RedeemCode) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case redeemcode.FieldValue:
+		case redeemcode.FieldValue, redeemcode.FieldBalanceAmount:
 			values[i] = new(sql.NullFloat64)
-		case redeemcode.FieldID, redeemcode.FieldUsedBy, redeemcode.FieldGroupID, redeemcode.FieldValidityDays:
+		case redeemcode.FieldID, redeemcode.FieldSubscriptionGroupID, redeemcode.FieldSubscriptionDays, redeemcode.FieldUsedBy, redeemcode.FieldGroupID, redeemcode.FieldValidityDays:
 			values[i] = new(sql.NullInt64)
-		case redeemcode.FieldCode, redeemcode.FieldType, redeemcode.FieldStatus, redeemcode.FieldNotes:
+		case redeemcode.FieldCode, redeemcode.FieldType, redeemcode.FieldBenefitType, redeemcode.FieldStatus, redeemcode.FieldNotes:
 			values[i] = new(sql.NullString)
 		case redeemcode.FieldUsedAt, redeemcode.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -129,6 +137,34 @@ func (_m *RedeemCode) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field value", values[i])
 			} else if value.Valid {
 				_m.Value = value.Float64
+			}
+		case redeemcode.FieldBenefitType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field benefit_type", values[i])
+			} else if value.Valid {
+				_m.BenefitType = new(string)
+				*_m.BenefitType = value.String
+			}
+		case redeemcode.FieldBalanceAmount:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field balance_amount", values[i])
+			} else if value.Valid {
+				_m.BalanceAmount = new(float64)
+				*_m.BalanceAmount = value.Float64
+			}
+		case redeemcode.FieldSubscriptionGroupID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field subscription_group_id", values[i])
+			} else if value.Valid {
+				_m.SubscriptionGroupID = new(int64)
+				*_m.SubscriptionGroupID = value.Int64
+			}
+		case redeemcode.FieldSubscriptionDays:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field subscription_days", values[i])
+			} else if value.Valid {
+				_m.SubscriptionDays = new(int)
+				*_m.SubscriptionDays = int(value.Int64)
 			}
 		case redeemcode.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -230,6 +266,26 @@ func (_m *RedeemCode) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("value=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Value))
+	builder.WriteString(", ")
+	if v := _m.BenefitType; v != nil {
+		builder.WriteString("benefit_type=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.BalanceAmount; v != nil {
+		builder.WriteString("balance_amount=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.SubscriptionGroupID; v != nil {
+		builder.WriteString("subscription_group_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.SubscriptionDays; v != nil {
+		builder.WriteString("subscription_days=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)

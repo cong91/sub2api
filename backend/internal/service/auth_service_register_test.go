@@ -677,7 +677,15 @@ func TestAuthService_InviteLogin_RejectsWrongTypeOrUsedCode(t *testing.T) {
 
 func TestAuthService_InviteLogin_AssignsDefaultsAndMarksCodeUsed(t *testing.T) {
 	repo := &userRepoStub{nextID: 77}
-	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{ID: 15, Type: RedeemTypeInvitation, Status: StatusUnused}}
+	balanceBenefitType := InviteBenefitTypeBalance
+	balanceAmount := 5.25
+	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{
+		ID:            15,
+		Type:          RedeemTypeInvitation,
+		Status:        StatusUnused,
+		BenefitType:   &balanceBenefitType,
+		BalanceAmount: &balanceAmount,
+	}}
 	assigner := &defaultSubscriptionAssignerStub{}
 	groupResolver := &inviteGroupResolverStub{
 		byPlatform: map[string][]Group{
@@ -709,8 +717,8 @@ func TestAuthService_InviteLogin_AssignsDefaultsAndMarksCodeUsed(t *testing.T) {
 	require.Equal(t, int64(77), result.User.ID)
 	require.Equal(t, RoleUser, result.User.Role)
 	require.Equal(t, StatusActive, result.User.Status)
-	require.Equal(t, 9.5, result.User.Balance)
-	require.Equal(t, 4, result.User.Concurrency)
+	require.Equal(t, 14.75, result.User.Balance)
+	require.Equal(t, 1, result.User.Concurrency)
 	require.Len(t, repo.created, 1)
 	require.NotEmpty(t, result.User.PasswordHash)
 	require.NotEqual(t, "INVITE-OK", result.User.Email)
@@ -722,8 +730,58 @@ func TestAuthService_InviteLogin_AssignsDefaultsAndMarksCodeUsed(t *testing.T) {
 	require.Nil(t, apiKeyProvisioner.lastReq.GroupID)
 	require.Equal(t, []int64{31}, apiKeyProvisioner.lastReq.GrantedGroupIDs)
 	// Invite-login no longer applies default subscriptions from settings in this flow.
-	// Assignment only happens when invitation/group bootstrap requires it.
+	// Assignment only happens when invitation benefit is subscription.
 	require.Len(t, assigner.calls, 0)
+}
+
+func TestAuthService_InviteLogin_AppliesSubscriptionBenefit(t *testing.T) {
+	repo := &userRepoStub{nextID: 81}
+	subscriptionBenefitType := InviteBenefitTypeSubscription
+	groupID := int64(25)
+	days := 15
+	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{
+		ID:                  22,
+		Type:                RedeemTypeInvitation,
+		Status:              StatusUnused,
+		BenefitType:         &subscriptionBenefitType,
+		SubscriptionGroupID: &groupID,
+		SubscriptionDays:    &days,
+	}}
+	assigner := &defaultSubscriptionAssignerStub{}
+	groupResolver := &inviteGroupResolverStub{
+		byPlatform: map[string][]Group{
+			PlatformOpenAI: {{
+				ID:             31,
+				Name:           "openai-bootstrap",
+				Platform:       PlatformOpenAI,
+				Status:         StatusActive,
+				RateMultiplier: 1,
+			}},
+		},
+	}
+	apiKeyProvisioner := &inviteAPIKeyProvisionerStub{key: "sk-bootstrap"}
+	service := newAuthService(repo, map[string]string{
+		SettingKeyInvitationCodeEnabled: "true",
+		SettingKeyDefaultBalance:        "9.5",
+		SettingKeyDefaultConcurrency:    "4",
+	}, nil)
+	service.redeemRepo = redeemRepo
+	service.groupRepo = groupResolver
+	service.apiKeyProvisioner = apiKeyProvisioner
+	service.defaultSubAssigner = assigner
+
+	result, err := service.InviteLogin(context.Background(), "INVITE-SUB")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.User)
+	require.Equal(t, 9.5, result.User.Balance)
+	require.Equal(t, 1, result.User.Concurrency)
+	require.Len(t, assigner.calls, 1)
+	require.Equal(t, int64(81), assigner.calls[0].UserID)
+	require.Equal(t, groupID, assigner.calls[0].GroupID)
+	require.Equal(t, days, assigner.calls[0].ValidityDays)
+	require.Equal(t, int64(22), redeemRepo.usedID)
+	require.Equal(t, int64(81), redeemRepo.usedUserID)
 }
 
 func TestAuthService_InviteLogin_UseFailureReturnsInvalid(t *testing.T) {

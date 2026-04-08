@@ -70,6 +70,26 @@ func Value(v float64) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldEQ(FieldValue, v))
 }
 
+// BenefitType applies equality check predicate on the "benefit_type" field. It's identical to BenefitTypeEQ.
+func BenefitType(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldBenefitType, v))
+}
+
+// BalanceAmount applies equality check predicate on the "balance_amount" field. It's identical to BalanceAmountEQ.
+func BalanceAmount(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldBalanceAmount, v))
+}
+
+// SubscriptionGroupID applies equality check predicate on the "subscription_group_id" field. It's identical to SubscriptionGroupIDEQ.
+func SubscriptionGroupID(v int64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldSubscriptionGroupID, v))
+}
+
+// SubscriptionDays applies equality check predicate on the "subscription_days" field. It's identical to SubscriptionDaysEQ.
+func SubscriptionDays(v int) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldSubscriptionDays, v))
+}
+
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldEQ(FieldStatus, v))
@@ -273,6 +293,231 @@ func ValueLT(v float64) predicate.RedeemCode {
 // ValueLTE applies the LTE predicate on the "value" field.
 func ValueLTE(v float64) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldLTE(FieldValue, v))
+}
+
+// BenefitTypeEQ applies the EQ predicate on the "benefit_type" field.
+func BenefitTypeEQ(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldBenefitType, v))
+}
+
+// BenefitTypeNEQ applies the NEQ predicate on the "benefit_type" field.
+func BenefitTypeNEQ(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNEQ(FieldBenefitType, v))
+}
+
+// BenefitTypeIn applies the In predicate on the "benefit_type" field.
+func BenefitTypeIn(vs ...string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIn(FieldBenefitType, vs...))
+}
+
+// BenefitTypeNotIn applies the NotIn predicate on the "benefit_type" field.
+func BenefitTypeNotIn(vs ...string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotIn(FieldBenefitType, vs...))
+}
+
+// BenefitTypeGT applies the GT predicate on the "benefit_type" field.
+func BenefitTypeGT(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGT(FieldBenefitType, v))
+}
+
+// BenefitTypeGTE applies the GTE predicate on the "benefit_type" field.
+func BenefitTypeGTE(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGTE(FieldBenefitType, v))
+}
+
+// BenefitTypeLT applies the LT predicate on the "benefit_type" field.
+func BenefitTypeLT(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLT(FieldBenefitType, v))
+}
+
+// BenefitTypeLTE applies the LTE predicate on the "benefit_type" field.
+func BenefitTypeLTE(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLTE(FieldBenefitType, v))
+}
+
+// BenefitTypeContains applies the Contains predicate on the "benefit_type" field.
+func BenefitTypeContains(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldContains(FieldBenefitType, v))
+}
+
+// BenefitTypeHasPrefix applies the HasPrefix predicate on the "benefit_type" field.
+func BenefitTypeHasPrefix(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldHasPrefix(FieldBenefitType, v))
+}
+
+// BenefitTypeHasSuffix applies the HasSuffix predicate on the "benefit_type" field.
+func BenefitTypeHasSuffix(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldHasSuffix(FieldBenefitType, v))
+}
+
+// BenefitTypeIsNil applies the IsNil predicate on the "benefit_type" field.
+func BenefitTypeIsNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIsNull(FieldBenefitType))
+}
+
+// BenefitTypeNotNil applies the NotNil predicate on the "benefit_type" field.
+func BenefitTypeNotNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotNull(FieldBenefitType))
+}
+
+// BenefitTypeEqualFold applies the EqualFold predicate on the "benefit_type" field.
+func BenefitTypeEqualFold(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEqualFold(FieldBenefitType, v))
+}
+
+// BenefitTypeContainsFold applies the ContainsFold predicate on the "benefit_type" field.
+func BenefitTypeContainsFold(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldContainsFold(FieldBenefitType, v))
+}
+
+// BalanceAmountEQ applies the EQ predicate on the "balance_amount" field.
+func BalanceAmountEQ(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldBalanceAmount, v))
+}
+
+// BalanceAmountNEQ applies the NEQ predicate on the "balance_amount" field.
+func BalanceAmountNEQ(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNEQ(FieldBalanceAmount, v))
+}
+
+// BalanceAmountIn applies the In predicate on the "balance_amount" field.
+func BalanceAmountIn(vs ...float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIn(FieldBalanceAmount, vs...))
+}
+
+// BalanceAmountNotIn applies the NotIn predicate on the "balance_amount" field.
+func BalanceAmountNotIn(vs ...float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotIn(FieldBalanceAmount, vs...))
+}
+
+// BalanceAmountGT applies the GT predicate on the "balance_amount" field.
+func BalanceAmountGT(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGT(FieldBalanceAmount, v))
+}
+
+// BalanceAmountGTE applies the GTE predicate on the "balance_amount" field.
+func BalanceAmountGTE(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGTE(FieldBalanceAmount, v))
+}
+
+// BalanceAmountLT applies the LT predicate on the "balance_amount" field.
+func BalanceAmountLT(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLT(FieldBalanceAmount, v))
+}
+
+// BalanceAmountLTE applies the LTE predicate on the "balance_amount" field.
+func BalanceAmountLTE(v float64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLTE(FieldBalanceAmount, v))
+}
+
+// BalanceAmountIsNil applies the IsNil predicate on the "balance_amount" field.
+func BalanceAmountIsNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIsNull(FieldBalanceAmount))
+}
+
+// BalanceAmountNotNil applies the NotNil predicate on the "balance_amount" field.
+func BalanceAmountNotNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotNull(FieldBalanceAmount))
+}
+
+// SubscriptionGroupIDEQ applies the EQ predicate on the "subscription_group_id" field.
+func SubscriptionGroupIDEQ(v int64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldSubscriptionGroupID, v))
+}
+
+// SubscriptionGroupIDNEQ applies the NEQ predicate on the "subscription_group_id" field.
+func SubscriptionGroupIDNEQ(v int64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNEQ(FieldSubscriptionGroupID, v))
+}
+
+// SubscriptionGroupIDIn applies the In predicate on the "subscription_group_id" field.
+func SubscriptionGroupIDIn(vs ...int64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIn(FieldSubscriptionGroupID, vs...))
+}
+
+// SubscriptionGroupIDNotIn applies the NotIn predicate on the "subscription_group_id" field.
+func SubscriptionGroupIDNotIn(vs ...int64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotIn(FieldSubscriptionGroupID, vs...))
+}
+
+// SubscriptionGroupIDGT applies the GT predicate on the "subscription_group_id" field.
+func SubscriptionGroupIDGT(v int64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGT(FieldSubscriptionGroupID, v))
+}
+
+// SubscriptionGroupIDGTE applies the GTE predicate on the "subscription_group_id" field.
+func SubscriptionGroupIDGTE(v int64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGTE(FieldSubscriptionGroupID, v))
+}
+
+// SubscriptionGroupIDLT applies the LT predicate on the "subscription_group_id" field.
+func SubscriptionGroupIDLT(v int64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLT(FieldSubscriptionGroupID, v))
+}
+
+// SubscriptionGroupIDLTE applies the LTE predicate on the "subscription_group_id" field.
+func SubscriptionGroupIDLTE(v int64) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLTE(FieldSubscriptionGroupID, v))
+}
+
+// SubscriptionGroupIDIsNil applies the IsNil predicate on the "subscription_group_id" field.
+func SubscriptionGroupIDIsNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIsNull(FieldSubscriptionGroupID))
+}
+
+// SubscriptionGroupIDNotNil applies the NotNil predicate on the "subscription_group_id" field.
+func SubscriptionGroupIDNotNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotNull(FieldSubscriptionGroupID))
+}
+
+// SubscriptionDaysEQ applies the EQ predicate on the "subscription_days" field.
+func SubscriptionDaysEQ(v int) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldSubscriptionDays, v))
+}
+
+// SubscriptionDaysNEQ applies the NEQ predicate on the "subscription_days" field.
+func SubscriptionDaysNEQ(v int) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNEQ(FieldSubscriptionDays, v))
+}
+
+// SubscriptionDaysIn applies the In predicate on the "subscription_days" field.
+func SubscriptionDaysIn(vs ...int) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIn(FieldSubscriptionDays, vs...))
+}
+
+// SubscriptionDaysNotIn applies the NotIn predicate on the "subscription_days" field.
+func SubscriptionDaysNotIn(vs ...int) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotIn(FieldSubscriptionDays, vs...))
+}
+
+// SubscriptionDaysGT applies the GT predicate on the "subscription_days" field.
+func SubscriptionDaysGT(v int) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGT(FieldSubscriptionDays, v))
+}
+
+// SubscriptionDaysGTE applies the GTE predicate on the "subscription_days" field.
+func SubscriptionDaysGTE(v int) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGTE(FieldSubscriptionDays, v))
+}
+
+// SubscriptionDaysLT applies the LT predicate on the "subscription_days" field.
+func SubscriptionDaysLT(v int) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLT(FieldSubscriptionDays, v))
+}
+
+// SubscriptionDaysLTE applies the LTE predicate on the "subscription_days" field.
+func SubscriptionDaysLTE(v int) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLTE(FieldSubscriptionDays, v))
+}
+
+// SubscriptionDaysIsNil applies the IsNil predicate on the "subscription_days" field.
+func SubscriptionDaysIsNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIsNull(FieldSubscriptionDays))
+}
+
+// SubscriptionDaysNotNil applies the NotNil predicate on the "subscription_days" field.
+func SubscriptionDaysNotNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotNull(FieldSubscriptionDays))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

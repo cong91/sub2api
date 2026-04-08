@@ -46,6 +46,7 @@ var (
 )
 
 const inviteLoginSyntheticEmailDomain = "@invite-login.invalid"
+const inviteCreatedUserConcurrency = 1
 
 // maxTokenLength 限制 token 大小，避免超长 header 触发解析时的异常内存分配。
 const maxTokenLength = 8192
@@ -185,8 +186,8 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 			return "", nil, ErrInvitationCodeInvalid
 		}
 		// 检查类型和状态
-		if redeemCode.Type != RedeemTypeInvitation || redeemCode.Status != StatusUnused {
-			logger.LegacyPrintf("service.auth", "[Auth] Invitation code invalid: type=%s, status=%s", redeemCode.Type, redeemCode.Status)
+		if err := validateInvitationRedeemCode(redeemCode); err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Invitation code invalid: %v", err)
 			return "", nil, ErrInvitationCodeInvalid
 		}
 		invitationRedeemCode = redeemCode
@@ -232,6 +233,9 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 		defaultBalance = s.settingService.GetDefaultBalance(ctx)
 		defaultConcurrency = s.settingService.GetDefaultConcurrency(ctx)
 	}
+	if invitationRedeemCode != nil {
+		defaultConcurrency = inviteCreatedUserConcurrency
+	}
 
 	// 创建用户
 	user := &User{
@@ -260,6 +264,13 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 			return "", nil, ErrServiceUnavailable
 		}
 
+		if balanceDelta, err := s.applyInvitationBenefit(txCtx, user.ID, invitationRedeemCode); err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to apply invitation benefit in registration transaction: user_id=%d err=%v", user.ID, err)
+			return "", nil, ErrServiceUnavailable
+		} else {
+			user.Balance += balanceDelta
+		}
+
 		if err := s.redeemRepo.Use(txCtx, invitationRedeemCode.ID, user.ID); err != nil {
 			if errors.Is(err, ErrRedeemCodeUsed) {
 				return "", nil, ErrInvitationCodeInvalid
@@ -283,6 +294,16 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 		}
 
 		if invitationRedeemCode != nil {
+			if balanceDelta, err := s.applyInvitationBenefit(ctx, user.ID, invitationRedeemCode); err != nil {
+				if rollbackErr := s.userRepo.Delete(ctx, user.ID); rollbackErr != nil {
+					logger.LegacyPrintf("service.auth", "[Auth] Failed to rollback user after invitation benefit apply failure: user_id=%d err=%v", user.ID, rollbackErr)
+				}
+				logger.LegacyPrintf("service.auth", "[Auth] Failed to apply invitation benefit during registration: user_id=%d err=%v", user.ID, err)
+				return "", nil, ErrServiceUnavailable
+			} else {
+				user.Balance += balanceDelta
+			}
+
 			if err := s.redeemRepo.Use(ctx, invitationRedeemCode.ID, user.ID); err != nil {
 				if rollbackErr := s.userRepo.Delete(ctx, user.ID); rollbackErr != nil {
 					logger.LegacyPrintf("service.auth", "[Auth] Failed to rollback user after invitation consume failure: user_id=%d err=%v", user.ID, rollbackErr)
@@ -335,7 +356,7 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 	if err != nil {
 		return nil, ErrInvitationCodeInvalid
 	}
-	if redeemCode.Type != RedeemTypeInvitation || redeemCode.Status != StatusUnused {
+	if err := validateInvitationRedeemCode(redeemCode); err != nil {
 		return nil, ErrInvitationCodeInvalid
 	}
 
@@ -346,10 +367,8 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 	}
 
 	defaultBalance := s.cfg.Default.UserBalance
-	defaultConcurrency := s.cfg.Default.UserConcurrency
 	if s.settingService != nil {
 		defaultBalance = s.settingService.GetDefaultBalance(ctx)
-		defaultConcurrency = s.settingService.GetDefaultConcurrency(ctx)
 	}
 
 	hashedPassword, err := s.HashPassword(bootstrapPassword)
@@ -363,7 +382,7 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 		PasswordHash: hashedPassword,
 		Role:         RoleUser,
 		Balance:      defaultBalance,
-		Concurrency:  defaultConcurrency,
+		Concurrency:  inviteCreatedUserConcurrency,
 		Status:       StatusActive,
 	}
 
@@ -384,6 +403,13 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 			return nil, ErrServiceUnavailable
 		}
 
+		if balanceDelta, err := s.applyInvitationBenefit(txCtx, newUser.ID, redeemCode); err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to apply invitation benefit in transaction: user_id=%d err=%v", newUser.ID, err)
+			return nil, ErrServiceUnavailable
+		} else {
+			newUser.Balance += balanceDelta
+		}
+
 		if err := s.redeemRepo.Use(txCtx, redeemCode.ID, newUser.ID); err != nil {
 			if errors.Is(err, ErrRedeemCodeUsed) {
 				return nil, ErrInvitationCodeInvalid
@@ -391,16 +417,6 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 			logger.LegacyPrintf("service.auth", "[Auth] Failed to consume invitation code in transaction: %v", err)
 			return nil, ErrServiceUnavailable
 		}
-
-		if redeemCode.Value != 0 {
-			if err := s.userRepo.UpdateBalance(txCtx, newUser.ID, redeemCode.Value); err != nil {
-				logger.LegacyPrintf("service.auth", "[Auth] Failed to apply invitation value in transaction: user_id=%d value=%f err=%v", newUser.ID, redeemCode.Value, err)
-				return nil, ErrServiceUnavailable
-			}
-			newUser.Balance += redeemCode.Value
-		}
-
-		s.assignInvitationBenefits(txCtx, newUser.ID, redeemCode)
 
 		if err := tx.Commit(); err != nil {
 			logger.LegacyPrintf("service.auth", "[Auth] Failed to commit invite login transaction: %v", err)
@@ -415,6 +431,14 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 			return nil, ErrServiceUnavailable
 		}
 
+		if balanceDelta, err := s.applyInvitationBenefit(ctx, newUser.ID, redeemCode); err != nil {
+			_ = s.userRepo.Delete(ctx, newUser.ID)
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to apply invitation benefit: user_id=%d err=%v", newUser.ID, err)
+			return nil, ErrServiceUnavailable
+		} else {
+			newUser.Balance += balanceDelta
+		}
+
 		if err := s.redeemRepo.Use(ctx, redeemCode.ID, newUser.ID); err != nil {
 			_ = s.userRepo.Delete(ctx, newUser.ID)
 			if errors.Is(err, ErrRedeemCodeUsed) {
@@ -423,17 +447,6 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 			logger.LegacyPrintf("service.auth", "[Auth] Failed to consume invitation code: %v", err)
 			return nil, ErrServiceUnavailable
 		}
-
-		if redeemCode.Value != 0 {
-			if err := s.userRepo.UpdateBalance(ctx, newUser.ID, redeemCode.Value); err != nil {
-				_ = s.userRepo.Delete(ctx, newUser.ID)
-				logger.LegacyPrintf("service.auth", "[Auth] Failed to apply invitation value: user_id=%d value=%f err=%v", newUser.ID, redeemCode.Value, err)
-				return nil, ErrServiceUnavailable
-			}
-			newUser.Balance += redeemCode.Value
-		}
-
-		s.assignInvitationBenefits(ctx, newUser.ID, redeemCode)
 	}
 
 	bootstrapTargets, err := s.resolveInviteBootstrapTargets(ctx)
@@ -653,18 +666,123 @@ func (s *AuthService) buildInviteBootstrapIdentity() (email string, username str
 	return email, username, password, nil
 }
 
-func (s *AuthService) assignInvitationBenefits(ctx context.Context, userID int64, code *RedeemCode) {
-	if s.defaultSubAssigner == nil || userID <= 0 || code == nil || code.GroupID == nil || code.ValidityDays <= 0 {
-		return
+func validateInvitationRedeemCode(code *RedeemCode) error {
+	if code == nil {
+		return fmt.Errorf("invite code is nil")
 	}
-	if _, _, err := s.defaultSubAssigner.AssignOrExtendSubscription(ctx, &AssignSubscriptionInput{
-		UserID:       userID,
-		GroupID:      *code.GroupID,
-		ValidityDays: code.ValidityDays,
-		Notes:        "assigned by invitation bootstrap",
-	}); err != nil {
-		logger.LegacyPrintf("service.auth", "[Auth] Failed to assign invitation benefits: user_id=%d group_id=%d err=%v", userID, *code.GroupID, err)
+	if code.Type != RedeemTypeInvitation || code.Status != StatusUnused {
+		return fmt.Errorf("invite code status/type invalid: type=%s status=%s", code.Type, code.Status)
 	}
+	_, _, _, _, err := resolveInvitationBenefit(code)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func resolveInvitationBenefit(code *RedeemCode) (benefitType string, balanceAmount float64, subscriptionGroupID int64, subscriptionDays int, err error) {
+	if code == nil {
+		return "", 0, 0, 0, fmt.Errorf("invite code is nil")
+	}
+
+	benefitType = strings.TrimSpace(valueOrEmpty(code.BenefitType))
+	hasLegacyBalance := code.Value > 0
+	hasLegacySubscription := code.GroupID != nil && code.ValidityDays > 0
+
+	switch benefitType {
+	case "":
+		if hasLegacyBalance && hasLegacySubscription {
+			return "", 0, 0, 0, fmt.Errorf("invite code mixed legacy payload")
+		}
+		if hasLegacyBalance {
+			return InviteBenefitTypeBalance, code.Value, 0, 0, nil
+		}
+		if hasLegacySubscription {
+			return InviteBenefitTypeSubscription, 0, *code.GroupID, code.ValidityDays, nil
+		}
+		return "", 0, 0, 0, fmt.Errorf("invite code missing benefit payload")
+
+	case InviteBenefitTypeBalance:
+		amount := 0.0
+		if code.BalanceAmount != nil {
+			amount = *code.BalanceAmount
+		} else {
+			amount = code.Value
+		}
+		hasSubscriptionPayload := (code.SubscriptionGroupID != nil && code.SubscriptionDays != nil && *code.SubscriptionDays > 0) || hasLegacySubscription
+		if amount <= 0 {
+			return "", 0, 0, 0, fmt.Errorf("invite balance amount must be > 0")
+		}
+		if hasSubscriptionPayload {
+			return "", 0, 0, 0, fmt.Errorf("invite code mixed payload")
+		}
+		return InviteBenefitTypeBalance, amount, 0, 0, nil
+
+	case InviteBenefitTypeSubscription:
+		groupID := int64(0)
+		days := 0
+		if code.SubscriptionGroupID != nil {
+			groupID = *code.SubscriptionGroupID
+		} else if code.GroupID != nil {
+			groupID = *code.GroupID
+		}
+		if code.SubscriptionDays != nil {
+			days = *code.SubscriptionDays
+		} else {
+			days = code.ValidityDays
+		}
+
+		hasBalancePayload := (code.BalanceAmount != nil && *code.BalanceAmount > 0) || hasLegacyBalance
+		if groupID <= 0 || days <= 0 {
+			return "", 0, 0, 0, fmt.Errorf("invite subscription payload invalid")
+		}
+		if hasBalancePayload {
+			return "", 0, 0, 0, fmt.Errorf("invite code mixed payload")
+		}
+		return InviteBenefitTypeSubscription, 0, groupID, days, nil
+
+	default:
+		return "", 0, 0, 0, fmt.Errorf("unsupported invite benefit_type: %s", benefitType)
+	}
+}
+
+func (s *AuthService) applyInvitationBenefit(ctx context.Context, userID int64, code *RedeemCode) (float64, error) {
+	benefitType, amount, groupID, days, err := resolveInvitationBenefit(code)
+	if err != nil {
+		return 0, err
+	}
+
+	switch benefitType {
+	case InviteBenefitTypeBalance:
+		if err := s.userRepo.UpdateBalance(ctx, userID, amount); err != nil {
+			return 0, err
+		}
+		return amount, nil
+
+	case InviteBenefitTypeSubscription:
+		if s.defaultSubAssigner == nil {
+			return 0, fmt.Errorf("subscription assigner not configured")
+		}
+		if _, _, err := s.defaultSubAssigner.AssignOrExtendSubscription(ctx, &AssignSubscriptionInput{
+			UserID:       userID,
+			GroupID:      groupID,
+			ValidityDays: days,
+			Notes:        "assigned by invitation code entitlement",
+		}); err != nil {
+			return 0, err
+		}
+		return 0, nil
+
+	default:
+		return 0, fmt.Errorf("unsupported invite benefit type: %s", benefitType)
+	}
+}
+
+func valueOrEmpty(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 // SendVerifyCodeResult 发送验证码返回结果
@@ -999,7 +1117,7 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 				if err != nil {
 					return nil, nil, ErrInvitationCodeInvalid
 				}
-				if redeemCode.Type != RedeemTypeInvitation || redeemCode.Status != StatusUnused {
+				if err := validateInvitationRedeemCode(redeemCode); err != nil {
 					return nil, nil, ErrInvitationCodeInvalid
 				}
 				invitationRedeemCode = redeemCode
@@ -1020,6 +1138,9 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 			if s.settingService != nil {
 				defaultBalance = s.settingService.GetDefaultBalance(ctx)
 				defaultConcurrency = s.settingService.GetDefaultConcurrency(ctx)
+			}
+			if invitationRedeemCode != nil {
+				defaultConcurrency = inviteCreatedUserConcurrency
 			}
 
 			newUser := &User{
@@ -1053,6 +1174,11 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 						return nil, nil, ErrServiceUnavailable
 					}
 				} else {
+					if balanceDelta, err := s.applyInvitationBenefit(txCtx, newUser.ID, invitationRedeemCode); err != nil {
+						return nil, nil, ErrServiceUnavailable
+					} else {
+						newUser.Balance += balanceDelta
+					}
 					if err := s.redeemRepo.Use(txCtx, invitationRedeemCode.ID, newUser.ID); err != nil {
 						return nil, nil, ErrInvitationCodeInvalid
 					}
@@ -1077,6 +1203,12 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 					}
 				} else {
 					if invitationRedeemCode != nil {
+						if balanceDelta, err := s.applyInvitationBenefit(ctx, newUser.ID, invitationRedeemCode); err != nil {
+							_ = s.userRepo.Delete(ctx, newUser.ID)
+							return nil, nil, ErrServiceUnavailable
+						} else {
+							newUser.Balance += balanceDelta
+						}
 						if err := s.redeemRepo.Use(ctx, invitationRedeemCode.ID, newUser.ID); err != nil {
 							_ = s.userRepo.Delete(ctx, newUser.ID)
 							if errors.Is(err, ErrRedeemCodeUsed) {

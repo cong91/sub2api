@@ -307,6 +307,12 @@ type GenerateRedeemCodesInput struct {
 	Value        float64
 	GroupID      *int64 // 订阅类型专用：关联的分组ID
 	ValidityDays int    // 订阅类型专用：有效天数
+
+	// 邀请码权益（Type=invitation）
+	BenefitType         string
+	BalanceAmount       *float64
+	SubscriptionGroupID *int64
+	SubscriptionDays    *int
 }
 
 type ProxyBatchDeleteResult struct {
@@ -2046,6 +2052,11 @@ func (s *adminServiceImpl) GetRedeemCode(ctx context.Context, id int64) (*Redeem
 }
 
 func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error) {
+	var inviteBenefitType *string
+	var inviteBalanceAmount *float64
+	var inviteSubscriptionGroupID *int64
+	var inviteSubscriptionDays *int
+
 	// 如果是订阅类型，验证必须有 GroupID
 	if input.Type == RedeemTypeSubscription {
 		if input.GroupID == nil {
@@ -2061,6 +2072,55 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 		}
 	}
 
+	if input.Type == RedeemTypeInvitation {
+		benefitType := strings.TrimSpace(input.BenefitType)
+		switch benefitType {
+		case InviteBenefitTypeBalance:
+			if input.BalanceAmount == nil || *input.BalanceAmount <= 0 {
+				return nil, errors.New("balance_amount must be greater than 0 for invitation balance benefit")
+			}
+			if input.SubscriptionGroupID != nil || (input.SubscriptionDays != nil && *input.SubscriptionDays != 0) {
+				return nil, errors.New("invalid invitation payload: choose either balance or subscription benefit")
+			}
+			inviteBenefitType = &benefitType
+			amount := *input.BalanceAmount
+			inviteBalanceAmount = &amount
+			input.Value = amount
+			input.GroupID = nil
+			input.ValidityDays = 0
+
+		case InviteBenefitTypeSubscription:
+			if input.SubscriptionGroupID == nil {
+				return nil, errors.New("subscription_group_id is required for invitation subscription benefit")
+			}
+			if input.SubscriptionDays == nil || *input.SubscriptionDays <= 0 {
+				return nil, errors.New("subscription_days must be greater than 0 for invitation subscription benefit")
+			}
+			if input.BalanceAmount != nil && *input.BalanceAmount > 0 {
+				return nil, errors.New("invalid invitation payload: choose either balance or subscription benefit")
+			}
+			group, err := s.groupRepo.GetByID(ctx, *input.SubscriptionGroupID)
+			if err != nil {
+				return nil, fmt.Errorf("group not found: %w", err)
+			}
+			if !group.IsSubscriptionType() {
+				return nil, errors.New("group must be subscription type")
+			}
+
+			inviteBenefitType = &benefitType
+			groupID := *input.SubscriptionGroupID
+			days := *input.SubscriptionDays
+			inviteSubscriptionGroupID = &groupID
+			inviteSubscriptionDays = &days
+			input.Value = 0
+			input.GroupID = &groupID
+			input.ValidityDays = days
+
+		default:
+			return nil, errors.New("benefit_type is required for invitation and must be balance or subscription")
+		}
+	}
+
 	codes := make([]RedeemCode, 0, input.Count)
 	for i := 0; i < input.Count; i++ {
 		codeValue, err := GenerateRedeemCode()
@@ -2068,10 +2128,14 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 			return nil, err
 		}
 		code := RedeemCode{
-			Code:   codeValue,
-			Type:   input.Type,
-			Value:  input.Value,
-			Status: StatusUnused,
+			Code:                codeValue,
+			Type:                input.Type,
+			Value:               input.Value,
+			BenefitType:         inviteBenefitType,
+			BalanceAmount:       inviteBalanceAmount,
+			SubscriptionGroupID: inviteSubscriptionGroupID,
+			SubscriptionDays:    inviteSubscriptionDays,
+			Status:              StatusUnused,
 		}
 		// 订阅类型专用字段
 		if input.Type == RedeemTypeSubscription {

@@ -41,6 +41,12 @@ const (
 	RedeemTypeInvitation   = "invitation"
 )
 
+// Invite benefit type constants (for invitation redeem codes only)
+const (
+	InviteBenefitTypeBalance      = "balance"
+	InviteBenefitTypeSubscription = "subscription"
+)
+
 // PromoCode status constants
 const (
 	PromoCodeStatusActive   = "active"
