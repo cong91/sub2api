@@ -82,12 +82,12 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-            cd "${APP_DIR:-$HOME/apps/sub2api}"
-            git fetch --all --prune
-            git checkout main
-            git reset --hard origin/main
-            cd deploy
+            APP_DIR_CLEAN="$(printf '%s' "$APP_DIR" | tr -d '' | sed 's/[[:space:]]*$//')"
+            DEPLOY_DIR="${APP_DIR_CLEAN:-/home/deploy/apps/sub2api}/deploy"
+            cd "$DEPLOY_DIR"
             mkdir -p data postgres_data redis_data nginx/conf.d
+            test -f .env
+            test -f docker-compose.prod.yml
             echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
             IMAGE_REPO="$IMAGE_REPO" IMAGE_TAG="$IMAGE_TAG" docker compose -f docker-compose.prod.yml pull
             IMAGE_REPO="$IMAGE_REPO" IMAGE_TAG="$IMAGE_TAG" docker compose -f docker-compose.prod.yml up -d
