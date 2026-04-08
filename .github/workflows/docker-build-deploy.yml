@@ -57,7 +57,7 @@ jobs:
           build-args: |
             VERSION=${{ github.ref_name }}
             COMMIT=${{ github.sha }}
-            DATE=${{ github.event.head_commit.timestamp || github.run_id }}
+            DATE=${{ github.run_id }}
 
   deploy:
     name: Deploy on VM via SSH
@@ -77,12 +77,13 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
+          port: ${{ secrets.SSH_PORT }}
           envs: IMAGE_REPO,IMAGE_TAG,GHCR_USERNAME,GHCR_PAT,APP_DIR
           script_stop: true
           script: |
             set -euo pipefail
-            APP_DIR_CLEAN="$(printf '%s' "$APP_DIR" | tr -d '' | sed 's/[[:space:]]*$//')"
+            APP_DIR_CLEAN="$(printf '%s' "$APP_DIR" | tr -d '
+' | sed 's/[[:space:]]*$//')"
             DEPLOY_DIR="${APP_DIR_CLEAN:-/home/deploy/apps/sub2api}/deploy"
             cd "$DEPLOY_DIR"
             mkdir -p data postgres_data redis_data nginx/conf.d
