@@ -43,6 +43,7 @@ jobs:
           images: ${{ env.IMAGE_REPO }}
           tags: |
             type=sha,prefix=sha-
+            type=raw,value=sha-${{ github.sha }}
             type=raw,value=latest
 
       - name: Build and push
