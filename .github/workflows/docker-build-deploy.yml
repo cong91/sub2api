@@ -82,8 +82,7 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-            APP_DIR_CLEAN="$(printf '%s' "$APP_DIR" | tr -d '
-' | sed 's/[[:space:]]*$//')"
+            APP_DIR_CLEAN="$(printf '%s' "$APP_DIR" | sed 's/[[:space:]]*$//')"
             DEPLOY_DIR="${APP_DIR_CLEAN:-/home/deploy/apps/sub2api}/deploy"
             cd "$DEPLOY_DIR"
             mkdir -p data postgres_data redis_data nginx/conf.d
