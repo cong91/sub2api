@@ -90,7 +90,7 @@ import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import { adminAPI } from '@/api/admin'
 import { useAppStore } from '@/stores/app'
-import type { AdminDataImportResult } from '@/types'
+import type { AdminDataAccount, AdminDataImportResult, AdminDataPayload } from '@/types'
 
 interface Props {
   show: boolean
@@ -161,6 +161,69 @@ const readFileAsText = async (sourceFile: File): Promise<string> => {
   })
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+const isAdminDataPayload = (value: unknown): value is AdminDataPayload => {
+  return isRecord(value) && Array.isArray(value.accounts) && Array.isArray(value.proxies)
+}
+
+const getString = (value: unknown): string | undefined => {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+const normalizeTokenImportFile = (value: unknown): AdminDataPayload => {
+  if (isAdminDataPayload(value)) {
+    return value
+  }
+
+  if (!isRecord(value)) {
+    throw new Error('Unsupported import file format')
+  }
+
+  const accessToken = getString(value.access_token)
+  const refreshToken = getString(value.refresh_token)
+  const email = getString(value.email)
+  const accountId = getString(value.account_id)
+  const idToken = getString(value.id_token)
+  const expired = getString(value.expired)
+  const tokenType = getString(value.type)?.toLowerCase()
+
+  const isTokenStyleFile = Boolean(accessToken || refreshToken) && Boolean(email || accountId || tokenType)
+  if (!isTokenStyleFile) {
+    throw new Error('Unsupported import file format')
+  }
+
+  const credentials: Record<string, unknown> = {}
+  if (accessToken) credentials.access_token = accessToken
+  if (refreshToken) credentials.refresh_token = refreshToken
+  if (idToken) credentials.id_token = idToken
+  if (email) credentials.email = email
+  if (accountId) {
+    credentials.chatgpt_account_id = accountId
+    credentials.account_id = accountId
+  }
+  if (expired) credentials.expires_at = expired
+
+  const importedAccount: AdminDataAccount = {
+    name: email || accountId || 'imported-openai-account',
+    platform: 'openai',
+    type: 'oauth',
+    credentials,
+    extra: isRecord(value.meta) ? { ...value.meta } : undefined,
+    concurrency: 10,
+    priority: 1,
+    auto_pause_on_expired: true
+  }
+
+  return {
+    exported_at: new Date().toISOString(),
+    proxies: [],
+    accounts: [importedAccount]
+  }
+}
+
 const handleImport = async () => {
   if (!file.value) {
     appStore.showError(t('admin.accounts.dataImportSelectFile'))
@@ -170,7 +233,8 @@ const handleImport = async () => {
   importing.value = true
   try {
     const text = await readFileAsText(file.value)
-    const dataPayload = JSON.parse(text)
+    const rawPayload = JSON.parse(text)
+    const dataPayload = normalizeTokenImportFile(rawPayload)
 
     const res = await adminAPI.accounts.importData({
       data: dataPayload,
