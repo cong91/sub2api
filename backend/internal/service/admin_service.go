@@ -2077,10 +2077,10 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 		switch benefitType {
 		case InviteBenefitTypeBalance:
 			if input.BalanceAmount == nil || *input.BalanceAmount <= 0 {
-				return nil, errors.New("balance_amount must be greater than 0 for invitation balance benefit")
+				return nil, infraerrors.BadRequest("INVITATION_BALANCE_AMOUNT_REQUIRED", "balance_amount must be greater than 0 for invitation balance benefit")
 			}
 			if input.SubscriptionGroupID != nil || (input.SubscriptionDays != nil && *input.SubscriptionDays != 0) {
-				return nil, errors.New("invalid invitation payload: choose either balance or subscription benefit")
+				return nil, infraerrors.BadRequest("INVITATION_MIXED_PAYLOAD", "invalid invitation payload: choose either balance or subscription benefit")
 			}
 			inviteBenefitType = &benefitType
 			amount := *input.BalanceAmount
@@ -2091,20 +2091,20 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 
 		case InviteBenefitTypeSubscription:
 			if input.SubscriptionGroupID == nil {
-				return nil, errors.New("subscription_group_id is required for invitation subscription benefit")
+				return nil, infraerrors.BadRequest("INVITATION_SUBSCRIPTION_GROUP_REQUIRED", "subscription_group_id is required for invitation subscription benefit")
 			}
 			if input.SubscriptionDays == nil || *input.SubscriptionDays <= 0 {
-				return nil, errors.New("subscription_days must be greater than 0 for invitation subscription benefit")
+				return nil, infraerrors.BadRequest("INVITATION_SUBSCRIPTION_DAYS_REQUIRED", "subscription_days must be greater than 0 for invitation subscription benefit")
 			}
 			if input.BalanceAmount != nil && *input.BalanceAmount > 0 {
-				return nil, errors.New("invalid invitation payload: choose either balance or subscription benefit")
+				return nil, infraerrors.BadRequest("INVITATION_MIXED_PAYLOAD", "invalid invitation payload: choose either balance or subscription benefit")
 			}
 			group, err := s.groupRepo.GetByID(ctx, *input.SubscriptionGroupID)
 			if err != nil {
 				return nil, fmt.Errorf("group not found: %w", err)
 			}
 			if !group.IsSubscriptionType() {
-				return nil, errors.New("group must be subscription type")
+				return nil, infraerrors.BadRequest("INVITATION_GROUP_NOT_SUBSCRIPTION", "group must be subscription type")
 			}
 
 			inviteBenefitType = &benefitType
@@ -2117,7 +2117,7 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 			input.ValidityDays = days
 
 		default:
-			return nil, errors.New("benefit_type is required for invitation and must be balance or subscription")
+			return nil, infraerrors.BadRequest("INVITATION_BENEFIT_TYPE_REQUIRED", "benefit_type is required for invitation and must be balance or subscription")
 		}
 	}
 
