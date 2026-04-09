@@ -2405,8 +2405,8 @@ const closeCreateModal = () => {
   createForm.allow_messages_dispatch = false
   createForm.require_oauth_only = false
   createForm.require_privacy_set = false
-  createForm.default_mapped_model = 'gpt-5.4'
-  createForm.supported_model_scopes = ['claude', 'gemini_text', 'gemini_image']
+  createForm.default_mapped_model = ''
+  createForm.supported_model_scopes = []
   createForm.mcp_xml_inject = true
   createForm.copy_accounts_from_group_ids = []
   createModelRoutingRules.value = []
@@ -2442,7 +2442,8 @@ const handleCreateGroup = async () => {
       daily_limit_usd: normalizeOptionalLimit(createForm.daily_limit_usd as number | string | null),
       weekly_limit_usd: normalizeOptionalLimit(createForm.weekly_limit_usd as number | string | null),
       monthly_limit_usd: normalizeOptionalLimit(createForm.monthly_limit_usd as number | string | null),
-      model_routing: convertRoutingRulesToApiFormat(createModelRoutingRules.value)
+      model_routing: convertRoutingRulesToApiFormat(createModelRoutingRules.value),
+      supported_model_scopes: createForm.platform === 'antigravity' ? createForm.supported_model_scopes : []
     }
     // v-model.number 清空输入框时产生 ""，转为 null 让后端设为无限制
     const emptyToNull = (v: any) => v === '' ? null : v
@@ -2489,7 +2490,9 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.require_privacy_set = group.require_privacy_set ?? false
   editForm.default_mapped_model = group.default_mapped_model || ''
   editForm.model_routing_enabled = group.model_routing_enabled || false
-  editForm.supported_model_scopes = group.supported_model_scopes || ['claude', 'gemini_text', 'gemini_image']
+  editForm.supported_model_scopes = group.platform === 'antigravity'
+    ? (group.supported_model_scopes || ['claude', 'gemini_text', 'gemini_image'])
+    : []
   editForm.mcp_xml_inject = group.mcp_xml_inject ?? true
   editForm.copy_accounts_from_group_ids = [] // 复制账号字段每次编辑时重置为空
   // 加载模型路由规则（异步加载账号名称）
@@ -2528,7 +2531,8 @@ const handleUpdateGroup = async () => {
         editForm.fallback_group_id_on_invalid_request === null
           ? 0
           : editForm.fallback_group_id_on_invalid_request,
-      model_routing: convertRoutingRulesToApiFormat(editModelRoutingRules.value)
+      model_routing: convertRoutingRulesToApiFormat(editModelRoutingRules.value),
+      supported_model_scopes: editForm.platform === 'antigravity' ? editForm.supported_model_scopes : []
     }
     // v-model.number 清空输入框时产生 ""，转为 null 让后端设为无限制
     const emptyToNull = (v: any) => v === '' ? null : v
@@ -2592,10 +2596,18 @@ watch(
     if (newVal !== 'openai') {
       createForm.allow_messages_dispatch = false
       createForm.default_mapped_model = ''
+    } else if (!createForm.default_mapped_model) {
+      createForm.default_mapped_model = 'gpt-5.4'
     }
     if (!['openai', 'antigravity', 'anthropic', 'gemini'].includes(newVal)) {
       createForm.require_oauth_only = false
       createForm.require_privacy_set = false
+    }
+    if (newVal !== 'antigravity') {
+      createForm.supported_model_scopes = []
+      createForm.mcp_xml_inject = true
+    } else if (!createForm.supported_model_scopes?.length) {
+      createForm.supported_model_scopes = ['claude', 'gemini_text', 'gemini_image']
     }
   }
 )

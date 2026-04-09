@@ -890,6 +890,11 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		}
 	}
 
+	supportedModelScopes := input.SupportedModelScopes
+	if platform != PlatformAntigravity {
+		supportedModelScopes = []string{}
+	}
+
 	group := &Group{
 		Name:                            input.Name,
 		Description:                     input.Description,
@@ -909,7 +914,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		FallbackGroupIDOnInvalidRequest: fallbackOnInvalidRequest,
 		ModelRouting:                    input.ModelRouting,
 		MCPXMLInject:                    mcpXMLInject,
-		SupportedModelScopes:            input.SupportedModelScopes,
+		SupportedModelScopes:            supportedModelScopes,
 		AllowMessagesDispatch:           input.AllowMessagesDispatch,
 		RequireOAuthOnly:                input.RequireOAuthOnly,
 		RequirePrivacySet:               input.RequirePrivacySet,
@@ -1125,7 +1130,11 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 
 	// 支持的模型系列（仅 antigravity 平台使用）
 	if input.SupportedModelScopes != nil {
-		group.SupportedModelScopes = *input.SupportedModelScopes
+		if group.Platform == PlatformAntigravity {
+			group.SupportedModelScopes = *input.SupportedModelScopes
+		} else {
+			group.SupportedModelScopes = []string{}
+		}
 	}
 
 	// OpenAI Messages 调度配置
