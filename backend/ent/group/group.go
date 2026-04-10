@@ -75,8 +75,6 @@ const (
 	FieldDefaultMappedModel = "default_mapped_model"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
 	EdgeAPIKeys = "api_keys"
-	// EdgeGrantedAPIKeys holds the string denoting the granted_api_keys edge name in mutations.
-	EdgeGrantedAPIKeys = "granted_api_keys"
 	// EdgeRedeemCodes holds the string denoting the redeem_codes edge name in mutations.
 	EdgeRedeemCodes = "redeem_codes"
 	// EdgeSubscriptions holds the string denoting the subscriptions edge name in mutations.
@@ -87,8 +85,6 @@ const (
 	EdgeAccounts = "accounts"
 	// EdgeAllowedUsers holds the string denoting the allowed_users edge name in mutations.
 	EdgeAllowedUsers = "allowed_users"
-	// EdgeAPIKeyGrantedGroups holds the string denoting the api_key_granted_groups edge name in mutations.
-	EdgeAPIKeyGrantedGroups = "api_key_granted_groups"
 	// EdgeAccountGroups holds the string denoting the account_groups edge name in mutations.
 	EdgeAccountGroups = "account_groups"
 	// EdgeUserAllowedGroups holds the string denoting the user_allowed_groups edge name in mutations.
@@ -101,12 +97,7 @@ const (
 	// It exists in this package in order to avoid circular dependency with the "apikey" package.
 	APIKeysInverseTable = "api_keys"
 	// APIKeysColumn is the table column denoting the api_keys relation/edge.
-	APIKeysColumn = "group_id"
-	// GrantedAPIKeysTable is the table that holds the granted_api_keys relation/edge. The primary key declared below.
-	GrantedAPIKeysTable = "api_key_groups"
-	// GrantedAPIKeysInverseTable is the table name for the APIKey entity.
-	// It exists in this package in order to avoid circular dependency with the "apikey" package.
-	GrantedAPIKeysInverseTable = "api_keys"
+	APIKeysColumn = "group_api_keys"
 	// RedeemCodesTable is the table that holds the redeem_codes relation/edge.
 	RedeemCodesTable = "redeem_codes"
 	// RedeemCodesInverseTable is the table name for the RedeemCode entity.
@@ -138,13 +129,6 @@ const (
 	// AllowedUsersInverseTable is the table name for the User entity.
 	// It exists in this package in order to avoid circular dependency with the "user" package.
 	AllowedUsersInverseTable = "users"
-	// APIKeyGrantedGroupsTable is the table that holds the api_key_granted_groups relation/edge.
-	APIKeyGrantedGroupsTable = "api_key_groups"
-	// APIKeyGrantedGroupsInverseTable is the table name for the APIKeyGrantedGroup entity.
-	// It exists in this package in order to avoid circular dependency with the "apikeygrantedgroup" package.
-	APIKeyGrantedGroupsInverseTable = "api_key_groups"
-	// APIKeyGrantedGroupsColumn is the table column denoting the api_key_granted_groups relation/edge.
-	APIKeyGrantedGroupsColumn = "group_id"
 	// AccountGroupsTable is the table that holds the account_groups relation/edge.
 	AccountGroupsTable = "account_groups"
 	// AccountGroupsInverseTable is the table name for the AccountGroup entity.
@@ -196,9 +180,6 @@ var Columns = []string{
 }
 
 var (
-	// GrantedAPIKeysPrimaryKey and GrantedAPIKeysColumn2 are the table columns denoting the
-	// primary key for the granted_api_keys relation (M2M).
-	GrantedAPIKeysPrimaryKey = []string{"group_id", "api_key_id"}
 	// AccountsPrimaryKey and AccountsColumn2 are the table columns denoting the
 	// primary key for the accounts relation (M2M).
 	AccountsPrimaryKey = []string{"account_id", "group_id"}
@@ -430,20 +411,6 @@ func ByAPIKeys(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
-// ByGrantedAPIKeysCount orders the results by granted_api_keys count.
-func ByGrantedAPIKeysCount(opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newGrantedAPIKeysStep(), opts...)
-	}
-}
-
-// ByGrantedAPIKeys orders the results by granted_api_keys terms.
-func ByGrantedAPIKeys(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newGrantedAPIKeysStep(), append([]sql.OrderTerm{term}, terms...)...)
-	}
-}
-
 // ByRedeemCodesCount orders the results by redeem_codes count.
 func ByRedeemCodesCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -514,20 +481,6 @@ func ByAllowedUsers(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
-// ByAPIKeyGrantedGroupsCount orders the results by api_key_granted_groups count.
-func ByAPIKeyGrantedGroupsCount(opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newAPIKeyGrantedGroupsStep(), opts...)
-	}
-}
-
-// ByAPIKeyGrantedGroups orders the results by api_key_granted_groups terms.
-func ByAPIKeyGrantedGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newAPIKeyGrantedGroupsStep(), append([]sql.OrderTerm{term}, terms...)...)
-	}
-}
-
 // ByAccountGroupsCount orders the results by account_groups count.
 func ByAccountGroupsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -560,13 +513,6 @@ func newAPIKeysStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(APIKeysInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, APIKeysTable, APIKeysColumn),
-	)
-}
-func newGrantedAPIKeysStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(GrantedAPIKeysInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2M, false, GrantedAPIKeysTable, GrantedAPIKeysPrimaryKey...),
 	)
 }
 func newRedeemCodesStep() *sqlgraph.Step {
@@ -602,13 +548,6 @@ func newAllowedUsersStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(AllowedUsersInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2M, true, AllowedUsersTable, AllowedUsersPrimaryKey...),
-	)
-}
-func newAPIKeyGrantedGroupsStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(APIKeyGrantedGroupsInverseTable, APIKeyGrantedGroupsColumn),
-		sqlgraph.Edge(sqlgraph.O2M, true, APIKeyGrantedGroupsTable, APIKeyGrantedGroupsColumn),
 	)
 }
 func newAccountGroupsStep() *sqlgraph.Step {

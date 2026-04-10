@@ -399,7 +399,8 @@
         <div>
           <label class="input-label">{{ t('keys.groupLabel') }}</label>
           <Select
-            v-model="formData.group_id"
+            :model-value="formData.group_ids[0] ?? null"
+            @update:model-value="(value) => { formData.group_ids = value == null || value === '' ? [] : [Number(value)] }"
             :options="groupOptions"
             :placeholder="t('keys.selectGroup')"
             :searchable="true"
@@ -917,8 +918,8 @@
       :show="showUseKeyModal"
       :api-key="selectedKey?.key || ''"
       :base-url="publicSettings?.api_base_url || ''"
-      :platform="selectedKey?.group?.platform || null"
-      :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"
+      :platform="selectedKey?.group?.platform || selectedKey?.groups?.[0]?.platform || null"
+      :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || selectedKey?.groups?.[0]?.allow_messages_dispatch || false"
       @close="closeUseKeyModal"
     />
 
@@ -1006,8 +1007,8 @@
             :class="[
               'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors',
               'border-b border-gray-100 last:border-0 dark:border-dark-700',
-              selectedKeyForGroup?.group_id === option.value ||
-              (!selectedKeyForGroup?.group_id && option.value === null)
+              selectedKeyForGroupPrimaryGroupId === option.value ||
+              (selectedKeyForGroupPrimaryGroupId === null && option.value === null)
                 ? 'bg-primary-50 dark:bg-primary-900/20'
                 : 'hover:bg-gray-100 dark:hover:bg-dark-700'
             ]"
@@ -1021,8 +1022,8 @@
               :user-rate-multiplier="option.userRate"
               :description="option.description"
               :selected="
-                selectedKeyForGroup?.group_id === option.value ||
-                (!selectedKeyForGroup?.group_id && option.value === null)
+                selectedKeyForGroupPrimaryGroupId === option.value ||
+                (selectedKeyForGroupPrimaryGroupId === null && option.value === null)
               "
             />
           </button>
@@ -1143,6 +1144,11 @@ const selectedKeyForGroup = computed(() => {
   return apiKeys.value.find((k) => k.id === groupSelectorKeyId.value) || null
 })
 
+const selectedKeyForGroupPrimaryGroupId = computed(() => {
+  const groupIds = selectedKeyForGroup.value?.group_ids || []
+  return groupIds.length > 0 ? groupIds[0] : null
+})
+
 const setGroupButtonRef = (keyId: number, el: Element | ComponentPublicInstance | null) => {
   if (el instanceof HTMLElement) {
     groupButtonRefs.value.set(keyId, el)
@@ -1153,7 +1159,7 @@ const setGroupButtonRef = (keyId: number, el: Element | ComponentPublicInstance 
 
 const formData = ref({
   name: '',
-  group_id: null as number | null,
+  group_ids: [] as number[],
   status: 'active' as 'active' | 'inactive',
   use_custom_key: false,
   custom_key: '',
@@ -1277,10 +1283,12 @@ const loadApiKeys = async () => {
   loading.value = true
   try {
     // Build filters
-    const filters: { search?: string; status?: string; group_id?: number | string } = {}
+    const filters: { search?: string; status?: string; group_ids?: Array<number | string> } = {}
     if (filterSearch.value) filters.search = filterSearch.value
     if (filterStatus.value) filters.status = filterStatus.value
-    if (filterGroupId.value !== '') filters.group_id = filterGroupId.value
+    if (filterGroupId.value !== '') {
+      filters.group_ids = [filterGroupId.value]
+    }
 
     const response = await keysAPI.list(pagination.value.page, pagination.value.page_size, filters, {
       signal
@@ -1366,7 +1374,7 @@ const editKey = (key: ApiKey) => {
   const hasExpiration = !!key.expires_at
   formData.value = {
     name: key.name,
-    group_id: key.group_id,
+    group_ids: [...(key.group_ids || [])],
     status: key.status === 'quota_exhausted' || key.status === 'expired' ? 'inactive' : key.status,
     use_custom_key: false,
     custom_key: '',
@@ -1433,10 +1441,13 @@ const openGroupSelector = (key: ApiKey) => {
 const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
   groupSelectorKeyId.value = null
   dropdownPosition.value = null
-  if (key.group_id === newGroupId) return
+  // User-facing quick switch is a narrow single-effective-group lane.
+  // Canonical membership stays in group_ids[]; request-time effective group is derived from index 0.
+  const currentEffectiveGroupId = key.group_ids?.[0] ?? null
+  if (currentEffectiveGroupId === newGroupId) return
 
   try {
-    await keysAPI.update(key.id, { group_id: newGroupId })
+    await keysAPI.update(key.id, { group_ids: newGroupId === null ? [] : [newGroupId] })
     appStore.showSuccess(t('keys.groupChangedSuccess'))
     loadApiKeys()
   } catch (error) {
@@ -1459,8 +1470,8 @@ const confirmDelete = (key: ApiKey) => {
 }
 
 const handleSubmit = async () => {
-  // Validate group_id is required
-  if (formData.value.group_id === null) {
+  // Validate group_ids is required
+  if (formData.value.group_ids.length === 0) {
     appStore.showError(t('keys.groupRequired'))
     return
   }
@@ -1517,7 +1528,7 @@ const handleSubmit = async () => {
     if (showEditModal.value && selectedKey.value) {
       await keysAPI.update(selectedKey.value.id, {
         name: formData.value.name,
-        group_id: formData.value.group_id,
+        group_ids: formData.value.group_ids,
         status: formData.value.status,
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
@@ -1532,7 +1543,7 @@ const handleSubmit = async () => {
       const customKey = formData.value.use_custom_key ? formData.value.custom_key : undefined
       await keysAPI.create(
         formData.value.name,
-        formData.value.group_id,
+        formData.value.group_ids,
         customKey,
         ipWhitelist,
         ipBlacklist,
@@ -1583,7 +1594,7 @@ const closeModals = () => {
   selectedKey.value = null
   formData.value = {
     name: '',
-    group_id: null,
+    group_ids: [],
     status: 'active',
     use_custom_key: false,
     custom_key: '',
@@ -1664,7 +1675,7 @@ const resetRateLimitUsage = async () => {
 }
 
 const importToCcswitch = (row: ApiKey) => {
-  const platform = row.group?.platform || 'anthropic'
+  const platform = row.group?.platform || row.groups?.[0]?.platform || 'anthropic'
 
   // For antigravity platform, show client selection dialog
   if (platform === 'antigravity') {
@@ -1679,7 +1690,7 @@ const importToCcswitch = (row: ApiKey) => {
 
 const executeCcsImport = (row: ApiKey, clientType: 'claude' | 'gemini') => {
   const baseUrl = publicSettings.value?.api_base_url || window.location.origin
-  const platform = row.group?.platform || 'anthropic'
+  const platform = row.group?.platform || row.groups?.[0]?.platform || 'anthropic'
 
   // Determine app name and endpoint based on platform and client type
   let app: string

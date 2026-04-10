@@ -425,21 +425,6 @@ func (_c *GroupCreate) AddAPIKeys(v ...*APIKey) *GroupCreate {
 	return _c.AddAPIKeyIDs(ids...)
 }
 
-// AddGrantedAPIKeyIDs adds the "granted_api_keys" edge to the APIKey entity by IDs.
-func (_c *GroupCreate) AddGrantedAPIKeyIDs(ids ...int64) *GroupCreate {
-	_c.mutation.AddGrantedAPIKeyIDs(ids...)
-	return _c
-}
-
-// AddGrantedAPIKeys adds the "granted_api_keys" edges to the APIKey entity.
-func (_c *GroupCreate) AddGrantedAPIKeys(v ...*APIKey) *GroupCreate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddGrantedAPIKeyIDs(ids...)
-}
-
 // AddRedeemCodeIDs adds the "redeem_codes" edge to the RedeemCode entity by IDs.
 func (_c *GroupCreate) AddRedeemCodeIDs(ids ...int64) *GroupCreate {
 	_c.mutation.AddRedeemCodeIDs(ids...)
@@ -867,26 +852,6 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.GrantedAPIKeysIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: false,
-			Table:   group.GrantedAPIKeysTable,
-			Columns: group.GrantedAPIKeysPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &APIKeyGrantedGroupCreate{config: _c.config, mutation: newAPIKeyGrantedGroupMutation(_c.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.RedeemCodesIDs(); len(nodes) > 0 {

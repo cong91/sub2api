@@ -27,7 +27,7 @@
                 :disabled="updatingKeyIds.has(key.id)"
               >
                 <GroupBadge
-                  v-if="key.group_id && key.group"
+                  v-if="key.group_ids?.length && key.group"
                   :name="key.group.name"
                   :platform="key.group.platform"
                   :subscription-type="key.group.subscription_type"
@@ -59,14 +59,14 @@
           @click="changeGroup(selectedKeyForGroup!, null)"
           :class="[
             'flex w-full items-center rounded-lg px-3 py-2 text-sm transition-colors',
-            !selectedKeyForGroup?.group_id
+            !selectedKeyForGroupPrimaryGroupId
               ? 'bg-primary-50 dark:bg-primary-900/20'
               : 'hover:bg-gray-100 dark:hover:bg-dark-700'
           ]"
         >
           <span class="text-gray-500 italic">{{ t('admin.users.none') }}</span>
           <svg
-            v-if="!selectedKeyForGroup?.group_id"
+            v-if="!selectedKeyForGroupPrimaryGroupId"
             class="ml-auto h-4 w-4 shrink-0 text-primary-600 dark:text-primary-400"
             fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"
           ><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
@@ -78,7 +78,7 @@
           @click="changeGroup(selectedKeyForGroup!, group.id)"
           :class="[
             'flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors',
-            selectedKeyForGroup?.group_id === group.id
+            selectedKeyForGroupPrimaryGroupId === group.id
               ? 'bg-primary-50 dark:bg-primary-900/20'
               : 'hover:bg-gray-100 dark:hover:bg-dark-700'
           ]"
@@ -89,7 +89,7 @@
             :subscription-type="group.subscription_type"
             :rate-multiplier="group.rate_multiplier"
             :description="group.description"
-            :selected="selectedKeyForGroup?.group_id === group.id"
+            :selected="selectedKeyForGroupPrimaryGroupId === group.id"
           />
         </button>
       </div>
@@ -126,6 +126,13 @@ const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
 const selectedKeyForGroup = computed(() => {
   if (groupSelectorKeyId.value === null) return null
   return apiKeys.value.find((k) => k.id === groupSelectorKeyId.value) || null
+})
+
+const selectedKeyForGroupPrimaryGroupId = computed(() => {
+  const groupIds = selectedKeyForGroup.value?.group_ids || []
+  // Admin modal currently edits the narrow single-effective-group lane only.
+  // Membership remains canonical in group_ids[]; UI derives the effective execution group from index 0.
+  return groupIds.length > 0 ? groupIds[0] : null
 })
 
 const setGroupButtonRef = (keyId: number, el: Element | ComponentPublicInstance | null) => {
@@ -196,7 +203,8 @@ const closeGroupSelector = () => {
 
 const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
   closeGroupSelector()
-  if (key.group_id === newGroupId || (!key.group_id && newGroupId === null)) return
+  const currentEffectiveGroupId = key.group_ids?.[0] ?? null
+  if (currentEffectiveGroupId === newGroupId) return
 
   updatingKeyIds.value.add(key.id)
   try {
@@ -206,8 +214,8 @@ const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
     if (idx !== -1) {
       apiKeys.value[idx] = result.api_key
     }
-    if (result.auto_granted_group_access && result.granted_group_name) {
-      appStore.showSuccess(t('admin.users.groupChangedWithGrant', { group: result.granted_group_name }))
+    if (result.auto_granted_group_access && result.auto_granted_group_name) {
+      appStore.showSuccess(t('admin.users.groupChangedWithGrant', { group: result.auto_granted_group_name }))
     } else {
       appStore.showSuccess(t('admin.users.groupChangedSuccess'))
     }

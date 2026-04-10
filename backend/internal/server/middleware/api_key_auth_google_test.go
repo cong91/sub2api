@@ -273,14 +273,14 @@ func TestApiKeyAuthWithSubscriptionGoogleSetsGroupContext(t *testing.T) {
 		Concurrency: 3,
 	}
 	apiKey := &service.APIKey{
-		ID:     100,
-		UserID: user.ID,
-		Key:    "test-key",
-		Status: service.StatusActive,
-		User:   user,
-		Group:  group,
+		ID:       100,
+		UserID:   user.ID,
+		Key:      "test-key",
+		Status:   service.StatusActive,
+		User:     user,
+		GroupIDs: []int64{group.ID},
+		Groups:   []*service.Group{group},
 	}
-	apiKey.GroupID = &group.ID
 
 	apiKeyService := service.NewAPIKeyService(
 		fakeAPIKeyRepo{
@@ -627,14 +627,14 @@ func TestApiKeyAuthWithSubscriptionGoogle_SubscriptionLimitExceededReturns429(t 
 		Concurrency: 3,
 	}
 	apiKey := &service.APIKey{
-		ID:     501,
-		UserID: user.ID,
-		Key:    "google-sub-limit",
-		Status: service.StatusActive,
-		User:   user,
-		Group:  group,
+		ID:       501,
+		UserID:   user.ID,
+		Key:      "google-sub-limit",
+		Status:   service.StatusActive,
+		User:     user,
+		GroupIDs: []int64{group.ID},
+		Groups:   []*service.Group{group},
 	}
-	apiKey.GroupID = &group.ID
 
 	apiKeyService := newTestAPIKeyService(fakeAPIKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {

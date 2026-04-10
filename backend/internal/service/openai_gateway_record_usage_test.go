@@ -205,11 +205,11 @@ func TestOpenAIGatewayServiceRecordUsage_UsesUserSpecificGroupRate(t *testing.T)
 		},
 		APIKey: &APIKey{
 			ID:      1001,
-			GroupID: i64p(groupID),
-			Group: &Group{
+			GroupIDs: []int64{groupID},
+			Groups: []*Group{{
 				ID:             groupID,
 				RateMultiplier: groupRate,
-			},
+			}},
 		},
 		User:    &User{ID: 2001},
 		Account: &Account{ID: 3001},
@@ -247,7 +247,7 @@ func TestOpenAIGatewayServiceRecordUsage_IncludesEndpointMetadata(t *testing.T) 
 		},
 		APIKey: &APIKey{
 			ID:    1002,
-			Group: &Group{RateMultiplier: 1},
+			Groups: []*Group{{RateMultiplier: 1}},
 		},
 		User:             &User{ID: 2002},
 		Account:          &Account{ID: 3002},
@@ -283,11 +283,11 @@ func TestOpenAIGatewayServiceRecordUsage_FallsBackToGroupDefaultRateOnResolverEr
 		},
 		APIKey: &APIKey{
 			ID:      1002,
-			GroupID: i64p(groupID),
-			Group: &Group{
+			GroupIDs: []int64{groupID},
+			Groups: []*Group{{
 				ID:             groupID,
 				RateMultiplier: groupRate,
-			},
+			}},
 		},
 		User:    &User{ID: 2002},
 		Account: &Account{ID: 3002},
@@ -322,11 +322,11 @@ func TestOpenAIGatewayServiceRecordUsage_FallsBackToGroupDefaultRateWhenResolver
 		},
 		APIKey: &APIKey{
 			ID:      1003,
-			GroupID: i64p(groupID),
-			Group: &Group{
+			GroupIDs: []int64{groupID},
+			Groups: []*Group{{
 				ID:             groupID,
 				RateMultiplier: groupRate,
-			},
+			}},
 		},
 		User:    &User{ID: 2003},
 		Account: &Account{ID: 3003},
@@ -871,7 +871,7 @@ func TestOpenAIGatewayServiceRecordUsage_UsesRequestedModelAndUpstreamModelMetad
 			Duration:     2 * time.Second,
 			FirstTokenMs: func() *int { v := 120; return &v }(),
 		},
-		APIKey:    &APIKey{ID: 10, GroupID: i64p(11), Group: &Group{ID: 11, RateMultiplier: 1.2}},
+		APIKey:    &APIKey{ID: 10, GroupIDs: []int64{11}, Groups: []*Group{{ID: 11, RateMultiplier: 1.2}}},
 		User:      &User{ID: 20},
 		Account:   &Account{ID: 30},
 		UserAgent: "codex-cli/1.0",
@@ -1030,7 +1030,7 @@ func TestOpenAIGatewayServiceRecordUsage_SubscriptionBillingSetsSubscriptionFiel
 			Model:     "gpt-5.1",
 			Duration:  time.Second,
 		},
-		APIKey:       &APIKey{ID: 100, GroupID: i64p(88), Group: &Group{ID: 88, SubscriptionType: SubscriptionTypeSubscription}},
+		APIKey:       &APIKey{ID: 100, GroupIDs: []int64{88}, Groups: []*Group{{ID: 88, SubscriptionType: SubscriptionTypeSubscription}}},
 		User:         &User{ID: 200},
 		Account:      &Account{ID: 300},
 		Subscription: subscription,

@@ -25,7 +25,7 @@ func setupAPIKeyHandler(adminSvc service.AdminService) *gin.Engine {
 
 func TestAdminAPIKeyHandler_UpdateGroup_InvalidID(t *testing.T) {
 	router := setupAPIKeyHandler(newStubAdminService())
-	body := `{"group_id": 2}`
+	body := `{"group_ids": [2]}`
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/api-keys/abc", bytes.NewBufferString(body))
@@ -50,7 +50,7 @@ func TestAdminAPIKeyHandler_UpdateGroup_InvalidJSON(t *testing.T) {
 
 func TestAdminAPIKeyHandler_UpdateGroup_KeyNotFound(t *testing.T) {
 	router := setupAPIKeyHandler(newStubAdminService())
-	body := `{"group_id": 2}`
+	body := `{"group_ids": [2]}`
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/api-keys/999", bytes.NewBufferString(body))
@@ -63,7 +63,7 @@ func TestAdminAPIKeyHandler_UpdateGroup_KeyNotFound(t *testing.T) {
 
 func TestAdminAPIKeyHandler_UpdateGroup_BindGroup(t *testing.T) {
 	router := setupAPIKeyHandler(newStubAdminService())
-	body := `{"group_id": 2}`
+	body := `{"group_ids": [2]}`
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/api-keys/10", bytes.NewBufferString(body))
@@ -81,23 +81,27 @@ func TestAdminAPIKeyHandler_UpdateGroup_BindGroup(t *testing.T) {
 
 	var data struct {
 		APIKey struct {
-			ID      int64  `json:"id"`
-			GroupID *int64 `json:"group_id"`
+			ID       int64   `json:"id"`
+			GroupIDs []int64 `json:"group_ids"`
 		} `json:"api_key"`
 		AutoGrantedGroupAccess bool `json:"auto_granted_group_access"`
 	}
 	require.NoError(t, json.Unmarshal(resp.Data, &data))
 	require.Equal(t, int64(10), data.APIKey.ID)
-	require.NotNil(t, data.APIKey.GroupID)
-	require.Equal(t, int64(2), *data.APIKey.GroupID)
+	if len(data.APIKey.GroupIDs) == 0 {
+		var raw map[string]any
+		require.NoError(t, json.Unmarshal(resp.Data, &raw))
+		t.Fatalf("expected api_key.group_ids, got raw payload: %s parsed=%v", string(resp.Data), raw)
+	}
+	require.Equal(t, []int64{2}, data.APIKey.GroupIDs)
 }
 
 func TestAdminAPIKeyHandler_UpdateGroup_Unbind(t *testing.T) {
 	svc := newStubAdminService()
 	gid := int64(2)
-	svc.apiKeys[0].GroupID = &gid
+	svc.apiKeys[0].GroupIDs = []int64{gid}
 	router := setupAPIKeyHandler(svc)
-	body := `{"group_id": 0}`
+	body := `{"group_ids": []}`
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/api-keys/10", bytes.NewBufferString(body))
@@ -109,12 +113,12 @@ func TestAdminAPIKeyHandler_UpdateGroup_Unbind(t *testing.T) {
 	var resp struct {
 		Data struct {
 			APIKey struct {
-				GroupID *int64 `json:"group_id"`
+				GroupIDs []int64 `json:"group_ids"`
 			} `json:"api_key"`
 		} `json:"data"`
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
-	require.Nil(t, resp.Data.APIKey.GroupID)
+	require.Empty(t, resp.Data.APIKey.GroupIDs)
 }
 
 func TestAdminAPIKeyHandler_UpdateGroup_ServiceError(t *testing.T) {
@@ -123,7 +127,7 @@ func TestAdminAPIKeyHandler_UpdateGroup_ServiceError(t *testing.T) {
 		err:              errors.New("internal failure"),
 	}
 	router := setupAPIKeyHandler(svc)
-	body := `{"group_id": 2}`
+	body := `{"group_ids": [2]}`
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/api-keys/10", bytes.NewBufferString(body))
@@ -133,7 +137,7 @@ func TestAdminAPIKeyHandler_UpdateGroup_ServiceError(t *testing.T) {
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 }
 
-// H2: empty body → group_id is nil → no-op, returns original key
+// H2: empty body → group_ids is nil → no-op, returns original key
 func TestAdminAPIKeyHandler_UpdateGroup_EmptyBody_NoChange(t *testing.T) {
 	router := setupAPIKeyHandler(newStubAdminService())
 
@@ -157,6 +161,18 @@ func TestAdminAPIKeyHandler_UpdateGroup_EmptyBody_NoChange(t *testing.T) {
 	require.Equal(t, int64(10), resp.Data.APIKey.ID)
 }
 
+func TestAdminAPIKeyHandler_UpdateGroup_RejectsMultipleGroups(t *testing.T) {
+	router := setupAPIKeyHandler(newStubAdminService())
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/api-keys/10", bytes.NewBufferString(`{"group_ids": [2,3]}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "group_ids must contain at most one group")
+}
+
 // M2: service returns GROUP_NOT_ACTIVE → handler maps to 400
 func TestAdminAPIKeyHandler_UpdateGroup_GroupNotActive(t *testing.T) {
 	svc := &failingUpdateGroupService{
@@ -166,7 +182,7 @@ func TestAdminAPIKeyHandler_UpdateGroup_GroupNotActive(t *testing.T) {
 	router := setupAPIKeyHandler(svc)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/api-keys/10", bytes.NewBufferString(`{"group_id": 5}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/api-keys/10", bytes.NewBufferString(`{"group_ids": [5]}`))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(rec, req)
 
@@ -178,12 +194,12 @@ func TestAdminAPIKeyHandler_UpdateGroup_GroupNotActive(t *testing.T) {
 func TestAdminAPIKeyHandler_UpdateGroup_NegativeGroupID(t *testing.T) {
 	svc := &failingUpdateGroupService{
 		stubAdminService: newStubAdminService(),
-		err:              infraerrors.BadRequest("INVALID_GROUP_ID", "group_id must be non-negative"),
+		err:              infraerrors.BadRequest("INVALID_GROUP_ID", "group_ids must contain positive group IDs"),
 	}
 	router := setupAPIKeyHandler(svc)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/api-keys/10", bytes.NewBufferString(`{"group_id": -5}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/api-keys/10", bytes.NewBufferString(`{"group_ids": [-5]}`))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(rec, req)
 

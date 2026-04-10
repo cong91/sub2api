@@ -27,8 +27,8 @@ const (
 	FieldKey = "key"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
-	// FieldGroupID holds the string denoting the group_id field in the database.
-	FieldGroupID = "group_id"
+	// FieldGroupIds holds the string denoting the group_ids field in the database.
+	FieldGroupIds = "group_ids"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
@@ -63,14 +63,8 @@ const (
 	FieldWindow7dStart = "window_7d_start"
 	// EdgeUser holds the string denoting the user edge name in mutations.
 	EdgeUser = "user"
-	// EdgeGroup holds the string denoting the group edge name in mutations.
-	EdgeGroup = "group"
-	// EdgeGrantedGroups holds the string denoting the granted_groups edge name in mutations.
-	EdgeGrantedGroups = "granted_groups"
 	// EdgeUsageLogs holds the string denoting the usage_logs edge name in mutations.
 	EdgeUsageLogs = "usage_logs"
-	// EdgeAPIKeyGrantedGroups holds the string denoting the api_key_granted_groups edge name in mutations.
-	EdgeAPIKeyGrantedGroups = "api_key_granted_groups"
 	// Table holds the table name of the apikey in the database.
 	Table = "api_keys"
 	// UserTable is the table that holds the user relation/edge.
@@ -80,18 +74,6 @@ const (
 	UserInverseTable = "users"
 	// UserColumn is the table column denoting the user relation/edge.
 	UserColumn = "user_id"
-	// GroupTable is the table that holds the group relation/edge.
-	GroupTable = "api_keys"
-	// GroupInverseTable is the table name for the Group entity.
-	// It exists in this package in order to avoid circular dependency with the "group" package.
-	GroupInverseTable = "groups"
-	// GroupColumn is the table column denoting the group relation/edge.
-	GroupColumn = "group_id"
-	// GrantedGroupsTable is the table that holds the granted_groups relation/edge. The primary key declared below.
-	GrantedGroupsTable = "api_key_groups"
-	// GrantedGroupsInverseTable is the table name for the Group entity.
-	// It exists in this package in order to avoid circular dependency with the "group" package.
-	GrantedGroupsInverseTable = "groups"
 	// UsageLogsTable is the table that holds the usage_logs relation/edge.
 	UsageLogsTable = "usage_logs"
 	// UsageLogsInverseTable is the table name for the UsageLog entity.
@@ -99,13 +81,6 @@ const (
 	UsageLogsInverseTable = "usage_logs"
 	// UsageLogsColumn is the table column denoting the usage_logs relation/edge.
 	UsageLogsColumn = "api_key_id"
-	// APIKeyGrantedGroupsTable is the table that holds the api_key_granted_groups relation/edge.
-	APIKeyGrantedGroupsTable = "api_key_groups"
-	// APIKeyGrantedGroupsInverseTable is the table name for the APIKeyGrantedGroup entity.
-	// It exists in this package in order to avoid circular dependency with the "apikeygrantedgroup" package.
-	APIKeyGrantedGroupsInverseTable = "api_key_groups"
-	// APIKeyGrantedGroupsColumn is the table column denoting the api_key_granted_groups relation/edge.
-	APIKeyGrantedGroupsColumn = "api_key_id"
 )
 
 // Columns holds all SQL columns for apikey fields.
@@ -117,7 +92,7 @@ var Columns = []string{
 	FieldUserID,
 	FieldKey,
 	FieldName,
-	FieldGroupID,
+	FieldGroupIds,
 	FieldStatus,
 	FieldLastUsedAt,
 	FieldIPWhitelist,
@@ -136,16 +111,21 @@ var Columns = []string{
 	FieldWindow7dStart,
 }
 
-var (
-	// GrantedGroupsPrimaryKey and GrantedGroupsColumn2 are the table columns denoting the
-	// primary key for the granted_groups relation (M2M).
-	GrantedGroupsPrimaryKey = []string{"group_id", "api_key_id"}
-)
+// ForeignKeys holds the SQL foreign-keys that are owned by the "api_keys"
+// table and are not defined as standalone fields in the schema.
+var ForeignKeys = []string{
+	"group_api_keys",
+}
 
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
+			return true
+		}
+	}
+	for i := range ForeignKeys {
+		if column == ForeignKeys[i] {
 			return true
 		}
 	}
@@ -170,6 +150,8 @@ var (
 	KeyValidator func(string) error
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
+	// DefaultGroupIds holds the default value on creation for the "group_ids" field.
+	DefaultGroupIds []int64
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -228,11 +210,6 @@ func ByKey(opts ...sql.OrderTermOption) OrderOption {
 // ByName orders the results by the name field.
 func ByName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldName, opts...).ToFunc()
-}
-
-// ByGroupID orders the results by the group_id field.
-func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.
@@ -312,27 +289,6 @@ func ByUserField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
-// ByGroupField orders the results by group field.
-func ByGroupField(field string, opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newGroupStep(), sql.OrderByField(field, opts...))
-	}
-}
-
-// ByGrantedGroupsCount orders the results by granted_groups count.
-func ByGrantedGroupsCount(opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newGrantedGroupsStep(), opts...)
-	}
-}
-
-// ByGrantedGroups orders the results by granted_groups terms.
-func ByGrantedGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newGrantedGroupsStep(), append([]sql.OrderTerm{term}, terms...)...)
-	}
-}
-
 // ByUsageLogsCount orders the results by usage_logs count.
 func ByUsageLogsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -346,20 +302,6 @@ func ByUsageLogs(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newUsageLogsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
-
-// ByAPIKeyGrantedGroupsCount orders the results by api_key_granted_groups count.
-func ByAPIKeyGrantedGroupsCount(opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newAPIKeyGrantedGroupsStep(), opts...)
-	}
-}
-
-// ByAPIKeyGrantedGroups orders the results by api_key_granted_groups terms.
-func ByAPIKeyGrantedGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newAPIKeyGrantedGroupsStep(), append([]sql.OrderTerm{term}, terms...)...)
-	}
-}
 func newUserStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -367,31 +309,10 @@ func newUserStep() *sqlgraph.Step {
 		sqlgraph.Edge(sqlgraph.M2O, true, UserTable, UserColumn),
 	)
 }
-func newGroupStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(GroupInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, true, GroupTable, GroupColumn),
-	)
-}
-func newGrantedGroupsStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(GrantedGroupsInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2M, true, GrantedGroupsTable, GrantedGroupsPrimaryKey...),
-	)
-}
 func newUsageLogsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UsageLogsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, UsageLogsTable, UsageLogsColumn),
-	)
-}
-func newAPIKeyGrantedGroupsStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(APIKeyGrantedGroupsInverseTable, APIKeyGrantedGroupsColumn),
-		sqlgraph.Edge(sqlgraph.O2M, true, APIKeyGrantedGroupsTable, APIKeyGrantedGroupsColumn),
 	)
 }

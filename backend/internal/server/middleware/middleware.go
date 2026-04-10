@@ -110,7 +110,7 @@ func RequireGroupAssignment(settingService *service.SettingService, writeError G
 			c.Next()
 			return
 		}
-		hasGroup := apiKey.GroupID != nil || len(apiKey.CanonicalGrantedGroups()) > 0
+		hasGroup := len(apiKey.CanonicalGrantedGroups()) > 0
 		if hasGroup {
 			c.Next()
 			return

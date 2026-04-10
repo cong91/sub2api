@@ -699,12 +699,12 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 				if apiKey.User != nil {
 					entry.UserID = &apiKey.User.ID
 				}
-				if apiKey.GroupID != nil {
-					entry.GroupID = apiKey.GroupID
+				if gid := apiKey.EffectiveGroupID(); gid != nil {
+					entry.GroupID = gid
 				}
 				// Prefer group platform if present (more stable than inferring from path).
-				if apiKey.Group != nil && apiKey.Group.Platform != "" {
-					entry.Platform = apiKey.Group.Platform
+				if group := apiKey.EffectiveGroup(); group != nil && group.Platform != "" {
+					entry.Platform = group.Platform
 				}
 			}
 
@@ -899,12 +899,12 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 			if apiKey.User != nil {
 				entry.UserID = &apiKey.User.ID
 			}
-			if apiKey.GroupID != nil {
-				entry.GroupID = apiKey.GroupID
+			if gid := apiKey.EffectiveGroupID(); gid != nil {
+				entry.GroupID = gid
 			}
 			// Prefer group platform if present (more stable than inferring from path).
-			if apiKey.Group != nil && apiKey.Group.Platform != "" {
-				entry.Platform = apiKey.Group.Platform
+			if group := apiKey.EffectiveGroup(); group != nil && group.Platform != "" {
+				entry.Platform = group.Platform
 			}
 		}
 
@@ -1055,8 +1055,10 @@ func parseOpsErrorResponse(body []byte) parsedOpsError {
 }
 
 func resolveOpsPlatform(apiKey *service.APIKey, fallback string) string {
-	if apiKey != nil && apiKey.Group != nil && apiKey.Group.Platform != "" {
-		return apiKey.Group.Platform
+	if apiKey != nil {
+		if group := apiKey.EffectiveGroup(); group != nil && group.Platform != "" {
+			return group.Platform
+		}
 	}
 	return fallback
 }

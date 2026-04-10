@@ -149,14 +149,11 @@ type APIKeyAuthCacheInvalidator interface {
 
 // CreateAPIKeyRequest 创建API Key请求
 type CreateAPIKeyRequest struct {
-	Name    string `json:"name"`
-	GroupID *int64 `json:"group_id"`
-	// GrantedGroupIDs enables multi-group API key provisioning while keeping
-	// GroupID as compatibility/default routing group.
-	GrantedGroupIDs []int64  `json:"granted_group_ids,omitempty"`
-	CustomKey       *string  `json:"custom_key"`   // 可选的自定义key
-	IPWhitelist     []string `json:"ip_whitelist"` // IP 白名单
-	IPBlacklist     []string `json:"ip_blacklist"` // IP 黑名单
+	Name       string  `json:"name"`
+	GroupIDs   []int64 `json:"group_ids"`
+	CustomKey  *string `json:"custom_key"`   // 可选的自定义key
+	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单
+	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单
 
 	// Quota fields
 	Quota         float64 `json:"quota"`           // Quota limit in USD (0 = unlimited)
@@ -170,12 +167,11 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest 更新API Key请求
 type UpdateAPIKeyRequest struct {
-	Name            *string  `json:"name"`
-	GroupID         *int64   `json:"group_id"`
-	GrantedGroupIDs *[]int64 `json:"granted_group_ids,omitempty"`
-	Status          *string  `json:"status"`
-	IPWhitelist     []string `json:"ip_whitelist"` // IP 白名单（空数组清空）
-	IPBlacklist     []string `json:"ip_blacklist"` // IP 黑名单（空数组清空）
+	Name      *string  `json:"name"`
+	GroupIDs  *[]int64 `json:"group_ids"`
+	Status    *string  `json:"status"`
+	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单（空数组清空）
+	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单（空数组清空）
 
 	// Quota fields
 	Quota           *float64   `json:"quota"`       // Quota limit in USD (nil = no change, 0 = unlimited)
@@ -351,28 +347,21 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		}
 	}
 
-	requestedGrantedIDs := make([]int64, 0, len(req.GrantedGroupIDs)+1)
-	seenGrantedIDs := make(map[int64]struct{}, len(req.GrantedGroupIDs)+1)
-	appendGrantedID := func(id int64) {
-		if id <= 0 {
-			return
+	requestedGroupIDs := make([]int64, 0, len(req.GroupIDs))
+	seenGroupIDs := make(map[int64]struct{}, len(req.GroupIDs))
+	for _, gid := range req.GroupIDs {
+		if gid <= 0 {
+			return nil, infraerrors.BadRequest("INVALID_GROUP_ID", "group_ids must contain positive group IDs")
 		}
-		if _, ok := seenGrantedIDs[id]; ok {
-			return
+		if _, ok := seenGroupIDs[gid]; ok {
+			continue
 		}
-		seenGrantedIDs[id] = struct{}{}
-		requestedGrantedIDs = append(requestedGrantedIDs, id)
+		seenGroupIDs[gid] = struct{}{}
+		requestedGroupIDs = append(requestedGroupIDs, gid)
 	}
 
-	for _, gid := range req.GrantedGroupIDs {
-		appendGrantedID(gid)
-	}
-	if req.GroupID != nil {
-		appendGrantedID(*req.GroupID)
-	}
-
-	resolvedGrantedGroups := make([]*Group, 0, len(requestedGrantedIDs))
-	for _, gid := range requestedGrantedIDs {
+	resolvedGroups := make([]*Group, 0, len(requestedGroupIDs))
+	for _, gid := range requestedGroupIDs {
 		group, err := s.groupRepo.GetByID(ctx, gid)
 		if err != nil {
 			return nil, fmt.Errorf("get group: %w", err)
@@ -380,7 +369,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		if !s.canUserBindGroup(ctx, user, group) {
 			return nil, ErrGroupNotAllowed
 		}
-		resolvedGrantedGroups = append(resolvedGrantedGroups, group)
+		resolvedGroups = append(resolvedGroups, group)
 	}
 
 	var key string
@@ -420,12 +409,12 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 
 	// 创建API Key记录
 	apiKey := &APIKey{
-		UserID:        userID,
-		Key:           key,
-		Name:          req.Name,
-		GroupID:       nil,
-		GrantedGroups: resolvedGrantedGroups,
-		Status:        StatusActive,
+		UserID:      userID,
+		Key:         key,
+		Name:        req.Name,
+		GroupIDs:    requestedGroupIDs,
+		Groups:      resolvedGroups,
+		Status:      StatusActive,
 		IPWhitelist:   req.IPWhitelist,
 		IPBlacklist:   req.IPBlacklist,
 		Quota:         req.Quota,
@@ -443,19 +432,6 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 
 	if err := s.apiKeyRepo.Create(ctx, apiKey); err != nil {
 		return nil, fmt.Errorf("create api key: %w", err)
-	}
-	if req.GroupID != nil {
-		for _, granted := range apiKey.GrantedGroups {
-			if granted != nil && granted.ID == *req.GroupID {
-				apiKey.Group = granted
-				gid := granted.ID
-				apiKey.GroupID = &gid
-				break
-			}
-		}
-	}
-	if apiKey.Group == nil {
-		apiKey.Group = apiKey.EffectiveGroup()
 	}
 
 	s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
@@ -578,60 +554,22 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		apiKey.Name = *req.Name
 	}
 
-	var user *User
-	if req.GroupID != nil || req.GrantedGroupIDs != nil {
-		var err error
-		user, err = s.userRepo.GetByID(ctx, userID)
+	if req.GroupIDs != nil {
+		user, err := s.userRepo.GetByID(ctx, userID)
 		if err != nil {
 			return nil, fmt.Errorf("get user: %w", err)
 		}
-	}
-
-	var resolvedDefaultGroup *Group
-	if req.GroupID != nil {
-		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
-		if err != nil {
-			return nil, fmt.Errorf("get group: %w", err)
-		}
-
-		if !s.canUserBindGroup(ctx, user, group) {
-			return nil, ErrGroupNotAllowed
-		}
-		resolvedDefaultGroup = group
-		if req.GrantedGroupIDs == nil {
-			// 兼容旧行为：仅 group_id 更新表示单分组 key。
-			apiKey.GrantedGroups = []*Group{group}
-		}
-	}
-
-	if req.GrantedGroupIDs != nil {
-		requestedGrantedIDs := make([]int64, 0, len(*req.GrantedGroupIDs)+1)
-		seen := make(map[int64]struct{}, len(*req.GrantedGroupIDs)+1)
-		appendGrantedID := func(id int64) error {
-			if id <= 0 {
-				return infraerrors.BadRequest("INVALID_GROUP_ID", "granted_group_ids must contain positive group IDs")
+		requestedGroupIDs := make([]int64, 0, len(*req.GroupIDs))
+		seen := make(map[int64]struct{}, len(*req.GroupIDs))
+		resolved := make([]*Group, 0, len(*req.GroupIDs))
+		for _, gid := range *req.GroupIDs {
+			if gid <= 0 {
+				return nil, infraerrors.BadRequest("INVALID_GROUP_ID", "group_ids must contain positive group IDs")
 			}
-			if _, ok := seen[id]; ok {
-				return nil
+			if _, ok := seen[gid]; ok {
+				continue
 			}
-			seen[id] = struct{}{}
-			requestedGrantedIDs = append(requestedGrantedIDs, id)
-			return nil
-		}
-
-		for _, gid := range *req.GrantedGroupIDs {
-			if err := appendGrantedID(gid); err != nil {
-				return nil, err
-			}
-		}
-		if req.GroupID != nil && *req.GroupID > 0 {
-			if err := appendGrantedID(*req.GroupID); err != nil {
-				return nil, err
-			}
-		}
-
-		resolved := make([]*Group, 0, len(requestedGrantedIDs))
-		for _, gid := range requestedGrantedIDs {
+			seen[gid] = struct{}{}
 			group, err := s.groupRepo.GetByID(ctx, gid)
 			if err != nil {
 				return nil, fmt.Errorf("get group: %w", err)
@@ -639,33 +577,11 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			if !s.canUserBindGroup(ctx, user, group) {
 				return nil, ErrGroupNotAllowed
 			}
-			if req.GroupID != nil && gid == *req.GroupID {
-				resolvedDefaultGroup = group
-			}
+			requestedGroupIDs = append(requestedGroupIDs, gid)
 			resolved = append(resolved, group)
 		}
-		apiKey.GrantedGroups = resolved
-		if len(resolved) == 0 {
-			apiKey.Group = nil
-			apiKey.GroupID = nil
-		} else if resolvedDefaultGroup != nil {
-			apiKey.Group = resolvedDefaultGroup
-			gid := resolvedDefaultGroup.ID
-			apiKey.GroupID = &gid
-		} else {
-			apiKey.Group = apiKey.EffectiveGroup()
-			apiKey.GroupID = nil
-		}
-	}
-
-	if req.GroupID != nil {
-		if resolvedDefaultGroup == nil {
-			apiKey.GroupID = nil
-			apiKey.Group = apiKey.EffectiveGroup()
-		}
-	} else if req.GrantedGroupIDs != nil {
-		apiKey.GroupID = nil
-		apiKey.Group = apiKey.EffectiveGroup()
+		apiKey.GroupIDs = requestedGroupIDs
+		apiKey.Groups = resolved
 	}
 
 	if req.Status != nil {

@@ -567,21 +567,6 @@ func (_u *GroupUpdate) AddAPIKeys(v ...*APIKey) *GroupUpdate {
 	return _u.AddAPIKeyIDs(ids...)
 }
 
-// AddGrantedAPIKeyIDs adds the "granted_api_keys" edge to the APIKey entity by IDs.
-func (_u *GroupUpdate) AddGrantedAPIKeyIDs(ids ...int64) *GroupUpdate {
-	_u.mutation.AddGrantedAPIKeyIDs(ids...)
-	return _u
-}
-
-// AddGrantedAPIKeys adds the "granted_api_keys" edges to the APIKey entity.
-func (_u *GroupUpdate) AddGrantedAPIKeys(v ...*APIKey) *GroupUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddGrantedAPIKeyIDs(ids...)
-}
-
 // AddRedeemCodeIDs adds the "redeem_codes" edge to the RedeemCode entity by IDs.
 func (_u *GroupUpdate) AddRedeemCodeIDs(ids ...int64) *GroupUpdate {
 	_u.mutation.AddRedeemCodeIDs(ids...)
@@ -681,27 +666,6 @@ func (_u *GroupUpdate) RemoveAPIKeys(v ...*APIKey) *GroupUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveAPIKeyIDs(ids...)
-}
-
-// ClearGrantedAPIKeys clears all "granted_api_keys" edges to the APIKey entity.
-func (_u *GroupUpdate) ClearGrantedAPIKeys() *GroupUpdate {
-	_u.mutation.ClearGrantedAPIKeys()
-	return _u
-}
-
-// RemoveGrantedAPIKeyIDs removes the "granted_api_keys" edge to APIKey entities by IDs.
-func (_u *GroupUpdate) RemoveGrantedAPIKeyIDs(ids ...int64) *GroupUpdate {
-	_u.mutation.RemoveGrantedAPIKeyIDs(ids...)
-	return _u
-}
-
-// RemoveGrantedAPIKeys removes "granted_api_keys" edges to APIKey entities.
-func (_u *GroupUpdate) RemoveGrantedAPIKeys(v ...*APIKey) *GroupUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveGrantedAPIKeyIDs(ids...)
 }
 
 // ClearRedeemCodes clears all "redeem_codes" edges to the RedeemCode entity.
@@ -1091,63 +1055,6 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.GrantedAPIKeysCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: false,
-			Table:   group.GrantedAPIKeysTable,
-			Columns: group.GrantedAPIKeysPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
-			},
-		}
-		createE := &APIKeyGrantedGroupCreate{config: _u.config, mutation: newAPIKeyGrantedGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedGrantedAPIKeysIDs(); len(nodes) > 0 && !_u.mutation.GrantedAPIKeysCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: false,
-			Table:   group.GrantedAPIKeysTable,
-			Columns: group.GrantedAPIKeysPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &APIKeyGrantedGroupCreate{config: _u.config, mutation: newAPIKeyGrantedGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.GrantedAPIKeysIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: false,
-			Table:   group.GrantedAPIKeysTable,
-			Columns: group.GrantedAPIKeysPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &APIKeyGrantedGroupCreate{config: _u.config, mutation: newAPIKeyGrantedGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.RedeemCodesCleared() {
@@ -1951,21 +1858,6 @@ func (_u *GroupUpdateOne) AddAPIKeys(v ...*APIKey) *GroupUpdateOne {
 	return _u.AddAPIKeyIDs(ids...)
 }
 
-// AddGrantedAPIKeyIDs adds the "granted_api_keys" edge to the APIKey entity by IDs.
-func (_u *GroupUpdateOne) AddGrantedAPIKeyIDs(ids ...int64) *GroupUpdateOne {
-	_u.mutation.AddGrantedAPIKeyIDs(ids...)
-	return _u
-}
-
-// AddGrantedAPIKeys adds the "granted_api_keys" edges to the APIKey entity.
-func (_u *GroupUpdateOne) AddGrantedAPIKeys(v ...*APIKey) *GroupUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddGrantedAPIKeyIDs(ids...)
-}
-
 // AddRedeemCodeIDs adds the "redeem_codes" edge to the RedeemCode entity by IDs.
 func (_u *GroupUpdateOne) AddRedeemCodeIDs(ids ...int64) *GroupUpdateOne {
 	_u.mutation.AddRedeemCodeIDs(ids...)
@@ -2065,27 +1957,6 @@ func (_u *GroupUpdateOne) RemoveAPIKeys(v ...*APIKey) *GroupUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveAPIKeyIDs(ids...)
-}
-
-// ClearGrantedAPIKeys clears all "granted_api_keys" edges to the APIKey entity.
-func (_u *GroupUpdateOne) ClearGrantedAPIKeys() *GroupUpdateOne {
-	_u.mutation.ClearGrantedAPIKeys()
-	return _u
-}
-
-// RemoveGrantedAPIKeyIDs removes the "granted_api_keys" edge to APIKey entities by IDs.
-func (_u *GroupUpdateOne) RemoveGrantedAPIKeyIDs(ids ...int64) *GroupUpdateOne {
-	_u.mutation.RemoveGrantedAPIKeyIDs(ids...)
-	return _u
-}
-
-// RemoveGrantedAPIKeys removes "granted_api_keys" edges to APIKey entities.
-func (_u *GroupUpdateOne) RemoveGrantedAPIKeys(v ...*APIKey) *GroupUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveGrantedAPIKeyIDs(ids...)
 }
 
 // ClearRedeemCodes clears all "redeem_codes" edges to the RedeemCode entity.
@@ -2505,63 +2376,6 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.GrantedAPIKeysCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: false,
-			Table:   group.GrantedAPIKeysTable,
-			Columns: group.GrantedAPIKeysPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
-			},
-		}
-		createE := &APIKeyGrantedGroupCreate{config: _u.config, mutation: newAPIKeyGrantedGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedGrantedAPIKeysIDs(); len(nodes) > 0 && !_u.mutation.GrantedAPIKeysCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: false,
-			Table:   group.GrantedAPIKeysTable,
-			Columns: group.GrantedAPIKeysPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &APIKeyGrantedGroupCreate{config: _u.config, mutation: newAPIKeyGrantedGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.GrantedAPIKeysIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: false,
-			Table:   group.GrantedAPIKeysTable,
-			Columns: group.GrantedAPIKeysPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &APIKeyGrantedGroupCreate{config: _u.config, mutation: newAPIKeyGrantedGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.RedeemCodesCleared() {

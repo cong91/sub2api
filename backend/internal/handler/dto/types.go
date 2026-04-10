@@ -30,15 +30,13 @@ type AdminUser struct {
 }
 
 type APIKey struct {
-	ID              int64      `json:"id"`
-	UserID          int64      `json:"user_id"`
-	Key             string     `json:"key"`
-	Name            string     `json:"name"`
-	GroupID         *int64     `json:"group_id"`
-	DefaultGroupID  *int64     `json:"default_group_id,omitempty"`
-	GrantedGroupIDs []int64    `json:"granted_group_ids,omitempty"`
-	GrantedGroups   []Group    `json:"granted_groups,omitempty"`
-	Status          string     `json:"status"`
+	ID           int64      `json:"id"`
+	UserID       int64      `json:"user_id"`
+	Key          string     `json:"key"`
+	Name         string     `json:"name"`
+	GroupIDs     []int64    `json:"group_ids,omitempty"`
+	Groups       []Group    `json:"groups,omitempty"`
+	Status       string     `json:"status"`
 	IPWhitelist     []string   `json:"ip_whitelist"`
 	IPBlacklist     []string   `json:"ip_blacklist"`
 	LastUsedAt      *time.Time `json:"last_used_at"`

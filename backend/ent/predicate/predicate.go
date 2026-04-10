@@ -9,9 +9,6 @@ import (
 // APIKey is the predicate function for apikey builders.
 type APIKey func(*sql.Selector)
 
-// APIKeyGrantedGroup is the predicate function for apikeygrantedgroup builders.
-type APIKeyGrantedGroup func(*sql.Selector)
-
 // Account is the predicate function for account builders.
 type Account func(*sql.Selector)
 

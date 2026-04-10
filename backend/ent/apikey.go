@@ -11,7 +11,6 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
-	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 )
 
@@ -32,8 +31,8 @@ type APIKey struct {
 	Key string `json:"key,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
-	// GroupID holds the value of the "group_id" field.
-	GroupID *int64 `json:"group_id,omitempty"`
+	// GroupIds holds the value of the "group_ids" field.
+	GroupIds []int64 `json:"group_ids,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// Last usage time of this API key
@@ -68,25 +67,20 @@ type APIKey struct {
 	Window7dStart *time.Time `json:"window_7d_start,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the APIKeyQuery when eager-loading is set.
-	Edges        APIKeyEdges `json:"edges"`
-	selectValues sql.SelectValues
+	Edges          APIKeyEdges `json:"edges"`
+	group_api_keys *int64
+	selectValues   sql.SelectValues
 }
 
 // APIKeyEdges holds the relations/edges for other nodes in the graph.
 type APIKeyEdges struct {
 	// User holds the value of the user edge.
 	User *User `json:"user,omitempty"`
-	// Group holds the value of the group edge.
-	Group *Group `json:"group,omitempty"`
-	// GrantedGroups holds the value of the granted_groups edge.
-	GrantedGroups []*Group `json:"granted_groups,omitempty"`
 	// UsageLogs holds the value of the usage_logs edge.
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
-	// APIKeyGrantedGroups holds the value of the api_key_granted_groups edge.
-	APIKeyGrantedGroups []*APIKeyGrantedGroup `json:"api_key_granted_groups,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
+	loadedTypes [2]bool
 }
 
 // UserOrErr returns the User value or an error if the edge
@@ -100,42 +94,13 @@ func (e APIKeyEdges) UserOrErr() (*User, error) {
 	return nil, &NotLoadedError{edge: "user"}
 }
 
-// GroupOrErr returns the Group value or an error if the edge
-// was not loaded in eager-loading, or loaded but was not found.
-func (e APIKeyEdges) GroupOrErr() (*Group, error) {
-	if e.Group != nil {
-		return e.Group, nil
-	} else if e.loadedTypes[1] {
-		return nil, &NotFoundError{label: group.Label}
-	}
-	return nil, &NotLoadedError{edge: "group"}
-}
-
-// GrantedGroupsOrErr returns the GrantedGroups value or an error if the edge
-// was not loaded in eager-loading.
-func (e APIKeyEdges) GrantedGroupsOrErr() ([]*Group, error) {
-	if e.loadedTypes[2] {
-		return e.GrantedGroups, nil
-	}
-	return nil, &NotLoadedError{edge: "granted_groups"}
-}
-
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e APIKeyEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[1] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
-}
-
-// APIKeyGrantedGroupsOrErr returns the APIKeyGrantedGroups value or an error if the edge
-// was not loaded in eager-loading.
-func (e APIKeyEdges) APIKeyGrantedGroupsOrErr() ([]*APIKeyGrantedGroup, error) {
-	if e.loadedTypes[4] {
-		return e.APIKeyGrantedGroups, nil
-	}
-	return nil, &NotLoadedError{edge: "api_key_granted_groups"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -143,16 +108,18 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case apikey.FieldIPWhitelist, apikey.FieldIPBlacklist:
+		case apikey.FieldGroupIds, apikey.FieldIPWhitelist, apikey.FieldIPBlacklist:
 			values[i] = new([]byte)
 		case apikey.FieldQuota, apikey.FieldQuotaUsed, apikey.FieldRateLimit5h, apikey.FieldRateLimit1d, apikey.FieldRateLimit7d, apikey.FieldUsage5h, apikey.FieldUsage1d, apikey.FieldUsage7d:
 			values[i] = new(sql.NullFloat64)
-		case apikey.FieldID, apikey.FieldUserID, apikey.FieldGroupID:
+		case apikey.FieldID, apikey.FieldUserID:
 			values[i] = new(sql.NullInt64)
 		case apikey.FieldKey, apikey.FieldName, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
 		case apikey.FieldCreatedAt, apikey.FieldUpdatedAt, apikey.FieldDeletedAt, apikey.FieldLastUsedAt, apikey.FieldExpiresAt, apikey.FieldWindow5hStart, apikey.FieldWindow1dStart, apikey.FieldWindow7dStart:
 			values[i] = new(sql.NullTime)
+		case apikey.ForeignKeys[0]: // group_api_keys
+			values[i] = new(sql.NullInt64)
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -211,12 +178,13 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Name = value.String
 			}
-		case apikey.FieldGroupID:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field group_id", values[i])
-			} else if value.Valid {
-				_m.GroupID = new(int64)
-				*_m.GroupID = value.Int64
+		case apikey.FieldGroupIds:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field group_ids", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.GroupIds); err != nil {
+					return fmt.Errorf("unmarshal field group_ids: %w", err)
+				}
 			}
 		case apikey.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -323,6 +291,13 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				_m.Window7dStart = new(time.Time)
 				*_m.Window7dStart = value.Time
 			}
+		case apikey.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for edge-field group_api_keys", value)
+			} else if value.Valid {
+				_m.group_api_keys = new(int64)
+				*_m.group_api_keys = int64(value.Int64)
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -341,24 +316,9 @@ func (_m *APIKey) QueryUser() *UserQuery {
 	return NewAPIKeyClient(_m.config).QueryUser(_m)
 }
 
-// QueryGroup queries the "group" edge of the APIKey entity.
-func (_m *APIKey) QueryGroup() *GroupQuery {
-	return NewAPIKeyClient(_m.config).QueryGroup(_m)
-}
-
-// QueryGrantedGroups queries the "granted_groups" edge of the APIKey entity.
-func (_m *APIKey) QueryGrantedGroups() *GroupQuery {
-	return NewAPIKeyClient(_m.config).QueryGrantedGroups(_m)
-}
-
 // QueryUsageLogs queries the "usage_logs" edge of the APIKey entity.
 func (_m *APIKey) QueryUsageLogs() *UsageLogQuery {
 	return NewAPIKeyClient(_m.config).QueryUsageLogs(_m)
-}
-
-// QueryAPIKeyGrantedGroups queries the "api_key_granted_groups" edge of the APIKey entity.
-func (_m *APIKey) QueryAPIKeyGrantedGroups() *APIKeyGrantedGroupQuery {
-	return NewAPIKeyClient(_m.config).QueryAPIKeyGrantedGroups(_m)
 }
 
 // Update returns a builder for updating this APIKey.
@@ -404,10 +364,8 @@ func (_m *APIKey) String() string {
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)
 	builder.WriteString(", ")
-	if v := _m.GroupID; v != nil {
-		builder.WriteString("group_id=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
-	}
+	builder.WriteString("group_ids=")
+	builder.WriteString(fmt.Sprintf("%v", _m.GroupIds))
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)

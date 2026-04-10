@@ -202,7 +202,7 @@ func (s *APIKeyService) snapshotFromAPIKey(apiKey *APIKey) *APIKeyAuthSnapshot {
 	snapshot := &APIKeyAuthSnapshot{
 		APIKeyID:    apiKey.ID,
 		UserID:      apiKey.UserID,
-		GroupID:     apiKey.GroupID,
+		GroupIDs:    append([]int64(nil), apiKey.GroupIDs...),
 		Status:      apiKey.Status,
 		IPWhitelist: apiKey.IPWhitelist,
 		IPBlacklist: apiKey.IPBlacklist,
@@ -220,13 +220,13 @@ func (s *APIKeyService) snapshotFromAPIKey(apiKey *APIKey) *APIKeyAuthSnapshot {
 			Concurrency: apiKey.User.Concurrency,
 		},
 	}
-	if len(apiKey.GrantedGroups) > 0 {
-		snapshot.GrantedGroups = make([]APIKeyAuthGroupSnapshot, 0, len(apiKey.GrantedGroups))
-		for _, granted := range apiKey.GrantedGroups {
+	if groups := apiKey.CanonicalGrantedGroups(); len(groups) > 0 {
+		snapshot.Groups = make([]APIKeyAuthGroupSnapshot, 0, len(groups))
+		for _, granted := range groups {
 			if granted == nil {
 				continue
 			}
-			snapshot.GrantedGroups = append(snapshot.GrantedGroups, APIKeyAuthGroupSnapshot{
+			snapshot.Groups = append(snapshot.Groups, APIKeyAuthGroupSnapshot{
 				ID:                              granted.ID,
 				Name:                            granted.Name,
 				Platform:                        granted.Platform,
@@ -251,31 +251,6 @@ func (s *APIKeyService) snapshotFromAPIKey(apiKey *APIKey) *APIKeyAuthSnapshot {
 			})
 		}
 	}
-	if apiKey.Group != nil {
-		snapshot.Group = &APIKeyAuthGroupSnapshot{
-			ID:                              apiKey.Group.ID,
-			Name:                            apiKey.Group.Name,
-			Platform:                        apiKey.Group.Platform,
-			Status:                          apiKey.Group.Status,
-			SubscriptionType:                apiKey.Group.SubscriptionType,
-			RateMultiplier:                  apiKey.Group.RateMultiplier,
-			DailyLimitUSD:                   apiKey.Group.DailyLimitUSD,
-			WeeklyLimitUSD:                  apiKey.Group.WeeklyLimitUSD,
-			MonthlyLimitUSD:                 apiKey.Group.MonthlyLimitUSD,
-			ImagePrice1K:                    apiKey.Group.ImagePrice1K,
-			ImagePrice2K:                    apiKey.Group.ImagePrice2K,
-			ImagePrice4K:                    apiKey.Group.ImagePrice4K,
-			ClaudeCodeOnly:                  apiKey.Group.ClaudeCodeOnly,
-			FallbackGroupID:                 apiKey.Group.FallbackGroupID,
-			FallbackGroupIDOnInvalidRequest: apiKey.Group.FallbackGroupIDOnInvalidRequest,
-			ModelRouting:                    apiKey.Group.ModelRouting,
-			ModelRoutingEnabled:             apiKey.Group.ModelRoutingEnabled,
-			MCPXMLInject:                    apiKey.Group.MCPXMLInject,
-			SupportedModelScopes:            apiKey.Group.SupportedModelScopes,
-			AllowMessagesDispatch:           apiKey.Group.AllowMessagesDispatch,
-			DefaultMappedModel:              apiKey.Group.DefaultMappedModel,
-		}
-	}
 	return snapshot
 }
 
@@ -286,7 +261,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 	apiKey := &APIKey{
 		ID:          snapshot.APIKeyID,
 		UserID:      snapshot.UserID,
-		GroupID:     snapshot.GroupID,
+		GroupIDs:    append([]int64(nil), snapshot.GroupIDs...),
 		Key:         key,
 		Status:      snapshot.Status,
 		IPWhitelist: snapshot.IPWhitelist,
@@ -305,41 +280,11 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			Concurrency: snapshot.User.Concurrency,
 		},
 	}
-	if snapshot.Group != nil {
-		apiKey.Group = &Group{
-			ID:                              snapshot.Group.ID,
-			Name:                            snapshot.Group.Name,
-			Platform:                        snapshot.Group.Platform,
-			Status:                          snapshot.Group.Status,
-			Hydrated:                        true,
-			SubscriptionType:                snapshot.Group.SubscriptionType,
-			RateMultiplier:                  snapshot.Group.RateMultiplier,
-			DailyLimitUSD:                   snapshot.Group.DailyLimitUSD,
-			WeeklyLimitUSD:                  snapshot.Group.WeeklyLimitUSD,
-			MonthlyLimitUSD:                 snapshot.Group.MonthlyLimitUSD,
-			ImagePrice1K:                    snapshot.Group.ImagePrice1K,
-			ImagePrice2K:                    snapshot.Group.ImagePrice2K,
-			ImagePrice4K:                    snapshot.Group.ImagePrice4K,
-			ClaudeCodeOnly:                  snapshot.Group.ClaudeCodeOnly,
-			FallbackGroupID:                 snapshot.Group.FallbackGroupID,
-			FallbackGroupIDOnInvalidRequest: snapshot.Group.FallbackGroupIDOnInvalidRequest,
-			ModelRouting:                    snapshot.Group.ModelRouting,
-			ModelRoutingEnabled:             snapshot.Group.ModelRoutingEnabled,
-			MCPXMLInject:                    snapshot.Group.MCPXMLInject,
-			SupportedModelScopes:            snapshot.Group.SupportedModelScopes,
-			AllowMessagesDispatch:           snapshot.Group.AllowMessagesDispatch,
-			DefaultMappedModel:              snapshot.Group.DefaultMappedModel,
-		}
-	}
-	if snapshot.GroupID != nil {
-		gid := *snapshot.GroupID
-		apiKey.GroupID = &gid
-	}
-	if len(snapshot.GrantedGroups) > 0 {
-		apiKey.GrantedGroups = make([]*Group, 0, len(snapshot.GrantedGroups))
-		for i := range snapshot.GrantedGroups {
-			g := snapshot.GrantedGroups[i]
-			apiKey.GrantedGroups = append(apiKey.GrantedGroups, &Group{
+	if len(snapshot.Groups) > 0 {
+		apiKey.Groups = make([]*Group, 0, len(snapshot.Groups))
+		for i := range snapshot.Groups {
+			g := snapshot.Groups[i]
+			apiKey.Groups = append(apiKey.Groups, &Group{
 				ID:                              g.ID,
 				Name:                            g.Name,
 				Platform:                        g.Platform,
@@ -364,18 +309,6 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 				DefaultMappedModel:              g.DefaultMappedModel,
 			})
 		}
-	}
-	if apiKey.GroupID != nil {
-		if apiKey.Group == nil || apiKey.Group.ID != *apiKey.GroupID {
-			for _, granted := range apiKey.GrantedGroups {
-				if granted != nil && granted.ID == *apiKey.GroupID {
-					apiKey.Group = granted
-					break
-				}
-			}
-		}
-	} else if eff := apiKey.EffectiveGroup(); eff != nil {
-		apiKey.Group = eff
 	}
 	s.compileAPIKeyIPRules(apiKey)
 	return apiKey

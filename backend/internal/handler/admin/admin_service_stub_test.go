@@ -53,6 +53,7 @@ func newStubAdminService() *stubAdminService {
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
+	apiKey.GroupIDs = []int64{}
 	group := service.Group{
 		ID:        2,
 		Name:      "group",
@@ -424,10 +425,13 @@ func (s *stubAdminService) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 			k := s.apiKeys[i]
 			if groupID != nil {
 				if *groupID == 0 {
-					k.GroupID = nil
+					k.GroupIDs = []int64{}
+					k.Groups = nil
 				} else {
 					gid := *groupID
-					k.GroupID = &gid
+					k.GroupIDs = []int64{gid}
+					group := &service.Group{ID: gid, Name: "group", Status: service.StatusActive}
+					k.Groups = []*service.Group{group}
 				}
 			}
 			return &service.AdminUpdateAPIKeyGroupIDResult{APIKey: &k}, nil

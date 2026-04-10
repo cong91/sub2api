@@ -122,12 +122,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
+	effectiveGroup := apiKey.EffectiveGroup()
+	effectiveGroupID := apiKey.EffectiveGroupID()
 	reqLog := requestLogger(
 		c,
 		"handler.gateway.messages",
 		zap.Int64("user_id", subject.UserID),
 		zap.Int64("api_key_id", apiKey.ID),
-		zap.Any("group_id", apiKey.GroupID),
+		zap.Int64s("group_ids", apiKey.GroupIDs),
 	)
 	defer h.maybeLogCompatibilityFallbackMetrics(reqLog)
 
@@ -159,7 +161,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
 
 	// 解析渠道级模型映射
-	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
+	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), effectiveGroupID, reqModel)
 
 	// 设置 max_tokens=1 + haiku 探测请求标识到 context 中
 	// 必须在 SetClaudeCodeClientContext 之前设置，因为 ClaudeCodeValidator 需要读取此标识进行绕过判断
@@ -241,7 +243,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	}
 
 	// 2. 【新增】Wait后二次检查余额/订阅
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, effectiveGroup, subscription); err != nil {
 		reqLog.Info("gateway.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message := billingErrorDetails(err)
 		h.handleStreamingAwareError(c, status, code, message, streamStarted)
@@ -260,8 +262,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	platform := ""
 	if forcePlatform, ok := middleware2.GetForcePlatformFromContext(c); ok {
 		platform = forcePlatform
-	} else if apiKey.Group != nil {
-		platform = apiKey.Group.Platform
+	} else if effectiveGroup != nil {
+		platform = effectiveGroup.Platform
 	}
 	sessionKey := sessionHash
 	if platform == service.PlatformGemini && sessionHash != "" {
@@ -271,11 +273,11 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	// 查询粘性会话绑定的账号 ID
 	var sessionBoundAccountID int64
 	if sessionKey != "" {
-		sessionBoundAccountID, _ = h.gatewayService.GetCachedSessionAccountID(c.Request.Context(), apiKey.GroupID, sessionKey)
+		sessionBoundAccountID, _ = h.gatewayService.GetCachedSessionAccountID(c.Request.Context(), effectiveGroupID, sessionKey)
 		if sessionBoundAccountID > 0 {
 			prefetchedGroupID := int64(0)
-			if apiKey.GroupID != nil {
-				prefetchedGroupID = *apiKey.GroupID
+			if effectiveGroupID != nil {
+				prefetchedGroupID = *effectiveGroupID
 			}
 			ctx := service.WithPrefetchedStickySession(c.Request.Context(), sessionBoundAccountID, prefetchedGroupID, h.metadataBridgeEnabled())
 			c.Request = c.Request.WithContext(ctx)
@@ -289,13 +291,13 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 		// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
 		// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
-		if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), apiKey.GroupID) {
+		if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), effectiveGroupID) {
 			ctx := service.WithSingleAccountRetry(c.Request.Context(), true, h.metadataBridgeEnabled())
 			c.Request = c.Request.WithContext(ctx)
 		}
 
 		for {
-			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, sessionKey, reqModel, fs.FailedAccountIDs, "", int64(0)) // Gemini 不使用会话限制
+			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), effectiveGroupID, sessionKey, reqModel, fs.FailedAccountIDs, "", int64(0)) // Gemini 不使用会话限制
 			if err != nil {
 				if len(fs.FailedAccountIDs) == 0 {
 					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), streamStarted)
@@ -382,7 +384,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 				// Slot acquired: no longer waiting in queue.
 				releaseWait()
-				if err := h.gatewayService.BindStickySession(c.Request.Context(), apiKey.GroupID, sessionKey, account.ID); err != nil {
+				if err := h.gatewayService.BindStickySession(c.Request.Context(), effectiveGroupID, sessionKey, account.ID); err != nil {
 					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
 			}
@@ -487,7 +489,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						zap.String("component", "handler.gateway.messages"),
 						zap.Int64("user_id", subject.UserID),
 						zap.Int64("api_key_id", apiKey.ID),
-						zap.Any("group_id", apiKey.GroupID),
+						zap.Int64s("group_ids", apiKey.GroupIDs),
 						zap.String("model", reqModel),
 						zap.Int64("account_id", account.ID),
 					).Error("gateway.record_usage_failed", zap.Error(err))
@@ -500,14 +502,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	currentAPIKey := apiKey
 	currentSubscription := subscription
 	var fallbackGroupID *int64
-	if apiKey.Group != nil {
-		fallbackGroupID = apiKey.Group.FallbackGroupIDOnInvalidRequest
+	if effectiveGroup != nil {
+		fallbackGroupID = effectiveGroup.FallbackGroupIDOnInvalidRequest
 	}
 	fallbackUsed := false
 
 	// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
 	// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
-	if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), currentAPIKey.GroupID) {
+	if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), currentAPIKey.EffectiveGroupID()) {
 		ctx := service.WithSingleAccountRetry(c.Request.Context(), true, h.metadataBridgeEnabled())
 		c.Request = c.Request.WithContext(ctx)
 	}
@@ -518,7 +520,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 		for {
 			// 选择支持该模型的账号
-			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), currentAPIKey.GroupID, sessionKey, reqModel, fs.FailedAccountIDs, parsedReq.MetadataUserID, int64(0))
+			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), currentAPIKey.EffectiveGroupID(), sessionKey, reqModel, fs.FailedAccountIDs, parsedReq.MetadataUserID, int64(0))
 			if err != nil {
 				if len(fs.FailedAccountIDs) == 0 {
 					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), streamStarted)
@@ -605,7 +607,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 				// Slot acquired: no longer waiting in queue.
 				releaseWait()
-				if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey, account.ID); err != nil {
+				if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.EffectiveGroupID(), sessionKey, account.ID); err != nil {
 					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
 			}
@@ -706,7 +708,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				var promptTooLongErr *service.PromptTooLongError
 				if errors.As(err, &promptTooLongErr) {
 					reqLog.Warn("gateway.prompt_too_long_from_antigravity",
-						zap.Any("current_group_id", currentAPIKey.GroupID),
+						zap.Any("current_group_id", currentAPIKey.EffectiveGroupID()),
 						zap.Any("fallback_group_id", fallbackGroupID),
 						zap.Bool("fallback_used", fallbackUsed),
 					)
@@ -827,7 +829,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						zap.String("component", "handler.gateway.messages"),
 						zap.Int64("user_id", subject.UserID),
 						zap.Int64("api_key_id", currentAPIKey.ID),
-						zap.Any("group_id", currentAPIKey.GroupID),
+						zap.Int64s("group_ids", currentAPIKey.GroupIDs),
 						zap.String("model", reqModel),
 						zap.Int64("account_id", account.ID),
 					).Error("gateway.record_usage_failed", zap.Error(err))
@@ -851,9 +853,11 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	var groupID *int64
 	var platform string
 
-	if apiKey != nil && apiKey.Group != nil {
-		groupID = &apiKey.Group.ID
-		platform = apiKey.Group.Platform
+	if apiKey != nil {
+		groupID = apiKey.EffectiveGroupID()
+		if effectiveGroup := apiKey.EffectiveGroup(); effectiveGroup != nil {
+			platform = effectiveGroup.Platform
+		}
 	}
 	if forcedPlatform, ok := middleware2.GetForcePlatformFromContext(c); ok && strings.TrimSpace(forcedPlatform) != "" {
 		platform = forcedPlatform
@@ -909,9 +913,8 @@ func cloneAPIKeyWithGroup(apiKey *service.APIKey, group *service.Group) *service
 		return apiKey
 	}
 	cloned := *apiKey
-	groupID := group.ID
-	cloned.GroupID = &groupID
-	cloned.Group = group
+	cloned.GroupIDs = []int64{group.ID}
+	cloned.Groups = []*service.Group{group}
 	return &cloned
 }
 
@@ -1109,26 +1112,26 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 // usageUnrestricted 处理 unrestricted 模式的响应（向后兼容）
 func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, usageData gin.H, modelStats any) {
 	// 订阅模式
-	if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() {
+	if effectiveGroup := apiKey.EffectiveGroup(); effectiveGroup != nil && effectiveGroup.IsSubscriptionType() {
 		resp := gin.H{
 			"mode":     "unrestricted",
 			"isValid":  true,
-			"planName": apiKey.Group.Name,
+			"planName": effectiveGroup.Name,
 			"unit":     "USD",
 		}
 
 		// 订阅信息可能不在 context 中（/v1/usage 路径跳过了中间件的计费检查）
 		subscription, ok := middleware2.GetSubscriptionFromContext(c)
 		if ok {
-			remaining := h.calculateSubscriptionRemaining(apiKey.Group, subscription)
+			remaining := h.calculateSubscriptionRemaining(effectiveGroup, subscription)
 			resp["remaining"] = remaining
 			resp["subscription"] = gin.H{
 				"daily_usage_usd":   subscription.DailyUsageUSD,
 				"weekly_usage_usd":  subscription.WeeklyUsageUSD,
 				"monthly_usage_usd": subscription.MonthlyUsageUSD,
-				"daily_limit_usd":   apiKey.Group.DailyLimitUSD,
-				"weekly_limit_usd":  apiKey.Group.WeeklyLimitUSD,
-				"monthly_limit_usd": apiKey.Group.MonthlyLimitUSD,
+				"daily_limit_usd":   effectiveGroup.DailyLimitUSD,
+				"weekly_limit_usd":  effectiveGroup.WeeklyLimitUSD,
+				"monthly_limit_usd": effectiveGroup.MonthlyLimitUSD,
 				"expires_at":        subscription.ExpiresAt,
 			}
 		}
@@ -1383,11 +1386,13 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
+	effectiveGroup := apiKey.EffectiveGroup()
+	effectiveGroupID := apiKey.EffectiveGroupID()
 	reqLog := requestLogger(
 		c,
 		"handler.gateway.count_tokens",
 		zap.Int64("api_key_id", apiKey.ID),
-		zap.Any("group_id", apiKey.GroupID),
+		zap.Int64s("group_ids", apiKey.GroupIDs),
 	)
 	defer h.maybeLogCompatibilityFallbackMetrics(reqLog)
 
@@ -1434,7 +1439,7 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 
 	// 校验 billing eligibility（订阅/余额）
 	// 【注意】不计算并发，但需要校验订阅/余额
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, effectiveGroup, subscription); err != nil {
 		status, code, message := billingErrorDetails(err)
 		h.errorResponse(c, status, code, message)
 		return
@@ -1449,7 +1454,7 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 	sessionHash := h.gatewayService.GenerateSessionHash(parsedReq)
 
 	// 选择支持该模型的账号
-	account, err := h.gatewayService.SelectAccountForModel(c.Request.Context(), apiKey.GroupID, sessionHash, parsedReq.Model)
+	account, err := h.gatewayService.SelectAccountForModel(c.Request.Context(), effectiveGroupID, sessionHash, parsedReq.Model)
 	if err != nil {
 		reqLog.Warn("gateway.count_tokens_select_account_failed", zap.Error(err))
 		h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "Service temporarily unavailable")

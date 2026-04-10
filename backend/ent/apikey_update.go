@@ -13,7 +13,6 @@ import (
 	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
-	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
@@ -100,23 +99,21 @@ func (_u *APIKeyUpdate) SetNillableName(v *string) *APIKeyUpdate {
 	return _u
 }
 
-// SetGroupID sets the "group_id" field.
-func (_u *APIKeyUpdate) SetGroupID(v int64) *APIKeyUpdate {
-	_u.mutation.SetGroupID(v)
+// SetGroupIds sets the "group_ids" field.
+func (_u *APIKeyUpdate) SetGroupIds(v []int64) *APIKeyUpdate {
+	_u.mutation.SetGroupIds(v)
 	return _u
 }
 
-// SetNillableGroupID sets the "group_id" field if the given value is not nil.
-func (_u *APIKeyUpdate) SetNillableGroupID(v *int64) *APIKeyUpdate {
-	if v != nil {
-		_u.SetGroupID(*v)
-	}
+// AppendGroupIds appends value to the "group_ids" field.
+func (_u *APIKeyUpdate) AppendGroupIds(v []int64) *APIKeyUpdate {
+	_u.mutation.AppendGroupIds(v)
 	return _u
 }
 
-// ClearGroupID clears the value of the "group_id" field.
-func (_u *APIKeyUpdate) ClearGroupID() *APIKeyUpdate {
-	_u.mutation.ClearGroupID()
+// ClearGroupIds clears the value of the "group_ids" field.
+func (_u *APIKeyUpdate) ClearGroupIds() *APIKeyUpdate {
+	_u.mutation.ClearGroupIds()
 	return _u
 }
 
@@ -443,26 +440,6 @@ func (_u *APIKeyUpdate) SetUser(v *User) *APIKeyUpdate {
 	return _u.SetUserID(v.ID)
 }
 
-// SetGroup sets the "group" edge to the Group entity.
-func (_u *APIKeyUpdate) SetGroup(v *Group) *APIKeyUpdate {
-	return _u.SetGroupID(v.ID)
-}
-
-// AddGrantedGroupIDs adds the "granted_groups" edge to the Group entity by IDs.
-func (_u *APIKeyUpdate) AddGrantedGroupIDs(ids ...int64) *APIKeyUpdate {
-	_u.mutation.AddGrantedGroupIDs(ids...)
-	return _u
-}
-
-// AddGrantedGroups adds the "granted_groups" edges to the Group entity.
-func (_u *APIKeyUpdate) AddGrantedGroups(v ...*Group) *APIKeyUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddGrantedGroupIDs(ids...)
-}
-
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
 func (_u *APIKeyUpdate) AddUsageLogIDs(ids ...int64) *APIKeyUpdate {
 	_u.mutation.AddUsageLogIDs(ids...)
@@ -487,33 +464,6 @@ func (_u *APIKeyUpdate) Mutation() *APIKeyMutation {
 func (_u *APIKeyUpdate) ClearUser() *APIKeyUpdate {
 	_u.mutation.ClearUser()
 	return _u
-}
-
-// ClearGroup clears the "group" edge to the Group entity.
-func (_u *APIKeyUpdate) ClearGroup() *APIKeyUpdate {
-	_u.mutation.ClearGroup()
-	return _u
-}
-
-// ClearGrantedGroups clears all "granted_groups" edges to the Group entity.
-func (_u *APIKeyUpdate) ClearGrantedGroups() *APIKeyUpdate {
-	_u.mutation.ClearGrantedGroups()
-	return _u
-}
-
-// RemoveGrantedGroupIDs removes the "granted_groups" edge to Group entities by IDs.
-func (_u *APIKeyUpdate) RemoveGrantedGroupIDs(ids ...int64) *APIKeyUpdate {
-	_u.mutation.RemoveGrantedGroupIDs(ids...)
-	return _u
-}
-
-// RemoveGrantedGroups removes "granted_groups" edges to Group entities.
-func (_u *APIKeyUpdate) RemoveGrantedGroups(v ...*Group) *APIKeyUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveGrantedGroupIDs(ids...)
 }
 
 // ClearUsageLogs clears all "usage_logs" edges to the UsageLog entity.
@@ -628,6 +578,17 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.GroupIds(); ok {
+		_spec.SetField(apikey.FieldGroupIds, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedGroupIds(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, apikey.FieldGroupIds, value)
+		})
+	}
+	if _u.mutation.GroupIdsCleared() {
+		_spec.ClearField(apikey.FieldGroupIds, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
@@ -759,92 +720,6 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.GroupCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   apikey.GroupTable,
-			Columns: []string{apikey.GroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.GroupIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   apikey.GroupTable,
-			Columns: []string{apikey.GroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.GrantedGroupsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: true,
-			Table:   apikey.GrantedGroupsTable,
-			Columns: apikey.GrantedGroupsPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		createE := &APIKeyGrantedGroupCreate{config: _u.config, mutation: newAPIKeyGrantedGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedGrantedGroupsIDs(); len(nodes) > 0 && !_u.mutation.GrantedGroupsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: true,
-			Table:   apikey.GrantedGroupsTable,
-			Columns: apikey.GrantedGroupsPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &APIKeyGrantedGroupCreate{config: _u.config, mutation: newAPIKeyGrantedGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.GrantedGroupsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: true,
-			Table:   apikey.GrantedGroupsTable,
-			Columns: apikey.GrantedGroupsPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &APIKeyGrantedGroupCreate{config: _u.config, mutation: newAPIKeyGrantedGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.UsageLogsCleared() {
@@ -980,23 +855,21 @@ func (_u *APIKeyUpdateOne) SetNillableName(v *string) *APIKeyUpdateOne {
 	return _u
 }
 
-// SetGroupID sets the "group_id" field.
-func (_u *APIKeyUpdateOne) SetGroupID(v int64) *APIKeyUpdateOne {
-	_u.mutation.SetGroupID(v)
+// SetGroupIds sets the "group_ids" field.
+func (_u *APIKeyUpdateOne) SetGroupIds(v []int64) *APIKeyUpdateOne {
+	_u.mutation.SetGroupIds(v)
 	return _u
 }
 
-// SetNillableGroupID sets the "group_id" field if the given value is not nil.
-func (_u *APIKeyUpdateOne) SetNillableGroupID(v *int64) *APIKeyUpdateOne {
-	if v != nil {
-		_u.SetGroupID(*v)
-	}
+// AppendGroupIds appends value to the "group_ids" field.
+func (_u *APIKeyUpdateOne) AppendGroupIds(v []int64) *APIKeyUpdateOne {
+	_u.mutation.AppendGroupIds(v)
 	return _u
 }
 
-// ClearGroupID clears the value of the "group_id" field.
-func (_u *APIKeyUpdateOne) ClearGroupID() *APIKeyUpdateOne {
-	_u.mutation.ClearGroupID()
+// ClearGroupIds clears the value of the "group_ids" field.
+func (_u *APIKeyUpdateOne) ClearGroupIds() *APIKeyUpdateOne {
+	_u.mutation.ClearGroupIds()
 	return _u
 }
 
@@ -1323,26 +1196,6 @@ func (_u *APIKeyUpdateOne) SetUser(v *User) *APIKeyUpdateOne {
 	return _u.SetUserID(v.ID)
 }
 
-// SetGroup sets the "group" edge to the Group entity.
-func (_u *APIKeyUpdateOne) SetGroup(v *Group) *APIKeyUpdateOne {
-	return _u.SetGroupID(v.ID)
-}
-
-// AddGrantedGroupIDs adds the "granted_groups" edge to the Group entity by IDs.
-func (_u *APIKeyUpdateOne) AddGrantedGroupIDs(ids ...int64) *APIKeyUpdateOne {
-	_u.mutation.AddGrantedGroupIDs(ids...)
-	return _u
-}
-
-// AddGrantedGroups adds the "granted_groups" edges to the Group entity.
-func (_u *APIKeyUpdateOne) AddGrantedGroups(v ...*Group) *APIKeyUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddGrantedGroupIDs(ids...)
-}
-
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
 func (_u *APIKeyUpdateOne) AddUsageLogIDs(ids ...int64) *APIKeyUpdateOne {
 	_u.mutation.AddUsageLogIDs(ids...)
@@ -1367,33 +1220,6 @@ func (_u *APIKeyUpdateOne) Mutation() *APIKeyMutation {
 func (_u *APIKeyUpdateOne) ClearUser() *APIKeyUpdateOne {
 	_u.mutation.ClearUser()
 	return _u
-}
-
-// ClearGroup clears the "group" edge to the Group entity.
-func (_u *APIKeyUpdateOne) ClearGroup() *APIKeyUpdateOne {
-	_u.mutation.ClearGroup()
-	return _u
-}
-
-// ClearGrantedGroups clears all "granted_groups" edges to the Group entity.
-func (_u *APIKeyUpdateOne) ClearGrantedGroups() *APIKeyUpdateOne {
-	_u.mutation.ClearGrantedGroups()
-	return _u
-}
-
-// RemoveGrantedGroupIDs removes the "granted_groups" edge to Group entities by IDs.
-func (_u *APIKeyUpdateOne) RemoveGrantedGroupIDs(ids ...int64) *APIKeyUpdateOne {
-	_u.mutation.RemoveGrantedGroupIDs(ids...)
-	return _u
-}
-
-// RemoveGrantedGroups removes "granted_groups" edges to Group entities.
-func (_u *APIKeyUpdateOne) RemoveGrantedGroups(v ...*Group) *APIKeyUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveGrantedGroupIDs(ids...)
 }
 
 // ClearUsageLogs clears all "usage_logs" edges to the UsageLog entity.
@@ -1539,6 +1365,17 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.GroupIds(); ok {
+		_spec.SetField(apikey.FieldGroupIds, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedGroupIds(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, apikey.FieldGroupIds, value)
+		})
+	}
+	if _u.mutation.GroupIdsCleared() {
+		_spec.ClearField(apikey.FieldGroupIds, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
 	}
@@ -1669,92 +1506,6 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.GroupCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   apikey.GroupTable,
-			Columns: []string{apikey.GroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.GroupIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   apikey.GroupTable,
-			Columns: []string{apikey.GroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.GrantedGroupsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: true,
-			Table:   apikey.GrantedGroupsTable,
-			Columns: apikey.GrantedGroupsPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		createE := &APIKeyGrantedGroupCreate{config: _u.config, mutation: newAPIKeyGrantedGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedGrantedGroupsIDs(); len(nodes) > 0 && !_u.mutation.GrantedGroupsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: true,
-			Table:   apikey.GrantedGroupsTable,
-			Columns: apikey.GrantedGroupsPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &APIKeyGrantedGroupCreate{config: _u.config, mutation: newAPIKeyGrantedGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.GrantedGroupsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: true,
-			Table:   apikey.GrantedGroupsTable,
-			Columns: apikey.GrantedGroupsPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &APIKeyGrantedGroupCreate{config: _u.config, mutation: newAPIKeyGrantedGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.UsageLogsCleared() {

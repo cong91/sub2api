@@ -264,8 +264,7 @@ type BulkUpdateAccountResult struct {
 type AdminUpdateAPIKeyGroupIDResult struct {
 	APIKey                 *APIKey
 	AutoGrantedGroupAccess bool   // true if a new exclusive group permission was auto-added
-	GrantedGroupID         *int64 // the group ID that was auto-granted
-	GrantedGroupName       string // the group name that was auto-granted
+	AutoGrantedGroupName   string // human-readable name of the unrelated user-allowed-group grant side effect
 }
 
 // ReplaceUserGroupResult 分组替换操作的结果
@@ -1321,8 +1320,8 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 
 	if *groupID == 0 {
 		// 0 表示解绑分组（不修改 user_allowed_groups，避免影响用户其他 Key）
-		apiKey.GroupID = nil
-		apiKey.Group = nil
+		apiKey.GroupIDs = []int64{}
+		apiKey.Groups = nil
 	} else {
 		// 验证目标分组存在且状态为 active
 		group, err := s.groupRepo.GetByID(ctx, *groupID)
@@ -1346,8 +1345,8 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 		}
 
 		gid := *groupID
-		apiKey.GroupID = &gid
-		apiKey.Group = group
+		apiKey.GroupIDs = []int64{gid}
+		apiKey.Groups = []*Group{group}
 
 		// 专属标准分组：使用事务保证「添加分组权限」与「更新 API Key」的原子性
 		if group.IsExclusive && !group.IsSubscriptionType() {
@@ -1378,8 +1377,7 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 			}
 
 			result.AutoGrantedGroupAccess = true
-			result.GrantedGroupID = &gid
-			result.GrantedGroupName = group.Name
+			result.AutoGrantedGroupName = group.Name
 
 			// 失效认证缓存（在事务提交后执行）
 			if s.authCacheInvalidator != nil {

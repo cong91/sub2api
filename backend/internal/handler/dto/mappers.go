@@ -69,49 +69,41 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 	if k == nil {
 		return nil
 	}
-	defaultGroupID := k.GroupID
-	if defaultGroupID == nil && k.Group != nil {
-		gid := k.Group.ID
-		defaultGroupID = &gid
-	}
-	grantedGroupIDs := make([]int64, 0, len(k.CanonicalGrantedGroups()))
-	grantedGroups := make([]Group, 0, len(k.CanonicalGrantedGroups()))
-	for _, granted := range k.CanonicalGrantedGroups() {
+	canonicalGroups := k.CanonicalGrantedGroups()
+	groupIDs := append([]int64(nil), k.GroupIDs...)
+	groups := make([]Group, 0, len(canonicalGroups))
+	for _, granted := range canonicalGroups {
 		if granted == nil {
 			continue
 		}
-		grantedGroupIDs = append(grantedGroupIDs, granted.ID)
-		grantedGroups = append(grantedGroups, *GroupFromServiceShallow(granted))
+		groups = append(groups, *GroupFromServiceShallow(granted))
 	}
 	out := &APIKey{
-		ID:              k.ID,
-		UserID:          k.UserID,
-		Key:             k.Key,
-		Name:            k.Name,
-		GroupID:         k.GroupID,
-		DefaultGroupID:  defaultGroupID,
-		GrantedGroupIDs: grantedGroupIDs,
-		GrantedGroups:   grantedGroups,
-		Status:          k.Status,
-		IPWhitelist:     k.IPWhitelist,
-		IPBlacklist:     k.IPBlacklist,
-		LastUsedAt:      k.LastUsedAt,
-		Quota:           k.Quota,
-		QuotaUsed:       k.QuotaUsed,
-		ExpiresAt:       k.ExpiresAt,
-		CreatedAt:       k.CreatedAt,
-		UpdatedAt:       k.UpdatedAt,
-		RateLimit5h:     k.RateLimit5h,
-		RateLimit1d:     k.RateLimit1d,
-		RateLimit7d:     k.RateLimit7d,
-		Usage5h:         k.EffectiveUsage5h(),
-		Usage1d:         k.EffectiveUsage1d(),
-		Usage7d:         k.EffectiveUsage7d(),
-		Window5hStart:   k.Window5hStart,
-		Window1dStart:   k.Window1dStart,
-		Window7dStart:   k.Window7dStart,
-		User:            UserFromServiceShallow(k.User),
-		Group:           GroupFromServiceShallow(k.Group),
+		ID:            k.ID,
+		UserID:        k.UserID,
+		Key:           k.Key,
+		Name:          k.Name,
+		GroupIDs:      groupIDs,
+		Groups:        groups,
+		Status:        k.Status,
+		IPWhitelist:   k.IPWhitelist,
+		IPBlacklist:   k.IPBlacklist,
+		LastUsedAt:    k.LastUsedAt,
+		Quota:         k.Quota,
+		QuotaUsed:     k.QuotaUsed,
+		ExpiresAt:     k.ExpiresAt,
+		CreatedAt:     k.CreatedAt,
+		UpdatedAt:     k.UpdatedAt,
+		RateLimit5h:   k.RateLimit5h,
+		RateLimit1d:   k.RateLimit1d,
+		RateLimit7d:   k.RateLimit7d,
+		Usage5h:       k.EffectiveUsage5h(),
+		Usage1d:       k.EffectiveUsage1d(),
+		Usage7d:       k.EffectiveUsage7d(),
+		Window5hStart: k.Window5hStart,
+		Window1dStart: k.Window1dStart,
+		Window7dStart: k.Window7dStart,
+		User:          UserFromServiceShallow(k.User),
 	}
 	if k.Window5hStart != nil && !service.IsWindowExpired(k.Window5hStart, service.RateLimitWindow5h) {
 		t := k.Window5hStart.Add(service.RateLimitWindow5h)

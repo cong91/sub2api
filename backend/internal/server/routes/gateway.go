@@ -172,8 +172,5 @@ func getGroupPlatform(c *gin.Context) string {
 	if group := apiKey.EffectiveGroup(); group != nil {
 		return group.Platform
 	}
-	if apiKey.Group == nil {
-		return ""
-	}
-	return apiKey.Group.Platform
+	return ""
 }

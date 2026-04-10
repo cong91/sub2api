@@ -7338,6 +7338,10 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 	defer cancel()
 
 	cost := p.Cost
+	effectiveGroup := (*Group)(nil)
+	if p.APIKey != nil {
+		effectiveGroup = p.APIKey.EffectiveGroup()
+	}
 
 	// 1. 订阅 / 余额扣费
 	if p.IsSubscriptionBill {
@@ -7345,7 +7349,7 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 			if err := deps.userSubRepo.IncrementUsage(billingCtx, p.Subscription.ID, cost.TotalCost); err != nil {
 				slog.Error("increment subscription usage failed", "subscription_id", p.Subscription.ID, "error", err)
 			}
-			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, cost.TotalCost)
+			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, effectiveGroup.ID, cost.TotalCost)
 		}
 	} else {
 		if cost.ActualCost > 0 {
@@ -7488,13 +7492,14 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 		return false, nil
 	}
 
+	postUsageBilling(billingCtx, p, deps)
+
 	if result.APIKeyQuotaExhausted {
 		if invalidator, ok := p.APIKeyService.(apiKeyAuthCacheInvalidator); ok && p.APIKey != nil && p.APIKey.Key != "" {
 			invalidator.InvalidateAuthCacheByKey(billingCtx, p.APIKey.Key)
 		}
 	}
 
-	finalizePostUsageBilling(p, deps)
 	return true, nil
 }
 
@@ -7502,10 +7507,14 @@ func finalizePostUsageBilling(p *postUsageBillingParams, deps *billingDeps) {
 	if p == nil || p.Cost == nil || deps == nil {
 		return
 	}
+	effectiveGroup := (*Group)(nil)
+	if p.APIKey != nil {
+		effectiveGroup = p.APIKey.EffectiveGroup()
+	}
 
 	if p.IsSubscriptionBill {
-		if p.Cost.TotalCost > 0 && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil {
-			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Cost.TotalCost)
+		if p.Cost.TotalCost > 0 && p.User != nil && effectiveGroup != nil {
+			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, effectiveGroup.ID, p.Cost.TotalCost)
 		}
 	} else if p.Cost.ActualCost > 0 && p.User != nil {
 		deps.billingCacheService.QueueDeductBalance(p.User.ID, p.Cost.ActualCost)
@@ -7706,9 +7715,9 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	if s.cfg != nil {
 		multiplier = s.cfg.Default.RateMultiplier
 	}
-	if apiKey.GroupID != nil && apiKey.Group != nil {
-		groupDefault := apiKey.Group.RateMultiplier
-		multiplier = s.getUserGroupRateMultiplier(ctx, user.ID, *apiKey.GroupID, groupDefault)
+	if effectiveGroup := apiKey.EffectiveGroup(); effectiveGroup != nil {
+		groupDefault := effectiveGroup.RateMultiplier
+		multiplier = s.getUserGroupRateMultiplier(ctx, user.ID, effectiveGroup.ID, groupDefault)
 	}
 
 	// 确定计费模型
@@ -7730,7 +7739,8 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	cost := s.calculateRecordUsageCost(ctx, result, apiKey, billingModel, multiplier, opts)
 
 	// 判断计费方式：订阅模式 vs 余额模式
-	isSubscriptionBilling := subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+	effectiveGroup := apiKey.EffectiveGroup()
+	isSubscriptionBilling := subscription != nil && effectiveGroup != nil && effectiveGroup.IsSubscriptionType()
 	billingType := BillingTypeBalance
 	if isSubscriptionBilling {
 		billingType = BillingTypeSubscription
@@ -7790,10 +7800,11 @@ func (s *GatewayService) calculateRecordUsageCost(
 // resolveChannelPricing 检查指定模型是否存在渠道级别定价。
 // 返回非 nil 的 ResolvedPricing 表示有渠道定价，nil 表示走默认定价路径。
 func (s *GatewayService) resolveChannelPricing(ctx context.Context, billingModel string, apiKey *APIKey) *ResolvedPricing {
-	if s.resolver == nil || apiKey.Group == nil {
+	effectiveGroup := apiKey.EffectiveGroup()
+	if s.resolver == nil || effectiveGroup == nil {
 		return nil
 	}
-	gid := apiKey.Group.ID
+	gid := effectiveGroup.ID
 	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid})
 	if resolved.Source == PricingSourceChannel {
 		return resolved
@@ -7815,7 +7826,8 @@ func (s *GatewayService) calculateImageCost(
 			OutputTokens:      result.Usage.OutputTokens,
 			ImageOutputTokens: result.Usage.ImageOutputTokens,
 		}
-		gid := apiKey.Group.ID
+		effectiveGroup := apiKey.EffectiveGroup()
+		gid := effectiveGroup.ID
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
 			Model:          billingModel,
@@ -7834,11 +7846,12 @@ func (s *GatewayService) calculateImageCost(
 	}
 
 	var groupConfig *ImagePriceConfig
-	if apiKey.Group != nil {
+	effectiveGroup := apiKey.EffectiveGroup()
+	if effectiveGroup != nil {
 		groupConfig = &ImagePriceConfig{
-			Price1K: apiKey.Group.ImagePrice1K,
-			Price2K: apiKey.Group.ImagePrice2K,
-			Price4K: apiKey.Group.ImagePrice4K,
+			Price1K: effectiveGroup.ImagePrice1K,
+			Price2K: effectiveGroup.ImagePrice2K,
+			Price4K: effectiveGroup.ImagePrice4K,
 		}
 	}
 	return s.billingService.CalculateImageCost(billingModel, result.ImageSize, result.ImageCount, groupConfig, multiplier)
@@ -7868,7 +7881,8 @@ func (s *GatewayService) calculateTokenCost(
 
 	// 优先尝试渠道定价 → CalculateCostUnified
 	if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil {
-		gid := apiKey.Group.ID
+		effectiveGroup := apiKey.EffectiveGroup()
+		gid := effectiveGroup.ID
 		cost, err = s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
 			Model:          billingModel,
@@ -7914,6 +7928,7 @@ func (s *GatewayService) buildRecordUsageLog(
 ) *UsageLog {
 	durationMs := int(result.Duration.Milliseconds())
 	requestID := resolveUsageBillingRequestID(ctx, result.RequestID)
+	effectiveGroup := apiKey.EffectiveGroup()
 	usageLog := &UsageLog{
 		UserID:                user.ID,
 		APIKeyID:              apiKey.ID,
@@ -7946,7 +7961,7 @@ func (s *GatewayService) buildRecordUsageLog(
 		ModelMappingChain:     optionalTrimmedStringPtr(input.ModelMappingChain),
 		UserAgent:             optionalTrimmedStringPtr(input.UserAgent),
 		IPAddress:             optionalTrimmedStringPtr(input.IPAddress),
-		GroupID:               apiKey.GroupID,
+		GroupID:               optionalGroupID(effectiveGroup),
 		SubscriptionID:        optionalSubscriptionID(subscription),
 		CreatedAt:             time.Now(),
 	}
@@ -8851,4 +8866,12 @@ func (s *GatewayService) debugLogGatewaySnapshot(tag string, headers http.Header
 
 	// 写入文件（调试用，并发写入可能交错但不影响可读性）
 	_, _ = f.WriteString(buf.String())
+}
+
+func optionalGroupID(group *Group) *int64 {
+	if group == nil {
+		return nil
+	}
+	gid := group.ID
+	return &gid
 }

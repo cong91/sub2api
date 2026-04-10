@@ -4441,17 +4441,19 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		ImageOutputTokens:   result.Usage.ImageOutputTokens,
 	}
 
-	// Get rate multiplier
+	// Get rate multiplier from the canonical effective group under group_ids[] ordering.
+	effectiveGroup := apiKey.EffectiveGroup()
 	multiplier := 1.0
 	if s.cfg != nil {
 		multiplier = s.cfg.Default.RateMultiplier
 	}
-	if apiKey.GroupID != nil && apiKey.Group != nil {
-		resolver := s.userGroupRateResolver
-		if resolver == nil {
-			resolver = newUserGroupRateResolver(nil, nil, resolveUserGroupRateCacheTTL(s.cfg), nil, "service.openai_gateway")
+	if effectiveGroup != nil {
+		if effectiveGroup.RateMultiplier > 0 {
+			multiplier = effectiveGroup.RateMultiplier
 		}
-		multiplier = resolver.Resolve(ctx, user.ID, *apiKey.GroupID, apiKey.Group.RateMultiplier)
+		if resolver := s.userGroupRateResolver; resolver != nil && user != nil {
+			multiplier = resolver.Resolve(ctx, user.ID, effectiveGroup.ID, multiplier)
+		}
 	}
 
 	var cost *CostBreakdown
@@ -4470,8 +4472,8 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if result.ServiceTier != nil {
 		serviceTier = strings.TrimSpace(*result.ServiceTier)
 	}
-	if s.resolver != nil && apiKey.Group != nil {
-		gid := apiKey.Group.ID
+	if s.resolver != nil && effectiveGroup != nil {
+		gid := effectiveGroup.ID
 		cost, err = s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
 			Model:          billingModel,
@@ -4490,7 +4492,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 
 	// Determine billing type
-	isSubscriptionBilling := subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+	isSubscriptionBilling := subscription != nil && effectiveGroup != nil && effectiveGroup.IsSubscriptionType()
 	billingType := BillingTypeBalance
 	if isSubscriptionBilling {
 		billingType = BillingTypeSubscription
@@ -4502,9 +4504,9 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	requestID := resolveUsageBillingRequestID(ctx, result.RequestID)
 
 	// 确定 RequestedModel（渠道映射前的原始模型）
-	requestedModel := result.Model
-	if input.OriginalModel != "" {
-		requestedModel = input.OriginalModel
+	requestedModel := strings.TrimSpace(result.Model)
+	if originalModel := strings.TrimSpace(input.OriginalModel); originalModel != "" {
+		requestedModel = originalModel
 	}
 
 	usageLog := &UsageLog{
@@ -4514,7 +4516,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		RequestID:           requestID,
 		Model:               result.Model,
 		RequestedModel:      requestedModel,
-		UpstreamModel:       optionalNonEqualStringPtr(result.UpstreamModel, result.Model),
+		UpstreamModel:       optionalTrimmedStringPtr(result.UpstreamModel),
 		ServiceTier:         result.ServiceTier,
 		ReasoningEffort:     result.ReasoningEffort,
 		InboundEndpoint:     optionalTrimmedStringPtr(input.InboundEndpoint),
@@ -4563,8 +4565,9 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		usageLog.IPAddress = &input.IPAddress
 	}
 
-	if apiKey.GroupID != nil {
-		usageLog.GroupID = apiKey.GroupID
+	if effectiveGroup != nil {
+		gid := effectiveGroup.ID
+		usageLog.GroupID = &gid
 	}
 	if subscription != nil {
 		usageLog.SubscriptionID = &subscription.ID

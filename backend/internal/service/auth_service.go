@@ -540,9 +540,8 @@ func (s *AuthService) ensureInviteBootstrapAPIAccess(ctx context.Context, userID
 
 	grantedGroupIDs := append([]int64(nil), entitledGroupIDs...)
 	createdKey, err := s.apiKeyProvisioner.Create(ctx, userID, CreateAPIKeyRequest{
-		Name:            canonicalKeyName,
-		GroupID:         nil,
-		GrantedGroupIDs: grantedGroupIDs,
+		Name:     canonicalKeyName,
+		GroupIDs: grantedGroupIDs,
 	})
 	if err != nil {
 		return "", fmt.Errorf("create bootstrap api key: %w", err)

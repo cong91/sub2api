@@ -353,25 +353,49 @@ func TestOpenAIEnsureResponsesDependencies(t *testing.T) {
 }
 
 func TestResolveOpenAIForwardDefaultMappedModel(t *testing.T) {
+	makeOpenAIGroup := func(id int64, defaultMappedModel string) *service.Group {
+		return &service.Group{
+			ID:                 id,
+			Hydrated:           true,
+			Platform:           "openai",
+			Status:             service.StatusActive,
+			DefaultMappedModel: defaultMappedModel,
+		}
+	}
+
 	t.Run("prefers_explicit_fallback_model", func(t *testing.T) {
 		apiKey := &service.APIKey{
-			Group: &service.Group{DefaultMappedModel: "gpt-5.4"},
+			GroupIDs: []int64{7},
+			Groups:   []*service.Group{makeOpenAIGroup(7, "gpt-5.4")},
 		}
 		require.Equal(t, "gpt-5.2", resolveOpenAIForwardDefaultMappedModel(apiKey, " gpt-5.2 "))
 	})
 
 	t.Run("uses_group_default_on_normal_path", func(t *testing.T) {
 		apiKey := &service.APIKey{
-			Group: &service.Group{DefaultMappedModel: "gpt-5.4"},
+			GroupIDs: []int64{7},
+			Groups:   []*service.Group{makeOpenAIGroup(7, "gpt-5.4")},
 		}
 		require.Equal(t, "gpt-5.4", resolveOpenAIForwardDefaultMappedModel(apiKey, ""))
+	})
+
+	t.Run("uses_effective_group_from_group_ids_order", func(t *testing.T) {
+		apiKey := &service.APIKey{
+			GroupIDs: []int64{9, 7},
+			Groups: []*service.Group{
+				makeOpenAIGroup(7, "stale-order-model"),
+				makeOpenAIGroup(9, "canonical-effective-model"),
+			},
+		}
+		require.Equal(t, "canonical-effective-model", resolveOpenAIForwardDefaultMappedModel(apiKey, ""))
 	})
 
 	t.Run("returns_empty_without_group_default", func(t *testing.T) {
 		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(nil, ""))
 		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(&service.APIKey{}, ""))
 		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(&service.APIKey{
-			Group: &service.Group{},
+			GroupIDs: []int64{7},
+			Groups:   []*service.Group{makeOpenAIGroup(7, "")},
 		}, ""))
 	})
 }
@@ -386,8 +410,8 @@ func TestOpenAIResponses_MissingDependencies_ReturnsServiceUnavailable(t *testin
 
 	groupID := int64(2)
 	c.Set(string(middleware.ContextKeyAPIKey), &service.APIKey{
-		ID:      10,
-		GroupID: &groupID,
+		ID:       10,
+		GroupIDs: []int64{groupID},
 	})
 	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{
 		UserID:      1,
@@ -439,9 +463,9 @@ func TestOpenAIResponses_RejectsMessageIDAsPreviousResponseID(t *testing.T) {
 
 	groupID := int64(2)
 	c.Set(string(middleware.ContextKeyAPIKey), &service.APIKey{
-		ID:      101,
-		GroupID: &groupID,
-		User:    &service.User{ID: 1},
+		ID:       101,
+		GroupIDs: []int64{groupID},
+		User:     &service.User{ID: 1},
 	})
 	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{
 		UserID:      1,
@@ -686,9 +710,9 @@ func newOpenAIWSHandlerTestServer(t *testing.T, h *OpenAIGatewayHandler, subject
 	t.Helper()
 	groupID := int64(2)
 	apiKey := &service.APIKey{
-		ID:      101,
-		GroupID: &groupID,
-		User:    &service.User{ID: subject.UserID},
+		ID:       101,
+		GroupIDs: []int64{groupID},
+		User:     &service.User{ID: subject.UserID},
 	}
 	router := gin.New()
 	router.Use(func(c *gin.Context) {

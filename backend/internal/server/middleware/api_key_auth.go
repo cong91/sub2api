@@ -25,9 +25,6 @@ func resolveEffectiveGroup(c *gin.Context, apiKey *service.APIKey) *service.Grou
 	if group := apiKey.EffectiveGroup(); service.IsGroupContextValid(group) {
 		return group
 	}
-	if service.IsGroupContextValid(apiKey.Group) {
-		return apiKey.Group
-	}
 	return nil
 }
 

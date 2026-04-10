@@ -10,7 +10,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
-	"github.com/Wei-Shaw/sub2api/ent/apikeygrantedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
@@ -90,6 +89,10 @@ func init() {
 			return nil
 		}
 	}()
+	// apikeyDescGroupIds is the schema descriptor for group_ids field.
+	apikeyDescGroupIds := apikeyFields[3].Descriptor()
+	// apikey.DefaultGroupIds holds the default value on creation for the group_ids field.
+	apikey.DefaultGroupIds = apikeyDescGroupIds.Default.([]int64)
 	// apikeyDescStatus is the schema descriptor for status field.
 	apikeyDescStatus := apikeyFields[4].Descriptor()
 	// apikey.DefaultStatus holds the default value on creation for the status field.
@@ -128,12 +131,6 @@ func init() {
 	apikeyDescUsage7d := apikeyFields[16].Descriptor()
 	// apikey.DefaultUsage7d holds the default value on creation for the usage_7d field.
 	apikey.DefaultUsage7d = apikeyDescUsage7d.Default.(float64)
-	apikeygrantedgroupFields := schema.APIKeyGrantedGroup{}.Fields()
-	_ = apikeygrantedgroupFields
-	// apikeygrantedgroupDescCreatedAt is the schema descriptor for created_at field.
-	apikeygrantedgroupDescCreatedAt := apikeygrantedgroupFields[2].Descriptor()
-	// apikeygrantedgroup.DefaultCreatedAt holds the default value on creation for the created_at field.
-	apikeygrantedgroup.DefaultCreatedAt = apikeygrantedgroupDescCreatedAt.Default.(func() time.Time)
 	accountMixin := schema.Account{}.Mixin()
 	accountMixinHooks1 := accountMixin[1].Hooks()
 	account.Hooks[0] = accountMixinHooks1[0]

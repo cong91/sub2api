@@ -111,11 +111,11 @@ func TestGroupRepository_DeleteCascade_RemovesAllowedGroupsAndClearsApiKeys(t *t
 	require.NoError(t, userRepo.Create(ctx, u))
 
 	key := &service.APIKey{
-		UserID:  u.ID,
-		Key:     uniqueTestValue(t, "sk-test-delete-cascade"),
-		Name:    "test key",
-		GroupID: &targetGroup.ID,
-		Status:  service.StatusActive,
+		UserID:   u.ID,
+		Key:      uniqueTestValue(t, "sk-test-delete-cascade"),
+		Name:     "test key",
+		GroupIDs: []int64{targetGroup.ID},
+		Status:   service.StatusActive,
 	}
 	require.NoError(t, apiKeyRepo.Create(ctx, key))
 
@@ -138,8 +138,9 @@ func TestGroupRepository_DeleteCascade_RemovesAllowedGroupsAndClearsApiKeys(t *t
 	require.NotContains(t, uAfter.AllowedGroups, targetGroup.ID)
 	require.Contains(t, uAfter.AllowedGroups, otherGroup.ID)
 
-	// API keys bound to the deleted group should have group_id cleared.
+	// API keys bound to the deleted group should have canonical group_ids[] membership cleared.
 	keyAfter, err := apiKeyRepo.GetByID(ctx, key.ID)
 	require.NoError(t, err)
-	require.Nil(t, keyAfter.GroupID)
+	require.NotContains(t, keyAfter.GroupIDs, targetGroup.ID)
+	require.Empty(t, keyAfter.GroupIDs)
 }

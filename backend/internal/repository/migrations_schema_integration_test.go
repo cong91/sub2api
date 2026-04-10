@@ -33,8 +33,26 @@ func TestMigrationsRunner_IsIdempotent_AndSchemaIsUpToDate(t *testing.T) {
 	requireColumn(t, tx, "accounts", "overload_until", "timestamp with time zone", 0, true)
 	requireColumn(t, tx, "accounts", "session_window_status", "character varying", 20, true)
 
-	// api_keys: key length should be 128
+	// api_keys: key length should be 128 and canonical group_ids[] exists.
+	// Migration 093 is authoritative and must cut over with explicit migrate-data-before-drop semantics:
+	// add group_ids -> migrate from api_key_groups + group_id -> dedupe/sort -> verify -> then drop legacy schema.
 	requireColumn(t, tx, "api_keys", "key", "character varying", 128, false)
+	requireColumn(t, tx, "api_keys", "group_ids", "ARRAY", 0, false)
+	requireIndex(t, tx, "api_keys", "idx_api_keys_group_ids_gin")
+
+	var legacyAPIKeyGroupID sql.NullString
+	require.NoError(t, tx.QueryRowContext(context.Background(), "SELECT to_regclass('public.api_key_groups')").Scan(&legacyAPIKeyGroupID))
+	require.False(t, legacyAPIKeyGroupID.Valid, "expected api_key_groups table to be removed after 093 migrate-data-before-drop cutover")
+
+	var apiKeysGroupIDCount int
+	require.NoError(t, tx.QueryRowContext(context.Background(), `
+SELECT COUNT(*)
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'api_keys'
+  AND column_name = 'group_id'
+`).Scan(&apiKeysGroupIDCount))
+	require.Equal(t, 0, apiKeysGroupIDCount, "expected api_keys.group_id column to be removed after 093 migrate-data-before-drop cutover")
 
 	// redeem_codes: subscription fields
 	requireColumn(t, tx, "redeem_codes", "group_id", "bigint", 0, true)

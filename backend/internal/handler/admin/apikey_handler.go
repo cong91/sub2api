@@ -22,12 +22,15 @@ func NewAdminAPIKeyHandler(adminService service.AdminService) *AdminAPIKeyHandle
 	}
 }
 
-// AdminUpdateAPIKeyGroupRequest represents the request to update an API key's group
+// AdminUpdateAPIKeyGroupRequest represents the request to update an API key's
+// canonical membership group_ids[]. This narrow admin lane still materializes a
+// single effective execution group by accepting either [] or [x].
 type AdminUpdateAPIKeyGroupRequest struct {
-	GroupID *int64 `json:"group_id"` // nil=不修改, 0=解绑, >0=绑定到目标分组
+	GroupIDs *[]int64 `json:"group_ids"` // nil=no-op, []=unbind all, [x]=bind exactly one membership group; request-time effective scalar is derived later
 }
 
-// UpdateGroup handles updating an API key's group binding
+// UpdateGroup handles updating an API key's membership groups in the narrow
+// admin single-effective-group lane.
 // PUT /api/v1/admin/api-keys/:id
 func (h *AdminAPIKeyHandler) UpdateGroup(c *gin.Context) {
 	keyID, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -42,7 +45,22 @@ func (h *AdminAPIKeyHandler) UpdateGroup(c *gin.Context) {
 		return
 	}
 
-	result, err := h.adminService.AdminUpdateAPIKeyGroupID(c.Request.Context(), keyID, req.GroupID)
+	var groupID *int64
+	if req.GroupIDs != nil {
+		switch len(*req.GroupIDs) {
+		case 0:
+			zero := int64(0)
+			groupID = &zero
+		case 1:
+			gid := (*req.GroupIDs)[0]
+			groupID = &gid
+		default:
+			response.BadRequest(c, "group_ids must contain at most one group in admin update path")
+			return
+		}
+	}
+
+	result, err := h.adminService.AdminUpdateAPIKeyGroupID(c.Request.Context(), keyID, groupID)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -51,13 +69,11 @@ func (h *AdminAPIKeyHandler) UpdateGroup(c *gin.Context) {
 	resp := struct {
 		APIKey                 *dto.APIKey `json:"api_key"`
 		AutoGrantedGroupAccess bool        `json:"auto_granted_group_access"`
-		GrantedGroupID         *int64      `json:"granted_group_id,omitempty"`
-		GrantedGroupName       string      `json:"granted_group_name,omitempty"`
+		AutoGrantedGroupName   string      `json:"auto_granted_group_name,omitempty"`
 	}{
 		APIKey:                 dto.APIKeyFromService(result.APIKey),
 		AutoGrantedGroupAccess: result.AutoGrantedGroupAccess,
-		GrantedGroupID:         result.GrantedGroupID,
-		GrantedGroupName:       result.GrantedGroupName,
+		AutoGrantedGroupName:   result.AutoGrantedGroupName,
 	}
 	response.Success(c, resp)
 }

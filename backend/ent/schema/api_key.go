@@ -41,9 +41,9 @@ func (APIKey) Fields() []ent.Field {
 		field.String("name").
 			MaxLen(100).
 			NotEmpty(),
-		field.Int64("group_id").
+		field.JSON("group_ids", []int64{}).
 			Optional().
-			Nillable(),
+			Default([]int64{}),
 		field.String("status").
 			MaxLen(20).
 			Default(domain.StatusActive),
@@ -125,13 +125,6 @@ func (APIKey) Edges() []ent.Edge {
 			Field("user_id").
 			Unique().
 			Required(),
-		edge.From("group", Group.Type).
-			Ref("api_keys").
-			Field("group_id").
-			Unique(),
-		edge.From("granted_groups", Group.Type).
-			Ref("granted_api_keys").
-			Through("api_key_granted_groups", APIKeyGrantedGroup.Type),
 		edge.To("usage_logs", UsageLog.Type),
 	}
 }
@@ -140,7 +133,7 @@ func (APIKey) Indexes() []ent.Index {
 	return []ent.Index{
 		// key 字段已在 Fields() 中声明 Unique()，无需重复索引
 		index.Fields("user_id"),
-		index.Fields("group_id"),
+		index.Fields("group_ids"),
 		index.Fields("status"),
 		index.Fields("deleted_at"),
 		index.Fields("last_used_at"),

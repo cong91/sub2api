@@ -29,18 +29,15 @@ func IsWindowExpired(windowStart *time.Time, duration time.Duration) bool {
 }
 
 type APIKey struct {
-	ID      int64
-	UserID  int64
-	Key     string
-	Name    string
-	GroupID *int64
-	// GrantedGroups contains all groups this key can access.
-	// Compatibility note: GroupID/Group are legacy fallback preference fields;
-	// request-time routing for multi-group keys derives effective group dynamically.
-	GrantedGroups []*Group
-	Status        string
-	IPWhitelist   []string
-	IPBlacklist   []string
+	ID          int64
+	UserID      int64
+	Key         string
+	Name        string
+	GroupIDs    []int64
+	Groups      []*Group
+	Status      string
+	IPWhitelist []string
+	IPBlacklist []string
 	// 预编译的 IP 规则，用于认证热路径避免重复 ParseIP/ParseCIDR。
 	CompiledIPWhitelist *ip.CompiledIPRules `json:"-"`
 	CompiledIPBlacklist *ip.CompiledIPRules `json:"-"`
@@ -48,7 +45,6 @@ type APIKey struct {
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 	User                *User
-	Group               *Group
 
 	// Quota fields
 	Quota     float64    // Quota limit in USD (0 = unlimited)
@@ -67,27 +63,58 @@ type APIKey struct {
 	Window7dStart *time.Time // Start of current 7d window
 }
 
-// EffectiveGroup returns the canonical effective/default group from granted_groups.
-// Runtime semantics must not fallback to legacy Group/GroupID fields.
+// EffectiveGroup returns the canonical request-time execution group.
+// Membership remains represented by group_ids[]/groups[]. The effective scalar
+// is derived from that ordered membership (first canonical usable group), not
+// stored as a separate membership field.
+// During the strict group_ids[] cutover, some in-flight callers/tests still
+// hydrate Groups without full runtime-valid metadata; for billing/routing
+// semantics we still need the first ordered hydrated group to be the effective
+// group instead of silently collapsing to nil.
 func (k *APIKey) EffectiveGroup() *Group {
 	if k == nil {
 		return nil
 	}
-	canonical := k.CanonicalGrantedGroups()
-	if len(canonical) == 0 {
-		return nil
+	if len(k.Groups) > 0 {
+		ordered := k.CanonicalGrantedGroups()
+		if len(ordered) > 0 {
+			return ordered[0]
+		}
+		for _, granted := range k.Groups {
+			if granted != nil {
+				return granted
+			}
+		}
 	}
-	return canonical[0]
+	return nil
 }
 
-// CanonicalGrantedGroups returns runtime-usable granted groups (hydrated, valid, deduplicated).
-func (k *APIKey) CanonicalGrantedGroups() []*Group {
-	if k == nil || len(k.GrantedGroups) == 0 {
+// EffectiveGroupID returns the canonical request-time execution group scalar
+// derived from group_ids[] ordering / hydrated groups[]. It is not a separate
+// membership contract.
+func (k *APIKey) EffectiveGroupID() *int64 {
+	if k == nil {
 		return nil
 	}
-	seen := make(map[int64]struct{}, len(k.GrantedGroups))
-	out := make([]*Group, 0, len(k.GrantedGroups))
-	for _, granted := range k.GrantedGroups {
+	if effective := k.EffectiveGroup(); effective != nil {
+		gid := effective.ID
+		return &gid
+	}
+	if len(k.GroupIDs) > 0 {
+		gid := k.GroupIDs[0]
+		return &gid
+	}
+	return nil
+}
+
+// CanonicalGrantedGroups returns runtime-usable groups[] (hydrated, valid, deduplicated, ordered by group_ids first).
+func (k *APIKey) CanonicalGrantedGroups() []*Group {
+	if k == nil || len(k.Groups) == 0 {
+		return nil
+	}
+	seen := make(map[int64]struct{}, len(k.Groups))
+	byID := make(map[int64]*Group, len(k.Groups))
+	for _, granted := range k.Groups {
 		if !IsGroupContextValid(granted) {
 			continue
 		}
@@ -95,7 +122,27 @@ func (k *APIKey) CanonicalGrantedGroups() []*Group {
 			continue
 		}
 		seen[granted.ID] = struct{}{}
+		byID[granted.ID] = granted
+	}
+	if len(byID) == 0 {
+		return nil
+	}
+	out := make([]*Group, 0, len(byID))
+	for _, gid := range k.GroupIDs {
+		if g, ok := byID[gid]; ok {
+			out = append(out, g)
+			delete(byID, gid)
+		}
+	}
+	for _, granted := range k.Groups {
+		if granted == nil {
+			continue
+		}
+		if _, ok := byID[granted.ID]; !ok {
+			continue
+		}
 		out = append(out, granted)
+		delete(byID, granted.ID)
 	}
 	if len(out) == 0 {
 		return nil
@@ -103,8 +150,9 @@ func (k *APIKey) CanonicalGrantedGroups() []*Group {
 	return out
 }
 
-// GroupForPlatform returns a granted group matching the requested platform when
-// available, otherwise it falls back to EffectiveGroup.
+// GroupForPlatform returns the effective execution group for a requested
+// platform when one exists in membership groups[], otherwise it falls back to
+// the canonical effective group.
 func (k *APIKey) GroupForPlatform(platform string) *Group {
 	if k == nil {
 		return nil
@@ -200,7 +248,7 @@ func (k *APIKey) EffectiveUsage7d() float64 {
 
 // APIKeyListFilters holds optional filtering parameters for listing API keys.
 type APIKeyListFilters struct {
-	Search  string
-	Status  string
-	GroupID *int64 // nil=不筛选, 0=无分组, >0=指定分组
+	Search   string
+	Status   string
+	GroupIDs []int64 // empty=不筛选; values filter keys containing any requested group id
 }

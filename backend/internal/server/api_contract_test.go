@@ -79,10 +79,8 @@ func TestAPIContracts(t *testing.T) {
 					"user_id": 1,
 					"key": "sk_custom_1234567890",
 					"name": "Key One",
-					"group_id": null,
-					"default_group_id": null,
-					"granted_group_ids": [],
-					"granted_groups": [],
+					"group_ids": [],
+					"groups": [],
 					"status": "active",
 					"ip_whitelist": null,
 					"ip_blacklist": null,
@@ -108,14 +106,13 @@ func TestAPIContracts(t *testing.T) {
 			name: "GET /api/v1/keys (paginated)",
 			setup: func(t *testing.T, deps *contractDeps) {
 				t.Helper()
-				groupID := int64(10)
 				deps.apiKeyRepo.MustSeed(&service.APIKey{
-					ID:      100,
-					UserID:  1,
-					Key:     "sk_custom_1234567890",
-					Name:    "Key One",
-					GroupID: &groupID,
-					GrantedGroups: []*service.Group{
+					ID:       100,
+					UserID:   1,
+					Key:      "sk_custom_1234567890",
+					Name:     "Key One",
+					GroupIDs: []int64{10, 11},
+					Groups: []*service.Group{
 						{
 							ID:       10,
 							Name:     "Group One",
@@ -147,10 +144,8 @@ func TestAPIContracts(t *testing.T) {
 							"user_id": 1,
 							"key": "sk_custom_1234567890",
 							"name": "Key One",
-							"group_id": 10,
-							"default_group_id": 10,
-							"granted_group_ids": [10, 11],
-							"granted_groups": [
+							"group_ids": [10, 11],
+							"groups": [
 								{
 									"id": 10,
 									"name": "Group One",
@@ -1552,12 +1547,21 @@ func (r *stubApiKeyRepo) ClearGroupIDByGroupID(ctx context.Context, groupID int6
 func (r *stubApiKeyRepo) UpdateGroupIDByUserAndGroup(ctx context.Context, userID, oldGroupID, newGroupID int64) (int64, error) {
 	var updated int64
 	for id, key := range r.byID {
-		if key.UserID != userID || key.GroupID == nil || *key.GroupID != oldGroupID {
+			if key.UserID != userID {
+			continue
+		}
+		found := false
+		for _, gid := range key.GroupIDs {
+			if gid == oldGroupID {
+				found = true
+				break
+			}
+		}
+		if !found {
 			continue
 		}
 		clone := *key
-		gid := newGroupID
-		clone.GroupID = &gid
+		clone.GroupIDs = []int64{newGroupID}
 		r.byID[id] = &clone
 		r.byKey[clone.Key] = &clone
 		updated++
