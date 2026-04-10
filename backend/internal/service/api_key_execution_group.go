@@ -35,7 +35,7 @@ func (k *APIKey) executionGroupForContext(ctx context.Context) *Group {
 
 	lane := normalizeExecutionLane(executionLaneFromContext(ctx))
 	if lane == "" {
-		return canonical[0]
+		return nil
 	}
 
 	for _, granted := range canonical {
