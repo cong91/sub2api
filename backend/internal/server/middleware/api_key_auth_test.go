@@ -25,6 +25,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 	group := &service.Group{
 		ID:               42,
 		Name:             "sub",
+		Platform:         service.PlatformOpenAI,
 		Status:           service.StatusActive,
 		Hydrated:         true,
 		SubscriptionType: service.SubscriptionTypeSubscription,
@@ -38,14 +39,14 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 		Concurrency: 3,
 	}
 	apiKey := &service.APIKey{
-		ID:     100,
-		UserID: user.ID,
-		Key:    "test-key",
-		Status: service.StatusActive,
-		User:   user,
-		Group:  group,
+		ID:       100,
+		UserID:   user.ID,
+		Key:      "test-key",
+		Status:   service.StatusActive,
+		User:     user,
+		GroupIDs: []int64{group.ID},
+		Groups:   []*service.Group{group},
 	}
-	apiKey.GroupID = &group.ID
 
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
@@ -96,6 +97,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/t", nil)
+		req = req.WithContext(context.WithValue(req.Context(), ctxkey.Platform, service.PlatformOpenAI))
 		req.Header.Set("x-api-key", apiKey.Key)
 		router.ServeHTTP(w, req)
 
@@ -130,6 +132,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/t", nil)
+		req = req.WithContext(context.WithValue(req.Context(), ctxkey.Platform, service.PlatformOpenAI))
 		req.Header.Set("Authorization", "bearer "+apiKey.Key)
 		router.ServeHTTP(w, req)
 
@@ -169,6 +172,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/t", nil)
+		req = req.WithContext(context.WithValue(req.Context(), ctxkey.Platform, service.PlatformOpenAI))
 		req.Header.Set("x-api-key", apiKey.Key)
 		router.ServeHTTP(w, req)
 
@@ -195,14 +199,14 @@ func TestAPIKeyAuthSetsGroupContext(t *testing.T) {
 		Concurrency: 3,
 	}
 	apiKey := &service.APIKey{
-		ID:     100,
-		UserID: user.ID,
-		Key:    "test-key",
-		Status: service.StatusActive,
-		User:   user,
-		Group:  group,
+		ID:       100,
+		UserID:   user.ID,
+		Key:      "test-key",
+		Status:   service.StatusActive,
+		User:     user,
+		GroupIDs: []int64{group.ID},
+		Groups:   []*service.Group{group},
 	}
-	apiKey.GroupID = &group.ID
 
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
@@ -220,7 +224,7 @@ func TestAPIKeyAuthSetsGroupContext(t *testing.T) {
 	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, nil, cfg)))
 	router.GET("/t", func(c *gin.Context) {
 		groupFromCtx, ok := c.Request.Context().Value(ctxkey.Group).(*service.Group)
-		if !ok || groupFromCtx == nil || groupFromCtx.ID != group.ID {
+		if !ok || groupFromCtx == nil || groupFromCtx.ID != group.ID || groupFromCtx.Platform != group.Platform {
 			c.JSON(http.StatusInternalServerError, gin.H{"ok": false})
 			return
 		}
@@ -229,6 +233,7 @@ func TestAPIKeyAuthSetsGroupContext(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	req = req.WithContext(context.WithValue(req.Context(), ctxkey.Platform, service.PlatformAnthropic))
 	req.Header.Set("x-api-key", apiKey.Key)
 	router.ServeHTTP(w, req)
 
@@ -253,14 +258,14 @@ func TestAPIKeyAuthOverwritesInvalidContextGroup(t *testing.T) {
 		Concurrency: 3,
 	}
 	apiKey := &service.APIKey{
-		ID:     100,
-		UserID: user.ID,
-		Key:    "test-key",
-		Status: service.StatusActive,
-		User:   user,
-		Group:  group,
+		ID:       100,
+		UserID:   user.ID,
+		Key:      "test-key",
+		Status:   service.StatusActive,
+		User:     user,
+		GroupIDs: []int64{group.ID},
+		Groups:   []*service.Group{group},
 	}
-	apiKey.GroupID = &group.ID
 
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
@@ -284,7 +289,7 @@ func TestAPIKeyAuthOverwritesInvalidContextGroup(t *testing.T) {
 	}
 	router.GET("/t", func(c *gin.Context) {
 		groupFromCtx, ok := c.Request.Context().Value(ctxkey.Group).(*service.Group)
-		if !ok || groupFromCtx == nil || groupFromCtx.ID != group.ID || !groupFromCtx.Hydrated || groupFromCtx == invalidGroup {
+		if !ok || groupFromCtx == nil || groupFromCtx.ID != group.ID || groupFromCtx.Platform != group.Platform || !groupFromCtx.Hydrated || groupFromCtx == invalidGroup {
 			c.JSON(http.StatusInternalServerError, gin.H{"ok": false})
 			return
 		}
@@ -293,6 +298,7 @@ func TestAPIKeyAuthOverwritesInvalidContextGroup(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	req = req.WithContext(context.WithValue(req.Context(), ctxkey.Platform, service.PlatformAnthropic))
 	req.Header.Set("x-api-key", apiKey.Key)
 	req = req.WithContext(context.WithValue(req.Context(), ctxkey.Group, invalidGroup))
 	router.ServeHTTP(w, req)

@@ -196,7 +196,8 @@ func TestOpenAIGatewayServiceRecordUsage_UsesUserSpecificGroupRate(t *testing.T)
 	rateRepo := &openAIUserGroupRateRepoStub{rate: &userRate}
 	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, rateRepo)
 
-	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+	ctx := context.WithValue(context.Background(), ctxkey.Platform, PlatformOpenAI)
+	err := svc.RecordUsage(ctx, &OpenAIRecordUsageInput{
 		Result: &OpenAIForwardResult{
 			RequestID: "resp_user_group_rate",
 			Usage:     usage,
@@ -204,10 +205,13 @@ func TestOpenAIGatewayServiceRecordUsage_UsesUserSpecificGroupRate(t *testing.T)
 			Duration:  time.Second,
 		},
 		APIKey: &APIKey{
-			ID:      1001,
+			ID:       1001,
 			GroupIDs: []int64{groupID},
 			Groups: []*Group{{
 				ID:             groupID,
+				Platform:       PlatformOpenAI,
+				Status:         StatusActive,
+				Hydrated:       true,
 				RateMultiplier: groupRate,
 			}},
 		},
@@ -274,7 +278,8 @@ func TestOpenAIGatewayServiceRecordUsage_FallsBackToGroupDefaultRateOnResolverEr
 	rateRepo := &openAIUserGroupRateRepoStub{err: errors.New("db unavailable")}
 	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, rateRepo)
 
-	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+	ctx := context.WithValue(context.Background(), ctxkey.Platform, PlatformOpenAI)
+	err := svc.RecordUsage(ctx, &OpenAIRecordUsageInput{
 		Result: &OpenAIForwardResult{
 			RequestID: "resp_group_default_on_error",
 			Usage:     usage,
@@ -282,10 +287,13 @@ func TestOpenAIGatewayServiceRecordUsage_FallsBackToGroupDefaultRateOnResolverEr
 			Duration:  time.Second,
 		},
 		APIKey: &APIKey{
-			ID:      1002,
+			ID:       1002,
 			GroupIDs: []int64{groupID},
 			Groups: []*Group{{
 				ID:             groupID,
+				Platform:       PlatformOpenAI,
+				Status:         StatusActive,
+				Hydrated:       true,
 				RateMultiplier: groupRate,
 			}},
 		},
@@ -313,7 +321,8 @@ func TestOpenAIGatewayServiceRecordUsage_FallsBackToGroupDefaultRateWhenResolver
 	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, nil)
 	svc.userGroupRateResolver = nil
 
-	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+	ctx := context.WithValue(context.Background(), ctxkey.Platform, PlatformOpenAI)
+	err := svc.RecordUsage(ctx, &OpenAIRecordUsageInput{
 		Result: &OpenAIForwardResult{
 			RequestID: "resp_group_default_nil_resolver",
 			Usage:     usage,
@@ -321,10 +330,13 @@ func TestOpenAIGatewayServiceRecordUsage_FallsBackToGroupDefaultRateWhenResolver
 			Duration:  time.Second,
 		},
 		APIKey: &APIKey{
-			ID:      1003,
+			ID:       1003,
 			GroupIDs: []int64{groupID},
 			Groups: []*Group{{
 				ID:             groupID,
+				Platform:       PlatformOpenAI,
+				Status:         StatusActive,
+				Hydrated:       true,
 				RateMultiplier: groupRate,
 			}},
 		},
@@ -855,8 +867,9 @@ func TestOpenAIGatewayServiceRecordUsage_UsesRequestedModelAndUpstreamModelMetad
 	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, nil)
 	serviceTier := "priority"
 	reasoning := "high"
+	ctx := context.WithValue(context.Background(), ctxkey.Platform, PlatformOpenAI)
 
-	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+	err := svc.RecordUsage(ctx, &OpenAIRecordUsageInput{
 		Result: &OpenAIForwardResult{
 			RequestID:       "resp_billing_model_override",
 			BillingModel:    "gpt-5.1-codex",
@@ -871,7 +884,7 @@ func TestOpenAIGatewayServiceRecordUsage_UsesRequestedModelAndUpstreamModelMetad
 			Duration:     2 * time.Second,
 			FirstTokenMs: func() *int { v := 120; return &v }(),
 		},
-		APIKey:    &APIKey{ID: 10, GroupIDs: []int64{11}, Groups: []*Group{{ID: 11, RateMultiplier: 1.2}}},
+		APIKey:    &APIKey{ID: 10, GroupIDs: []int64{11}, Groups: []*Group{{ID: 11, Platform: PlatformOpenAI, Status: StatusActive, RateMultiplier: 1.2, Hydrated: true}}},
 		User:      &User{ID: 20},
 		Account:   &Account{ID: 30},
 		UserAgent: "codex-cli/1.0",
@@ -1022,15 +1035,16 @@ func TestOpenAIGatewayServiceRecordUsage_SubscriptionBillingSetsSubscriptionFiel
 	subRepo := &openAIRecordUsageSubRepoStub{}
 	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, nil)
 	subscription := &UserSubscription{ID: 99}
+	ctx := context.WithValue(context.Background(), ctxkey.Platform, PlatformOpenAI)
 
-	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+	err := svc.RecordUsage(ctx, &OpenAIRecordUsageInput{
 		Result: &OpenAIForwardResult{
 			RequestID: "resp_subscription_billing",
 			Usage:     OpenAIUsage{InputTokens: 10, OutputTokens: 5},
 			Model:     "gpt-5.1",
 			Duration:  time.Second,
 		},
-		APIKey:       &APIKey{ID: 100, GroupIDs: []int64{88}, Groups: []*Group{{ID: 88, SubscriptionType: SubscriptionTypeSubscription}}},
+		APIKey:       &APIKey{ID: 100, GroupIDs: []int64{88}, Groups: []*Group{{ID: 88, Platform: PlatformOpenAI, Status: StatusActive, SubscriptionType: SubscriptionTypeSubscription, Hydrated: true}}},
 		User:         &User{ID: 200},
 		Account:      &Account{ID: 300},
 		Subscription: subscription,

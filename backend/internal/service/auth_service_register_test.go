@@ -107,10 +107,10 @@ func (s *inviteAPIKeyProvisionerStub) Create(_ context.Context, userID int64, re
 		key = "sk-test-bootstrap"
 	}
 	return &APIKey{
-		ID:      1,
-		UserID:  userID,
-		Key:     key,
-		GroupID: req.GroupID,
+		ID:       1,
+		UserID:   userID,
+		Key:      key,
+		GroupIDs: append([]int64(nil), req.GroupIDs...),
 	}, nil
 }
 
@@ -727,8 +727,7 @@ func TestAuthService_InviteLogin_AssignsDefaultsAndMarksCodeUsed(t *testing.T) {
 	require.Equal(t, int64(15), redeemRepo.usedID)
 	require.Equal(t, int64(77), redeemRepo.usedUserID)
 	require.Equal(t, int64(77), apiKeyProvisioner.lastUserID)
-	require.Nil(t, apiKeyProvisioner.lastReq.GroupID)
-	require.Equal(t, []int64{31}, apiKeyProvisioner.lastReq.GrantedGroupIDs)
+	require.Equal(t, []int64{31}, apiKeyProvisioner.lastReq.GroupIDs)
 	// Invite-login no longer applies default subscriptions from settings in this flow.
 	// Assignment only happens when invitation benefit is subscription.
 	require.Len(t, assigner.calls, 0)

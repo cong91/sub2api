@@ -42,6 +42,7 @@ func (APIKey) Fields() []ent.Field {
 			MaxLen(100).
 			NotEmpty(),
 		field.JSON("group_ids", []int64{}).
+			SchemaType(map[string]string{dialect.Postgres: "bigint[]"}).
 			Optional().
 			Default([]int64{}),
 		field.String("status").

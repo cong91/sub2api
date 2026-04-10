@@ -190,7 +190,7 @@ func TestAPIKeyService_GetByKey_UsesL2Cache(t *testing.T) {
 		Snapshot: &APIKeyAuthSnapshot{
 			APIKeyID: 1,
 			UserID:   2,
-			GroupID:  &groupID,
+			GroupIDs: []int64{groupID},
 			Status:   StatusActive,
 			User: APIKeyAuthUserSnapshot{
 				ID:          2,
@@ -199,7 +199,7 @@ func TestAPIKeyService_GetByKey_UsesL2Cache(t *testing.T) {
 				Balance:     10,
 				Concurrency: 3,
 			},
-			Group: &APIKeyAuthGroupSnapshot{
+			Groups: []APIKeyAuthGroupSnapshot{{
 				ID:                  groupID,
 				Name:                "g",
 				Platform:            PlatformAnthropic,
@@ -210,7 +210,7 @@ func TestAPIKeyService_GetByKey_UsesL2Cache(t *testing.T) {
 				ModelRouting: map[string][]int64{
 					"claude-opus-*": {1, 2},
 				},
-			},
+			}},
 		},
 	}
 	cache.getAuthCache = func(ctx context.Context, key string) (*APIKeyAuthCacheEntry, error) {
@@ -221,9 +221,10 @@ func TestAPIKeyService_GetByKey_UsesL2Cache(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), apiKey.ID)
 	require.Equal(t, int64(2), apiKey.User.ID)
-	require.Equal(t, groupID, apiKey.Group.ID)
-	require.True(t, apiKey.Group.ModelRoutingEnabled)
-	require.Equal(t, map[string][]int64{"claude-opus-*": {1, 2}}, apiKey.Group.ModelRouting)
+	require.Len(t, apiKey.Groups, 1)
+	require.Equal(t, groupID, apiKey.Groups[0].ID)
+	require.True(t, apiKey.Groups[0].ModelRoutingEnabled)
+	require.Equal(t, map[string][]int64{"claude-opus-*": {1, 2}}, apiKey.Groups[0].ModelRouting)
 }
 
 func TestAPIKeyService_GetByKey_NegativeCache(t *testing.T) {

@@ -172,6 +172,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 			apikey.FieldID,
 			apikey.FieldUserID,
 			apikey.FieldStatus,
+			apikey.FieldGroupIds,
 			apikey.FieldIPWhitelist,
 			apikey.FieldIPBlacklist,
 			apikey.FieldQuota,
@@ -197,7 +198,50 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+
+	out := apiKeyEntityToService(m)
+	if out == nil {
+		return nil, service.ErrAPIKeyNotFound
+	}
+	if len(out.GroupIDs) > 0 {
+		groups, groupErr := r.client.Group.Query().
+			Where(group.IDIn(out.GroupIDs...), group.DeletedAtIsNil()).
+			Select(
+				group.FieldID,
+				group.FieldName,
+				group.FieldPlatform,
+				group.FieldStatus,
+				group.FieldSubscriptionType,
+				group.FieldRateMultiplier,
+				group.FieldDailyLimitUsd,
+				group.FieldWeeklyLimitUsd,
+				group.FieldMonthlyLimitUsd,
+				group.FieldImagePrice1k,
+				group.FieldImagePrice2k,
+				group.FieldImagePrice4k,
+				group.FieldClaudeCodeOnly,
+				group.FieldFallbackGroupID,
+				group.FieldFallbackGroupIDOnInvalidRequest,
+				group.FieldModelRouting,
+				group.FieldModelRoutingEnabled,
+				group.FieldMcpXMLInject,
+				group.FieldSupportedModelScopes,
+				group.FieldAllowMessagesDispatch,
+				group.FieldDefaultMappedModel,
+			).
+			All(ctx)
+		if groupErr != nil {
+			return nil, groupErr
+		}
+		if len(groups) > 0 {
+			mapped := make([]*service.Group, 0, len(groups))
+			for _, g := range groups {
+				mapped = append(mapped, groupEntityToService(g))
+			}
+			out.Groups = cloneGroupsByIDs(mapped, out.GroupIDs)
+		}
+	}
+	return out, nil
 }
 
 func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) error {

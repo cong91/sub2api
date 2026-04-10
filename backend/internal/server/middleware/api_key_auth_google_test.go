@@ -305,7 +305,7 @@ func TestApiKeyAuthWithSubscriptionGoogleSetsGroupContext(t *testing.T) {
 	r.Use(APIKeyAuthWithSubscriptionGoogle(apiKeyService, nil, cfg))
 	r.GET("/v1beta/test", func(c *gin.Context) {
 		groupFromCtx, ok := c.Request.Context().Value(ctxkey.Group).(*service.Group)
-		if !ok || groupFromCtx == nil || groupFromCtx.ID != group.ID {
+		if !ok || groupFromCtx == nil || groupFromCtx.ID != group.ID || groupFromCtx.Platform != group.Platform {
 			c.JSON(http.StatusInternalServerError, gin.H{"ok": false})
 			return
 		}
@@ -313,6 +313,7 @@ func TestApiKeyAuthWithSubscriptionGoogleSetsGroupContext(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1beta/test", nil)
+	req = req.WithContext(context.WithValue(req.Context(), ctxkey.Platform, service.PlatformGemini))
 	req.Header.Set("x-api-key", apiKey.Key)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)

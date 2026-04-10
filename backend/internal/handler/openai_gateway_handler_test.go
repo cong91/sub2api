@@ -11,6 +11,7 @@ import (
 	"time"
 
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	coderws "github.com/coder/websocket"
@@ -376,7 +377,8 @@ func TestResolveOpenAIForwardDefaultMappedModel(t *testing.T) {
 			GroupIDs: []int64{7},
 			Groups:   []*service.Group{makeOpenAIGroup(7, "gpt-5.4")},
 		}
-		require.Equal(t, "gpt-5.4", resolveOpenAIForwardDefaultMappedModel(context.Background(), apiKey, ""))
+		ctx := context.WithValue(context.Background(), ctxkey.Platform, service.PlatformOpenAI)
+		require.Equal(t, "gpt-5.4", resolveOpenAIForwardDefaultMappedModel(ctx, apiKey, ""))
 	})
 
 	t.Run("uses_effective_group_from_group_ids_order", func(t *testing.T) {
@@ -387,13 +389,15 @@ func TestResolveOpenAIForwardDefaultMappedModel(t *testing.T) {
 				makeOpenAIGroup(9, "canonical-effective-model"),
 			},
 		}
-		require.Equal(t, "canonical-effective-model", resolveOpenAIForwardDefaultMappedModel(context.Background(), apiKey, ""))
+		ctx := context.WithValue(context.Background(), ctxkey.Platform, service.PlatformOpenAI)
+		require.Equal(t, "canonical-effective-model", resolveOpenAIForwardDefaultMappedModel(ctx, apiKey, ""))
 	})
 
 	t.Run("returns_empty_without_group_default", func(t *testing.T) {
-		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(context.Background(), nil, ""))
-		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(context.Background(), &service.APIKey{}, ""))
-		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(context.Background(), &service.APIKey{
+		ctx := context.WithValue(context.Background(), ctxkey.Platform, service.PlatformOpenAI)
+		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(ctx, nil, ""))
+		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(ctx, &service.APIKey{}, ""))
+		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(ctx, &service.APIKey{
 			GroupIDs: []int64{7},
 			Groups:   []*service.Group{makeOpenAIGroup(7, "")},
 		}, ""))
