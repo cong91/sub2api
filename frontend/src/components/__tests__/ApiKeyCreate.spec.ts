@@ -55,7 +55,7 @@ const ApiKeyCreateTestComponent = defineComponent({
     const createdKey = ref('')
     const formData = reactive({
       name: '',
-      group_id: null as number | null,
+      group_ids: [] as number[],
     })
 
     const handleCreate = async () => {
@@ -65,7 +65,7 @@ const ApiKeyCreateTestComponent = defineComponent({
       try {
         const result = await mockCreate({
           name: formData.name,
-          group_id: formData.group_id,
+          group_ids: formData.group_ids,
         })
         createdKey.value = result.key
         appStore.showSuccess('API Key 创建成功')
@@ -82,8 +82,8 @@ const ApiKeyCreateTestComponent = defineComponent({
     <div>
       <form @submit.prevent="handleCreate">
         <input id="name" v-model="formData.name" placeholder="Key 名称" />
-        <select id="group" v-model="formData.group_id">
-          <option :value="null">默认</option>
+        <select id="group" :value="formData.group_ids[0] ?? ''" @change="formData.group_ids = $event.target.value === '' ? [] : [Number($event.target.value)]">
+          <option value="">默认</option>
           <option :value="1">Group 1</option>
         </select>
         <button type="submit" :disabled="loading">创建</button>
@@ -114,7 +114,7 @@ describe('ApiKey 创建流程', () => {
 
     expect(mockCreate).toHaveBeenCalledWith({
       name: 'My Test Key',
-      group_id: null,
+      group_ids: [],
     })
 
     expect(wrapper.find('.created-key').text()).toBe('sk-test-key-12345')
@@ -130,14 +130,14 @@ describe('ApiKey 创建流程', () => {
     const wrapper = mount(ApiKeyCreateTestComponent)
 
     await wrapper.find('#name').setValue('Group Key')
-    // 选择 group_id = 1
+    // 选择唯一 canonical membership group
     await wrapper.find('#group').setValue('1')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
     expect(mockCreate).toHaveBeenCalledWith({
       name: 'Group Key',
-      group_id: 1,
+      group_ids: [1],
     })
   })
 

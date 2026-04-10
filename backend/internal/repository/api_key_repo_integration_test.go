@@ -64,11 +64,11 @@ func (s *APIKeyRepoSuite) TestGetByKey() {
 	group := s.mustCreateGroup("g-key")
 
 	key := &service.APIKey{
-		UserID:  user.ID,
-		Key:     "sk-getbykey",
-		Name:    "My Key",
-		GroupID: &group.ID,
-		Status:  service.StatusActive,
+		UserID:   user.ID,
+		Key:      "sk-getbykey",
+		Name:     "My Key",
+		GroupIDs: []int64{group.ID},
+		Status:   service.StatusActive,
 	}
 	s.Require().NoError(s.repo.Create(s.ctx, key))
 
@@ -77,8 +77,8 @@ func (s *APIKeyRepoSuite) TestGetByKey() {
 	s.Require().Equal(key.ID, got.ID)
 	s.Require().NotNil(got.User, "expected User preload")
 	s.Require().Equal(user.ID, got.User.ID)
-	s.Require().NotNil(got.Group, "expected Group preload")
-	s.Require().Equal(group.ID, got.Group.ID)
+	s.Require().Equal([]int64{group.ID}, got.GroupIDs)
+	s.Require().Nil(got.Groups)
 }
 
 func (s *APIKeyRepoSuite) TestGetByKey_NotFound() {
@@ -115,21 +115,21 @@ func (s *APIKeyRepoSuite) TestUpdate_ClearGroupID() {
 	user := s.mustCreateUser("cleargroup@test.com")
 	group := s.mustCreateGroup("g-clear")
 	key := &service.APIKey{
-		UserID:  user.ID,
-		Key:     "sk-clear-group",
-		Name:    "Group Key",
-		GroupID: &group.ID,
-		Status:  service.StatusActive,
+		UserID:   user.ID,
+		Key:      "sk-clear-group",
+		Name:     "Group Key",
+		GroupIDs: []int64{group.ID},
+		Status:   service.StatusActive,
 	}
 	s.Require().NoError(s.repo.Create(s.ctx, key))
 
-	key.GroupID = nil
+	key.GroupIDs = nil
 	err := s.repo.Update(s.ctx, key)
 	s.Require().NoError(err, "Update")
 
 	got, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err)
-	s.Require().Nil(got.GroupID, "expected GroupID to be cleared")
+	s.Require().Empty(got.GroupIDs, "expected group_ids to be cleared")
 }
 
 // --- Delete ---
@@ -187,6 +187,25 @@ func (s *APIKeyRepoSuite) TestListByUserID() {
 	s.Require().NoError(err, "ListByUserID")
 	s.Require().Len(keys, 2)
 	s.Require().Equal(int64(2), page.Total)
+}
+
+func (s *APIKeyRepoSuite) TestListByUserID_UsesCanonicalGroupIDsColumn() {
+	user := s.mustCreateUser("listbyuser-groups@test.com")
+	groupA := s.mustCreateGroup("g-list-hydrate-a")
+	groupB := s.mustCreateGroup("g-list-hydrate-b")
+	key := &service.APIKey{
+		UserID:   user.ID,
+		Key:      "sk-list-groups",
+		Name:     "Key With Groups",
+		GroupIDs: []int64{groupA.ID, groupB.ID},
+		Status:   service.StatusActive,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, key))
+
+	keys, _, err := s.repo.ListByUserID(s.ctx, user.ID, pagination.PaginationParams{Page: 1, PageSize: 10}, service.APIKeyListFilters{})
+	s.Require().NoError(err)
+	s.Require().Len(keys, 1)
+	s.Require().Equal([]int64{groupA.ID, groupB.ID}, keys[0].GroupIDs)
 }
 
 func (s *APIKeyRepoSuite) TestListByUserID_Pagination() {
@@ -303,8 +322,8 @@ func (s *APIKeyRepoSuite) TestClearGroupIDByGroupID() {
 
 	got1, _ := s.repo.GetByID(s.ctx, k1.ID)
 	got2, _ := s.repo.GetByID(s.ctx, k2.ID)
-	s.Require().Nil(got1.GroupID)
-	s.Require().Nil(got2.GroupID)
+	s.Require().Empty(got1.GroupIDs)
+	s.Require().Empty(got2.GroupIDs)
 
 	count, _ := s.repo.CountByGroupID(s.ctx, group.ID)
 	s.Require().Zero(count)
@@ -316,19 +335,18 @@ func (s *APIKeyRepoSuite) TestCRUD_Search_ClearGroupID() {
 	user := s.mustCreateUser("k@example.com")
 	group := s.mustCreateGroup("g-k")
 	key := s.mustCreateApiKey(user.ID, "sk-test-1", "My Key", &group.ID)
-	key.GroupID = &group.ID
+	key.GroupIDs = []int64{group.ID}
 
 	got, err := s.repo.GetByKey(s.ctx, key.Key)
 	s.Require().NoError(err, "GetByKey")
 	s.Require().Equal(key.ID, got.ID)
 	s.Require().NotNil(got.User)
 	s.Require().Equal(user.ID, got.User.ID)
-	s.Require().NotNil(got.Group)
-	s.Require().Equal(group.ID, got.Group.ID)
+	s.Require().Equal([]int64{group.ID}, got.GroupIDs)
 
 	key.Name = "Renamed"
 	key.Status = service.StatusDisabled
-	key.GroupID = nil
+	key.GroupIDs = nil
 	s.Require().NoError(s.repo.Update(s.ctx, key), "Update")
 
 	got2, err := s.repo.GetByID(s.ctx, key.ID)
@@ -337,7 +355,7 @@ func (s *APIKeyRepoSuite) TestCRUD_Search_ClearGroupID() {
 	s.Require().Equal(user.ID, got2.UserID, "Update should not change user_id")
 	s.Require().Equal("Renamed", got2.Name)
 	s.Require().Equal(service.StatusDisabled, got2.Status)
-	s.Require().Nil(got2.GroupID)
+	s.Require().Empty(got2.GroupIDs)
 
 	keys, page, err := s.repo.ListByUserID(s.ctx, user.ID, pagination.PaginationParams{Page: 1, PageSize: 10}, service.APIKeyListFilters{})
 	s.Require().NoError(err, "ListByUserID")
@@ -355,7 +373,7 @@ func (s *APIKeyRepoSuite) TestCRUD_Search_ClearGroupID() {
 
 	// ClearGroupIDByGroupID
 	k2 := s.mustCreateApiKey(user.ID, "sk-test-2", "Group Key", &group.ID)
-	k2.GroupID = &group.ID
+	k2.GroupIDs = []int64{group.ID}
 
 	countBefore, err := s.repo.CountByGroupID(s.ctx, group.ID)
 	s.Require().NoError(err, "CountByGroupID")
@@ -367,7 +385,7 @@ func (s *APIKeyRepoSuite) TestCRUD_Search_ClearGroupID() {
 
 	got3, err := s.repo.GetByID(s.ctx, k2.ID)
 	s.Require().NoError(err, "GetByID")
-	s.Require().Nil(got3.GroupID, "expected GroupID cleared")
+	s.Require().Empty(got3.GroupIDs, "expected group_ids cleared")
 
 	countAfter, err := s.repo.CountByGroupID(s.ctx, group.ID)
 	s.Require().NoError(err, "CountByGroupID after clear")
@@ -401,12 +419,16 @@ func (s *APIKeyRepoSuite) mustCreateGroup(name string) *service.Group {
 func (s *APIKeyRepoSuite) mustCreateApiKey(userID int64, key, name string, groupID *int64) *service.APIKey {
 	s.T().Helper()
 
+	groupIDs := []int64{}
+	if groupID != nil {
+		groupIDs = []int64{*groupID}
+	}
 	k := &service.APIKey{
-		UserID:  userID,
-		Key:     key,
-		Name:    name,
-		GroupID: groupID,
-		Status:  service.StatusActive,
+		UserID:   userID,
+		Key:      key,
+		Name:     name,
+		GroupIDs: groupIDs,
+		Status:   service.StatusActive,
 	}
 	s.Require().NoError(s.repo.Create(s.ctx, k), "create api key")
 	return k

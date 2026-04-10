@@ -95,10 +95,10 @@ func TestUsageBillingRepositoryApply_DeduplicatesSubscriptionBilling(t *testing.
 		SubscriptionType: service.SubscriptionTypeSubscription,
 	})
 	apiKey := mustCreateApiKey(t, client, &service.APIKey{
-		UserID:  user.ID,
-		GroupID: &group.ID,
-		Key:     "sk-usage-billing-sub-" + uuid.NewString(),
-		Name:    "billing-sub",
+		UserID:   user.ID,
+		GroupIDs: []int64{group.ID},
+		Key:      "sk-usage-billing-sub-" + uuid.NewString(),
+		Name:     "billing-sub",
 	})
 	subscription := mustCreateSubscription(t, client, &service.UserSubscription{
 		UserID:  user.ID,

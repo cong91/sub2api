@@ -298,8 +298,8 @@ func mustCreateApiKey(t *testing.T, client *dbent.Client, k *service.APIKey) *se
 	if k.ExpiresAt != nil {
 		create.SetExpiresAt(*k.ExpiresAt)
 	}
-	if k.GroupID != nil {
-		create.SetGroupID(*k.GroupID)
+	if len(k.GroupIDs) > 0 {
+		create.SetGroupIds(k.GroupIDs)
 	}
 	if !k.CreatedAt.IsZero() {
 		create.SetCreatedAt(k.CreatedAt)

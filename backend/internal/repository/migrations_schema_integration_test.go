@@ -34,8 +34,8 @@ func TestMigrationsRunner_IsIdempotent_AndSchemaIsUpToDate(t *testing.T) {
 	requireColumn(t, tx, "accounts", "session_window_status", "character varying", 20, true)
 
 	// api_keys: key length should be 128 and canonical group_ids[] exists.
-	// Migration 093 is authoritative and must cut over with explicit migrate-data-before-drop semantics:
-	// add group_ids -> migrate from api_key_groups + group_id -> dedupe/sort -> verify -> then drop legacy schema.
+	// Migration 093 is authoritative and must cut over with explicit rewrite semantics:
+	// add group_ids -> rewrite from legacy api_keys.group_id -> verify -> then drop all legacy schema.
 	requireColumn(t, tx, "api_keys", "key", "character varying", 128, false)
 	requireColumn(t, tx, "api_keys", "group_ids", "ARRAY", 0, false)
 	requireIndex(t, tx, "api_keys", "idx_api_keys_group_ids_gin")

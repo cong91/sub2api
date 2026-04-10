@@ -73,6 +73,30 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIKey, error) {
 	m, err := r.activeQuery().
 		Where(apikey.IDEQ(id)).
+		Select(
+			apikey.FieldID,
+			apikey.FieldUserID,
+			apikey.FieldKey,
+			apikey.FieldName,
+			apikey.FieldStatus,
+			apikey.FieldIPWhitelist,
+			apikey.FieldIPBlacklist,
+			apikey.FieldLastUsedAt,
+			apikey.FieldCreatedAt,
+			apikey.FieldUpdatedAt,
+			apikey.FieldQuota,
+			apikey.FieldQuotaUsed,
+			apikey.FieldExpiresAt,
+			apikey.FieldRateLimit5h,
+			apikey.FieldRateLimit1d,
+			apikey.FieldRateLimit7d,
+			apikey.FieldUsage5h,
+			apikey.FieldUsage1d,
+			apikey.FieldUsage7d,
+			apikey.FieldWindow5hStart,
+			apikey.FieldWindow1dStart,
+			apikey.FieldWindow7dStart,
+		).
 		WithUser().
 		Only(ctx)
 	if err != nil {
@@ -106,6 +130,30 @@ func (r *apiKeyRepository) GetKeyAndOwnerID(ctx context.Context, id int64) (stri
 func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.APIKey, error) {
 	m, err := r.activeQuery().
 		Where(apikey.KeyEQ(key)).
+		Select(
+			apikey.FieldID,
+			apikey.FieldUserID,
+			apikey.FieldKey,
+			apikey.FieldName,
+			apikey.FieldStatus,
+			apikey.FieldIPWhitelist,
+			apikey.FieldIPBlacklist,
+			apikey.FieldLastUsedAt,
+			apikey.FieldCreatedAt,
+			apikey.FieldUpdatedAt,
+			apikey.FieldQuota,
+			apikey.FieldQuotaUsed,
+			apikey.FieldExpiresAt,
+			apikey.FieldRateLimit5h,
+			apikey.FieldRateLimit1d,
+			apikey.FieldRateLimit7d,
+			apikey.FieldUsage5h,
+			apikey.FieldUsage1d,
+			apikey.FieldUsage7d,
+			apikey.FieldWindow5hStart,
+			apikey.FieldWindow1dStart,
+			apikey.FieldWindow7dStart,
+		).
 		WithUser().
 		Only(ctx)
 	if err != nil {
@@ -123,7 +171,6 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 		Select(
 			apikey.FieldID,
 			apikey.FieldUserID,
-			apikey.FieldGroupIds,
 			apikey.FieldStatus,
 			apikey.FieldIPWhitelist,
 			apikey.FieldIPBlacklist,
@@ -305,6 +352,30 @@ func (r *apiKeyRepository) ListByUserID(ctx context.Context, userID int64, param
 	}
 
 	keys, err := q.
+		Select(
+			apikey.FieldID,
+			apikey.FieldUserID,
+			apikey.FieldKey,
+			apikey.FieldName,
+			apikey.FieldStatus,
+			apikey.FieldIPWhitelist,
+			apikey.FieldIPBlacklist,
+			apikey.FieldLastUsedAt,
+			apikey.FieldCreatedAt,
+			apikey.FieldUpdatedAt,
+			apikey.FieldQuota,
+			apikey.FieldQuotaUsed,
+			apikey.FieldExpiresAt,
+			apikey.FieldRateLimit5h,
+			apikey.FieldRateLimit1d,
+			apikey.FieldRateLimit7d,
+			apikey.FieldUsage5h,
+			apikey.FieldUsage1d,
+			apikey.FieldUsage7d,
+			apikey.FieldWindow5hStart,
+			apikey.FieldWindow1dStart,
+			apikey.FieldWindow7dStart,
+		).
 		Offset(params.Offset()).
 		Limit(params.Limit()).
 		Order(dbent.Desc(apikey.FieldID)).
@@ -356,6 +427,30 @@ func (r *apiKeyRepository) ListByGroupID(ctx context.Context, groupID int64, par
 	}
 
 	keys, err := q.
+		Select(
+			apikey.FieldID,
+			apikey.FieldUserID,
+			apikey.FieldKey,
+			apikey.FieldName,
+			apikey.FieldStatus,
+			apikey.FieldIPWhitelist,
+			apikey.FieldIPBlacklist,
+			apikey.FieldLastUsedAt,
+			apikey.FieldCreatedAt,
+			apikey.FieldUpdatedAt,
+			apikey.FieldQuota,
+			apikey.FieldQuotaUsed,
+			apikey.FieldExpiresAt,
+			apikey.FieldRateLimit5h,
+			apikey.FieldRateLimit1d,
+			apikey.FieldRateLimit7d,
+			apikey.FieldUsage5h,
+			apikey.FieldUsage1d,
+			apikey.FieldUsage7d,
+			apikey.FieldWindow5hStart,
+			apikey.FieldWindow1dStart,
+			apikey.FieldWindow7dStart,
+		).
 		WithUser().
 		Offset(params.Offset()).
 		Limit(params.Limit()).
@@ -384,7 +479,34 @@ func (r *apiKeyRepository) SearchAPIKeys(ctx context.Context, userID int64, keyw
 		q = q.Where(apikey.NameContainsFold(keyword))
 	}
 
-	keys, err := q.Limit(limit).Order(dbent.Desc(apikey.FieldID)).All(ctx)
+	keys, err := q.
+		Select(
+			apikey.FieldID,
+			apikey.FieldUserID,
+			apikey.FieldKey,
+			apikey.FieldName,
+			apikey.FieldStatus,
+			apikey.FieldIPWhitelist,
+			apikey.FieldIPBlacklist,
+			apikey.FieldLastUsedAt,
+			apikey.FieldCreatedAt,
+			apikey.FieldUpdatedAt,
+			apikey.FieldQuota,
+			apikey.FieldQuotaUsed,
+			apikey.FieldExpiresAt,
+			apikey.FieldRateLimit5h,
+			apikey.FieldRateLimit1d,
+			apikey.FieldRateLimit7d,
+			apikey.FieldUsage5h,
+			apikey.FieldUsage1d,
+			apikey.FieldUsage7d,
+			apikey.FieldWindow5hStart,
+			apikey.FieldWindow1dStart,
+			apikey.FieldWindow7dStart,
+		).
+		Limit(limit).
+		Order(dbent.Desc(apikey.FieldID)).
+		All(ctx)
 	if err != nil {
 		return nil, err
 	}
