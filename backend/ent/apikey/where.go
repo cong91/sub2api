@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pgtypes"
 )
 
 // ID filters vertices based on their ID field.
@@ -83,6 +84,12 @@ func Key(v string) predicate.APIKey {
 // Name applies equality check predicate on the "name" field. It's identical to NameEQ.
 func Name(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldName, v))
+}
+
+// GroupIds applies equality check predicate on the "group_ids" field. It's identical to GroupIdsEQ.
+func GroupIds(v pgtypes.Int64Array) predicate.APIKey {
+	vc, err := ValueScanner.GroupIds.Value(v)
+	return predicate.APIKeyOrErr(sql.FieldEQ(FieldGroupIds, vc), err)
 }
 
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
@@ -433,6 +440,70 @@ func NameEqualFold(v string) predicate.APIKey {
 // NameContainsFold applies the ContainsFold predicate on the "name" field.
 func NameContainsFold(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldContainsFold(FieldName, v))
+}
+
+// GroupIdsEQ applies the EQ predicate on the "group_ids" field.
+func GroupIdsEQ(v pgtypes.Int64Array) predicate.APIKey {
+	vc, err := ValueScanner.GroupIds.Value(v)
+	return predicate.APIKeyOrErr(sql.FieldEQ(FieldGroupIds, vc), err)
+}
+
+// GroupIdsNEQ applies the NEQ predicate on the "group_ids" field.
+func GroupIdsNEQ(v pgtypes.Int64Array) predicate.APIKey {
+	vc, err := ValueScanner.GroupIds.Value(v)
+	return predicate.APIKeyOrErr(sql.FieldNEQ(FieldGroupIds, vc), err)
+}
+
+// GroupIdsIn applies the In predicate on the "group_ids" field.
+func GroupIdsIn(vs ...pgtypes.Int64Array) predicate.APIKey {
+	var (
+		err error
+		v   = make([]any, len(vs))
+	)
+	for i := range v {
+		if v[i], err = ValueScanner.GroupIds.Value(vs[i]); err != nil {
+			break
+		}
+	}
+	return predicate.APIKeyOrErr(sql.FieldIn(FieldGroupIds, v...), err)
+}
+
+// GroupIdsNotIn applies the NotIn predicate on the "group_ids" field.
+func GroupIdsNotIn(vs ...pgtypes.Int64Array) predicate.APIKey {
+	var (
+		err error
+		v   = make([]any, len(vs))
+	)
+	for i := range v {
+		if v[i], err = ValueScanner.GroupIds.Value(vs[i]); err != nil {
+			break
+		}
+	}
+	return predicate.APIKeyOrErr(sql.FieldNotIn(FieldGroupIds, v...), err)
+}
+
+// GroupIdsGT applies the GT predicate on the "group_ids" field.
+func GroupIdsGT(v pgtypes.Int64Array) predicate.APIKey {
+	vc, err := ValueScanner.GroupIds.Value(v)
+	return predicate.APIKeyOrErr(sql.FieldGT(FieldGroupIds, vc), err)
+}
+
+// GroupIdsGTE applies the GTE predicate on the "group_ids" field.
+func GroupIdsGTE(v pgtypes.Int64Array) predicate.APIKey {
+	vc, err := ValueScanner.GroupIds.Value(v)
+	return predicate.APIKeyOrErr(sql.FieldGTE(FieldGroupIds, vc), err)
+}
+
+// GroupIdsLT applies the LT predicate on the "group_ids" field.
+func GroupIdsLT(v pgtypes.Int64Array) predicate.APIKey {
+	vc, err := ValueScanner.GroupIds.Value(v)
+	return predicate.APIKeyOrErr(sql.FieldLT(FieldGroupIds, vc), err)
+}
+
+// GroupIdsLTE applies the LTE predicate on the "group_ids" field.
+func GroupIdsLTE(v pgtypes.Int64Array) predicate.APIKey {
+	vc, err := ValueScanner.GroupIds.Value(v)
+	return predicate.APIKeyOrErr(sql.FieldLTE(FieldGroupIds, vc), err)
 }
 
 // GroupIdsIsNil applies the IsNil predicate on the "group_ids" field.

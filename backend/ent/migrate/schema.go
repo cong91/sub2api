@@ -17,7 +17,7 @@ var (
 		{Name: "deleted_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "key", Type: field.TypeString, Unique: true, Size: 128},
 		{Name: "name", Type: field.TypeString, Size: 100},
-		{Name: "group_ids", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "bigint[]"}},
+		{Name: "group_ids", Type: field.TypeBytes, Nullable: true, SchemaType: map[string]string{"postgres": "bigint[]"}},
 		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
 		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
 		{Name: "ip_whitelist", Type: field.TypeJSON, Nullable: true},

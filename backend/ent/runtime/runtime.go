@@ -28,6 +28,9 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userattributedefinition"
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pgtypes"
+
+	"entgo.io/ent/schema/field"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -92,7 +95,8 @@ func init() {
 	// apikeyDescGroupIds is the schema descriptor for group_ids field.
 	apikeyDescGroupIds := apikeyFields[3].Descriptor()
 	// apikey.DefaultGroupIds holds the default value on creation for the group_ids field.
-	apikey.DefaultGroupIds = apikeyDescGroupIds.Default.([]int64)
+	apikey.DefaultGroupIds = apikeyDescGroupIds.Default.(func() pgtypes.Int64Array)
+	apikey.ValueScanner.GroupIds = apikeyDescGroupIds.ValueScanner.(field.TypeValueScanner[pgtypes.Int64Array])
 	// apikeyDescStatus is the schema descriptor for status field.
 	apikeyDescStatus := apikeyFields[4].Descriptor()
 	// apikey.DefaultStatus holds the default value on creation for the status field.

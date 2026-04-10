@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pgtypes"
 )
 
 // APIKeyUpdate is the builder for updating APIKey entities.
@@ -100,14 +101,8 @@ func (_u *APIKeyUpdate) SetNillableName(v *string) *APIKeyUpdate {
 }
 
 // SetGroupIds sets the "group_ids" field.
-func (_u *APIKeyUpdate) SetGroupIds(v []int64) *APIKeyUpdate {
+func (_u *APIKeyUpdate) SetGroupIds(v pgtypes.Int64Array) *APIKeyUpdate {
 	_u.mutation.SetGroupIds(v)
-	return _u
-}
-
-// AppendGroupIds appends value to the "group_ids" field.
-func (_u *APIKeyUpdate) AppendGroupIds(v []int64) *APIKeyUpdate {
-	_u.mutation.AppendGroupIds(v)
 	return _u
 }
 
@@ -580,15 +575,14 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.GroupIds(); ok {
-		_spec.SetField(apikey.FieldGroupIds, field.TypeJSON, value)
-	}
-	if value, ok := _u.mutation.AppendedGroupIds(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, apikey.FieldGroupIds, value)
-		})
+		vv, err := apikey.ValueScanner.GroupIds.Value(value)
+		if err != nil {
+			return 0, err
+		}
+		_spec.SetField(apikey.FieldGroupIds, field.TypeBytes, vv)
 	}
 	if _u.mutation.GroupIdsCleared() {
-		_spec.ClearField(apikey.FieldGroupIds, field.TypeJSON)
+		_spec.ClearField(apikey.FieldGroupIds, field.TypeBytes)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
@@ -856,14 +850,8 @@ func (_u *APIKeyUpdateOne) SetNillableName(v *string) *APIKeyUpdateOne {
 }
 
 // SetGroupIds sets the "group_ids" field.
-func (_u *APIKeyUpdateOne) SetGroupIds(v []int64) *APIKeyUpdateOne {
+func (_u *APIKeyUpdateOne) SetGroupIds(v pgtypes.Int64Array) *APIKeyUpdateOne {
 	_u.mutation.SetGroupIds(v)
-	return _u
-}
-
-// AppendGroupIds appends value to the "group_ids" field.
-func (_u *APIKeyUpdateOne) AppendGroupIds(v []int64) *APIKeyUpdateOne {
-	_u.mutation.AppendGroupIds(v)
 	return _u
 }
 
@@ -1366,15 +1354,14 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.GroupIds(); ok {
-		_spec.SetField(apikey.FieldGroupIds, field.TypeJSON, value)
-	}
-	if value, ok := _u.mutation.AppendedGroupIds(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, apikey.FieldGroupIds, value)
-		})
+		vv, err := apikey.ValueScanner.GroupIds.Value(value)
+		if err != nil {
+			return nil, err
+		}
+		_spec.SetField(apikey.FieldGroupIds, field.TypeBytes, vv)
 	}
 	if _u.mutation.GroupIdsCleared() {
-		_spec.ClearField(apikey.FieldGroupIds, field.TypeJSON)
+		_spec.ClearField(apikey.FieldGroupIds, field.TypeBytes)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)

@@ -36,6 +36,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pgtypes"
 )
 
 const (
@@ -82,8 +83,7 @@ type APIKeyMutation struct {
 	deleted_at         *time.Time
 	key                *string
 	name               *string
-	group_ids          *[]int64
-	appendgroup_ids    []int64
+	group_ids          *pgtypes.Int64Array
 	status             *string
 	last_used_at       *time.Time
 	ip_whitelist       *[]string
@@ -449,13 +449,12 @@ func (m *APIKeyMutation) ResetName() {
 }
 
 // SetGroupIds sets the "group_ids" field.
-func (m *APIKeyMutation) SetGroupIds(i []int64) {
-	m.group_ids = &i
-	m.appendgroup_ids = nil
+func (m *APIKeyMutation) SetGroupIds(pg pgtypes.Int64Array) {
+	m.group_ids = &pg
 }
 
 // GroupIds returns the value of the "group_ids" field in the mutation.
-func (m *APIKeyMutation) GroupIds() (r []int64, exists bool) {
+func (m *APIKeyMutation) GroupIds() (r pgtypes.Int64Array, exists bool) {
 	v := m.group_ids
 	if v == nil {
 		return
@@ -466,7 +465,7 @@ func (m *APIKeyMutation) GroupIds() (r []int64, exists bool) {
 // OldGroupIds returns the old "group_ids" field's value of the APIKey entity.
 // If the APIKey object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *APIKeyMutation) OldGroupIds(ctx context.Context) (v []int64, err error) {
+func (m *APIKeyMutation) OldGroupIds(ctx context.Context) (v pgtypes.Int64Array, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldGroupIds is only allowed on UpdateOne operations")
 	}
@@ -480,23 +479,9 @@ func (m *APIKeyMutation) OldGroupIds(ctx context.Context) (v []int64, err error)
 	return oldValue.GroupIds, nil
 }
 
-// AppendGroupIds adds i to the "group_ids" field.
-func (m *APIKeyMutation) AppendGroupIds(i []int64) {
-	m.appendgroup_ids = append(m.appendgroup_ids, i...)
-}
-
-// AppendedGroupIds returns the list of values that were appended to the "group_ids" field in this mutation.
-func (m *APIKeyMutation) AppendedGroupIds() ([]int64, bool) {
-	if len(m.appendgroup_ids) == 0 {
-		return nil, false
-	}
-	return m.appendgroup_ids, true
-}
-
 // ClearGroupIds clears the value of the "group_ids" field.
 func (m *APIKeyMutation) ClearGroupIds() {
 	m.group_ids = nil
-	m.appendgroup_ids = nil
 	m.clearedFields[apikey.FieldGroupIds] = struct{}{}
 }
 
@@ -509,7 +494,6 @@ func (m *APIKeyMutation) GroupIdsCleared() bool {
 // ResetGroupIds resets all changes to the "group_ids" field.
 func (m *APIKeyMutation) ResetGroupIds() {
 	m.group_ids = nil
-	m.appendgroup_ids = nil
 	delete(m.clearedFields, apikey.FieldGroupIds)
 }
 
@@ -1718,7 +1702,7 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 		m.SetName(v)
 		return nil
 	case apikey.FieldGroupIds:
-		v, ok := value.([]int64)
+		v, ok := value.(pgtypes.Int64Array)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

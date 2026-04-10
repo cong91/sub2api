@@ -3,6 +3,7 @@ package schema
 import (
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pgtypes"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
@@ -41,10 +42,12 @@ func (APIKey) Fields() []ent.Field {
 		field.String("name").
 			MaxLen(100).
 			NotEmpty(),
-		field.JSON("group_ids", []int64{}).
+		field.Bytes("group_ids").
+			GoType(pgtypes.Int64Array{}).
+			ValueScanner(pgtypes.Int64ArrayValueScanner).
 			SchemaType(map[string]string{dialect.Postgres: "bigint[]"}).
 			Optional().
-			Default([]int64{}),
+			DefaultFunc(func() pgtypes.Int64Array { return pgtypes.Int64Array{} }),
 		field.String("status").
 			MaxLen(20).
 			Default(domain.StatusActive),

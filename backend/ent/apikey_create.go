@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pgtypes"
 )
 
 // APIKeyCreate is the builder for creating a APIKey entity.
@@ -85,7 +86,7 @@ func (_c *APIKeyCreate) SetName(v string) *APIKeyCreate {
 }
 
 // SetGroupIds sets the "group_ids" field.
-func (_c *APIKeyCreate) SetGroupIds(v []int64) *APIKeyCreate {
+func (_c *APIKeyCreate) SetGroupIds(v pgtypes.Int64Array) *APIKeyCreate {
 	_c.mutation.SetGroupIds(v)
 	return _c
 }
@@ -370,7 +371,10 @@ func (_c *APIKeyCreate) defaults() error {
 		_c.mutation.SetUpdatedAt(v)
 	}
 	if _, ok := _c.mutation.GroupIds(); !ok {
-		v := apikey.DefaultGroupIds
+		if apikey.DefaultGroupIds == nil {
+			return fmt.Errorf("ent: uninitialized apikey.DefaultGroupIds (forgotten import ent/runtime?)")
+		}
+		v := apikey.DefaultGroupIds()
 		_c.mutation.SetGroupIds(v)
 	}
 	if _, ok := _c.mutation.Status(); !ok {
@@ -481,7 +485,10 @@ func (_c *APIKeyCreate) sqlSave(ctx context.Context) (*APIKey, error) {
 	if err := _c.check(); err != nil {
 		return nil, err
 	}
-	_node, _spec := _c.createSpec()
+	_node, _spec, err := _c.createSpec()
+	if err != nil {
+		return nil, err
+	}
 	if err := sqlgraph.CreateNode(ctx, _c.driver, _spec); err != nil {
 		if sqlgraph.IsConstraintError(err) {
 			err = &ConstraintError{msg: err.Error(), wrap: err}
@@ -495,7 +502,7 @@ func (_c *APIKeyCreate) sqlSave(ctx context.Context) (*APIKey, error) {
 	return _node, nil
 }
 
-func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
+func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec, error) {
 	var (
 		_node = &APIKey{config: _c.config}
 		_spec = sqlgraph.NewCreateSpec(apikey.Table, sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64))
@@ -522,7 +529,11 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 		_node.Name = value
 	}
 	if value, ok := _c.mutation.GroupIds(); ok {
-		_spec.SetField(apikey.FieldGroupIds, field.TypeJSON, value)
+		vv, err := apikey.ValueScanner.GroupIds.Value(value)
+		if err != nil {
+			return nil, nil, err
+		}
+		_spec.SetField(apikey.FieldGroupIds, field.TypeBytes, vv)
 		_node.GroupIds = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
@@ -622,7 +633,7 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	return _node, _spec
+	return _node, _spec, nil
 }
 
 // OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
@@ -741,7 +752,7 @@ func (u *APIKeyUpsert) UpdateName() *APIKeyUpsert {
 }
 
 // SetGroupIds sets the "group_ids" field.
-func (u *APIKeyUpsert) SetGroupIds(v []int64) *APIKeyUpsert {
+func (u *APIKeyUpsert) SetGroupIds(v pgtypes.Int64Array) *APIKeyUpsert {
 	u.Set(apikey.FieldGroupIds, v)
 	return u
 }
@@ -1163,7 +1174,7 @@ func (u *APIKeyUpsertOne) UpdateName() *APIKeyUpsertOne {
 }
 
 // SetGroupIds sets the "group_ids" field.
-func (u *APIKeyUpsertOne) SetGroupIds(v []int64) *APIKeyUpsertOne {
+func (u *APIKeyUpsertOne) SetGroupIds(v pgtypes.Int64Array) *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.SetGroupIds(v)
 	})
@@ -1575,7 +1586,10 @@ func (_c *APIKeyCreateBulk) Save(ctx context.Context) ([]*APIKey, error) {
 				}
 				builder.mutation = mutation
 				var err error
-				nodes[i], specs[i] = builder.createSpec()
+				nodes[i], specs[i], err = builder.createSpec()
+				if err != nil {
+					return nil, err
+				}
 				if i < len(mutators)-1 {
 					_, err = mutators[i+1].Mutate(root, _c.builders[i+1].mutation)
 				} else {
@@ -1801,7 +1815,7 @@ func (u *APIKeyUpsertBulk) UpdateName() *APIKeyUpsertBulk {
 }
 
 // SetGroupIds sets the "group_ids" field.
-func (u *APIKeyUpsertBulk) SetGroupIds(v []int64) *APIKeyUpsertBulk {
+func (u *APIKeyUpsertBulk) SetGroupIds(v pgtypes.Int64Array) *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.SetGroupIds(v)
 	})

@@ -8,6 +8,8 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/schema/field"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pgtypes"
 )
 
 const (
@@ -151,7 +153,7 @@ var (
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
 	// DefaultGroupIds holds the default value on creation for the "group_ids" field.
-	DefaultGroupIds []int64
+	DefaultGroupIds func() pgtypes.Int64Array
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -172,6 +174,10 @@ var (
 	DefaultUsage1d float64
 	// DefaultUsage7d holds the default value on creation for the "usage_7d" field.
 	DefaultUsage7d float64
+	// ValueScanner of all APIKey fields.
+	ValueScanner struct {
+		GroupIds field.TypeValueScanner[pgtypes.Int64Array]
+	}
 )
 
 // OrderOption defines the ordering options for the APIKey queries.

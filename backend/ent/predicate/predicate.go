@@ -9,6 +9,17 @@ import (
 // APIKey is the predicate function for apikey builders.
 type APIKey func(*sql.Selector)
 
+// APIKeyOrErr calls the predicate only if the error is not nit.
+func APIKeyOrErr(p APIKey, err error) APIKey {
+	return func(s *sql.Selector) {
+		if err != nil {
+			s.AddError(err)
+			return
+		}
+		p(s)
+	}
+}
+
 // Account is the predicate function for account builders.
 type Account func(*sql.Selector)
 

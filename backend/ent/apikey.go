@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/user"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pgtypes"
 )
 
 // APIKey is the model entity for the APIKey schema.
@@ -32,7 +33,7 @@ type APIKey struct {
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
 	// GroupIds holds the value of the "group_ids" field.
-	GroupIds []int64 `json:"group_ids,omitempty"`
+	GroupIds pgtypes.Int64Array `json:"group_ids,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// Last usage time of this API key
@@ -108,7 +109,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case apikey.FieldGroupIds, apikey.FieldIPWhitelist, apikey.FieldIPBlacklist:
+		case apikey.FieldIPWhitelist, apikey.FieldIPBlacklist:
 			values[i] = new([]byte)
 		case apikey.FieldQuota, apikey.FieldQuotaUsed, apikey.FieldRateLimit5h, apikey.FieldRateLimit1d, apikey.FieldRateLimit7d, apikey.FieldUsage5h, apikey.FieldUsage1d, apikey.FieldUsage7d:
 			values[i] = new(sql.NullFloat64)
@@ -118,6 +119,8 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullString)
 		case apikey.FieldCreatedAt, apikey.FieldUpdatedAt, apikey.FieldDeletedAt, apikey.FieldLastUsedAt, apikey.FieldExpiresAt, apikey.FieldWindow5hStart, apikey.FieldWindow1dStart, apikey.FieldWindow7dStart:
 			values[i] = new(sql.NullTime)
+		case apikey.FieldGroupIds:
+			values[i] = apikey.ValueScanner.GroupIds.ScanValue()
 		case apikey.ForeignKeys[0]: // group_api_keys
 			values[i] = new(sql.NullInt64)
 		default:
@@ -179,12 +182,10 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				_m.Name = value.String
 			}
 		case apikey.FieldGroupIds:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field group_ids", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &_m.GroupIds); err != nil {
-					return fmt.Errorf("unmarshal field group_ids: %w", err)
-				}
+			if value, err := apikey.ValueScanner.GroupIds.FromValue(values[i]); err != nil {
+				return err
+			} else {
+				_m.GroupIds = value
 			}
 		case apikey.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
