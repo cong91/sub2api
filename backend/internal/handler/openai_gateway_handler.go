@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime/debug"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -49,6 +50,54 @@ func resolveOpenAIForwardDefaultMappedModel(ctx context.Context, apiKey *service
 		return ""
 	}
 	return strings.TrimSpace(effectiveGroup.DefaultMappedModel)
+}
+
+func openAIGrantedGroupSummary(apiKey *service.APIKey) []int64 {
+	if apiKey == nil || len(apiKey.GroupIDs) == 0 {
+		return nil
+	}
+	groupIDs := append([]int64(nil), apiKey.GroupIDs...)
+	sort.Slice(groupIDs, func(i, j int) bool { return groupIDs[i] < groupIDs[j] })
+	return groupIDs
+}
+
+func openAIExecutionGroupLogFields(ctx context.Context, endpoint string, apiKey *service.APIKey, effectiveGroup *service.Group, effectiveGroupID *int64) []zap.Field {
+	fields := []zap.Field{
+		zap.String("endpoint", strings.TrimSpace(endpoint)),
+		zap.String("lane", "openai"),
+	}
+	if apiKey != nil {
+		fields = append(fields,
+			zap.Int64("api_key_id", apiKey.ID),
+			zap.Int64s("api_key_group_ids", apiKey.GroupIDs),
+			zap.Int64s("api_key_group_ids_sorted", openAIGrantedGroupSummary(apiKey)),
+		)
+	}
+	if effectiveGroupID != nil {
+		fields = append(fields, zap.Int64("execution_group_id", *effectiveGroupID))
+	} else {
+		fields = append(fields, zap.Bool("execution_group_resolved", false))
+	}
+	if effectiveGroup != nil {
+		fields = append(fields,
+			zap.Bool("execution_group_resolved", true),
+			zap.String("execution_group_platform", strings.TrimSpace(effectiveGroup.Platform)),
+			zap.String("execution_group_name", strings.TrimSpace(effectiveGroup.Name)),
+			zap.String("execution_group_default_mapped_model", strings.TrimSpace(effectiveGroup.DefaultMappedModel)),
+		)
+	} else if apiKey != nil {
+		resolved := apiKey.ExecutionGroupResolver(ctx)
+		if resolved != nil {
+			fields = append(fields,
+				zap.Bool("execution_group_resolved", true),
+				zap.Int64("execution_group_id", resolved.ID),
+				zap.String("execution_group_platform", strings.TrimSpace(resolved.Platform)),
+				zap.String("execution_group_name", strings.TrimSpace(resolved.Name)),
+				zap.String("execution_group_default_mapped_model", strings.TrimSpace(resolved.DefaultMappedModel)),
+			)
+		}
+	}
+	return fields
 }
 
 // NewOpenAIGatewayHandler creates a new OpenAIGatewayHandler
@@ -112,7 +161,19 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		zap.Int64("api_key_id", apiKey.ID),
 		zap.Int64s("group_ids", apiKey.GroupIDs),
 	)
+	effectiveGroup := apiKey.ExecutionGroupResolver(c.Request.Context())
+	effectiveGroupID := apiKey.ExecutionGroupIDResolver(c.Request.Context())
+	endpoint := strings.TrimSpace(c.FullPath())
+	if endpoint == "" {
+		endpoint = "/v1/responses"
+	}
+	reqLog.Info("openai.execution_group_resolved", openAIExecutionGroupLogFields(c.Request.Context(), endpoint, apiKey, effectiveGroup, effectiveGroupID)...)
 	if !h.ensureResponsesDependencies(c, reqLog) {
+		reqLog.Warn("openai.hot_path_gate_blocked",
+			zap.String("endpoint", endpoint),
+			zap.String("lane", "openai"),
+			zap.String("gate", "handler_dependencies"),
+		)
 		return
 	}
 
@@ -190,7 +251,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
 
 	// 解析渠道级模型映射
-	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.ExecutionGroupIDResolver(c.Request.Context()), reqModel)
+	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), effectiveGroupID, reqModel)
 
 	// 提前校验 function_call_output 是否具备可关联上下文，避免上游 400。
 	if !h.validateFunctionCallOutputRequest(c, body, reqLog) {
@@ -218,8 +279,14 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 2. Re-check billing eligibility after wait
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.ExecutionGroupResolver(c.Request.Context()), subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, effectiveGroup, subscription); err != nil {
 		reqLog.Info("openai.billing_eligibility_check_failed", zap.Error(err))
+		reqLog.Warn("openai.hot_path_gate_blocked",
+			zap.String("endpoint", endpoint),
+			zap.String("lane", "openai"),
+			zap.String("gate", "billing_eligibility"),
+			zap.Error(err),
+		)
 		status, code, message := billingErrorDetails(err)
 		h.handleStreamingAwareError(c, status, code, message, streamStarted)
 		return
@@ -239,7 +306,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		reqLog.Debug("openai.account_selecting", zap.Int("excluded_account_count", len(failedAccountIDs)))
 		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithScheduler(
 			c.Request.Context(),
-			apiKey.ExecutionGroupIDResolver(c.Request.Context()),
+			effectiveGroupID,
 			previousResponseID,
 			sessionHash,
 			reqModel,
@@ -250,6 +317,28 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			reqLog.Warn("openai.account_select_failed",
 				zap.Error(err),
 				zap.Int("excluded_account_count", len(failedAccountIDs)),
+				zap.Int64p("selection_group_id", effectiveGroupID),
+				zap.String("schedule_layer", scheduleDecision.Layer),
+				zap.Int("candidate_count", scheduleDecision.CandidateCount),
+				zap.Int("top_k", scheduleDecision.TopK),
+				zap.Float64("load_skew", scheduleDecision.LoadSkew),
+			)
+			reqLog.Warn("openai.scheduler_selection_result",
+				zap.String("endpoint", endpoint),
+				zap.String("lane", "openai"),
+				zap.Int64p("selection_group_id", effectiveGroupID),
+				zap.String("schedule_layer", scheduleDecision.Layer),
+				zap.Bool("sticky_previous_hit", scheduleDecision.StickyPreviousHit),
+				zap.Bool("sticky_session_hit", scheduleDecision.StickySessionHit),
+				zap.Int("candidate_count", scheduleDecision.CandidateCount),
+				zap.Int("top_k", scheduleDecision.TopK),
+				zap.Int64("scheduler_latency_ms", scheduleDecision.LatencyMs),
+				zap.Float64("load_skew", scheduleDecision.LoadSkew),
+				zap.Int64("selected_account_id", scheduleDecision.SelectedAccountID),
+				zap.String("selected_account_type", scheduleDecision.SelectedAccountType),
+				zap.Int("excluded_account_count", len(failedAccountIDs)),
+				zap.String("selection_outcome", "error"),
+				zap.Error(err),
 			)
 			if len(failedAccountIDs) == 0 {
 				h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "Service temporarily unavailable", streamStarted)
@@ -263,6 +352,19 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			return
 		}
 		if selection == nil || selection.Account == nil {
+			reqLog.Warn("openai.scheduler_selection_result",
+				zap.String("endpoint", endpoint),
+				zap.String("lane", "openai"),
+				zap.Int64p("selection_group_id", effectiveGroupID),
+				zap.String("schedule_layer", scheduleDecision.Layer),
+				zap.Bool("sticky_previous_hit", scheduleDecision.StickyPreviousHit),
+				zap.Bool("sticky_session_hit", scheduleDecision.StickySessionHit),
+				zap.Int("candidate_count", scheduleDecision.CandidateCount),
+				zap.Int("top_k", scheduleDecision.TopK),
+				zap.Int64("scheduler_latency_ms", scheduleDecision.LatencyMs),
+				zap.Float64("load_skew", scheduleDecision.LoadSkew),
+				zap.String("selection_outcome", "nil_account"),
+			)
 			h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts", streamStarted)
 			return
 		}
@@ -281,9 +383,26 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		account := selection.Account
 		sessionHash = ensureOpenAIPoolModeSessionHash(sessionHash, account)
 		reqLog.Debug("openai.account_selected", zap.Int64("account_id", account.ID), zap.String("account_name", account.Name))
+		reqLog.Info("openai.scheduler_selection_result",
+			zap.String("endpoint", endpoint),
+			zap.String("lane", "openai"),
+			zap.Int64p("selection_group_id", effectiveGroupID),
+			zap.String("schedule_layer", scheduleDecision.Layer),
+			zap.Bool("sticky_previous_hit", scheduleDecision.StickyPreviousHit),
+			zap.Bool("sticky_session_hit", scheduleDecision.StickySessionHit),
+			zap.Int("candidate_count", scheduleDecision.CandidateCount),
+			zap.Int("top_k", scheduleDecision.TopK),
+			zap.Int64("scheduler_latency_ms", scheduleDecision.LatencyMs),
+			zap.Float64("load_skew", scheduleDecision.LoadSkew),
+			zap.Int64("selected_account_id", account.ID),
+			zap.String("selected_account_platform", account.Platform),
+			zap.String("selected_account_type", account.Type),
+			zap.String("selection_outcome", "selected"),
+		)
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 
-		accountReleaseFunc, acquired := h.acquireResponsesAccountSlot(c, apiKey.ExecutionGroupIDResolver(c.Request.Context()), sessionHash, selection, reqStream, &streamStarted, reqLog)
+		effectiveExecutionGroupID := effectiveGroupID
+		accountReleaseFunc, acquired := h.acquireResponsesAccountSlot(c, effectiveExecutionGroupID, sessionHash, selection, reqStream, &streamStarted, reqLog)
 		if !acquired {
 			return
 		}
@@ -296,6 +415,17 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		if channelMapping.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
+		reqLog.Info("openai.upstream_dispatch_start",
+			zap.String("endpoint", endpoint),
+			zap.String("lane", "openai"),
+			zap.Int64p("effective_group_id", effectiveExecutionGroupID),
+			zap.Int64("account_id", account.ID),
+			zap.String("account_platform", account.Platform),
+			zap.String("account_type", account.Type),
+			zap.String("requested_model", reqModel),
+			zap.Bool("channel_model_mapped", channelMapping.Mapped),
+			zap.String("channel_mapped_model", channelMapping.MappedModel),
+		)
 		result, err := h.gatewayService.Forward(c.Request.Context(), c, account, forwardBody)
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		if accountReleaseFunc != nil {
@@ -313,6 +443,17 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		if err != nil {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
+				reqLog.Warn("openai.upstream_dispatch_failed",
+					zap.String("endpoint", endpoint),
+					zap.String("lane", "openai"),
+					zap.Int64p("effective_group_id", effectiveExecutionGroupID),
+					zap.Int64("account_id", account.ID),
+					zap.String("dispatch_stage", "upstream_response"),
+					zap.Int("upstream_status", failoverErr.StatusCode),
+					zap.Bool("retryable_on_same_account", failoverErr.RetryableOnSameAccount),
+					zap.Int("response_body_bytes", len(failoverErr.ResponseBody)),
+					zap.String("response_body_summary", strings.TrimSpace(service.ExtractUpstreamErrorMessage(failoverErr.ResponseBody))),
+				)
 				h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
 				// 池模式：同账号重试
 				if failoverErr.RetryableOnSameAccount {
@@ -352,18 +493,33 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
 			wroteFallback := h.ensureForwardErrorResponse(c, streamStarted)
 			fields := []zap.Field{
+				zap.String("endpoint", endpoint),
+				zap.String("lane", "openai"),
+				zap.Int64p("effective_group_id", effectiveExecutionGroupID),
 				zap.Int64("account_id", account.ID),
+				zap.String("dispatch_stage", "transport_or_local_forward"),
 				zap.Bool("fallback_error_response_written", wroteFallback),
 				zap.Error(err),
 			}
 			if shouldLogOpenAIForwardFailureAsWarn(c, wroteFallback) {
+				reqLog.Warn("openai.upstream_dispatch_failed", fields...)
 				reqLog.Warn("openai.forward_failed", fields...)
 				return
 			}
+			reqLog.Error("openai.upstream_dispatch_failed", fields...)
 			reqLog.Error("openai.forward_failed", fields...)
 			return
 		}
 		if result != nil {
+			reqLog.Info("openai.upstream_dispatch_succeeded",
+				zap.String("endpoint", endpoint),
+				zap.String("lane", "openai"),
+				zap.Int64p("effective_group_id", effectiveExecutionGroupID),
+				zap.Int64("account_id", account.ID),
+				zap.String("upstream_request_id", strings.TrimSpace(result.RequestID)),
+				zap.String("upstream_model", strings.TrimSpace(result.UpstreamModel)),
+				zap.Bool("stream", result.Stream),
+			)
 			if account.Type == service.AccountTypeOAuth {
 				h.gatewayService.UpdateCodexUsageSnapshotFromHeaders(c.Request.Context(), account.ID, result.ResponseHeaders)
 			}
