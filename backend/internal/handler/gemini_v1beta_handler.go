@@ -38,10 +38,11 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		googleError(c, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
-	// 检查平台：优先使用强制平台（/antigravity 路由），否则要求 gemini 分组
+	// 检查平台：优先使用强制平台（/antigravity 路由）；否则按 execution-group 语义放行 gemini lane。
+	// API key có thể materialize lane Gemini từ antigravity execution source, nên không được chặn chỉ vì group.Platform != gemini.
 	forcePlatform, hasForcePlatform := middleware.GetForcePlatformFromContext(c)
 	effectiveGroup := apiKey.ExecutionGroupResolver(c.Request.Context())
-	if !hasForcePlatform && (effectiveGroup == nil || effectiveGroup.Platform != service.PlatformGemini) {
+	if !hasForcePlatform && effectiveGroup == nil {
 		googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
 		return
 	}
@@ -85,10 +86,10 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 		googleError(c, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
-	// 检查平台：优先使用强制平台（/antigravity 路由），否则要求 gemini 分组
+	// 检查平台：优先使用强制平台（/antigravity 路由）；否则按 execution-group 语义放行 gemini lane。
 	forcePlatform, hasForcePlatform := middleware.GetForcePlatformFromContext(c)
 	effectiveGroup := apiKey.ExecutionGroupResolver(c.Request.Context())
-	if !hasForcePlatform && (effectiveGroup == nil || effectiveGroup.Platform != service.PlatformGemini) {
+	if !hasForcePlatform && effectiveGroup == nil {
 		googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
 		return
 	}
@@ -152,10 +153,11 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		zap.Int64s("group_ids", apiKey.GroupIDs),
 	)
 
-	// 检查平台：优先使用强制平台（/antigravity 路由，中间件已设置 request.Context），否则要求 gemini 分组
+	// 检查平台：优先使用强制平台（/antigravity 路由，中间件已设置 request.Context）；
+	// 否则只要求 execution-group resolver 成功解析出 gemini lane，对 antigravity-backed gemini 也放行。
 	if !middleware.HasForcePlatform(c) {
 		effectiveGroup := apiKey.ExecutionGroupResolver(c.Request.Context())
-		if effectiveGroup == nil || effectiveGroup.Platform != service.PlatformGemini {
+		if effectiveGroup == nil {
 			googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
 			return
 		}
