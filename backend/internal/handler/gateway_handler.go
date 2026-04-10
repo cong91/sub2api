@@ -122,8 +122,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
-	effectiveGroup := apiKey.EffectiveGroup()
-	effectiveGroupID := apiKey.EffectiveGroupID()
+	effectiveGroup := apiKey.ExecutionGroupResolver(c.Request.Context())
+	effectiveGroupID := apiKey.ExecutionGroupIDResolver(c.Request.Context())
 	reqLog := requestLogger(
 		c,
 		"handler.gateway.messages",
@@ -509,7 +509,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
 	// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
-	if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), currentAPIKey.EffectiveGroupID()) {
+	if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), currentAPIKey.ExecutionGroupIDResolver(c.Request.Context())) {
 		ctx := service.WithSingleAccountRetry(c.Request.Context(), true, h.metadataBridgeEnabled())
 		c.Request = c.Request.WithContext(ctx)
 	}
@@ -520,7 +520,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 		for {
 			// 选择支持该模型的账号
-			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), currentAPIKey.EffectiveGroupID(), sessionKey, reqModel, fs.FailedAccountIDs, parsedReq.MetadataUserID, int64(0))
+			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), currentAPIKey.ExecutionGroupIDResolver(c.Request.Context()), sessionKey, reqModel, fs.FailedAccountIDs, parsedReq.MetadataUserID, int64(0))
 			if err != nil {
 				if len(fs.FailedAccountIDs) == 0 {
 					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), streamStarted)
@@ -607,7 +607,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 				// Slot acquired: no longer waiting in queue.
 				releaseWait()
-				if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.EffectiveGroupID(), sessionKey, account.ID); err != nil {
+				if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.ExecutionGroupIDResolver(c.Request.Context()), sessionKey, account.ID); err != nil {
 					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
 			}
@@ -708,7 +708,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				var promptTooLongErr *service.PromptTooLongError
 				if errors.As(err, &promptTooLongErr) {
 					reqLog.Warn("gateway.prompt_too_long_from_antigravity",
-						zap.Any("current_group_id", currentAPIKey.EffectiveGroupID()),
+						zap.Any("current_group_id", currentAPIKey.ExecutionGroupIDResolver(c.Request.Context())),
 						zap.Any("fallback_group_id", fallbackGroupID),
 						zap.Bool("fallback_used", fallbackUsed),
 					)
@@ -854,8 +854,8 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	var platform string
 
 	if apiKey != nil {
-		groupID = apiKey.EffectiveGroupID()
-		if effectiveGroup := apiKey.EffectiveGroup(); effectiveGroup != nil {
+		groupID = apiKey.ExecutionGroupIDResolver(c.Request.Context())
+		if effectiveGroup := apiKey.ExecutionGroupResolver(c.Request.Context()); effectiveGroup != nil {
 			platform = effectiveGroup.Platform
 		}
 	}
@@ -1112,7 +1112,7 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 // usageUnrestricted 处理 unrestricted 模式的响应（向后兼容）
 func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, usageData gin.H, modelStats any) {
 	// 订阅模式
-	if effectiveGroup := apiKey.EffectiveGroup(); effectiveGroup != nil && effectiveGroup.IsSubscriptionType() {
+	if effectiveGroup := apiKey.ExecutionGroupResolver(c.Request.Context()); effectiveGroup != nil && effectiveGroup.IsSubscriptionType() {
 		resp := gin.H{
 			"mode":     "unrestricted",
 			"isValid":  true,
@@ -1386,8 +1386,8 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
-	effectiveGroup := apiKey.EffectiveGroup()
-	effectiveGroupID := apiKey.EffectiveGroupID()
+	effectiveGroup := apiKey.ExecutionGroupResolver(c.Request.Context())
+	effectiveGroupID := apiKey.ExecutionGroupIDResolver(c.Request.Context())
 	reqLog := requestLogger(
 		c,
 		"handler.gateway.count_tokens",

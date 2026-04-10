@@ -35,8 +35,8 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
-	effectiveGroup := apiKey.EffectiveGroup()
-	effectiveGroupID := apiKey.EffectiveGroupID()
+	effectiveGroup := apiKey.ExecutionGroupResolver(c.Request.Context())
+	effectiveGroupID := apiKey.ExecutionGroupIDResolver(c.Request.Context())
 	reqLog := requestLogger(
 		c,
 		"handler.openai_gateway.chat_completions",
@@ -187,7 +187,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 		service.SetOpsLatencyMs(c, service.OpsRoutingLatencyMsKey, time.Since(routingStart).Milliseconds())
 		forwardStart := time.Now()
 
-		defaultMappedModel := resolveOpenAIForwardDefaultMappedModel(apiKey, c.GetString("openai_chat_completions_fallback_model"))
+		defaultMappedModel := resolveOpenAIForwardDefaultMappedModel(c.Request.Context(), apiKey, c.GetString("openai_chat_completions_fallback_model"))
 		forwardBody := body
 		if channelMapping.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)

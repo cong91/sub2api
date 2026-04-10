@@ -3789,7 +3789,7 @@ func getOpenAIGroupIDFromContext(c *gin.Context) int64 {
 	if !ok || apiKey == nil {
 		return 0
 	}
-	group := apiKey.EffectiveGroup()
+	group := apiKey.ExecutionGroupResolver(c.Request.Context())
 	if group == nil {
 		return 0
 	}

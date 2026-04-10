@@ -169,7 +169,7 @@ func getGroupPlatform(c *gin.Context) string {
 	if !ok {
 		return ""
 	}
-	if group := apiKey.EffectiveGroup(); group != nil {
+	if group := apiKey.ExecutionGroupResolver(c.Request.Context()); group != nil {
 		return group.Platform
 	}
 	return ""

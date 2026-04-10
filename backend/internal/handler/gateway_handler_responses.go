@@ -35,8 +35,8 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		h.responsesErrorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
-	effectiveGroup := apiKey.EffectiveGroup()
-	effectiveGroupID := apiKey.EffectiveGroupID()
+	effectiveGroup := apiKey.ExecutionGroupResolver(c.Request.Context())
+	effectiveGroupID := apiKey.ExecutionGroupIDResolver(c.Request.Context())
 	reqLog := requestLogger(
 		c,
 		"handler.gateway.responses",

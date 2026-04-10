@@ -37,12 +37,15 @@ type OpenAIGatewayHandler struct {
 	cfg                     *config.Config
 }
 
-func resolveOpenAIForwardDefaultMappedModel(apiKey *service.APIKey, fallbackModel string) string {
+func resolveOpenAIForwardDefaultMappedModel(ctx context.Context, apiKey *service.APIKey, fallbackModel string) string {
 	if fallbackModel = strings.TrimSpace(fallbackModel); fallbackModel != "" {
 		return fallbackModel
 	}
-	effectiveGroup := apiKey.EffectiveGroup()
-	if apiKey == nil || effectiveGroup == nil {
+	if apiKey == nil {
+		return ""
+	}
+	effectiveGroup := apiKey.ExecutionGroupResolver(ctx)
+	if effectiveGroup == nil {
 		return ""
 	}
 	return strings.TrimSpace(effectiveGroup.DefaultMappedModel)
@@ -187,7 +190,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
 
 	// 解析渠道级模型映射
-	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.EffectiveGroupID(), reqModel)
+	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.ExecutionGroupIDResolver(c.Request.Context()), reqModel)
 
 	// 提前校验 function_call_output 是否具备可关联上下文，避免上游 400。
 	if !h.validateFunctionCallOutputRequest(c, body, reqLog) {
@@ -215,7 +218,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 2. Re-check billing eligibility after wait
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.EffectiveGroup(), subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.ExecutionGroupResolver(c.Request.Context()), subscription); err != nil {
 		reqLog.Info("openai.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message := billingErrorDetails(err)
 		h.handleStreamingAwareError(c, status, code, message, streamStarted)
@@ -236,7 +239,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		reqLog.Debug("openai.account_selecting", zap.Int("excluded_account_count", len(failedAccountIDs)))
 		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithScheduler(
 			c.Request.Context(),
-			apiKey.EffectiveGroupID(),
+			apiKey.ExecutionGroupIDResolver(c.Request.Context()),
 			previousResponseID,
 			sessionHash,
 			reqModel,
@@ -280,7 +283,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		reqLog.Debug("openai.account_selected", zap.Int64("account_id", account.ID), zap.String("account_name", account.Name))
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 
-		accountReleaseFunc, acquired := h.acquireResponsesAccountSlot(c, apiKey.EffectiveGroupID(), sessionHash, selection, reqStream, &streamStarted, reqLog)
+		accountReleaseFunc, acquired := h.acquireResponsesAccountSlot(c, apiKey.ExecutionGroupIDResolver(c.Request.Context()), sessionHash, selection, reqStream, &streamStarted, reqLog)
 		if !acquired {
 			return
 		}
@@ -516,7 +519,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	)
 
 	// 检查分组是否允许 /v1/messages 调度
-	if effectiveGroup := apiKey.EffectiveGroup(); effectiveGroup != nil && !effectiveGroup.AllowMessagesDispatch {
+	if effectiveGroup := apiKey.ExecutionGroupResolver(c.Request.Context()); effectiveGroup != nil && !effectiveGroup.AllowMessagesDispatch {
 		h.anthropicErrorResponse(c, http.StatusForbidden, "permission_error",
 			"This group does not allow /v1/messages dispatch")
 		return
@@ -560,7 +563,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
 
 	// 解析渠道级模型映射
-	channelMappingMsg, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.EffectiveGroupID(), reqModel)
+	channelMappingMsg, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.ExecutionGroupIDResolver(c.Request.Context()), reqModel)
 
 	// 绑定错误透传服务，允许 service 层在非 failover 错误场景复用规则。
 	if h.errorPassthroughService != nil {
@@ -580,7 +583,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		defer userReleaseFunc()
 	}
 
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.EffectiveGroup(), subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.ExecutionGroupResolver(c.Request.Context()), subscription); err != nil {
 		reqLog.Info("openai_messages.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message := billingErrorDetails(err)
 		h.anthropicStreamingAwareError(c, status, code, message, streamStarted)
@@ -617,7 +620,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		reqLog.Debug("openai_messages.account_selecting", zap.Int("excluded_account_count", len(failedAccountIDs)))
 		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithScheduler(
 			c.Request.Context(),
-			apiKey.EffectiveGroupID(),
+			apiKey.ExecutionGroupIDResolver(c.Request.Context()),
 			"", // no previous_response_id
 			sessionHash,
 			routingModel,
@@ -632,7 +635,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			// 首次调度失败 + 有默认映射模型 → 用默认模型重试
 			if len(failedAccountIDs) == 0 {
 				defaultModel := ""
-				if effectiveGroup := apiKey.EffectiveGroup(); effectiveGroup != nil {
+				if effectiveGroup := apiKey.ExecutionGroupResolver(c.Request.Context()); effectiveGroup != nil {
 					defaultModel = effectiveGroup.DefaultMappedModel
 				}
 				if defaultModel != "" && defaultModel != routingModel {
@@ -641,7 +644,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 					)
 					selection, scheduleDecision, err = h.gatewayService.SelectAccountWithScheduler(
 						c.Request.Context(),
-						apiKey.EffectiveGroupID(),
+						apiKey.ExecutionGroupIDResolver(c.Request.Context()),
 						"",
 						sessionHash,
 						defaultModel,
@@ -675,7 +678,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		_ = scheduleDecision
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 
-		accountReleaseFunc, acquired := h.acquireResponsesAccountSlot(c, apiKey.EffectiveGroupID(), sessionHash, selection, reqStream, &streamStarted, reqLog)
+		accountReleaseFunc, acquired := h.acquireResponsesAccountSlot(c, apiKey.ExecutionGroupIDResolver(c.Request.Context()), sessionHash, selection, reqStream, &streamStarted, reqLog)
 		if !acquired {
 			return
 		}
@@ -685,7 +688,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 		// Forward 层需要始终拿到 group 默认映射模型，这样未命中账号级映射的
 		// Claude 兼容模型才不会在后续 Codex 规范化中意外退化到 gpt-5.1。
-		defaultMappedModel := resolveOpenAIForwardDefaultMappedModel(apiKey, c.GetString("openai_messages_fallback_model"))
+		defaultMappedModel := resolveOpenAIForwardDefaultMappedModel(c.Request.Context(), apiKey, c.GetString("openai_messages_fallback_model"))
 		// 应用渠道模型映射到请求体
 		forwardBody := body
 		if channelMappingMsg.Mapped {
@@ -1121,7 +1124,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	setOpsEndpointContext(c, "", int16(service.RequestTypeWSV2))
 
 	// 解析渠道级模型映射
-	channelMappingWS, _ := h.gatewayService.ResolveChannelMappingAndRestrict(ctx, apiKey.EffectiveGroupID(), reqModel)
+	channelMappingWS, _ := h.gatewayService.ResolveChannelMappingAndRestrict(ctx, apiKey.ExecutionGroupIDResolver(c.Request.Context()), reqModel)
 
 	var currentUserRelease func()
 	var currentAccountRelease func()
@@ -1151,7 +1154,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	currentUserRelease = wrapReleaseOnDone(ctx, userReleaseFunc)
 
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
-	if err := h.billingCacheService.CheckBillingEligibility(ctx, apiKey.User, apiKey, apiKey.EffectiveGroup(), subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(ctx, apiKey.User, apiKey, apiKey.ExecutionGroupResolver(c.Request.Context()), subscription); err != nil {
 		reqLog.Info("openai.websocket_billing_eligibility_check_failed", zap.Error(err))
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "billing check failed")
 		return
@@ -1160,11 +1163,11 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	sessionHash := h.gatewayService.GenerateSessionHashWithFallback(
 		c,
 		firstMessage,
-		openAIWSIngressFallbackSessionSeed(subject.UserID, apiKey.ID, apiKey.EffectiveGroupID()),
+		openAIWSIngressFallbackSessionSeed(subject.UserID, apiKey.ID, apiKey.ExecutionGroupIDResolver(c.Request.Context())),
 	)
 	selection, scheduleDecision, err := h.gatewayService.SelectAccountWithScheduler(
 		ctx,
-		apiKey.EffectiveGroupID(),
+		apiKey.ExecutionGroupIDResolver(c.Request.Context()),
 		previousResponseID,
 		sessionHash,
 		reqModel,
@@ -1209,7 +1212,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		accountReleaseFunc = fastReleaseFunc
 	}
 	currentAccountRelease = wrapReleaseOnDone(ctx, accountReleaseFunc)
-	if err := h.gatewayService.BindStickySession(ctx, apiKey.EffectiveGroupID(), sessionHash, account.ID); err != nil {
+	if err := h.gatewayService.BindStickySession(ctx, apiKey.ExecutionGroupIDResolver(c.Request.Context()), sessionHash, account.ID); err != nil {
 		reqLog.Warn("openai.websocket_bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 	}
 

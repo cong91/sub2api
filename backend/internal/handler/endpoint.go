@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -25,6 +27,28 @@ const (
 const (
 	ctxKeyInboundEndpoint = "_gateway_inbound_endpoint"
 )
+
+func deriveExecutionLane(inbound, rawRequestPath string) string {
+	inbound = NormalizeInboundEndpoint(inbound)
+	rawPath := strings.TrimSpace(rawRequestPath)
+
+	switch inbound {
+	case EndpointGeminiModels:
+		if strings.Contains(rawPath, "/antigravity/") {
+			return service.PlatformAntigravity
+		}
+		return service.PlatformGemini
+	case EndpointMessages:
+		if strings.Contains(rawPath, "/antigravity/") {
+			return service.PlatformAntigravity
+		}
+		return service.PlatformAnthropic
+	case EndpointResponses, EndpointChatCompletions:
+		return service.PlatformOpenAI
+	default:
+		return ""
+	}
+}
 
 // ──────────────────────────────────────────────────────────
 // Normalization functions
@@ -128,7 +152,15 @@ func InboundEndpointMiddleware() gin.HandlerFunc {
 		if path == "" && c.Request != nil && c.Request.URL != nil {
 			path = c.Request.URL.Path
 		}
-		c.Set(ctxKeyInboundEndpoint, NormalizeInboundEndpoint(path))
+		inbound := NormalizeInboundEndpoint(path)
+		c.Set(ctxKeyInboundEndpoint, inbound)
+		if c.Request != nil {
+			lane := deriveExecutionLane(inbound, c.Request.URL.Path)
+			if strings.TrimSpace(lane) != "" {
+				ctx := context.WithValue(c.Request.Context(), ctxkey.Platform, lane)
+				c.Request = c.Request.WithContext(ctx)
+			}
+		}
 		c.Next()
 	}
 }

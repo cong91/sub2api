@@ -368,7 +368,7 @@ func TestResolveOpenAIForwardDefaultMappedModel(t *testing.T) {
 			GroupIDs: []int64{7},
 			Groups:   []*service.Group{makeOpenAIGroup(7, "gpt-5.4")},
 		}
-		require.Equal(t, "gpt-5.2", resolveOpenAIForwardDefaultMappedModel(apiKey, " gpt-5.2 "))
+		require.Equal(t, "gpt-5.2", resolveOpenAIForwardDefaultMappedModel(context.Background(), apiKey, " gpt-5.2 "))
 	})
 
 	t.Run("uses_group_default_on_normal_path", func(t *testing.T) {
@@ -376,7 +376,7 @@ func TestResolveOpenAIForwardDefaultMappedModel(t *testing.T) {
 			GroupIDs: []int64{7},
 			Groups:   []*service.Group{makeOpenAIGroup(7, "gpt-5.4")},
 		}
-		require.Equal(t, "gpt-5.4", resolveOpenAIForwardDefaultMappedModel(apiKey, ""))
+		require.Equal(t, "gpt-5.4", resolveOpenAIForwardDefaultMappedModel(context.Background(), apiKey, ""))
 	})
 
 	t.Run("uses_effective_group_from_group_ids_order", func(t *testing.T) {
@@ -387,13 +387,13 @@ func TestResolveOpenAIForwardDefaultMappedModel(t *testing.T) {
 				makeOpenAIGroup(9, "canonical-effective-model"),
 			},
 		}
-		require.Equal(t, "canonical-effective-model", resolveOpenAIForwardDefaultMappedModel(apiKey, ""))
+		require.Equal(t, "canonical-effective-model", resolveOpenAIForwardDefaultMappedModel(context.Background(), apiKey, ""))
 	})
 
 	t.Run("returns_empty_without_group_default", func(t *testing.T) {
-		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(nil, ""))
-		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(&service.APIKey{}, ""))
-		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(&service.APIKey{
+		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(context.Background(), nil, ""))
+		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(context.Background(), &service.APIKey{}, ""))
+		require.Empty(t, resolveOpenAIForwardDefaultMappedModel(context.Background(), &service.APIKey{
 			GroupIDs: []int64{7},
 			Groups:   []*service.Group{makeOpenAIGroup(7, "")},
 		}, ""))

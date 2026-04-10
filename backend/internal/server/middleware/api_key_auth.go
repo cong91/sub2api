@@ -17,12 +17,7 @@ func resolveEffectiveGroup(c *gin.Context, apiKey *service.APIKey) *service.Grou
 	if apiKey == nil {
 		return nil
 	}
-	if platform, ok := c.Request.Context().Value(ctxkey.ForcePlatform).(string); ok && strings.TrimSpace(platform) != "" {
-		if group := apiKey.GroupForPlatform(platform); service.IsGroupContextValid(group) {
-			return group
-		}
-	}
-	if group := apiKey.EffectiveGroup(); service.IsGroupContextValid(group) {
+	if group := apiKey.ExecutionGroupResolver(c.Request.Context()); service.IsGroupContextValid(group) {
 		return group
 	}
 	return nil

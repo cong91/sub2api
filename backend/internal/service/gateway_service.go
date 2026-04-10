@@ -7715,7 +7715,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	if s.cfg != nil {
 		multiplier = s.cfg.Default.RateMultiplier
 	}
-	if effectiveGroup := apiKey.EffectiveGroup(); effectiveGroup != nil {
+	if effectiveGroup := apiKey.ExecutionGroupResolver(ctx); effectiveGroup != nil {
 		groupDefault := effectiveGroup.RateMultiplier
 		multiplier = s.getUserGroupRateMultiplier(ctx, user.ID, effectiveGroup.ID, groupDefault)
 	}
@@ -7739,7 +7739,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	cost := s.calculateRecordUsageCost(ctx, result, apiKey, billingModel, multiplier, opts)
 
 	// 判断计费方式：订阅模式 vs 余额模式
-	effectiveGroup := apiKey.EffectiveGroup()
+	effectiveGroup := apiKey.ExecutionGroupResolver(ctx)
 	isSubscriptionBilling := subscription != nil && effectiveGroup != nil && effectiveGroup.IsSubscriptionType()
 	billingType := BillingTypeBalance
 	if isSubscriptionBilling {
@@ -7800,7 +7800,7 @@ func (s *GatewayService) calculateRecordUsageCost(
 // resolveChannelPricing 检查指定模型是否存在渠道级别定价。
 // 返回非 nil 的 ResolvedPricing 表示有渠道定价，nil 表示走默认定价路径。
 func (s *GatewayService) resolveChannelPricing(ctx context.Context, billingModel string, apiKey *APIKey) *ResolvedPricing {
-	effectiveGroup := apiKey.EffectiveGroup()
+	effectiveGroup := apiKey.ExecutionGroupResolver(ctx)
 	if s.resolver == nil || effectiveGroup == nil {
 		return nil
 	}
@@ -7826,7 +7826,7 @@ func (s *GatewayService) calculateImageCost(
 			OutputTokens:      result.Usage.OutputTokens,
 			ImageOutputTokens: result.Usage.ImageOutputTokens,
 		}
-		effectiveGroup := apiKey.EffectiveGroup()
+		effectiveGroup := apiKey.ExecutionGroupResolver(ctx)
 		gid := effectiveGroup.ID
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
@@ -7846,7 +7846,7 @@ func (s *GatewayService) calculateImageCost(
 	}
 
 	var groupConfig *ImagePriceConfig
-	effectiveGroup := apiKey.EffectiveGroup()
+	effectiveGroup := apiKey.ExecutionGroupResolver(ctx)
 	if effectiveGroup != nil {
 		groupConfig = &ImagePriceConfig{
 			Price1K: effectiveGroup.ImagePrice1K,
@@ -7881,7 +7881,7 @@ func (s *GatewayService) calculateTokenCost(
 
 	// 优先尝试渠道定价 → CalculateCostUnified
 	if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil {
-		effectiveGroup := apiKey.EffectiveGroup()
+		effectiveGroup := apiKey.ExecutionGroupResolver(ctx)
 		gid := effectiveGroup.ID
 		cost, err = s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
@@ -7928,7 +7928,7 @@ func (s *GatewayService) buildRecordUsageLog(
 ) *UsageLog {
 	durationMs := int(result.Duration.Milliseconds())
 	requestID := resolveUsageBillingRequestID(ctx, result.RequestID)
-	effectiveGroup := apiKey.EffectiveGroup()
+	effectiveGroup := apiKey.ExecutionGroupResolver(ctx)
 	usageLog := &UsageLog{
 		UserID:                user.ID,
 		APIKeyID:              apiKey.ID,

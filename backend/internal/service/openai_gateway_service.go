@@ -4442,7 +4442,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 
 	// Get rate multiplier from the canonical effective group under group_ids[] ordering.
-	effectiveGroup := apiKey.EffectiveGroup()
+	effectiveGroup := apiKey.ExecutionGroupResolver(ctx)
 	multiplier := 1.0
 	if s.cfg != nil {
 		multiplier = s.cfg.Default.RateMultiplier
