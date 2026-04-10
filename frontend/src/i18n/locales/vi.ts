@@ -38,7 +38,7 @@ export default {
       }
     },
     solutions: {
-      title: 'Sub2API giúp bạn giải quyết những điểm nghẽn này',
+      title: 'Token V-Claw giúp bạn giải quyết những điểm nghẽn này',
       subtitle: 'Ba bước để dùng AI gọn hơn, ổn định hơn và dễ kiểm soát hơn'
     },
     features: {
@@ -96,7 +96,7 @@ export default {
     },
     cta: {
       title: 'Sẵn sàng bắt đầu chưa?',
-      description: 'Đăng ký ngay để nhận credit dùng thử và trải nghiệm gateway AI thống nhất của Sub2API.',
+      description: 'Đăng ký ngay để nhận credit dùng thử và trải nghiệm gateway AI thống nhất của Token V-Claw.',
       button: 'Đăng ký miễn phí'
     },
     footer: {
@@ -171,8 +171,8 @@ export default {
     queryFailedRetry: 'Tra cứu thất bại, vui lòng thử lại sau'
   },
   setup: {
-    title: 'Thiết lập Sub2API',
-    description: 'Cấu hình phiên bản Sub2API của bạn',
+    title: 'Thiết lập Token V-Claw',
+    description: 'Cấu hình phiên bản Token V-Claw của bạn',
     database: {
       title: 'Cấu hình cơ sở dữ liệu',
       description: 'Kết nối PostgreSQL',
@@ -1077,7 +1077,7 @@ export default {
         step1: {
           title: 'Tạo bucket R2',
           line1: 'Đăng nhập Cloudflare Dashboard (dash.cloudflare.com), sau đó chọn "R2 Object Storage" ở thanh bên.',
-          line2: 'Bấm "Create bucket", nhập tên (ví dụ: sub2api-backups), rồi chọn khu vực.',
+          line2: 'Bấm "Create bucket", nhập tên (ví dụ: token-v-claw-backups), rồi chọn khu vực.',
           line3: 'Bấm Create để hoàn tất'
         },
         step2: {
@@ -2277,7 +2277,7 @@ export default {
       modelCount: '{count} model',
       poolMode: 'Chế độ pool',
       poolModeHint: 'Bật khi upstream là một pool tài khoản; lỗi sẽ không đánh dấu trạng thái tài khoản cục bộ',
-      poolModeInfo: 'Khi bật, các lỗi upstream 429/403/401 sẽ tự retry mà không đánh dấu tài khoản là bị giới hạn tốc độ hoặc lỗi. Phù hợp khi upstream trỏ tới một instance sub2api khác.',
+      poolModeInfo: 'Khi bật, các lỗi upstream 429/403/401 sẽ tự retry mà không đánh dấu tài khoản là bị giới hạn tốc độ hoặc lỗi. Phù hợp khi upstream trỏ tới một instance token-v-claw khác.',
       poolModeRetryCount: 'Số lần retry cùng tài khoản',
       poolModeRetryCountHint: 'Chỉ áp dụng trong chế độ pool. Dùng 0 để tắt retry tại chỗ. Mặc định {default}, tối đa {max}.',
       customErrorCodes: 'Mã lỗi tùy chỉnh',
@@ -4134,7 +4134,7 @@ export default {
       },
       linuxdo: {
         title: 'Đăng nhập LinuxDo Connect',
-        description: 'Cấu hình OAuth LinuxDo Connect cho đăng nhập người dùng cuối trên Sub2API',
+        description: 'Cấu hình OAuth LinuxDo Connect cho đăng nhập người dùng cuối trên Token V-Claw',
         enable: 'Bật đăng nhập LinuxDo',
         enableHint: 'Hiển thị đăng nhập LinuxDo trên trang đăng nhập/đăng ký',
         clientId: 'Client ID',
@@ -4196,7 +4196,7 @@ export default {
         backendMode: 'Backend Mode',
         backendModeDescription: 'Disables user registration, public site, and self-service features. Only admin can log in and manage the platform.',
         siteName: 'Site Name',
-        siteNamePlaceholder: 'Sub2API',
+        siteNamePlaceholder: 'Token V-Claw',
         siteNameHint: 'Displayed in emails and page titles',
         siteSubtitle: 'Site Subtitle',
         siteSubtitlePlaceholder: 'Subscription to API Conversion Platform',
@@ -4294,7 +4294,7 @@ export default {
         fromEmail: 'Email gửi đi',
         fromEmailPlaceholder: 'noreply{\'@\'}example.com',
         fromName: 'Tên người gửi',
-        fromNamePlaceholder: 'Sub2API',
+        fromNamePlaceholder: 'Token V-Claw',
         useTls: 'Dùng TLS',
         useTlsHint: 'Bật mã hóa TLS cho kết nối SMTP'
       },
@@ -4766,14 +4766,14 @@ export default {
     },
     admin: {
       welcome: {
-        title: '👋 Chào mừng đến với Sub2API',
-        description: '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">Sub2API is a powerful AI service gateway platform that helps you easily manage and distribute AI services.</p><p style="margin-bottom: 12px;"><b>🎯 Core Features:</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>📦 <b>Group Management</b> - Create service tiers (VIP, Free Trial, etc.)</li><li>🔗 <b>Account Pool</b> - Connect multiple upstream AI service accounts</li><li>🔑 <b>Key Distribution</b> - Generate independent API Keys for users</li><li>💰 <b>Billing Control</b> - Flexible rate and quota management</li></ul><p style="color: #10b981; font-weight: 600;">Let\'s complete the initial setup in 3 minutes →</p></div>',
+        title: '👋 Chào mừng đến với Token V-Claw',
+        description: '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">Token V-Claw is a powerful AI service gateway platform that helps you easily manage and distribute AI services.</p><p style="margin-bottom: 12px;"><b>🎯 Core Features:</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>📦 <b>Group Management</b> - Create service tiers (VIP, Free Trial, etc.)</li><li>🔗 <b>Account Pool</b> - Connect multiple upstream AI service accounts</li><li>🔑 <b>Key Distribution</b> - Generate independent API Keys for users</li><li>💰 <b>Billing Control</b> - Flexible rate and quota management</li></ul><p style="color: #10b981; font-weight: 600;">Let\'s complete the initial setup in 3 minutes →</p></div>',
         nextBtn: 'Bắt đầu thiết lập 🚀',
         prevBtn: 'Bỏ qua'
       },
       groupManage: {
         title: '📦 Bước 1: Quản lý nhóm',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>Nhóm là gì?</b></p><p style="margin-bottom: 12px;">Nhóm là đơn vị cốt lõi của Sub2API, tương tự một "gói dịch vụ":</p><ul style="margin-left: 20px; margin-bottom: 12px; font-size: 13px;"><li>🎯 Mỗi nhóm có thể chứa nhiều tài khoản upstream</li><li>💰 Mỗi nhóm có hệ số tính phí riêng</li><li>👥 Có thể đặt là công khai hoặc độc quyền</li></ul><p style="margin-top: 12px; padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Ví dụ:</b> Bạn có thể tạo nhóm "VIP Premium" (hệ số cao) và "Dùng thử" (hệ số thấp)</p><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 Nhấn "Quản lý nhóm" ở thanh bên trái</p></div>'
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>Nhóm là gì?</b></p><p style="margin-bottom: 12px;">Nhóm là đơn vị cốt lõi của Token V-Claw, tương tự một "gói dịch vụ":</p><ul style="margin-left: 20px; margin-bottom: 12px; font-size: 13px;"><li>🎯 Mỗi nhóm có thể chứa nhiều tài khoản upstream</li><li>💰 Mỗi nhóm có hệ số tính phí riêng</li><li>👥 Có thể đặt là công khai hoặc độc quyền</li></ul><p style="margin-top: 12px; padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Ví dụ:</b> Bạn có thể tạo nhóm "VIP Premium" (hệ số cao) và "Dùng thử" (hệ số thấp)</p><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 Nhấn "Quản lý nhóm" ở thanh bên trái</p></div>'
       },
       createGroup: {
         title: '➕ Tạo nhóm mới',
@@ -4865,8 +4865,8 @@ export default {
     },
     user: {
       welcome: {
-        title: '👋 Welcome to Sub2API',
-        description: '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">Hello! Welcome to the Sub2API AI service platform.</p><p style="margin-bottom: 12px;"><b>🎯 Quick Start:</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>🔑 Create API Key</li><li>📋 Copy key to your application</li><li>🚀 Start using AI services</li></ul><p style="color: #10b981; font-weight: 600;">Just 1 minute, let\'s get started →</p></div>',
+        title: '👋 Welcome to Token V-Claw',
+        description: '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">Hello! Welcome to the Token V-Claw AI service platform.</p><p style="margin-bottom: 12px;"><b>🎯 Quick Start:</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>🔑 Create API Key</li><li>📋 Copy key to your application</li><li>🚀 Start using AI services</li></ul><p style="color: #10b981; font-weight: 600;">Just 1 minute, let\'s get started →</p></div>',
         nextBtn: 'Start 🚀',
         prevBtn: 'Skip'
       },
