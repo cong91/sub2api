@@ -3250,7 +3250,10 @@ export default {
       subscription: '订阅',
       invitation: '邀请码',
       invitationHint: '邀请码用于限制用户注册，使用后自动标记为已使用。',
-      allTypes: '全部类型',
+
+      inviteBenefitType: '邀请码权益类型',
+      benefitBalance: '余额权益',
+      benefitSubscription: '订阅权益',      allTypes: '全部类型',
       allStatus: '全部状态',
       unused: '未使用',
       used: '已使用',

@@ -3009,7 +3009,10 @@ export default {
       subscription: 'Gói thuê bao',
       invitation: 'Invitation',
       invitationHint: 'Invitation codes are used to restrict user registration. They are automatically marked as used after use.',
-      unused: 'Unused',
+
+      inviteBenefitType: 'Loại quyền lợi mã mời',
+      benefitBalance: 'Quyền lợi số dư',
+      benefitSubscription: 'Quyền lợi gói thuê bao',      unused: 'Unused',
       used: 'Used',
       columns: {
         code: 'Code',
