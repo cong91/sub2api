@@ -207,9 +207,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	canWait, err := geminiConcurrency.IncrementWaitCount(c.Request.Context(), authSubject.UserID, maxWait)
 	waitCounted := false
 	if err != nil {
-		reqLog.Warn("gemini.user_wait_counter_increment_failed", zap.Error(err))
 	} else if !canWait {
-		reqLog.Info("gemini.user_wait_queue_full", zap.Int("max_wait", maxWait))
 		googleError(c, http.StatusTooManyRequests, "Too many pending requests, please retry later")
 		return
 	}
@@ -229,7 +227,6 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	}
 	userReleaseFunc, err := geminiConcurrency.AcquireUserSlotWithWait(c, authSubject.UserID, authSubject.Concurrency, stream, &streamStarted)
 	if err != nil {
-		reqLog.Warn("gemini.user_slot_acquire_failed", zap.Error(err))
 		googleError(c, http.StatusTooManyRequests, err.Error())
 		return
 	}
@@ -245,7 +242,6 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 
 	// 2) billing eligibility check (after wait)
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.ExecutionGroupResolver(c.Request.Context()), subscription); err != nil {
-		reqLog.Info("gemini.billing_eligibility_check_failed", zap.Error(err))
 		status, _, message := billingErrorDetails(err)
 		googleError(c, status, message)
 		return
@@ -327,11 +323,6 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 					matchedDigestChain = foundMatchedChain
 					sessionBoundAccountID = foundAccountID
 					geminiSessionUUID = foundUUID
-					reqLog.Info("gemini.digest_fallback_matched",
-						zap.String("session_uuid_prefix", safeShortPrefix(foundUUID, 8)),
-						zap.Int64("account_id", foundAccountID),
-						zap.String("digest_chain", truncateDigestChain(geminiDigestChain)),
-					)
 
 					// 关键：如果原 sessionKey 为空，使用 prefixHash + uuid 作为 sessionKey
 					// 这样 SelectAccountWithLoadAwareness 的粘性会话逻辑会优先使用匹配到的账号
@@ -390,19 +381,11 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		// 检测账号切换：如果粘性会话绑定的账号与当前选择的账号不同，清除 thoughtSignature
 		// 注意：Gemini 原生 API 的 thoughtSignature 与具体上游账号强相关；跨账号透传会导致 400。
 		if sessionBoundAccountID > 0 && sessionBoundAccountID != account.ID {
-			reqLog.Info("gemini.sticky_session_account_switched",
-				zap.Int64("from_account_id", sessionBoundAccountID),
-				zap.Int64("to_account_id", account.ID),
-				zap.Bool("clean_thought_signature", true),
-			)
 			body = service.CleanGeminiNativeThoughtSignatures(body)
 			sessionBoundAccountID = account.ID
 		} else if sessionKey != "" && sessionBoundAccountID == 0 && !cleanedForUnknownBinding && bytes.Contains(body, []byte(`"thoughtSignature"`)) {
 			// 无缓存绑定但请求里已有 thoughtSignature：常见于缓存丢失/TTL 过期后，客户端继续携带旧签名。
 			// 为避免第一次转发就 400，这里做一次确定性清理，让新账号重新生成签名链路。
-			reqLog.Info("gemini.sticky_session_binding_missing",
-				zap.Bool("clean_thought_signature", true),
-			)
 			body = service.CleanGeminiNativeThoughtSignatures(body)
 			cleanedForUnknownBinding = true
 			sessionBoundAccountID = account.ID
@@ -421,12 +404,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			accountWaitCounted := false
 			canWait, err := geminiConcurrency.IncrementAccountWaitCount(c.Request.Context(), account.ID, selection.WaitPlan.MaxWaiting)
 			if err != nil {
-				reqLog.Warn("gemini.account_wait_counter_increment_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 			} else if !canWait {
-				reqLog.Info("gemini.account_wait_queue_full",
-					zap.Int64("account_id", account.ID),
-					zap.Int("max_waiting", selection.WaitPlan.MaxWaiting),
-				)
 				googleError(c, http.StatusTooManyRequests, "Too many pending requests, please retry later")
 				return
 			}
@@ -448,7 +426,6 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				&streamStarted,
 			)
 			if err != nil {
-				reqLog.Warn("gemini.account_slot_acquire_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				googleError(c, http.StatusTooManyRequests, err.Error())
 				return
 			}
@@ -457,7 +434,6 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				accountWaitCounted = false
 			}
 			if err := h.gatewayService.BindStickySession(c.Request.Context(), apiKey.ExecutionGroupIDResolver(c.Request.Context()), sessionKey, account.ID); err != nil {
-				reqLog.Warn("gemini.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 			}
 		}
 		// 账号槽位/等待计数需要在超时或断开时安全回收
@@ -511,7 +487,6 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				account.ID,
 				matchedDigestChain,
 			); err != nil {
-				reqLog.Warn("gemini.digest_session_save_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 			}
 		}
 
@@ -547,10 +522,6 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				).Error("gemini.record_usage_failed", zap.Error(err))
 			}
 		})
-		reqLog.Debug("gemini.request_completed",
-			zap.Int64("account_id", account.ID),
-			zap.Int("switch_count", fs.SwitchCount),
-		)
 		return
 	}
 }
