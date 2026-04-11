@@ -74,18 +74,14 @@
             </div>
           </template>
 
-          <template #cell-type="{ value }">
+          <template #cell-type="{ row }">
             <span
               :class="[
                 'badge',
-                value === 'balance'
-                  ? 'badge-success'
-                  : value === 'subscription'
-                    ? 'badge-warning'
-                    : 'badge-primary'
+                row.benefit_type === 'balance' ? 'badge-success' : 'badge-warning'
               ]"
             >
-              {{ t('admin.redeem.types.' + value) }}
+              {{ row.benefit_type === 'balance' ? t('admin.redeem.benefitBalance') : t('admin.redeem.benefitSubscription') }}
             </span>
           </template>
 
@@ -218,30 +214,8 @@
             {{ t('admin.redeem.generateCodesTitle') }}
           </h2>
           <form @submit.prevent="handleGenerateCodes" class="space-y-4">
-            <div>
-              <label class="input-label">{{ t('admin.redeem.codeType') }}</label>
-              <Select v-model="generateForm.type" :options="typeOptions" />
-            </div>
-            <!-- 余额/并发类型：显示数值输入 -->
-            <div v-if="generateForm.type !== 'subscription' && generateForm.type !== 'invitation'">
-              <label class="input-label">
-                {{
-                  generateForm.type === 'balance'
-                    ? t('admin.redeem.amount')
-                    : t('admin.redeem.columns.value')
-                }}
-              </label>
-              <input
-                v-model.number="generateForm.value"
-                type="number"
-                :step="generateForm.type === 'balance' ? '0.01' : '1'"
-                :min="generateForm.type === 'balance' ? '0.01' : '1'"
-                required
-                class="input"
-              />
-            </div>
-            <!-- 邀请码类型：显示提示与权益配置 -->
-            <template v-if="generateForm.type === 'invitation'">
+            <!-- 邀请码类型：固定 invitation，仅显示权益配置 -->
+            <template>
               <div class="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
                 <p class="text-sm text-blue-700 dark:text-blue-300">
                   {{ t('admin.redeem.invitationHint') }}
@@ -306,51 +280,6 @@
                   />
                 </div>
               </template>
-            </template>
-            <!-- 订阅类型：显示分组选择和有效天数 -->
-            <template v-if="generateForm.type === 'subscription'">
-              <div>
-                <label class="input-label">{{ t('admin.redeem.selectGroup') }}</label>
-                <Select
-                  v-model="generateForm.group_id"
-                  :options="subscriptionGroupOptions"
-                  :placeholder="t('admin.redeem.selectGroupPlaceholder')"
-                >
-                  <template #selected="{ option }">
-                    <GroupBadge
-                      v-if="option"
-                      :name="(option as unknown as GroupOption).label"
-                      :platform="(option as unknown as GroupOption).platform"
-                      :subscription-type="(option as unknown as GroupOption).subscriptionType"
-                      :rate-multiplier="(option as unknown as GroupOption).rate"
-                    />
-                    <span v-else class="text-gray-400">{{
-                      t('admin.redeem.selectGroupPlaceholder')
-                    }}</span>
-                  </template>
-                  <template #option="{ option, selected }">
-                    <GroupOptionItem
-                      :name="(option as unknown as GroupOption).label"
-                      :platform="(option as unknown as GroupOption).platform"
-                      :subscription-type="(option as unknown as GroupOption).subscriptionType"
-                      :rate-multiplier="(option as unknown as GroupOption).rate"
-                      :description="(option as unknown as GroupOption).description"
-                      :selected="selected"
-                    />
-                  </template>
-                </Select>
-              </div>
-              <div>
-                <label class="input-label">{{ t('admin.redeem.validityDays') }}</label>
-                <input
-                  v-model.number="generateForm.validity_days"
-                  type="number"
-                  min="1"
-                  max="365"
-                  required
-                  class="input"
-                />
-              </div>
             </template>
             <div>
               <label class="input-label">{{ t('admin.redeem.count') }}</label>
@@ -464,7 +393,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useClipboard } from '@/composables/useClipboard'
@@ -581,13 +510,6 @@ const columns = computed<Column[]>(() => [
   { key: 'actions', label: t('admin.redeem.columns.actions') }
 ])
 
-const typeOptions = computed(() => [
-  { value: 'balance', label: t('admin.redeem.balance') },
-  { value: 'concurrency', label: t('admin.redeem.concurrency') },
-  { value: 'subscription', label: t('admin.redeem.subscription') },
-  { value: 'invitation', label: t('admin.redeem.invitation') }
-])
-
 const filterTypeOptions = computed(() => [
   { value: '', label: t('admin.redeem.allTypes') },
   { value: 'balance', label: t('admin.redeem.balance') },
@@ -631,8 +553,8 @@ const deletingCode = ref<RedeemCode | null>(null)
 const copiedCode = ref<string | null>(null)
 
 const generateForm = reactive({
-  type: 'balance' as RedeemCodeType,
-  value: 10,
+  type: 'invitation' as RedeemCodeType,
+  value: 0,
   count: 1,
   group_id: null as number | null,
   validity_days: 30,
@@ -641,19 +563,6 @@ const generateForm = reactive({
   subscription_group_id: null as number | null,
   subscription_days: 30
 })
-
-// 监听类型变化，邀请码类型时自动设置 value 为 0
-watch(
-  () => generateForm.type,
-  (newType) => {
-    if (newType === 'invitation') {
-      generateForm.value = 0
-      generateForm.group_id = null
-    } else if (generateForm.value === 0) {
-      generateForm.value = 10
-    }
-  }
-)
 
 const loadCodes = async () => {
   if (abortController) {
@@ -720,12 +629,6 @@ const handlePageSizeChange = (pageSize: number) => {
 }
 
 const handleGenerateCodes = async () => {
-  // 订阅类型必须选择分组
-  if (generateForm.type === 'subscription' && !generateForm.group_id) {
-    appStore.showError(t('admin.redeem.groupRequired'))
-    return
-  }
-
   if (generateForm.type === 'invitation') {
     if (generateForm.invite_benefit_type === 'balance') {
       if (generateForm.balance_amount <= 0) {
@@ -748,25 +651,23 @@ const handleGenerateCodes = async () => {
   try {
     const result = await adminAPI.redeem.generate(
       generateForm.count,
-      generateForm.type,
-      generateForm.value,
-      generateForm.type === 'subscription' ? generateForm.group_id : undefined,
-      generateForm.type === 'subscription' ? generateForm.validity_days : undefined,
-      generateForm.type === 'invitation' ? generateForm.invite_benefit_type : undefined,
-      generateForm.type === 'invitation' && generateForm.invite_benefit_type === 'balance'
-        ? generateForm.balance_amount
-        : undefined,
-      generateForm.type === 'invitation' && generateForm.invite_benefit_type === 'subscription'
+      'invitation',
+      0,
+      undefined,
+      undefined,
+      generateForm.invite_benefit_type,
+      generateForm.invite_benefit_type === 'balance' ? generateForm.balance_amount : undefined,
+      generateForm.invite_benefit_type === 'subscription'
         ? generateForm.subscription_group_id
         : undefined,
-      generateForm.type === 'invitation' && generateForm.invite_benefit_type === 'subscription'
-        ? generateForm.subscription_days
-        : undefined
+      generateForm.invite_benefit_type === 'subscription' ? generateForm.subscription_days : undefined
     )
     showGenerateDialog.value = false
     generatedCodes.value = result
     showResultDialog.value = true
     // 重置表单
+    generateForm.type = 'invitation'
+    generateForm.value = 0
     generateForm.group_id = null
     generateForm.validity_days = 30
     generateForm.invite_benefit_type = 'balance'
