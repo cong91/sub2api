@@ -677,6 +677,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_SubscriptionLimitExceededReturns429(t 
 	r.GET("/v1beta/test", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
 
 	req := httptest.NewRequest(http.MethodGet, "/v1beta/test", nil)
+	req = req.WithContext(context.WithValue(req.Context(), ctxkey.Platform, service.PlatformGemini))
 	req.Header.Set("x-goog-api-key", apiKey.Key)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)

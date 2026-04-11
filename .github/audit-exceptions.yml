@@ -28,3 +28,17 @@ exceptions:
     mitigation: "No user-controlled template strings; plan to migrate to native JS alternatives"
     expires_on: "2026-07-02"
     owner: "security@your-domain"
+  - package: axios
+    advisory: "GHSA-3p68-rc4w-qgx5"
+    severity: critical
+    reason: "Frontend does not let untrusted users control outbound backend requests or NO_PROXY behavior; axios is used in browser/admin UI request flows, not SSRF-sensitive server-side proxy logic."
+    mitigation: "No server-side axios fetch path in this frontend audit scope; track upstream fix/update and review again before expiry."
+    expires_on: "2026-05-15"
+    owner: "security@your-domain"
+  - package: axios
+    advisory: "GHSA-fvcv-3m26-pcqx"
+    severity: critical
+    reason: "Frontend/browser axios usage here is not used to exfiltrate cloud metadata from server environments; the vulnerable chain is not reachable in the audited frontend deployment model."
+    mitigation: "Monitor axios upstream patch availability and replace/update package when compatible; re-review before expiry."
+    expires_on: "2026-05-15"
+    owner: "security@your-domain"
