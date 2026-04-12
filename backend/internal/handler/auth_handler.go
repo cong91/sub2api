@@ -48,6 +48,29 @@ type RegisterRequest struct {
 	InvitationCode string `json:"invitation_code"` // 邀请码
 }
 
+type InviteLoginRequest struct {
+	InvitationCode string `json:"invitation_code" binding:"required"`
+	TurnstileToken string `json:"turnstile_token"`
+}
+
+type InviteBootstrapAPIKeyResponse struct {
+	Platform   string `json:"platform"`
+	GroupID    int64  `json:"group_id"`
+	GroupName  string `json:"group_name"`
+	APIKeyID   int64  `json:"api_key_id"`
+	APIKey     string `json:"api_key"`
+	APIKeyName string `json:"api_key_name"`
+}
+
+type InviteLoginResponse struct {
+	AccessToken      string                          `json:"access_token"`
+	RefreshToken     string                          `json:"refresh_token,omitempty"`
+	ExpiresIn        int                             `json:"expires_in,omitempty"`
+	TokenType        string                          `json:"token_type"`
+	User             *dto.User                       `json:"user"`
+	BootstrapAPIKeys []InviteBootstrapAPIKeyResponse `json:"bootstrap_api_keys"`
+}
+
 // SendVerifyCodeRequest 发送验证码请求
 type SendVerifyCodeRequest struct {
 	Email          string `json:"email" binding:"required,email"`
@@ -126,6 +149,49 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	h.respondWithTokenPair(c, user)
+}
+
+// InviteLogin handles first-time invitation bootstrap login
+// POST /api/v1/auth/invite-login
+func (h *AuthHandler) InviteLogin(c *gin.Context) {
+	var req InviteLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	if err := h.authService.VerifyTurnstile(c.Request.Context(), req.TurnstileToken, ip.GetClientIP(c)); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	result, err := h.authService.InviteLogin(c.Request.Context(), req.InvitationCode)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	bootstrapKeys := make([]InviteBootstrapAPIKeyResponse, 0, len(result.BootstrapAPIKeys))
+	for i := range result.BootstrapAPIKeys {
+		item := result.BootstrapAPIKeys[i]
+		bootstrapKeys = append(bootstrapKeys, InviteBootstrapAPIKeyResponse{
+			Platform:   item.Platform,
+			GroupID:    item.GroupID,
+			GroupName:  item.GroupName,
+			APIKeyID:   item.APIKeyID,
+			APIKey:     item.APIKey,
+			APIKeyName: item.APIKeyName,
+		})
+	}
+
+	response.Success(c, InviteLoginResponse{
+		AccessToken:      result.TokenPair.AccessToken,
+		RefreshToken:     result.TokenPair.RefreshToken,
+		ExpiresIn:        result.TokenPair.ExpiresIn,
+		TokenType:        "Bearer",
+		User:             dto.UserFromService(result.User),
+		BootstrapAPIKeys: bootstrapKeys,
+	})
 }
 
 // SendVerifyCode 发送邮箱验证码

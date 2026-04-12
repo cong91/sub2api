@@ -7,7 +7,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"net/mail"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -71,10 +73,19 @@ type AuthService struct {
 	emailQueueService  *EmailQueueService
 	promoService       *PromoService
 	defaultSubAssigner DefaultSubscriptionAssigner
+
+	inviteGroupRepo      GroupRepository
+	inviteAccountRepo    AccountRepository
+	inviteAPIKeyCreator  InviteAPIKeyCreator
+	invitePricingResolve *ModelPricingResolver
 }
 
 type DefaultSubscriptionAssigner interface {
 	AssignOrExtendSubscription(ctx context.Context, input *AssignSubscriptionInput) (*UserSubscription, bool, error)
+}
+
+type InviteAPIKeyCreator interface {
+	Create(ctx context.Context, userID int64, req CreateAPIKeyRequest) (*APIKey, error)
 }
 
 // NewAuthService 创建认证服务实例
@@ -109,6 +120,378 @@ func NewAuthService(
 // Register 用户注册，返回token和用户
 func (s *AuthService) Register(ctx context.Context, email, password string) (string, *User, error) {
 	return s.RegisterWithVerification(ctx, email, password, "", "", "")
+}
+
+type InviteBootstrapAPIKey struct {
+	Platform   string `json:"platform"`
+	GroupID    int64  `json:"group_id"`
+	GroupName  string `json:"group_name"`
+	APIKeyID   int64  `json:"api_key_id"`
+	APIKey     string `json:"api_key"`
+	APIKeyName string `json:"api_key_name"`
+}
+
+type InviteLoginResult struct {
+	User             *User                   `json:"user"`
+	TokenPair        *TokenPair              `json:"token_pair"`
+	BootstrapAPIKeys []InviteBootstrapAPIKey `json:"bootstrap_api_keys"`
+}
+
+type inviteBootstrapCandidate struct {
+	group       Group
+	bestAccount Account
+	score       float64
+}
+
+var inviteBootstrapPlatforms = []string{
+	PlatformOpenAI,
+	PlatformAnthropic,
+	PlatformGemini,
+	PlatformAntigravity,
+}
+
+// ConfigureInviteLoginDependencies wires optional invite-login bootstrap dependencies.
+// Keep this out of constructor to avoid broad call-site churn in tests/tools.
+func (s *AuthService) ConfigureInviteLoginDependencies(groupRepo GroupRepository, accountRepo AccountRepository, apiKeyCreator InviteAPIKeyCreator, pricingResolver *ModelPricingResolver) {
+	s.inviteGroupRepo = groupRepo
+	s.inviteAccountRepo = accountRepo
+	s.inviteAPIKeyCreator = apiKeyCreator
+	s.invitePricingResolve = pricingResolver
+}
+
+// InviteLogin validates an invitation code and creates a first-time bootstrap user.
+func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*InviteLoginResult, error) {
+	if s.settingService == nil || !s.settingService.IsRegistrationEnabled(ctx) {
+		return nil, ErrRegDisabled
+	}
+
+	invitationCode = strings.TrimSpace(invitationCode)
+	if invitationCode == "" {
+		return nil, ErrInvitationCodeRequired
+	}
+
+	if !s.settingService.IsInvitationCodeEnabled(ctx) {
+		return nil, ErrInvitationCodeInvalid
+	}
+
+	redeemCode, err := s.redeemRepo.GetByCode(ctx, invitationCode)
+	if err != nil {
+		return nil, ErrInvitationCodeInvalid
+	}
+	if redeemCode.Type != RedeemTypeInvitation || redeemCode.Status != StatusUnused {
+		return nil, ErrInvitationCodeInvalid
+	}
+
+	if s.refreshTokenCache == nil {
+		return nil, ErrServiceUnavailable
+	}
+
+	email, err := s.buildInviteSyntheticEmail(ctx, invitationCode)
+	if err != nil {
+		return nil, err
+	}
+
+	randomPassword, err := randomHexString(32)
+	if err != nil {
+		return nil, ErrServiceUnavailable
+	}
+	hashedPassword, err := s.HashPassword(randomPassword)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+
+	defaultBalance := s.cfg.Default.UserBalance
+	defaultConcurrency := s.cfg.Default.UserConcurrency
+	defaultBalance = s.settingService.GetDefaultBalance(ctx)
+	defaultConcurrency = s.settingService.GetDefaultConcurrency(ctx)
+
+	newUser := &User{
+		Email:        email,
+		PasswordHash: hashedPassword,
+		Role:         RoleUser,
+		Balance:      defaultBalance,
+		Concurrency:  defaultConcurrency,
+		Status:       StatusActive,
+	}
+
+	if s.entClient != nil {
+		tx, txErr := s.entClient.Tx(ctx)
+		if txErr != nil {
+			return nil, ErrServiceUnavailable
+		}
+		defer func() { _ = tx.Rollback() }()
+		txCtx := dbent.NewTxContext(ctx, tx)
+
+		if err := s.userRepo.Create(txCtx, newUser); err != nil {
+			if errors.Is(err, ErrEmailExists) {
+				return nil, ErrServiceUnavailable
+			}
+			return nil, ErrServiceUnavailable
+		}
+
+		if err := s.redeemRepo.Use(txCtx, redeemCode.ID, newUser.ID); err != nil {
+			return nil, ErrInvitationCodeInvalid
+		}
+
+		if err := tx.Commit(); err != nil {
+			return nil, ErrServiceUnavailable
+		}
+	} else {
+		if err := s.userRepo.Create(ctx, newUser); err != nil {
+			if errors.Is(err, ErrEmailExists) {
+				return nil, ErrServiceUnavailable
+			}
+			return nil, ErrServiceUnavailable
+		}
+		if err := s.redeemRepo.Use(ctx, redeemCode.ID, newUser.ID); err != nil {
+			_ = s.userRepo.Delete(ctx, newUser.ID)
+			return nil, ErrInvitationCodeInvalid
+		}
+	}
+
+	s.assignDefaultSubscriptions(ctx, newUser.ID)
+
+	bootstrapAPIKeys, err := s.provisionInviteBootstrapAPIKeys(ctx, newUser.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenPair, err := s.GenerateTokenPair(ctx, newUser, "")
+	if err != nil {
+		return nil, ErrServiceUnavailable
+	}
+
+	return &InviteLoginResult{
+		User:             newUser,
+		TokenPair:        tokenPair,
+		BootstrapAPIKeys: bootstrapAPIKeys,
+	}, nil
+}
+
+func (s *AuthService) buildInviteSyntheticEmail(ctx context.Context, invitationCode string) (string, error) {
+	fragment := inviteCodeFragment(invitationCode)
+	for i := 0; i < 5; i++ {
+		suffix, err := randomHexString(4)
+		if err != nil {
+			return "", ErrServiceUnavailable
+		}
+		email := fmt.Sprintf("invite+%s-%s@bootstrap.local", fragment, suffix)
+		exists, err := s.userRepo.ExistsByEmail(ctx, email)
+		if err != nil {
+			return "", ErrServiceUnavailable
+		}
+		if !exists {
+			return email, nil
+		}
+	}
+	return "", ErrServiceUnavailable
+}
+
+func inviteCodeFragment(code string) string {
+	trimmed := strings.TrimSpace(strings.ToLower(code))
+	b := make([]byte, 0, 8)
+	for i := 0; i < len(trimmed) && len(b) < 8; i++ {
+		c := trimmed[i]
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') {
+			b = append(b, c)
+		}
+	}
+	if len(b) == 0 {
+		return "invite"
+	}
+	return string(b)
+}
+
+func (s *AuthService) provisionInviteBootstrapAPIKeys(ctx context.Context, userID int64) ([]InviteBootstrapAPIKey, error) {
+	if s.inviteGroupRepo == nil || s.inviteAccountRepo == nil || s.inviteAPIKeyCreator == nil {
+		return nil, ErrServiceUnavailable
+	}
+
+	keys := make([]InviteBootstrapAPIKey, 0, len(inviteBootstrapPlatforms))
+	for _, platform := range inviteBootstrapPlatforms {
+		candidate, err := s.selectInviteBootstrapCandidate(ctx, platform)
+		if err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] invite-login candidate selection failed: platform=%s err=%v", platform, err)
+			continue
+		}
+		if candidate == nil {
+			continue
+		}
+
+		groupID := candidate.group.ID
+		name := fmt.Sprintf("bootstrap-%s", platform)
+		apiKey, err := s.inviteAPIKeyCreator.Create(ctx, userID, CreateAPIKeyRequest{
+			Name:    name,
+			GroupID: &groupID,
+		})
+		if err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] invite-login bootstrap key create failed: user_id=%d platform=%s group_id=%d err=%v", userID, platform, groupID, err)
+			continue
+		}
+
+		keys = append(keys, InviteBootstrapAPIKey{
+			Platform:   platform,
+			GroupID:    groupID,
+			GroupName:  candidate.group.Name,
+			APIKeyID:   apiKey.ID,
+			APIKey:     apiKey.Key,
+			APIKeyName: apiKey.Name,
+		})
+	}
+
+	if len(keys) == 0 {
+		return nil, ErrServiceUnavailable
+	}
+
+	return keys, nil
+}
+
+func (s *AuthService) selectInviteBootstrapCandidate(ctx context.Context, platform string) (*inviteBootstrapCandidate, error) {
+	groups, err := s.inviteGroupRepo.ListActiveByPlatform(ctx, platform)
+	if err != nil {
+		return nil, err
+	}
+
+	var best *inviteBootstrapCandidate
+	for i := range groups {
+		group := groups[i]
+		if !group.IsActive() || group.Platform != platform || group.IsSubscriptionType() {
+			continue
+		}
+
+		accounts, err := s.inviteAccountRepo.ListSchedulableByGroupIDAndPlatform(ctx, group.ID, platform)
+		if err != nil || len(accounts) == 0 {
+			continue
+		}
+
+		bestAccount, ok := pickBestInviteAccount(accounts)
+		if !ok {
+			continue
+		}
+
+		score := s.inviteBootstrapCostScore(ctx, platform, &group)
+		candidate := &inviteBootstrapCandidate{group: group, bestAccount: bestAccount, score: score}
+		if best == nil || inviteBootstrapCandidateLess(candidate, best) {
+			best = candidate
+		}
+	}
+
+	return best, nil
+}
+
+func (s *AuthService) inviteBootstrapCostScore(ctx context.Context, platform string, group *Group) float64 {
+	if group == nil {
+		return math.Inf(1)
+	}
+	if group.RateMultiplier == 0 {
+		return 0
+	}
+
+	if s.invitePricingResolve == nil {
+		if group.RateMultiplier > 0 {
+			return group.RateMultiplier
+		}
+		return math.Inf(1)
+	}
+
+	model := inviteCanonicalModelForPlatform(platform, group)
+	if model == "" {
+		return math.Inf(1)
+	}
+
+	resolved := s.invitePricingResolve.Resolve(ctx, PricingInput{Model: model, GroupID: &group.ID})
+	if resolved == nil || resolved.BasePricing == nil {
+		return math.Inf(1)
+	}
+
+	return resolved.BasePricing.InputPricePerToken + resolved.BasePricing.OutputPricePerToken
+}
+
+func inviteCanonicalModelForPlatform(platform string, group *Group) string {
+	switch platform {
+	case PlatformOpenAI:
+		return "gpt-5-mini"
+	case PlatformAnthropic:
+		return "claude-sonnet-4"
+	case PlatformGemini:
+		return "gemini-2.5-flash"
+	case PlatformAntigravity:
+		if group != nil {
+			for _, scope := range group.SupportedModelScopes {
+				if strings.EqualFold(strings.TrimSpace(scope), "claude") {
+					return "claude-sonnet-4"
+				}
+			}
+		}
+		return "gemini-2.5-flash"
+	default:
+		return ""
+	}
+}
+
+func pickBestInviteAccount(accounts []Account) (Account, bool) {
+	eligible := make([]Account, 0, len(accounts))
+	for i := range accounts {
+		if accounts[i].IsSchedulable() {
+			eligible = append(eligible, accounts[i])
+		}
+	}
+	if len(eligible) == 0 {
+		return Account{}, false
+	}
+
+	sort.Slice(eligible, func(i, j int) bool {
+		if eligible[i].Priority != eligible[j].Priority {
+			return eligible[i].Priority < eligible[j].Priority
+		}
+		if inviteLastUsedBefore(eligible[i].LastUsedAt, eligible[j].LastUsedAt) {
+			return true
+		}
+		if inviteLastUsedBefore(eligible[j].LastUsedAt, eligible[i].LastUsedAt) {
+			return false
+		}
+		return eligible[i].ID < eligible[j].ID
+	})
+
+	return eligible[0], true
+}
+
+func inviteBootstrapCandidateLess(a, b *inviteBootstrapCandidate) bool {
+	if a == nil {
+		return false
+	}
+	if b == nil {
+		return true
+	}
+	if a.score != b.score {
+		return a.score < b.score
+	}
+	if a.group.RateMultiplier != b.group.RateMultiplier {
+		return a.group.RateMultiplier < b.group.RateMultiplier
+	}
+	if a.bestAccount.Priority != b.bestAccount.Priority {
+		return a.bestAccount.Priority < b.bestAccount.Priority
+	}
+	if inviteLastUsedBefore(a.bestAccount.LastUsedAt, b.bestAccount.LastUsedAt) {
+		return true
+	}
+	if inviteLastUsedBefore(b.bestAccount.LastUsedAt, a.bestAccount.LastUsedAt) {
+		return false
+	}
+	if a.group.ID != b.group.ID {
+		return a.group.ID < b.group.ID
+	}
+	return a.bestAccount.ID < b.bestAccount.ID
+}
+
+func inviteLastUsedBefore(a, b *time.Time) bool {
+	if a == nil {
+		return b != nil
+	}
+	if b == nil {
+		return false
+	}
+	return a.Before(*b)
 }
 
 // RegisterWithVerification 用户注册（支持邮件验证、优惠码和邀请码），返回token和用户
