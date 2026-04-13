@@ -546,7 +546,8 @@ export default {
 
   // Groups (shared)
   groups: {
-    subscription: '订阅'
+    subscription: '订阅',
+    deleteConfirm: "确定要删除 '{name}' 吗？所有相关的 API 密钥将不再属于任何分组。"
   },
 
   // API Keys
@@ -837,7 +838,16 @@ export default {
     codeRedeemSuccess: '兑换成功！',
     failedToRedeem: '兑换失败，请检查兑换码后重试。',
     subscriptionRefreshFailed: '兑换成功，但订阅状态刷新失败。',
-    pleaseEnterCode: '请输入兑换码'
+    pleaseEnterCode: '请输入兑换码',
+    types: {
+      balance: 'Balance',
+      concurrency: 'Concurrency',
+      subscription: 'Subscription',
+      invitation: 'Invitation',
+      admin_balance: 'Admin Balance',
+      admin_concurrency: 'Admin Concurrency'
+    },
+    deleteConfirm: "Are you sure you want to delete '{name}'? All related API keys will no longer belong to any group."
   },
 
   // Profile
@@ -997,6 +1007,12 @@ export default {
       performance: '性能指标',
       avgResponse: '平均响应',
       averageTime: '平均时间',
+      active: '活跃',
+      ok: '正常',
+      err: '异常',
+      newUsersToday: '今日新增用户',
+      userUsageTrend: '用户使用趋势',
+      create: '创建',
       timeRange: '时间范围',
       granularity: '粒度',
       day: '按天',
@@ -1456,8 +1472,6 @@ export default {
       failedToAdjust: '调整失败',
       emailRequired: '请输入邮箱',
       concurrencyMin: '并发数不能小于1',
-      soraStorageQuota: 'Sora 存储配额',
-      soraStorageQuotaHint: '单位 GB，0 表示使用分组或系统默认配额',
       amountRequired: '请输入有效金额',
       insufficientBalance: '余额不足',
       setAllowedGroups: '设置允许分组',
@@ -1599,20 +1613,26 @@ export default {
       deleteConfirm: "确定要删除分组 '{name}' 吗？所有关联的 API 密钥将不再属于任何分组。",
       deleteConfirmSubscription:
         "确定要删除订阅分组 '{name}' 吗？此操作会让所有绑定此订阅的用户的 API Key 失效，并删除所有相关的订阅记录。此操作无法撤销。",
+      allPlatforms: '全部平台',
+      allStatus: '全部状态',
+      allGroups: '全部分组',
+      exclusive: '专属',
+      nonExclusive: '非专属',
+      public: '公开',
       columns: {
         name: '名称',
         platform: '平台',
         rateMultiplier: '费率倍数',
-        exclusive: '独占',
         type: '类型',
-        priority: '优先级',
-        apiKeys: 'API 密钥数',
         accounts: '账号数',
+        apiKeys: 'API 密钥数',
         capacity: '容量',
         usage: '用量',
         status: '状态',
         actions: '操作',
         billingType: '计费类型',
+        priority: '优先级',
+        exclusive: '专属',
         userName: '用户名',
         userEmail: '邮箱',
         userNotes: '备注',
@@ -1624,6 +1644,8 @@ export default {
       accountsRateLimited: '限流:',
       accountsTotal: '总量:',
       accountsUnit: '个账号',
+      rateAndAccounts: '{rate}x 费率 · {count} 个账号',
+      accountsCount: '{count} 个账号',
       form: {
         name: '名称',
         description: '描述',
@@ -1648,10 +1670,9 @@ export default {
         statusLabel: '状态'
       },
       exclusiveObj: {
-        yes: '是',
-        no: '否'
+        yes: '仅看专属分组',
+        no: '仅看非专属分组'
       },
-      exclusive: '专属',
       exclusiveHint: '专属分组，可以手动指定给特定用户',
       exclusiveTooltip: {
         title: '什么是专属分组？',
@@ -1678,14 +1699,7 @@ export default {
       failedToLoad: '加载分组列表失败',
       failedToSave: '保存分组失败',
       failedToDelete: '删除分组失败',
-      allPlatforms: '全部平台',
-      allStatus: '全部状态',
-      allGroups: '全部分组',
       exclusiveFilter: '专属',
-      nonExclusive: '公开',
-      public: '公开',
-      rateAndAccounts: '{rate}x 费率 · {count} 个账号',
-      accountsCount: '{count} 个账号',
       enterGroupName: '请输入分组名称',
       optionalDescription: '可选描述',
       platformHint: '选择此分组关联的平台',
@@ -1726,7 +1740,7 @@ export default {
       subscription: {
         title: '订阅设置',
         type: '计费类型',
-        typeHint: '标准计费从用户余额扣除。订阅模式使用配额限制。',
+        typeHint: '标准分组从用户钱包余额扣费；订阅分组则消耗已分配的配额窗口。',
         typeNotEditable: '分组创建后无法修改计费类型。',
         standard: '标准（余额）',
         subscription: '订阅（配额）',
@@ -1812,6 +1826,14 @@ export default {
         tooltip: '启用后，当请求包含 MCP 工具时，会在 system prompt 中注入 XML 格式调用协议提示词。关闭此选项可避免对某些客户端造成干扰。',
         enabled: '已启用',
         disabled: '已禁用'
+      },
+      claudeMaxSimulation: {
+        title: 'Claude Max 用量模拟',
+        tooltip:
+          '启用后，对于上游未返回 cache-write 用量的 Claude 模型，系统会在保持总 token 不变的前提下，按确定性规则映射为少量输入加 1 小时缓存创建。',
+        enabled: '已启用（模拟 1 小时缓存）',
+        disabled: '已禁用',
+        hint: '仅会调整用量计费日志中的 token 分类，不会持久化每次请求的映射状态。'
       },
       supportedScopes: {
         title: '支持的模型系列',
@@ -2101,7 +2123,6 @@ export default {
       crsBack: '返回',
       editAccount: '编辑账号',
       deleteAccount: '删除账号',
-      deleteConfirmMessage: "确定要删除账号 '{name}' 吗？",
       refreshCookie: '刷新 Cookie',
       testAccount: '测试账号',
       searchAccounts: '搜索账号...',
@@ -2218,6 +2239,7 @@ export default {
       noAccountsYet: '暂无账号',
       createFirstAccount: '添加 AI 平台账号以开始使用 API 网关。',
       tokenRefreshed: 'Token 刷新成功',
+      tokenRefreshedSuccess: 'Token 刷新成功',
       accountDeleted: '账号删除成功',
       rateLimitCleared: '速率限制已清除',
       setupToken: 'Setup Token',
@@ -2416,6 +2438,7 @@ export default {
       statusReset: '账号状态已重置',
       failedToResetStatus: '重置账号状态失败',
       cookieRefreshedSuccess: 'Cookie 刷新成功',
+      deleteConfirmMessage: "确定要删除账号 '{name}' 吗？",
       testSuccess: '账号测试通过',
       testFailed: '账号测试失败',
       failedToLoad: '加载账号列表失败',
@@ -2478,7 +2501,7 @@ export default {
       modelWhitelist: '模型白名单',
       modelMapping: '模型映射',
       selectAllowedModels: '选择允许的模型。留空则支持所有模型。',
-      mapRequestModels: '将请求模型映射到实际模型。左边是请求的模型，右边是发送到 API 的实际模型。',
+      mapRequestModels: '将请求中的模型映射到实际转发给上游的模型。左侧是请求模型，右侧是实际发送模型。',
       selectedModels: '已选择 {count} 个模型',
       supportsAllModels: '（支持所有模型）',
       requestModel: '请求模型',
@@ -2504,7 +2527,7 @@ export default {
       poolModeRetryCountHint: '仅在池模式下生效。0 表示不原地重试；默认 {default}，最大 {max}。',
       customErrorCodes: '自定义错误码',
       customErrorCodesHint: '仅对选中的错误码停止调度',
-      customErrorCodesWarning: '仅选中的错误码会停止调度，其他错误将返回 500。',
+      customErrorCodesWarning: '只有选中的错误码才会停止调度，其他上游错误会按通用 500 响应返回。',
       customErrorCodes429Warning:
         '429 已有内置的限流处理机制。添加到自定义错误码后，将直接停止调度而非临时限流。确定要添加吗？',
       customErrorCodes529Warning:
@@ -2515,7 +2538,7 @@ export default {
       invalidErrorCode: '请输入有效的 HTTP 错误码 (100-599)',
       errorCodeExists: '该错误码已被选中',
       interceptWarmupRequests: '拦截预热请求',
-      interceptWarmupRequestsDesc: '启用后，标题生成等预热请求将返回 mock 响应，不消耗上游 token',
+      interceptWarmupRequestsDesc: '启用后，标题生成等预热请求会直接返回模拟响应，不消耗上游 token。',
       autoPauseOnExpired: '过期自动暂停调度',
       autoPauseOnExpiredDesc: '启用后，账号过期将自动暂停调度',
       // Quota control (Anthropic OAuth/SetupToken only)
@@ -4592,12 +4615,6 @@ export default {
         integrationDoc: '支付集成文档',
         integrationDocHint: '包含接口说明、幂等语义及示例代码'
       },
-      soraClient: {
-        title: 'Sora 客户端',
-        description: '控制是否在侧边栏展示 Sora 客户端入口',
-        enabled: '启用 Sora 客户端',
-        enabledHint: '开启后，侧边栏将显示 Sora 入口，用户可访问 Sora 功能'
-      },
       customMenu: {
         title: '自定义菜单页面',
         description: '添加自定义 iframe 页面到侧边栏导航。每个页面可以设置为普通用户或管理员可见。',
@@ -4784,98 +4801,6 @@ export default {
         keyWarning: '此密钥仅显示一次，请立即复制保存。',
         securityWarning: '警告：此密钥拥有完整的管理员权限，请妥善保管。',
         usage: '使用方法：在请求头中添加 x-api-key: <your-admin-api-key>'
-      },
-      soraS3: {
-        title: 'Sora 存储配置',
-        description: '以多配置列表管理 Sora 媒体存储，支持 S3 和 Google Drive',
-        newProfile: '新建配置',
-        reloadProfiles: '刷新列表',
-        empty: '暂无存储配置，请先创建',
-        createTitle: '新建存储配置',
-        editTitle: '编辑存储配置',
-        selectProvider: '选择存储类型',
-        providerS3Desc: 'S3 兼容对象存储',
-        providerGDriveDesc: 'Google Drive 云盘',
-        profileID: '配置 ID',
-        profileName: '配置名称',
-        setActive: '创建后设为生效',
-        saveProfile: '保存配置',
-        activateProfile: '设为生效',
-        profileCreated: '存储配置创建成功',
-        profileSaved: '存储配置保存成功',
-        profileDeleted: '存储配置删除成功',
-        profileActivated: '生效配置已切换',
-        profileIDRequired: '请填写配置 ID',
-        profileNameRequired: '请填写配置名称',
-        profileSelectRequired: '请先选择配置',
-        endpointRequired: '启用时必须填写 S3 端点',
-        bucketRequired: '启用时必须填写存储桶',
-        accessKeyRequired: '启用时必须填写 Access Key ID',
-        deleteConfirm: '确定删除存储配置 {profileID} 吗？',
-        columns: {
-          profile: '配置',
-          profileId: 'Profile ID',
-          name: '名称',
-          provider: '存储类型',
-          active: '生效状态',
-          endpoint: '端点',
-          bucket: '存储桶',
-          storagePath: '存储路径',
-          capacityUsage: '容量 / 已用',
-          capacityUnlimited: '无限制',
-          videoCount: '视频数',
-          videoCompleted: '完成',
-          videoInProgress: '进行中',
-          quota: '默认配额',
-          updatedAt: '更新时间',
-          actions: '操作',
-          rootFolder: '根目录',
-          testInTable: '测试',
-          testingInTable: '测试中...',
-          testTimeout: '测试超时（15秒）'
-        },
-        enabled: '启用存储',
-        enabledHint: '启用后，Sora 生成的媒体文件将自动上传到存储',
-        endpoint: 'S3 端点',
-        region: '区域',
-        bucket: '存储桶',
-        prefix: '对象前缀',
-        accessKeyId: 'Access Key ID',
-        secretAccessKey: 'Secret Access Key',
-        secretConfigured: '(已配置，留空保持不变)',
-        cdnUrl: 'CDN URL',
-        cdnUrlHint: '可选，配置后使用 CDN URL 访问文件',
-        forcePathStyle: '强制路径风格（Path Style）',
-        defaultQuota: '默认存储配额',
-        defaultQuotaHint: '未在用户或分组级别指定配额时的默认值，0 表示无限制',
-        testConnection: '测试连接',
-        testing: '测试中...',
-        testSuccess: '连接测试成功',
-        testFailed: '连接测试失败',
-        saved: '存储设置保存成功',
-        saveFailed: '保存存储设置失败',
-        gdrive: {
-          authType: '认证方式',
-          serviceAccount: '服务账号',
-          clientId: 'Client ID',
-          clientSecret: 'Client Secret',
-          clientSecretConfigured: '(已配置，留空保持不变)',
-          refreshToken: 'Refresh Token',
-          refreshTokenConfigured: '(已配置，留空保持不变)',
-          serviceAccountJson: '服务账号 JSON',
-          serviceAccountConfigured: '(已配置，留空保持不变)',
-          folderId: 'Folder ID（可选）',
-          authorize: '授权 Google Drive',
-          authorizeHint: '通过 OAuth2 获取 Refresh Token',
-          oauthFieldsRequired: '请先填写 Client ID 和 Client Secret',
-          oauthSuccess: 'Google Drive 授权成功',
-          oauthFailed: 'Google Drive 授权失败',
-          closeWindow: '此窗口将自动关闭',
-          processing: '正在处理授权...',
-          testStorage: '测试存储',
-          testSuccess: 'Google Drive 存储测试成功（上传、访问、删除均正常）',
-          testFailed: 'Google Drive 存储测试失败'
-        }
       },
       overloadCooldown: {
         title: '529 过载冷却',
