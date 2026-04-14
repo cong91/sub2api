@@ -13,15 +13,17 @@ import (
 )
 
 type userRepoStub struct {
-	user       *User
-	getErr     error
-	createErr  error
-	deleteErr  error
-	exists     bool
-	existsErr  error
-	nextID     int64
-	created    []*User
-	deletedIDs []int64
+	user              *User
+	getErr            error
+	createErr         error
+	deleteErr         error
+	exists            bool
+	existsErr         error
+	nextID            int64
+	created           []*User
+	deletedIDs        []int64
+	balanceUpdates    []float64
+	concurrencyDeltas []int
 }
 
 func (s *userRepoStub) Create(ctx context.Context, user *User) error {
@@ -71,7 +73,11 @@ func (s *userRepoStub) ListWithFilters(ctx context.Context, params pagination.Pa
 }
 
 func (s *userRepoStub) UpdateBalance(ctx context.Context, id int64, amount float64) error {
-	panic("unexpected UpdateBalance call")
+	s.balanceUpdates = append(s.balanceUpdates, amount)
+	if s.user != nil && s.user.ID == id {
+		s.user.Balance += amount
+	}
+	return nil
 }
 
 func (s *userRepoStub) DeductBalance(ctx context.Context, id int64, amount float64) error {
@@ -79,7 +85,11 @@ func (s *userRepoStub) DeductBalance(ctx context.Context, id int64, amount float
 }
 
 func (s *userRepoStub) UpdateConcurrency(ctx context.Context, id int64, amount int) error {
-	panic("unexpected UpdateConcurrency call")
+	s.concurrencyDeltas = append(s.concurrencyDeltas, amount)
+	if s.user != nil && s.user.ID == id {
+		s.user.Concurrency += amount
+	}
+	return nil
 }
 
 func (s *userRepoStub) ExistsByEmail(ctx context.Context, email string) (bool, error) {
