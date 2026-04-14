@@ -71,11 +71,26 @@ type LoginRequest struct {
 
 // AuthResponse 认证响应格式（匹配前端期望）
 type AuthResponse struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token,omitempty"` // 新增：Refresh Token
-	ExpiresIn    int       `json:"expires_in,omitempty"`    // 新增：Access Token有效期（秒）
-	TokenType    string    `json:"token_type"`
-	User         *dto.User `json:"user"`
+	AccessToken      string                    `json:"access_token"`
+	RefreshToken     string                    `json:"refresh_token,omitempty"` // 新增：Refresh Token
+	ExpiresIn        int                       `json:"expires_in,omitempty"`    // 新增：Access Token有效期（秒）
+	TokenType        string                    `json:"token_type"`
+	User             *dto.User                 `json:"user"`
+	BootstrapAPIKeys []BootstrapAPIKeyResponse `json:"bootstrap_api_keys,omitempty"`
+}
+
+type BootstrapAPIKeyResponse struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Key      string `json:"key"`
+	GroupID  int64  `json:"group_id"`
+	Platform string `json:"platform"`
+}
+
+// InviteLoginRequest first-time invite bootstrap login request.
+type InviteLoginRequest struct {
+	InvitationCode string `json:"invitation_code" binding:"required"`
+	TurnstileToken string `json:"turnstile_token"`
 }
 
 func ensureLoginUserActive(user *service.User) error {
@@ -171,6 +186,47 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	h.respondWithTokenPair(c, user)
+}
+
+// InviteLogin handles first-time invite bootstrap login.
+// POST /api/v1/auth/invite-login
+func (h *AuthHandler) InviteLogin(c *gin.Context) {
+	var req InviteLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	if err := h.authService.VerifyTurnstile(c.Request.Context(), req.TurnstileToken, ip.GetClientIP(c)); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	tokenPair, user, bootstrapKeys, err := h.authService.InviteLogin(c.Request.Context(), req.InvitationCode)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	apiKeysResp := make([]BootstrapAPIKeyResponse, 0, len(bootstrapKeys))
+	for _, key := range bootstrapKeys {
+		apiKeysResp = append(apiKeysResp, BootstrapAPIKeyResponse{
+			ID:       key.ID,
+			Name:     key.Name,
+			Key:      key.Key,
+			GroupID:  key.GroupID,
+			Platform: key.Platform,
+		})
+	}
+
+	response.Success(c, AuthResponse{
+		AccessToken:      tokenPair.AccessToken,
+		RefreshToken:     tokenPair.RefreshToken,
+		ExpiresIn:        tokenPair.ExpiresIn,
+		TokenType:        "Bearer",
+		User:             dto.UserFromService(user),
+		BootstrapAPIKeys: apiKeysResp,
+	})
 }
 
 // SendVerifyCode 发送邮箱验证码
