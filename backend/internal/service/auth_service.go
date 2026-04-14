@@ -308,6 +308,13 @@ func (s *AuthService) InviteLogin(ctx context.Context, invitationCode string) (*
 		return nil, nil, nil, err
 	}
 
+	if err := s.applyInviteLoginEntitlement(ctx, user.ID, redeemCode); err != nil {
+		return nil, nil, nil, err
+	}
+	if updatedUser, err := s.userRepo.GetByID(ctx, user.ID); err == nil {
+		user = updatedUser
+	}
+
 	bootstrapKeys, err := s.provisionInviteBootstrapAPIKeys(ctx, user.ID, redeemCode)
 	if err != nil {
 		return nil, nil, nil, err
@@ -485,6 +492,44 @@ func (s *AuthService) ensureInviteBootstrapSubscriptions(ctx context.Context, us
 		}
 	}
 	return nil
+}
+
+func (s *AuthService) applyInviteLoginEntitlement(ctx context.Context, userID int64, redeemCode *RedeemCode) error {
+	if redeemCode == nil {
+		return ErrInvitationCodeInvalid
+	}
+	if userID <= 0 {
+		return ErrServiceUnavailable
+	}
+
+	switch redeemCode.Type {
+	case RedeemTypeBalance:
+		if redeemCode.Value != 0 {
+			if err := s.userRepo.UpdateBalance(ctx, userID, redeemCode.Value); err != nil {
+				return ErrServiceUnavailable
+			}
+		}
+		return nil
+	case RedeemTypeSubscription:
+		if redeemCode.GroupID == nil || s.defaultSubAssigner == nil {
+			return ErrServiceUnavailable
+		}
+		_, _, err := s.defaultSubAssigner.AssignOrExtendSubscription(ctx, &AssignSubscriptionInput{
+			UserID:       userID,
+			GroupID:      *redeemCode.GroupID,
+			ValidityDays: inviteBootstrapValidityDays(redeemCode),
+			AssignedBy:   0,
+			Notes:        fmt.Sprintf("invite-login redeem subscription code %s", redeemCode.Code),
+		})
+		if err != nil {
+			return ErrServiceUnavailable
+		}
+		return nil
+	case RedeemTypeInvitation:
+		return nil
+	default:
+		return ErrInvitationCodeInvalid
+	}
 }
 
 func inviteBootstrapValidityDays(redeemCode *RedeemCode) int {

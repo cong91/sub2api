@@ -206,7 +206,9 @@ func (s *inviteAPIKeyRepoStub) GetByID(context.Context, int64) (*APIKey, error) 
 func (s *inviteAPIKeyRepoStub) GetKeyAndOwnerID(context.Context, int64) (string, int64, error) {
 	panic("unexpected")
 }
-func (s *inviteAPIKeyRepoStub) GetByKey(context.Context, string) (*APIKey, error) { panic("unexpected") }
+func (s *inviteAPIKeyRepoStub) GetByKey(context.Context, string) (*APIKey, error) {
+	panic("unexpected")
+}
 func (s *inviteAPIKeyRepoStub) GetByKeyForAuth(context.Context, string) (*APIKey, error) {
 	panic("unexpected")
 }
@@ -246,11 +248,15 @@ func (s *inviteAPIKeyRepoStub) ListKeysByGroupID(context.Context, int64) ([]stri
 func (s *inviteAPIKeyRepoStub) IncrementQuotaUsed(context.Context, int64, float64) (float64, error) {
 	panic("unexpected")
 }
-func (s *inviteAPIKeyRepoStub) UpdateLastUsed(context.Context, int64, time.Time) error { panic("unexpected") }
+func (s *inviteAPIKeyRepoStub) UpdateLastUsed(context.Context, int64, time.Time) error {
+	panic("unexpected")
+}
 func (s *inviteAPIKeyRepoStub) IncrementRateLimitUsage(context.Context, int64, float64) error {
 	panic("unexpected")
 }
-func (s *inviteAPIKeyRepoStub) ResetRateLimitWindows(context.Context, int64) error { panic("unexpected") }
+func (s *inviteAPIKeyRepoStub) ResetRateLimitWindows(context.Context, int64) error {
+	panic("unexpected")
+}
 func (s *inviteAPIKeyRepoStub) GetRateLimitData(context.Context, int64) (*APIKeyRateLimitData, error) {
 	panic("unexpected")
 }
@@ -364,8 +370,8 @@ func TestAuthService_InviteLogin_FailsWhenNoBootstrapKeyCreated(t *testing.T) {
 }
 
 func TestAuthService_InviteLogin_BalanceUsesNonSubscriptionBootstrapGroups(t *testing.T) {
-	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{ID: 77, Type: RedeemTypeBalance, Status: StatusUnused}}
-	userRepo := &userRepoStub{nextID: 303}
+	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{ID: 77, Type: RedeemTypeBalance, Status: StatusUnused, Value: 25}}
+	userRepo := &userRepoStub{nextID: 303, user: &User{ID: 303, Balance: 1.5, Concurrency: 2}}
 	svc := newAuthServiceForInviteLoginTest(userRepo, redeemRepo)
 	svc.SetInviteBootstrapAPIKeyService(&inviteBootstrapAPIKeySvcStub{
 		groups: []Group{
@@ -376,11 +382,14 @@ func TestAuthService_InviteLogin_BalanceUsesNonSubscriptionBootstrapGroups(t *te
 		keys: []*APIKey{{ID: 4001, Name: "bootstrap-openai", Key: "sk-openai"}},
 	})
 
-	_, _, keys, err := svc.InviteLogin(context.Background(), "BALANCE-001")
+	_, user, keys, err := svc.InviteLogin(context.Background(), "BALANCE-001")
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
 	require.Equal(t, int64(8), keys[0].GroupID)
 	require.Equal(t, PlatformOpenAI, keys[0].Platform)
+	require.NotNil(t, user)
+	require.Equal(t, 26.5, user.Balance)
+	require.Equal(t, []float64{25}, userRepo.balanceUpdates)
 }
 
 func TestAPIKeyService_Create_SubscriptionGroupRequiresActiveSubscription(t *testing.T) {
@@ -427,8 +436,8 @@ func TestAPIKeyService_Create_SubscriptionGroupAllowsWhenActiveSubscriptionExist
 
 func TestAuthService_InviteLogin_SubscriptionRedeemAssignsSubscriptionBeforeCreate(t *testing.T) {
 	groupID := int64(42)
-	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{ID: 90, Type: RedeemTypeSubscription, Status: StatusUnused, GroupID: &groupID, ValidityDays: 45}}
-	userRepo := &userRepoStub{nextID: 404}
+	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{ID: 90, Code: "SUB-001", Type: RedeemTypeSubscription, Status: StatusUnused, GroupID: &groupID, ValidityDays: 45}}
+	userRepo := &userRepoStub{nextID: 404, user: &User{ID: 404, Balance: 1.5, Concurrency: 2}}
 	assigner := &inviteDefaultSubAssignerStub{}
 	bootstrapSvc := &inviteBootstrapAPIKeySvcStub{keys: []*APIKey{{ID: 5001, Name: "bootstrap-openai", Key: "sk-openai"}}}
 	svc := newAuthServiceForInviteLoginTest(userRepo, redeemRepo)
@@ -440,10 +449,13 @@ func TestAuthService_InviteLogin_SubscriptionRedeemAssignsSubscriptionBeforeCrea
 	require.NoError(t, err)
 	require.NotNil(t, user)
 	require.Len(t, keys, 1)
-	require.Len(t, assigner.calls, 1)
+	require.Len(t, assigner.calls, 2)
 	require.Equal(t, int64(404), assigner.calls[0].UserID)
 	require.Equal(t, groupID, assigner.calls[0].GroupID)
 	require.Equal(t, 45, assigner.calls[0].ValidityDays)
+	require.Equal(t, int64(404), assigner.calls[1].UserID)
+	require.Equal(t, groupID, assigner.calls[1].GroupID)
+	require.Equal(t, 45, assigner.calls[1].ValidityDays)
 	require.Len(t, bootstrapSvc.requests, 1)
 	require.NotNil(t, bootstrapSvc.requests[0].GroupID)
 	require.Equal(t, groupID, *bootstrapSvc.requests[0].GroupID)
