@@ -187,6 +187,17 @@ func TestPcGroupByPaymentType(t *testing.T) {
 		}
 	})
 
+	t.Run("sepay instance maps to sepay group", func(t *testing.T) {
+		t.Parallel()
+		sp := makeInstance(3, payment.TypeSepay, "sepay", "")
+
+		groups := pcGroupByPaymentType([]*dbent.PaymentProviderInstance{sp})
+
+		if len(groups[payment.TypeSepay]) != 1 || groups[payment.TypeSepay][0].ID != 3 {
+			t.Fatalf("sepay group should contain only sepay instance, got %v", groups[payment.TypeSepay])
+		}
+	})
+
 	t.Run("stripe with no supported types still in stripe group", func(t *testing.T) {
 		t.Parallel()
 		stripe := makeInstance(1, payment.TypeStripe, "", "")

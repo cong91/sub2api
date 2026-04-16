@@ -48,6 +48,13 @@ func TestWriteSuccessResponse(t *testing.T) {
 			wantBody:        "",
 		},
 		{
+			name:            "sepay returns success json",
+			providerKey:     "sepay",
+			wantCode:        http.StatusOK,
+			wantContentType: "application/json",
+			wantBody:        `{"success":true}`,
+		},
+		{
 			name:            "easypay returns plain text success",
 			providerKey:     "easypay",
 			wantCode:        http.StatusOK,
