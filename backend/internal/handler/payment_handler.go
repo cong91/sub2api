@@ -136,6 +136,9 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		HelpText:                  cfg.HelpText,
 		HelpImageURL:              cfg.HelpImageURL,
 		StripePublishableKey:      cfg.StripePublishableKey,
+		LedgerCurrency:            cfg.LedgerCurrency,
+		AllowedPaymentCurrencies:  cfg.AllowedPaymentCurrencies,
+		ManualFXRates:             cfg.ManualFXRates,
 	})
 }
 
@@ -150,6 +153,9 @@ type checkoutInfoResponse struct {
 	HelpText                  string                          `json:"help_text"`
 	HelpImageURL              string                          `json:"help_image_url"`
 	StripePublishableKey      string                          `json:"stripe_publishable_key"`
+	LedgerCurrency            string                          `json:"ledger_currency"`
+	AllowedPaymentCurrencies  []string                        `json:"allowed_payment_currencies"`
+	ManualFXRates             map[string]float64              `json:"manual_fx_rates"`
 }
 
 type checkoutPlan struct {
@@ -202,10 +208,11 @@ func (h *PaymentHandler) GetLimits(c *gin.Context) {
 
 // CreateOrderRequest is the request body for creating a payment order.
 type CreateOrderRequest struct {
-	Amount      float64 `json:"amount"`
-	PaymentType string  `json:"payment_type" binding:"required"`
-	OrderType   string  `json:"order_type"`
-	PlanID      int64   `json:"plan_id"`
+	Amount          float64 `json:"amount"`
+	PaymentCurrency string  `json:"payment_currency"`
+	PaymentType     string  `json:"payment_type" binding:"required"`
+	OrderType       string  `json:"order_type"`
+	PlanID          int64   `json:"plan_id"`
 	// IsMobile lets the frontend declare its mobile status directly. When
 	// nil we fall back to User-Agent heuristics (which miss iPadOS / some
 	// embedded browsers that strip the "Mobile" keyword).
@@ -231,15 +238,16 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		mobile = *req.IsMobile
 	}
 	result, err := h.paymentService.CreateOrder(c.Request.Context(), service.CreateOrderRequest{
-		UserID:      subject.UserID,
-		Amount:      req.Amount,
-		PaymentType: req.PaymentType,
-		ClientIP:    c.ClientIP(),
-		IsMobile:    mobile,
-		SrcHost:     c.Request.Host,
-		SrcURL:      c.Request.Referer(),
-		OrderType:   req.OrderType,
-		PlanID:      req.PlanID,
+		UserID:          subject.UserID,
+		Amount:          req.Amount,
+		PaymentCurrency: req.PaymentCurrency,
+		PaymentType:     req.PaymentType,
+		ClientIP:        c.ClientIP(),
+		IsMobile:        mobile,
+		SrcHost:         c.Request.Host,
+		SrcURL:          c.Request.Referer(),
+		OrderType:       req.OrderType,
+		PlanID:          req.PlanID,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)

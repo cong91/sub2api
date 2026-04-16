@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -55,6 +56,12 @@ func (h *PaymentWebhookHandler) WxpayNotify(c *gin.Context) {
 // POST /api/v1/payment/webhook/stripe
 func (h *PaymentWebhookHandler) StripeWebhook(c *gin.Context) {
 	h.handleNotify(c, payment.TypeStripe)
+}
+
+// SepayWebhook handles SePay webhook events.
+// POST /api/v1/payment/webhook/sepay
+func (h *PaymentWebhookHandler) SepayWebhook(c *gin.Context) {
+	h.handleNotify(c, payment.TypeSepay)
 }
 
 // handleNotify is the shared logic for all provider webhook handlers.
@@ -125,6 +132,13 @@ func extractOutTradeNo(rawBody, providerKey string) string {
 		if err == nil {
 			return values.Get("out_trade_no")
 		}
+	case payment.TypeSepay:
+		var payload struct {
+			Code string `json:"code"`
+		}
+		if err := json.Unmarshal([]byte(rawBody), &payload); err == nil {
+			return payload.Code
+		}
 	}
 	// For other providers (Stripe, Alipay direct, WxPay direct), the registry
 	// typically has only one instance, so no instance lookup is needed.
@@ -135,6 +149,10 @@ func extractOutTradeNo(rawBody, providerKey string) string {
 type wxpaySuccessResponse struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+}
+
+type sepaySuccessResponse struct {
+	Success bool `json:"success"`
 }
 
 // WeChat Pay webhook success response constants.
@@ -152,6 +170,8 @@ func writeSuccessResponse(c *gin.Context, providerKey string) {
 		c.JSON(http.StatusOK, wxpaySuccessResponse{Code: wxpaySuccessCode, Message: wxpaySuccessMessage})
 	case payment.TypeStripe:
 		c.String(http.StatusOK, "")
+	case payment.TypeSepay:
+		c.JSON(http.StatusOK, sepaySuccessResponse{Success: true})
 	default:
 		c.String(http.StatusOK, "success")
 	}

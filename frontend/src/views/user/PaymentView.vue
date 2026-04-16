@@ -33,6 +33,8 @@
             :order-type="paymentState.orderType || undefined"
             :publishable-key="checkout.stripe_publishable_key"
             :pay-amount="paymentState.payAmount"
+            :payment-currency="selectedCurrency"
+            :ledger-currency="ledgerCurrency"
             @success="onPaymentSuccess"
             @done="onStripeDone"
             @back="resetPayment"
@@ -62,6 +64,31 @@
               />
               <p v-if="amountError" class="mt-2 text-xs text-amber-600 dark:text-amber-300">{{ amountError }}</p>
             </div>
+            <div v-if="paymentCurrencies.length > 1" class="card p-6">
+              <div class="space-y-3">
+                <div>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">Payment currency</p>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Ledger currency stays {{ ledgerCurrency }}.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <button
+                    v-for="currency in paymentCurrencies"
+                    :key="currency"
+                    type="button"
+                    class="rounded-xl border px-4 py-3 text-sm font-medium transition-all"
+                    :class="selectedCurrency === currency
+                      ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300'
+                      : 'border-gray-200 text-gray-700 hover:border-primary-300 dark:border-dark-600 dark:text-gray-200'"
+                    @click="selectedPaymentCurrency = currency"
+                  >
+                    {{ currency }}
+                  </button>
+                </div>
+                <p v-if="selectedCurrency !== ledgerCurrency && selectedFXRate > 0" class="text-xs text-gray-500 dark:text-gray-400">
+                  Snapshot FX: 1 {{ selectedCurrency }} ≈ {{ selectedFXRate.toFixed(6) }} {{ ledgerCurrency }}
+                </p>
+              </div>
+            </div>
             <div v-if="enabledMethods.length >= 1" class="card p-6">
               <PaymentMethodSelector
                 :methods="methodOptions"
@@ -73,19 +100,19 @@
               <div class="space-y-2 text-sm">
                 <div class="flex justify-between">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('payment.paymentAmount') }}</span>
-                  <span class="text-gray-900 dark:text-white">¥{{ validAmount.toFixed(2) }}</span>
+                  <span class="text-gray-900 dark:text-white">{{ formatCurrencyAmount(validAmount, selectedCurrency) }}</span>
                 </div>
                 <div v-if="feeRate > 0" class="flex justify-between">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fee') }} ({{ feeRate }}%)</span>
-                  <span class="text-gray-900 dark:text-white">¥{{ feeAmount.toFixed(2) }}</span>
+                  <span class="text-gray-900 dark:text-white">{{ formatCurrencyAmount(feeAmount, selectedCurrency) }}</span>
                 </div>
                 <div v-if="feeRate > 0" class="flex justify-between border-t border-gray-200 pt-2 dark:border-dark-600">
                   <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.actualPay') }}</span>
-                  <span class="text-lg font-bold text-primary-600 dark:text-primary-400">¥{{ totalAmount.toFixed(2) }}</span>
+                  <span class="text-lg font-bold text-primary-600 dark:text-primary-400">{{ formatCurrencyAmount(totalAmount, selectedCurrency) }}</span>
                 </div>
                 <div v-if="balanceRechargeMultiplier !== 1" class="flex justify-between" :class="{ 'border-t border-gray-200 pt-2 dark:border-dark-600': feeRate <= 0 }">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('payment.creditedBalance') }}</span>
-                  <span class="text-gray-900 dark:text-white">${{ creditedAmount.toFixed(2) }}</span>
+                  <span class="text-gray-900 dark:text-white">{{ formatCurrencyAmount(creditedAmount, ledgerCurrency) }}</span>
                 </div>
                 <p v-if="balanceRechargeMultiplier !== 1" class="border-t border-gray-200 pt-2 text-xs text-gray-500 dark:border-dark-600 dark:text-gray-400">
                   {{ t('payment.rechargeRatePreview', { usd: balanceRechargeMultiplier.toFixed(2) }) }}
@@ -97,7 +124,7 @@
                 <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                 {{ t('common.processing') }}
               </span>
-              <span v-else>{{ t('payment.createOrder') }} ¥{{ totalAmount.toFixed(2) }}</span>
+              <span v-else>{{ t('payment.createOrder') }} {{ formatCurrencyAmount(totalAmount, selectedCurrency) }}</span>
             </button>
             <div v-if="errorMessage" class="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-800/50 dark:bg-red-900/20">
               <p class="text-sm text-red-700 dark:text-red-400">{{ errorMessage }}</p>
@@ -161,19 +188,44 @@
                   @select="selectedMethod = $event"
                 />
               </div>
+              <div v-if="paymentCurrencies.length > 1" class="card p-6">
+                <div class="space-y-3 text-sm">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="font-medium text-gray-900 dark:text-white">Payment currency</span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">Ledger: {{ ledgerCurrency }}</span>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      v-for="currency in paymentCurrencies"
+                      :key="currency"
+                      type="button"
+                      class="rounded-full border px-3 py-1.5 text-xs font-medium transition-all"
+                      :class="selectedCurrency === currency
+                        ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300'
+                        : 'border-gray-200 text-gray-700 hover:border-primary-300 dark:border-dark-600 dark:text-gray-200'"
+                      @click="selectedPaymentCurrency = currency"
+                    >
+                      {{ currency }}
+                    </button>
+                  </div>
+                  <p v-if="selectedCurrency !== ledgerCurrency && selectedFXRate > 0" class="text-xs text-gray-500 dark:text-gray-400">
+                    Snapshot FX: 1 {{ selectedCurrency }} ≈ {{ selectedFXRate.toFixed(6) }} {{ ledgerCurrency }}
+                  </p>
+                </div>
+              </div>
               <div v-if="feeRate > 0 && selectedPlan.price > 0" class="card p-6">
                 <div class="space-y-2 text-sm">
                   <div class="flex justify-between">
                     <span class="text-gray-500 dark:text-gray-400">{{ t('payment.amountLabel') }}</span>
-                    <span class="text-gray-900 dark:text-white">¥{{ selectedPlan.price.toFixed(2) }}</span>
+                    <span class="text-gray-900 dark:text-white">{{ formatCurrencyAmount(selectedPlan.price, selectedCurrency) }}</span>
                   </div>
                   <div class="flex justify-between">
                     <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fee') }} ({{ feeRate }}%)</span>
-                    <span class="text-gray-900 dark:text-white">¥{{ subFeeAmount.toFixed(2) }}</span>
+                    <span class="text-gray-900 dark:text-white">{{ formatCurrencyAmount(subFeeAmount, selectedCurrency) }}</span>
                   </div>
                   <div class="flex justify-between border-t border-gray-200 pt-2 dark:border-dark-600">
                     <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.actualPay') }}</span>
-                    <span class="text-lg font-bold text-primary-600 dark:text-primary-400">¥{{ subTotalAmount.toFixed(2) }}</span>
+                    <span class="text-lg font-bold text-primary-600 dark:text-primary-400">{{ formatCurrencyAmount(subTotalAmount, selectedCurrency) }}</span>
                   </div>
                 </div>
               </div>
@@ -182,7 +234,7 @@
                   <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                   {{ t('common.processing') }}
                 </span>
-                <span v-else>{{ t('payment.createOrder') }} ¥{{ (feeRate > 0 ? subTotalAmount : selectedPlan.price).toFixed(2) }}</span>
+                <span v-else>{{ t('payment.createOrder') }} {{ formatCurrencyAmount(feeRate > 0 ? subTotalAmount : selectedPlan.price, selectedCurrency) }}</span>
               </button>
               <button class="btn btn-secondary w-full" @click="selectedPlan = null">{{ t('common.cancel') }}</button>
               <div v-if="errorMessage" class="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-800/50 dark:bg-red-900/20">
@@ -272,6 +324,7 @@ import { useSubscriptionStore } from '@/stores/subscriptions'
 import { useAppStore } from '@/stores'
 import { paymentAPI } from '@/api/payment'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import { formatCurrencyAmount, normalizeCurrencyCode } from '@/utils/paymentCurrency'
 import { isMobileDevice } from '@/utils/device'
 import type { SubscriptionPlan, CheckoutInfoResponse, OrderType } from '@/types/payment'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -306,6 +359,7 @@ const errorMessage = ref('')
 const activeTab = ref<'recharge' | 'subscription'>('recharge')
 const amount = ref<number | null>(null)
 const selectedMethod = ref('')
+const selectedPaymentCurrency = ref('')
 const selectedPlan = ref<SubscriptionPlan | null>(null)
 const previewImage = ref('')
 
@@ -362,6 +416,7 @@ function onStripeRedirect(orderId: number, payUrl: string) {
 const checkout = ref<CheckoutInfoResponse>({
   methods: {}, global_min: 0, global_max: 0,
   plans: [], balance_disabled: false, balance_recharge_multiplier: 1, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '',
+  ledger_currency: 'USD', allowed_payment_currencies: ['USD'], manual_fx_rates: { USD: 1 },
 })
 
 const tabs = computed(() => {
@@ -372,6 +427,18 @@ const tabs = computed(() => {
 })
 
 const enabledMethods = computed(() => Object.keys(checkout.value.methods))
+const ledgerCurrency = computed(() => normalizeCurrencyCode(checkout.value.ledger_currency, 'USD'))
+const paymentCurrencies = computed(() => {
+  const configured = checkout.value.allowed_payment_currencies?.length
+    ? checkout.value.allowed_payment_currencies
+    : [ledgerCurrency.value]
+  return configured.map(code => normalizeCurrencyCode(code, ledgerCurrency.value))
+})
+const selectedCurrency = computed(() => normalizeCurrencyCode(selectedPaymentCurrency.value, ledgerCurrency.value))
+const selectedFXRate = computed(() => {
+  const normalized = selectedCurrency.value
+  return checkout.value.manual_fx_rates?.[normalized] || (normalized === ledgerCurrency.value ? 1 : 0)
+})
 const validAmount = computed(() => amount.value ?? 0)
 const balanceRechargeMultiplier = computed(() => {
   const multiplier = checkout.value.balance_recharge_multiplier
@@ -485,6 +552,17 @@ watch(() => [validAmount.value, selectedMethod.value] as const, ([amt, method]) 
   if (available) selectedMethod.value = available
 })
 
+watch(paymentCurrencies, (currencies) => {
+  if (!currencies.length) {
+    selectedPaymentCurrency.value = ledgerCurrency.value
+    return
+  }
+  const normalized = normalizeCurrencyCode(selectedPaymentCurrency.value, '')
+  if (!normalized || !currencies.includes(normalized)) {
+    selectedPaymentCurrency.value = currencies[0]
+  }
+}, { immediate: true })
+
 // Payment button class: follows selected payment method color
 const paymentButtonClass = computed(() => {
   const m = selectedMethod.value
@@ -548,6 +626,7 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
   try {
     const result = await paymentStore.createOrder({
       amount: orderAmount,
+      payment_currency: selectedCurrency.value,
       payment_type: selectedMethod.value,
       order_type: orderType,
       plan_id: planId,
