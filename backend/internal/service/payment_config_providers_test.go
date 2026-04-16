@@ -59,6 +59,13 @@ func TestValidateProviderRequest(t *testing.T) {
 			wantErr:        false,
 		},
 		{
+			name:           "valid sepay provider",
+			providerKey:    "sepay",
+			providerName:   "SePay",
+			supportedTypes: "sepay",
+			wantErr:        false,
+		},
+		{
 			name:           "invalid provider key",
 			providerKey:    "invalid",
 			providerName:   "Name",

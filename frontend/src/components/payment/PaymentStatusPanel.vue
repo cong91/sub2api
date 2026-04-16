@@ -22,11 +22,15 @@
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.amount') }}</span>
-                <span class="font-medium text-gray-900 dark:text-white">{{ paidOrder.order_type === 'balance' ? '$' : '¥' }}{{ paidOrder.amount.toFixed(2) }}</span>
+                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrencyAmount(paidOrder.amount, paidOrder.ledger_currency) }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.payAmount') }}</span>
-                <span class="font-medium text-gray-900 dark:text-white">¥{{ paidOrder.pay_amount.toFixed(2) }}</span>
+                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrencyAmount(paidOrder.pay_amount, paidOrder.payment_currency || paidOrder.ledger_currency) }}</span>
+              </div>
+              <div v-if="paidOrder.payment_currency && paidOrder.ledger_currency && paidOrder.payment_currency !== paidOrder.ledger_currency && paidOrder.fx_rate_payment_to_ledger > 0" class="flex justify-between">
+                <span class="text-gray-500 dark:text-gray-400">FX snapshot</span>
+                <span class="font-medium text-gray-900 dark:text-white">1 {{ paidOrder.payment_currency }} ≈ {{ paidOrder.fx_rate_payment_to_ledger.toFixed(6) }} {{ paidOrder.ledger_currency }}</span>
               </div>
             </div>
           </div>
@@ -70,14 +74,15 @@
     <!-- ═══ Active States: QR or Popup waiting ═══ -->
 
     <!-- QR Code Mode -->
-    <template v-else-if="qrUrl">
+    <template v-else-if="hasQRCode">
       <div class="card p-6">
         <div class="flex flex-col items-center space-y-4">
           <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ scanTitle }}</p>
           <div :class="['relative rounded-lg border-2 p-4', qrBorderClass]">
-            <canvas ref="qrCanvas" class="mx-auto"></canvas>
+            <img v-if="qrImageUrl" :src="qrImageUrl" alt="Payment QR" class="mx-auto h-[220px] w-[220px] rounded-lg object-contain" />
+            <canvas v-else ref="qrCanvas" class="mx-auto"></canvas>
             <!-- Brand logo overlay -->
-            <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div v-if="isAlipay || isWxpay" class="pointer-events-none absolute inset-0 flex items-center justify-center">
               <span :class="['rounded-full p-2 shadow ring-2 ring-white', qrLogoBgClass]">
                 <img :src="isAlipay ? alipayIcon : wxpayIcon" alt="" class="h-5 w-5 brightness-0 invert" />
               </span>
@@ -130,6 +135,7 @@ import { paymentAPI } from '@/api/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import { getPaymentPopupFeatures } from '@/components/payment/providerConfig'
 import type { PaymentOrder } from '@/types/payment'
+import { formatCurrencyAmount } from '@/utils/paymentCurrency'
 import Icon from '@/components/icons/Icon.vue'
 import QRCode from 'qrcode'
 import alipayIcon from '@/assets/icons/alipay.svg'
@@ -157,6 +163,12 @@ const qrUrl = ref('')
 const remainingSeconds = ref(0)
 const cancelling = ref(false)
 const paidOrder = ref<PaymentOrder | null>(null)
+
+const qrImageUrl = computed(() => {
+  const value = qrUrl.value.trim()
+  return /^(data:image\/|https?:\/\/)/i.test(value) ? value : ''
+})
+const hasQRCode = computed(() => Boolean(qrUrl.value))
 
 // Terminal outcome: null = still active, 'success' | 'cancelled' | 'expired'
 const outcome = ref<PaymentOutcome | null>(null)
@@ -218,7 +230,7 @@ function setOutcome(next: PaymentOutcome) {
 
 async function renderQR() {
   await nextTick()
-  if (!qrCanvas.value || !qrUrl.value) return
+  if (!qrCanvas.value || !qrUrl.value || qrImageUrl.value) return
   await QRCode.toCanvas(qrCanvas.value, qrUrl.value, {
     width: 220, margin: 2,
     errorCorrectionLevel: 'M',

@@ -45,11 +45,15 @@
           </div>
           <div class="flex justify-between">
             <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.amount') }}</span>
-            <span class="font-medium text-gray-900 dark:text-white">{{ paidOrder.order_type === 'balance' ? '$' : '¥' }}{{ paidOrder.amount.toFixed(2) }}</span>
+            <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrencyAmount(paidOrder.amount, paidOrder.ledger_currency) }}</span>
           </div>
           <div class="flex justify-between">
             <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.payAmount') }}</span>
-            <span class="font-medium text-gray-900 dark:text-white">¥{{ paidOrder.pay_amount.toFixed(2) }}</span>
+            <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrencyAmount(paidOrder.pay_amount, paidOrder.payment_currency || paidOrder.ledger_currency) }}</span>
+          </div>
+          <div v-if="paidOrder.payment_currency && paidOrder.ledger_currency && paidOrder.payment_currency !== paidOrder.ledger_currency && paidOrder.fx_rate_payment_to_ledger > 0" class="flex justify-between">
+            <span class="text-gray-500 dark:text-gray-400">FX snapshot</span>
+            <span class="font-medium text-gray-900 dark:text-white">1 {{ paidOrder.payment_currency }} ≈ {{ paidOrder.fx_rate_payment_to_ledger.toFixed(6) }} {{ paidOrder.ledger_currency }}</span>
           </div>
         </div>
       </div>
@@ -81,6 +85,7 @@ import { paymentAPI } from '@/api/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import { getPaymentPopupFeatures } from '@/components/payment/providerConfig'
 import type { PaymentOrder } from '@/types/payment'
+import { formatCurrencyAmount } from '@/utils/paymentCurrency'
 import QRCode from 'qrcode'
 import alipayIcon from '@/assets/icons/alipay.svg'
 import wxpayIcon from '@/assets/icons/wxpay.svg'
