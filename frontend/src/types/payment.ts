@@ -18,7 +18,7 @@ export type OrderStatus =
   | 'REFUNDED'
   | 'REFUND_FAILED'
 
-export type PaymentType = 'alipay' | 'wxpay' | 'alipay_direct' | 'wxpay_direct' | 'stripe' | 'easypay'
+export type PaymentType = 'alipay' | 'wxpay' | 'alipay_direct' | 'wxpay_direct' | 'stripe' | 'easypay' | 'sepay'
 
 export type OrderType = 'balance' | 'subscription'
 
@@ -37,6 +37,9 @@ export interface PaymentConfig {
   help_image_url: string
   help_text: string
   stripe_publishable_key: string
+  ledger_currency: string
+  allowed_payment_currencies: string[]
+  manual_fx_rates: Record<string, number>
 }
 
 export interface MethodLimit {
@@ -68,6 +71,9 @@ export interface CheckoutInfoResponse {
   help_text: string
   help_image_url: string
   stripe_publishable_key: string
+  ledger_currency: string
+  allowed_payment_currencies: string[]
+  manual_fx_rates: Record<string, number>
 }
 
 // ==================== Orders ====================
@@ -77,6 +83,13 @@ export interface PaymentOrder {
   user_id: number
   amount: number
   pay_amount: number
+  payment_amount: number
+  payment_currency: string
+  ledger_amount: number
+  ledger_currency: string
+  fx_rate_payment_to_ledger: number
+  fx_source?: string
+  fx_timestamp?: string
   fee_rate: number
   payment_type: string
   out_trade_no: string
@@ -151,6 +164,7 @@ export interface ProviderInstance {
 
 export interface CreateOrderRequest {
   amount: number
+  payment_currency?: string
   payment_type: string
   order_type: string
   plan_id?: number
@@ -159,6 +173,13 @@ export interface CreateOrderRequest {
 export interface CreateOrderResult {
   order_id: number
   amount: number
+  payment_amount: number
+  payment_currency: string
+  ledger_amount: number
+  ledger_currency: string
+  fx_rate: number
+  fx_source: string
+  fx_timestamp: string
   pay_url?: string
   qr_code?: string
   client_secret?: string

@@ -28,30 +28,42 @@ func (s *PaymentService) HandlePaymentNotification(ctx context.Context, n *payme
 		// Fallback: try legacy format (sub2_N where N is DB ID)
 		trimmed := strings.TrimPrefix(n.OrderID, orderIDPrefix)
 		if oid, parseErr := strconv.ParseInt(trimmed, 10, 64); parseErr == nil {
-			return s.confirmPayment(ctx, oid, n.TradeNo, n.Amount, pk)
+			return s.confirmPayment(ctx, oid, n.TradeNo, n.Amount, n.Currency, pk)
 		}
 		return fmt.Errorf("order not found for out_trade_no: %s", n.OrderID)
 	}
-	return s.confirmPayment(ctx, order.ID, n.TradeNo, n.Amount, pk)
+	return s.confirmPayment(ctx, order.ID, n.TradeNo, n.Amount, n.Currency, pk)
 }
 
-func (s *PaymentService) confirmPayment(ctx context.Context, oid int64, tradeNo string, paid float64, pk string) error {
+func (s *PaymentService) confirmPayment(ctx context.Context, oid int64, tradeNo string, paid float64, currency, pk string) error {
 	o, err := s.entClient.PaymentOrder.Get(ctx, oid)
 	if err != nil {
 		slog.Error("order not found", "orderID", oid)
 		return nil
 	}
+	expectedPaid := o.PayAmount
+	if o.PaymentAmount > 0 {
+		expectedPaid = o.PaymentAmount
+	}
+	expectedCurrency := o.PaymentCurrency
+	if expectedCurrency == "" {
+		expectedCurrency = "CNY"
+	}
+	if currency != "" && !strings.EqualFold(currency, expectedCurrency) {
+		s.writeAuditLog(ctx, o.ID, "PAYMENT_CURRENCY_MISMATCH", pk, map[string]any{"expected": expectedCurrency, "paid": currency, "tradeNo": tradeNo})
+		return fmt.Errorf("currency mismatch: expected %s, got %s", expectedCurrency, currency)
+	}
 	// Skip amount check when paid=0 (e.g. QueryOrder doesn't return amount).
 	// Also skip if paid is NaN/Inf (malformed provider data).
 	if paid > 0 && !math.IsNaN(paid) && !math.IsInf(paid, 0) {
-		if math.Abs(paid-o.PayAmount) > amountToleranceCNY {
-			s.writeAuditLog(ctx, o.ID, "PAYMENT_AMOUNT_MISMATCH", pk, map[string]any{"expected": o.PayAmount, "paid": paid, "tradeNo": tradeNo})
-			return fmt.Errorf("amount mismatch: expected %.2f, got %.2f", o.PayAmount, paid)
+		if !currencyAmountMatches(paid, expectedPaid, expectedCurrency) {
+			s.writeAuditLog(ctx, o.ID, "PAYMENT_AMOUNT_MISMATCH", pk, map[string]any{"expected": expectedPaid, "paid": paid, "currency": expectedCurrency, "tradeNo": tradeNo})
+			return fmt.Errorf("amount mismatch: expected %.2f %s, got %.2f", expectedPaid, expectedCurrency, paid)
 		}
 	}
 	// Use order's expected amount when provider didn't report one
 	if paid <= 0 || math.IsNaN(paid) || math.IsInf(paid, 0) {
-		paid = o.PayAmount
+		paid = expectedPaid
 	}
 	return s.toPaid(ctx, o, tradeNo, paid, pk)
 }

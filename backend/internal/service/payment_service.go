@@ -65,29 +65,37 @@ func generateRandomString(n int) string {
 }
 
 type CreateOrderRequest struct {
-	UserID      int64
-	Amount      float64
-	PaymentType string
-	ClientIP    string
-	IsMobile    bool
-	SrcHost     string
-	SrcURL      string
-	OrderType   string
-	PlanID      int64
+	UserID          int64
+	Amount          float64
+	PaymentCurrency string
+	PaymentType     string
+	ClientIP        string
+	IsMobile        bool
+	SrcHost         string
+	SrcURL          string
+	OrderType       string
+	PlanID          int64
 }
 
 type CreateOrderResponse struct {
-	OrderID      int64     `json:"order_id"`
-	Amount       float64   `json:"amount"`
-	PayAmount    float64   `json:"pay_amount"`
-	FeeRate      float64   `json:"fee_rate"`
-	Status       string    `json:"status"`
-	PaymentType  string    `json:"payment_type"`
-	PayURL       string    `json:"pay_url,omitempty"`
-	QRCode       string    `json:"qr_code,omitempty"`
-	ClientSecret string    `json:"client_secret,omitempty"`
-	ExpiresAt    time.Time `json:"expires_at"`
-	PaymentMode  string    `json:"payment_mode,omitempty"`
+	OrderID         int64     `json:"order_id"`
+	Amount          float64   `json:"amount"`
+	PaymentAmount   float64   `json:"payment_amount"`
+	PaymentCurrency string    `json:"payment_currency"`
+	LedgerAmount    float64   `json:"ledger_amount"`
+	LedgerCurrency  string    `json:"ledger_currency"`
+	FXRate          float64   `json:"fx_rate"`
+	FXSource        string    `json:"fx_source"`
+	FXTimestamp     time.Time `json:"fx_timestamp"`
+	PayAmount       float64   `json:"pay_amount"`
+	FeeRate         float64   `json:"fee_rate"`
+	Status          string    `json:"status"`
+	PaymentType     string    `json:"payment_type"`
+	PayURL          string    `json:"pay_url,omitempty"`
+	QRCode          string    `json:"qr_code,omitempty"`
+	ClientSecret    string    `json:"client_secret,omitempty"`
+	ExpiresAt       time.Time `json:"expires_at"`
+	PaymentMode     string    `json:"payment_mode,omitempty"`
 }
 
 type OrderListParams struct {

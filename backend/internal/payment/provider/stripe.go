@@ -14,7 +14,7 @@ import (
 
 // Stripe constants.
 const (
-	stripeCurrency            = "cny"
+	stripeDefaultCurrency     = "cny"
 	stripeEventPaymentSuccess = "payment_intent.succeeded"
 	stripeEventPaymentFailed  = "payment_intent.payment_failed"
 )
@@ -76,6 +76,13 @@ func (s *Stripe) CreatePayment(ctx context.Context, req payment.CreatePaymentReq
 	if err != nil {
 		return nil, fmt.Errorf("stripe create payment: %w", err)
 	}
+	currency := strings.ToLower(strings.TrimSpace(req.PaymentCurrency))
+	if currency == "" {
+		currency = stripeDefaultCurrency
+	}
+	if len(currency) != 3 {
+		currency = stripeDefaultCurrency
+	}
 
 	// Collect all Stripe payment_method_types from the instance's configured sub-methods
 	methods := resolveStripeMethodTypes(req.InstanceSubMethods)
@@ -87,7 +94,7 @@ func (s *Stripe) CreatePayment(ctx context.Context, req payment.CreatePaymentReq
 
 	params := &stripe.PaymentIntentCreateParams{
 		Amount:             stripe.Int64(amountInCents),
-		Currency:           stripe.String(stripeCurrency),
+		Currency:           stripe.String(currency),
 		PaymentMethodTypes: pmTypes,
 		Description:        stripe.String(req.Subject),
 		Metadata:           map[string]string{"orderId": req.OrderID},
@@ -134,9 +141,10 @@ func (s *Stripe) QueryOrder(ctx context.Context, tradeNo string) (*payment.Query
 	}
 
 	return &payment.QueryOrderResponse{
-		TradeNo: pi.ID,
-		Status:  status,
-		Amount:  payment.FenToYuan(pi.Amount),
+		TradeNo:  pi.ID,
+		Status:   status,
+		Amount:   payment.FenToYuan(pi.Amount),
+		Currency: strings.ToUpper(string(pi.Currency)),
 	}, nil
 }
 
@@ -175,11 +183,12 @@ func parseStripePaymentIntent(event *stripe.Event, status string, rawBody string
 		return nil, fmt.Errorf("stripe parse payment_intent: %w", err)
 	}
 	return &payment.PaymentNotification{
-		TradeNo: pi.ID,
-		OrderID: pi.Metadata["orderId"],
-		Amount:  payment.FenToYuan(pi.Amount),
-		Status:  status,
-		RawData: rawBody,
+		TradeNo:  pi.ID,
+		OrderID:  pi.Metadata["orderId"],
+		Amount:   payment.FenToYuan(pi.Amount),
+		Currency: strings.ToUpper(string(pi.Currency)),
+		Status:   status,
+		RawData:  rawBody,
 	}, nil
 }
 
