@@ -2,11 +2,9 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"math"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -23,9 +21,6 @@ import (
 func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest) (*CreateOrderResponse, error) {
 	if req.OrderType == "" {
 		req.OrderType = payment.OrderTypeBalance
-	}
-	if normalized := NormalizeVisibleMethod(req.PaymentType); normalized != "" {
-		req.PaymentType = normalized
 	}
 	cfg, err := s.configService.GetPaymentConfig(ctx)
 	if err != nil {
@@ -48,36 +43,22 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if user.Status != payment.EntityStatusActive {
 		return nil, infraerrors.Forbidden("USER_INACTIVE", "user account is disabled")
 	}
-	orderAmount := req.Amount
-	limitAmount := req.Amount
+	ledgerAmount := req.Amount
+	paymentAmount := req.Amount
 	if plan != nil {
-		orderAmount = plan.Price
-		limitAmount = plan.Price
+		ledgerAmount = plan.Price
+		paymentAmount = plan.Price
 	} else if req.OrderType == payment.OrderTypeBalance {
-		orderAmount = calculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier)
+		ledgerAmount = calculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier)
 	}
 	feeRate := cfg.RechargeFeeRate
-	payAmountStr := payment.CalculatePayAmount(limitAmount, feeRate)
+	payAmountStr := payment.CalculatePayAmount(paymentAmount, feeRate)
 	payAmount, _ := strconv.ParseFloat(payAmountStr, 64)
-	sel, err := s.selectCreateOrderInstance(ctx, req, cfg, payAmount)
+	order, err := s.createOrderInTx(ctx, req, user, plan, cfg, ledgerAmount, paymentAmount, feeRate, payAmount)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.validateSelectedCreateOrderInstance(ctx, req, sel); err != nil {
-		return nil, err
-	}
-	oauthResp, err := s.maybeBuildWeChatOAuthRequiredResponseForSelection(ctx, req, limitAmount, payAmount, feeRate, sel)
-	if err != nil {
-		return nil, err
-	}
-	if oauthResp != nil {
-		return oauthResp, nil
-	}
-	order, err := s.createOrderInTx(ctx, req, user, plan, cfg, orderAmount, limitAmount, feeRate, payAmount, sel)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := s.invokeProvider(ctx, order, req, cfg, limitAmount, payAmountStr, payAmount, plan, sel)
+	resp, err := s.invokeProvider(ctx, order, req, cfg, ledgerAmount, paymentAmount, payAmountStr, payAmount, order.PaymentCurrency, order.LedgerCurrency, plan)
 	if err != nil {
 		_, _ = s.entClient.PaymentOrder.UpdateOneID(order.ID).
 			SetStatus(OrderStatusFailed).
@@ -122,7 +103,7 @@ func (s *PaymentService) validateSubOrder(ctx context.Context, req CreateOrderRe
 	return plan, nil
 }
 
-func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, orderAmount, limitAmount, feeRate, payAmount float64, sel *payment.InstanceSelection) (*dbent.PaymentOrder, error) {
+func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, ledgerAmount, paymentAmount, feeRate, payAmount float64) (*dbent.PaymentOrder, error) {
 	tx, err := s.entClient.Tx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
@@ -131,7 +112,7 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 	if err := s.checkPendingLimit(ctx, tx, req.UserID, cfg.MaxPendingOrders); err != nil {
 		return nil, err
 	}
-	if err := s.checkDailyLimit(ctx, tx, req.UserID, limitAmount, cfg.DailyLimit); err != nil {
+	if err := s.checkDailyLimit(ctx, tx, req.UserID, ledgerAmount, cfg.DailyLimit); err != nil {
 		return nil, err
 	}
 	tm := cfg.OrderTimeoutMin
@@ -139,27 +120,28 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 		tm = defaultOrderTimeoutMin
 	}
 	exp := time.Now().Add(time.Duration(tm) * time.Minute)
-	outTradeNo, err := s.allocateOutTradeNo(ctx, tx)
+	snapshot, err := resolveFXSnapshot(req.PaymentCurrency, cfg, exp)
 	if err != nil {
 		return nil, err
 	}
-	providerSnapshot := buildPaymentOrderProviderSnapshot(sel, req)
-	selectedInstanceID := ""
-	selectedProviderKey := ""
-	if sel != nil {
-		selectedInstanceID = strings.TrimSpace(sel.InstanceID)
-		selectedProviderKey = strings.TrimSpace(sel.ProviderKey)
+	paymentCurrency := snapshot.PaymentCurrency
+	if paymentCurrency == "" {
+		paymentCurrency = cfg.LedgerCurrency
+	}
+	ledgerCurrency := snapshot.LedgerCurrency
+	if ledgerCurrency == "" {
+		ledgerCurrency = defaultLedgerCurrency
 	}
 	b := tx.PaymentOrder.Create().
 		SetUserID(req.UserID).
 		SetUserEmail(user.Email).
 		SetUserName(user.Username).
 		SetNillableUserNotes(psNilIfEmpty(user.Notes)).
-		SetAmount(orderAmount).
+		SetAmount(ledgerAmount).
 		SetPayAmount(payAmount).
 		SetFeeRate(feeRate).
 		SetRechargeCode("").
-		SetOutTradeNo(outTradeNo).
+		SetOutTradeNo(generateOutTradeNo()).
 		SetPaymentType(req.PaymentType).
 		SetPaymentTradeNo("").
 		SetOrderType(req.OrderType).
@@ -170,15 +152,6 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 	if req.SrcURL != "" {
 		b.SetSrcURL(req.SrcURL)
 	}
-	if selectedInstanceID != "" {
-		b.SetProviderInstanceID(selectedInstanceID)
-	}
-	if selectedProviderKey != "" {
-		b.SetProviderKey(selectedProviderKey)
-	}
-	if providerSnapshot != nil {
-		b.SetProviderSnapshot(providerSnapshot)
-	}
 	if plan != nil {
 		b.SetPlanID(plan.ID).SetSubscriptionGroupID(plan.GroupID).SetSubscriptionDays(psComputeValidityDays(plan.ValidityDays, plan.ValidityUnit))
 	}
@@ -187,7 +160,16 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 		return nil, fmt.Errorf("create order: %w", err)
 	}
 	code := fmt.Sprintf("PAY-%d-%d", order.ID, time.Now().UnixNano()%100000)
-	order, err = tx.PaymentOrder.UpdateOneID(order.ID).SetRechargeCode(code).Save(ctx)
+	order, err = tx.PaymentOrder.UpdateOneID(order.ID).
+		SetRechargeCode(code).
+		SetPaymentCurrency(paymentCurrency).
+		SetLedgerCurrency(ledgerCurrency).
+		SetPaymentAmount(payAmount).
+		SetLedgerAmount(ledgerAmount).
+		SetFxRatePaymentToLedger(snapshot.RatePaymentToLedger).
+		SetFxSource(snapshot.Source).
+		SetFxTimestamp(snapshot.Timestamp).
+		Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("set recharge code: %w", err)
 	}
@@ -195,21 +177,6 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 		return nil, fmt.Errorf("commit order transaction: %w", err)
 	}
 	return order, nil
-}
-
-func (s *PaymentService) allocateOutTradeNo(ctx context.Context, tx *dbent.Tx) (string, error) {
-	const maxAttempts = 5
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		candidate := generateOutTradeNo()
-		exists, err := tx.PaymentOrder.Query().Where(paymentorder.OutTradeNo(candidate)).Exist(ctx)
-		if err != nil {
-			return "", fmt.Errorf("check out_trade_no uniqueness: %w", err)
-		}
-		if !exists {
-			return candidate, nil
-		}
-	}
-	return "", fmt.Errorf("generate unique out_trade_no: exhausted %d attempts", maxAttempts)
 }
 
 func (s *PaymentService) checkPendingLimit(ctx context.Context, tx *dbent.Tx, userID int64, max int) error {
@@ -221,69 +188,10 @@ func (s *PaymentService) checkPendingLimit(ctx context.Context, tx *dbent.Tx, us
 		return fmt.Errorf("count pending orders: %w", err)
 	}
 	if c >= max {
-		return infraerrors.TooManyRequests("TOO_MANY_PENDING", "too_many_pending").
+		return infraerrors.TooManyRequests("TOO_MANY_PENDING", fmt.Sprintf("too many pending orders (max %d)", max)).
 			WithMetadata(map[string]string{"max": strconv.Itoa(max)})
 	}
 	return nil
-}
-
-func buildPaymentOrderProviderSnapshot(sel *payment.InstanceSelection, req CreateOrderRequest) map[string]any {
-	if sel == nil {
-		return nil
-	}
-
-	snapshot := map[string]any{}
-	snapshot["schema_version"] = 2
-
-	instanceID := strings.TrimSpace(sel.InstanceID)
-	if instanceID != "" {
-		snapshot["provider_instance_id"] = instanceID
-	}
-
-	providerKey := strings.TrimSpace(sel.ProviderKey)
-	if providerKey != "" {
-		snapshot["provider_key"] = providerKey
-	}
-
-	paymentMode := strings.TrimSpace(sel.PaymentMode)
-	if paymentMode != "" {
-		snapshot["payment_mode"] = paymentMode
-	}
-
-	if providerKey == payment.TypeWxpay {
-		if merchantAppID := paymentOrderSnapshotWxpayAppID(sel, req); merchantAppID != "" {
-			snapshot["merchant_app_id"] = merchantAppID
-		}
-		if merchantID := strings.TrimSpace(sel.Config["mchId"]); merchantID != "" {
-			snapshot["merchant_id"] = merchantID
-		}
-		snapshot["currency"] = "CNY"
-	}
-	if providerKey == payment.TypeAlipay {
-		if merchantAppID := strings.TrimSpace(sel.Config["appId"]); merchantAppID != "" {
-			snapshot["merchant_app_id"] = merchantAppID
-		}
-	}
-	if providerKey == payment.TypeEasyPay {
-		if merchantID := strings.TrimSpace(sel.Config["pid"]); merchantID != "" {
-			snapshot["merchant_id"] = merchantID
-		}
-	}
-
-	if len(snapshot) == 1 {
-		return nil
-	}
-	return snapshot
-}
-
-func paymentOrderSnapshotWxpayAppID(sel *payment.InstanceSelection, req CreateOrderRequest) string {
-	if sel == nil || strings.TrimSpace(sel.ProviderKey) != payment.TypeWxpay {
-		return ""
-	}
-	if strings.TrimSpace(req.OpenID) != "" {
-		return strings.TrimSpace(provider.ResolveWxpayJSAPIAppID(sel.Config))
-	}
-	return strings.TrimSpace(sel.Config["appId"])
 }
 
 func (s *PaymentService) checkDailyLimit(ctx context.Context, tx *dbent.Tx, userID int64, amount, limit float64) error {
@@ -304,127 +212,35 @@ func (s *PaymentService) checkDailyLimit(ctx context.Context, tx *dbent.Tx, user
 		used += o.Amount
 	}
 	if used+amount > limit {
-		return infraerrors.TooManyRequests("DAILY_LIMIT_EXCEEDED", "daily_limit_exceeded").
-			WithMetadata(map[string]string{"remaining": fmt.Sprintf("%.2f", math.Max(0, limit-used))})
+		return infraerrors.TooManyRequests("DAILY_LIMIT_EXCEEDED", fmt.Sprintf("daily recharge limit reached, remaining: %.2f", math.Max(0, limit-used)))
 	}
 	return nil
 }
 
-func (s *PaymentService) selectCreateOrderInstance(ctx context.Context, req CreateOrderRequest, cfg *PaymentConfig, payAmount float64) (*payment.InstanceSelection, error) {
-	selectCtx, err := s.prepareCreateOrderSelectionContext(ctx, req)
+func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.PaymentOrder, req CreateOrderRequest, cfg *PaymentConfig, ledgerAmount, paymentAmount float64, payAmountStr string, payAmount float64, paymentCurrency, ledgerCurrency string, plan *dbent.SubscriptionPlan) (*CreateOrderResponse, error) {
+	// Select an instance across all providers that support the requested payment type.
+	// This enables cross-provider load balancing (e.g. EasyPay + Alipay direct for "alipay").
+	sel, err := s.loadBalancer.SelectInstance(ctx, "", req.PaymentType, payment.Strategy(cfg.LoadBalanceStrategy), payAmount)
 	if err != nil {
-		return nil, err
-	}
-	sel, err := s.loadBalancer.SelectInstance(selectCtx, "", req.PaymentType, payment.Strategy(cfg.LoadBalanceStrategy), payAmount)
-	if err != nil {
-		return nil, infraerrors.ServiceUnavailable("PAYMENT_GATEWAY_ERROR", "method_not_configured").
-			WithMetadata(map[string]string{"payment_type": req.PaymentType})
+		return nil, infraerrors.ServiceUnavailable("PAYMENT_GATEWAY_ERROR", fmt.Sprintf("payment method (%s) is not configured", req.PaymentType))
 	}
 	if sel == nil {
-		return nil, infraerrors.TooManyRequests("NO_AVAILABLE_INSTANCE", "no_available_instance")
+		return nil, infraerrors.TooManyRequests("NO_AVAILABLE_INSTANCE", "no available payment instance")
 	}
-	return sel, nil
-}
-
-func (s *PaymentService) prepareCreateOrderSelectionContext(ctx context.Context, req CreateOrderRequest) (context.Context, error) {
-	if !requestNeedsWeChatJSAPICompatibility(req) {
-		return ctx, nil
-	}
-	if !s.usesOfficialWxpayVisibleMethod(ctx) {
-		return ctx, nil
-	}
-	expectedAppID, _, err := s.getWeChatPaymentOAuthCredential(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return payment.WithWxpayJSAPIAppID(ctx, expectedAppID), nil
-}
-
-func requestNeedsWeChatJSAPICompatibility(req CreateOrderRequest) bool {
-	if payment.GetBasePaymentType(req.PaymentType) != payment.TypeWxpay {
-		return false
-	}
-	return req.IsWeChatBrowser || strings.TrimSpace(req.OpenID) != ""
-}
-
-func (s *PaymentService) usesOfficialWxpayVisibleMethod(ctx context.Context) bool {
-	if s == nil || s.configService == nil {
-		return false
-	}
-	inst, err := s.configService.resolveEnabledVisibleMethodInstance(ctx, payment.TypeWxpay)
-	if err != nil {
-		return false
-	}
-	if inst == nil {
-		return false
-	}
-	return inst.ProviderKey == payment.TypeWxpay
-}
-
-func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.PaymentOrder, req CreateOrderRequest, cfg *PaymentConfig, limitAmount float64, payAmountStr string, payAmount float64, plan *dbent.SubscriptionPlan, sel *payment.InstanceSelection) (*CreateOrderResponse, error) {
 	prov, err := provider.CreateProvider(sel.ProviderKey, sel.InstanceID, sel.Config)
 	if err != nil {
-		slog.Error("[PaymentService] CreateProvider failed", "provider", sel.ProviderKey, "instance", sel.InstanceID, "error", err)
-		// If the provider returned a structured ApplicationError (e.g. WXPAY_CONFIG_MISSING_KEY),
-		// pass it through with provider context added to metadata. Otherwise wrap as PAYMENT_PROVIDER_MISCONFIGURED.
-		if appErr := new(infraerrors.ApplicationError); errors.As(err, &appErr) {
-			md := map[string]string{"provider": sel.ProviderKey, "instance_id": sel.InstanceID}
-			for k, v := range appErr.Metadata {
-				md[k] = v
-			}
-			return nil, appErr.WithMetadata(md)
-		}
-		return nil, infraerrors.ServiceUnavailable("PAYMENT_PROVIDER_MISCONFIGURED", "provider_misconfigured").
-			WithMetadata(map[string]string{"provider": sel.ProviderKey, "instance_id": sel.InstanceID})
+		return nil, infraerrors.ServiceUnavailable("PAYMENT_GATEWAY_ERROR", "payment method is temporarily unavailable")
 	}
-	subject := s.buildPaymentSubject(plan, limitAmount, cfg)
+	providerAmountStr := payAmountStr
+	providerCurrency := paymentCurrency
+	subject := s.buildPaymentSubject(plan, ledgerAmount, paymentCurrency, cfg)
 	outTradeNo := order.OutTradeNo
-	canonicalReturnURL, err := CanonicalizeReturnURL(req.ReturnURL, req.SrcHost, req.SrcURL)
-	if err != nil {
-		return nil, err
-	}
-	resumeToken := ""
-	if resume := s.paymentResume(); resume != nil {
-		if canonicalReturnURL != "" && resume.isSigningConfigured() {
-			resumeToken, err = resume.CreateToken(ResumeTokenClaims{
-				OrderID:            order.ID,
-				UserID:             order.UserID,
-				ProviderInstanceID: sel.InstanceID,
-				ProviderKey:        sel.ProviderKey,
-				PaymentType:        req.PaymentType,
-				CanonicalReturnURL: canonicalReturnURL,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("create payment resume token: %w", err)
-			}
-		}
-	}
-	providerReturnURL, err := buildPaymentReturnURL(canonicalReturnURL, order.ID, outTradeNo, resumeToken)
-	if err != nil {
-		return nil, err
-	}
-	providerReq := buildProviderCreatePaymentRequest(CreateOrderRequest{
-		PaymentType: req.PaymentType,
-		OpenID:      req.OpenID,
-		ClientIP:    req.ClientIP,
-		IsMobile:    req.IsMobile,
-		ReturnURL:   providerReturnURL,
-	}, sel, outTradeNo, payAmountStr, subject)
-	pr, err := prov.CreatePayment(ctx, providerReq)
+	pr, err := prov.CreatePayment(ctx, payment.CreatePaymentRequest{OrderID: outTradeNo, Amount: providerAmountStr, PaymentCurrency: providerCurrency, LedgerCurrency: ledgerCurrency, LedgerAmount: strconv.FormatFloat(ledgerAmount, 'f', 2, 64), PaymentType: req.PaymentType, Subject: subject, ClientIP: req.ClientIP, IsMobile: req.IsMobile, InstanceSubMethods: sel.SupportedTypes})
 	if err != nil {
 		slog.Error("[PaymentService] CreatePayment failed", "provider", sel.ProviderKey, "instance", sel.InstanceID, "error", err)
-		if appErr := new(infraerrors.ApplicationError); errors.As(err, &appErr) {
-			return nil, appErr
-		}
-		return nil, classifyCreatePaymentError(req, sel.ProviderKey, err)
+		return nil, infraerrors.ServiceUnavailable("PAYMENT_GATEWAY_ERROR", fmt.Sprintf("payment gateway error: %s", err.Error()))
 	}
-	_, err = s.entClient.PaymentOrder.UpdateOneID(order.ID).
-		SetNillablePaymentTradeNo(psNilIfEmpty(pr.TradeNo)).
-		SetNillablePayURL(psNilIfEmpty(pr.PayURL)).
-		SetNillableQrCode(psNilIfEmpty(pr.QRCode)).
-		SetNillableProviderInstanceID(psNilIfEmpty(sel.InstanceID)).
-		SetNillableProviderKey(psNilIfEmpty(sel.ProviderKey)).
-		Save(ctx)
+	_, err = s.entClient.PaymentOrder.UpdateOneID(order.ID).SetNillablePaymentTradeNo(psNilIfEmpty(pr.TradeNo)).SetNillablePayURL(psNilIfEmpty(pr.PayURL)).SetNillableQrCode(psNilIfEmpty(pr.QRCode)).SetNillableProviderInstanceID(psNilIfEmpty(sel.InstanceID)).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("update order with payment details: %w", err)
 	}
@@ -434,239 +250,55 @@ func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.Paymen
 		"payAmount":      order.PayAmount,
 		"paymentType":    req.PaymentType,
 		"orderType":      req.OrderType,
-		"paymentSource":  NormalizePaymentSource(req.PaymentSource),
 	})
-	resultType := pr.ResultType
-	if resultType == "" {
-		resultType = payment.CreatePaymentResultOrderCreated
+	fxSource := ""
+	if order.FxSource != nil {
+		fxSource = *order.FxSource
 	}
-	resp := buildCreateOrderResponse(order, req, payAmount, sel, pr, resultType)
-	resp.ResumeToken = resumeToken
-	return resp, nil
+	var fxTimestamp time.Time
+	if order.FxTimestamp != nil {
+		fxTimestamp = *order.FxTimestamp
+	}
+	return &CreateOrderResponse{
+		OrderID:         order.ID,
+		Amount:          order.Amount,
+		PaymentAmount:   order.PaymentAmount,
+		PaymentCurrency: order.PaymentCurrency,
+		LedgerAmount:    order.LedgerAmount,
+		LedgerCurrency:  order.LedgerCurrency,
+		FXRate:          order.FxRatePaymentToLedger,
+		FXSource:        fxSource,
+		FXTimestamp:     fxTimestamp,
+		PayAmount:       order.PayAmount,
+		FeeRate:         order.FeeRate,
+		Status:          OrderStatusPending,
+		PaymentType:     req.PaymentType,
+		PayURL:          pr.PayURL,
+		QRCode:          pr.QRCode,
+		ClientSecret:    pr.ClientSecret,
+		CheckoutID:      pr.CheckoutID,
+		ExpiresAt:       order.ExpiresAt,
+		PaymentMode:     sel.PaymentMode,
+	}, nil
 }
 
-func buildProviderCreatePaymentRequest(req CreateOrderRequest, sel *payment.InstanceSelection, orderID, amount, subject string) payment.CreatePaymentRequest {
-	return payment.CreatePaymentRequest{
-		OrderID:            orderID,
-		Amount:             amount,
-		PaymentType:        req.PaymentType,
-		Subject:            subject,
-		ReturnURL:          req.ReturnURL,
-		OpenID:             strings.TrimSpace(req.OpenID),
-		ClientIP:           req.ClientIP,
-		IsMobile:           req.IsMobile,
-		InstanceSubMethods: selectedInstanceSupportedTypes(sel),
-	}
-}
-
-func selectedInstanceSupportedTypes(sel *payment.InstanceSelection) string {
-	if sel == nil {
-		return ""
-	}
-	return sel.SupportedTypes
-}
-
-func (s *PaymentService) buildPaymentSubject(plan *dbent.SubscriptionPlan, limitAmount float64, cfg *PaymentConfig) string {
+func (s *PaymentService) buildPaymentSubject(plan *dbent.SubscriptionPlan, amount float64, currency string, cfg *PaymentConfig) string {
 	if plan != nil {
 		if plan.ProductName != "" {
 			return plan.ProductName
 		}
 		return "Sub2API Subscription " + plan.Name
 	}
-	amountStr := strconv.FormatFloat(limitAmount, 'f', 2, 64)
+	amountStr := strconv.FormatFloat(amount, 'f', 2, 64)
 	pf := strings.TrimSpace(cfg.ProductNamePrefix)
 	sf := strings.TrimSpace(cfg.ProductNameSuffix)
 	if pf != "" || sf != "" {
-		return strings.TrimSpace(pf + " " + amountStr + " " + sf)
+		return strings.TrimSpace(pf + " " + amountStr + " " + currency + " " + sf)
 	}
-	return "Sub2API " + amountStr + " CNY"
-}
-
-func (s *PaymentService) maybeBuildWeChatOAuthRequiredResponse(ctx context.Context, req CreateOrderRequest, amount, payAmount, feeRate float64) (*CreateOrderResponse, error) {
-	return s.maybeBuildWeChatOAuthRequiredResponseForSelection(ctx, req, amount, payAmount, feeRate, nil)
-}
-
-func (s *PaymentService) maybeBuildWeChatOAuthRequiredResponseForSelection(ctx context.Context, req CreateOrderRequest, amount, payAmount, feeRate float64, sel *payment.InstanceSelection) (*CreateOrderResponse, error) {
-	if sel != nil && sel.ProviderKey != "" && sel.ProviderKey != payment.TypeWxpay {
-		return nil, nil
+	if currency == "" {
+		currency = defaultLedgerCurrency
 	}
-	if strings.TrimSpace(req.OpenID) != "" || !req.IsWeChatBrowser || payment.GetBasePaymentType(req.PaymentType) != payment.TypeWxpay {
-		return nil, nil
-	}
-	return s.buildWeChatOAuthRequiredResponse(ctx, req, amount, payAmount, feeRate)
-}
-
-func (s *PaymentService) buildWeChatOAuthRequiredResponse(ctx context.Context, req CreateOrderRequest, amount, payAmount, feeRate float64) (*CreateOrderResponse, error) {
-	appID, _, err := s.getWeChatPaymentOAuthCredential(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.paymentResume().ensureSigningKey(); err != nil {
-		return nil, err
-	}
-
-	authorizeURL, err := buildWeChatPaymentOAuthStartURL(req, "snsapi_base")
-	if err != nil {
-		return nil, err
-	}
-
-	return &CreateOrderResponse{
-		Amount:      amount,
-		PayAmount:   payAmount,
-		FeeRate:     feeRate,
-		ResultType:  payment.CreatePaymentResultOAuthRequired,
-		PaymentType: req.PaymentType,
-		OAuth: &payment.WechatOAuthInfo{
-			AuthorizeURL: authorizeURL,
-			AppID:        appID,
-			Scope:        "snsapi_base",
-			RedirectURL:  "/auth/wechat/payment/callback",
-		},
-	}, nil
-}
-
-func (s *PaymentService) validateSelectedCreateOrderInstance(ctx context.Context, req CreateOrderRequest, sel *payment.InstanceSelection) error {
-	if !requiresWeChatJSAPICompatibleSelection(req, sel) {
-		return nil
-	}
-	expectedAppID, _, err := s.getWeChatPaymentOAuthCredential(ctx)
-	if err != nil {
-		return err
-	}
-	selectedAppID := provider.ResolveWxpayJSAPIAppID(sel.Config)
-	if selectedAppID == "" || selectedAppID != expectedAppID {
-		return infraerrors.TooManyRequests("NO_AVAILABLE_INSTANCE", "selected payment instance is not compatible with the current WeChat OAuth app")
-	}
-	return nil
-}
-
-func requiresWeChatJSAPICompatibleSelection(req CreateOrderRequest, sel *payment.InstanceSelection) bool {
-	if sel == nil || sel.ProviderKey != payment.TypeWxpay || payment.GetBasePaymentType(req.PaymentType) != payment.TypeWxpay {
-		return false
-	}
-	return req.IsWeChatBrowser || strings.TrimSpace(req.OpenID) != ""
-}
-
-func (s *PaymentService) getWeChatPaymentOAuthCredential(ctx context.Context) (string, string, error) {
-	if s == nil || s.configService == nil || s.configService.settingRepo == nil {
-		return "", "", infraerrors.ServiceUnavailable(
-			"WECHAT_PAYMENT_MP_NOT_CONFIGURED",
-			"wechat in-app payment requires a complete WeChat MP OAuth credential",
-		)
-	}
-	cfg, err := (&SettingService{settingRepo: s.configService.settingRepo}).GetWeChatConnectOAuthConfig(ctx)
-	appID := strings.TrimSpace(cfg.AppIDForMode("mp"))
-	appSecret := strings.TrimSpace(cfg.AppSecretForMode("mp"))
-	if err != nil || !cfg.SupportsMode("mp") || appID == "" || appSecret == "" {
-		return "", "", infraerrors.ServiceUnavailable(
-			"WECHAT_PAYMENT_MP_NOT_CONFIGURED",
-			"wechat in-app payment requires a complete WeChat MP OAuth credential",
-		)
-	}
-	return appID, appSecret, nil
-}
-
-func classifyCreatePaymentError(req CreateOrderRequest, providerKey string, err error) error {
-	if err == nil {
-		return nil
-	}
-	if providerKey == payment.TypeWxpay &&
-		payment.GetBasePaymentType(req.PaymentType) == payment.TypeWxpay &&
-		strings.Contains(err.Error(), "wxpay h5 payments are not authorized for this merchant") {
-		return infraerrors.ServiceUnavailable(
-			"WECHAT_H5_NOT_AUTHORIZED",
-			"wechat h5 payment is not available for this merchant",
-		).WithMetadata(map[string]string{
-			"action": "open_in_wechat_or_scan_qr",
-		})
-	}
-	return infraerrors.ServiceUnavailable("PAYMENT_GATEWAY_ERROR", fmt.Sprintf("payment gateway error: %s", err.Error()))
-}
-
-func buildCreateOrderResponse(order *dbent.PaymentOrder, req CreateOrderRequest, payAmount float64, sel *payment.InstanceSelection, pr *payment.CreatePaymentResponse, resultType payment.CreatePaymentResultType) *CreateOrderResponse {
-	return &CreateOrderResponse{
-		OrderID:      order.ID,
-		Amount:       order.Amount,
-		PayAmount:    payAmount,
-		FeeRate:      order.FeeRate,
-		Status:       OrderStatusPending,
-		ResultType:   resultType,
-		PaymentType:  req.PaymentType,
-		OutTradeNo:   order.OutTradeNo,
-		PayURL:       pr.PayURL,
-		QRCode:       pr.QRCode,
-		ClientSecret: pr.ClientSecret,
-		OAuth:        pr.OAuth,
-		JSAPI:        pr.JSAPI,
-		JSAPIPayload: pr.JSAPI,
-		ExpiresAt:    order.ExpiresAt,
-		PaymentMode:  sel.PaymentMode,
-	}
-}
-
-func buildWeChatPaymentOAuthStartURL(req CreateOrderRequest, scope string) (string, error) {
-	u, err := url.Parse("/api/v1/auth/oauth/wechat/payment/start")
-	if err != nil {
-		return "", fmt.Errorf("build wechat payment oauth start url: %w", err)
-	}
-	q := u.Query()
-	q.Set("payment_type", strings.TrimSpace(req.PaymentType))
-	if req.Amount > 0 {
-		q.Set("amount", strconv.FormatFloat(req.Amount, 'f', -1, 64))
-	}
-	if orderType := strings.TrimSpace(req.OrderType); orderType != "" {
-		q.Set("order_type", orderType)
-	}
-	if req.PlanID > 0 {
-		q.Set("plan_id", strconv.FormatInt(req.PlanID, 10))
-	}
-	if scope = strings.TrimSpace(scope); scope != "" {
-		q.Set("scope", scope)
-	}
-	if redirectTo := paymentRedirectPathFromURL(req.SrcURL); redirectTo != "" {
-		q.Set("redirect", redirectTo)
-	}
-	u.RawQuery = q.Encode()
-	return u.String(), nil
-}
-
-func paymentRedirectPathFromURL(rawURL string) string {
-	rawURL = strings.TrimSpace(rawURL)
-	if rawURL == "" {
-		return "/purchase"
-	}
-	if strings.HasPrefix(rawURL, "/") && !strings.HasPrefix(rawURL, "//") {
-		return normalizePaymentRedirectPath(rawURL)
-	}
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return "/purchase"
-	}
-	path := strings.TrimSpace(u.EscapedPath())
-	if path == "" {
-		path = strings.TrimSpace(u.Path)
-	}
-	if path == "" || !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") {
-		return "/purchase"
-	}
-	if strings.TrimSpace(u.RawQuery) != "" {
-		path += "?" + u.RawQuery
-	}
-	return normalizePaymentRedirectPath(path)
-}
-
-func normalizePaymentRedirectPath(path string) string {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return "/purchase"
-	}
-	if path == "/payment" {
-		return "/purchase"
-	}
-	if strings.HasPrefix(path, "/payment?") {
-		return "/purchase" + strings.TrimPrefix(path, "/payment")
-	}
-	return path
+	return "Sub2API " + amountStr + " " + currency
 }
 
 // --- Order Queries ---

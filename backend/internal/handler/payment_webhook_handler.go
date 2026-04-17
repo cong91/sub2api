@@ -1,9 +1,7 @@
 package handler
 
 import (
-	"context"
-	"errors"
-	"fmt"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -60,6 +58,18 @@ func (h *PaymentWebhookHandler) StripeWebhook(c *gin.Context) {
 	h.handleNotify(c, payment.TypeStripe)
 }
 
+// SepayWebhook handles SePay webhook events.
+// POST /api/v1/payment/webhook/sepay
+func (h *PaymentWebhookHandler) SepayWebhook(c *gin.Context) {
+	h.handleNotify(c, payment.TypeSepay)
+}
+
+// PaddleWebhook handles Paddle webhook events.
+// POST /api/v1/payment/webhook/paddle
+func (h *PaymentWebhookHandler) PaddleWebhook(c *gin.Context) {
+	h.handleNotify(c, payment.TypePaddle)
+}
+
 // handleNotify is the shared logic for all provider webhook handlers.
 func (h *PaymentWebhookHandler) handleNotify(c *gin.Context, providerKey string) {
 	var rawBody string
@@ -80,13 +90,9 @@ func (h *PaymentWebhookHandler) handleNotify(c *gin.Context, providerKey string)
 	// This is needed when multiple instances of the same provider exist (e.g. multiple EasyPay accounts).
 	outTradeNo := extractOutTradeNo(rawBody, providerKey)
 
-	providers, err := h.paymentService.GetWebhookProviders(c.Request.Context(), providerKey, outTradeNo)
+	provider, err := h.paymentService.GetWebhookProvider(c.Request.Context(), providerKey, outTradeNo)
 	if err != nil {
 		slog.Warn("[Payment Webhook] provider not found", "provider", providerKey, "outTradeNo", outTradeNo, "error", err)
-		if providerKey == payment.TypeWxpay {
-			c.String(http.StatusBadRequest, "verify failed")
-			return
-		}
 		writeSuccessResponse(c, providerKey)
 		return
 	}
@@ -96,7 +102,7 @@ func (h *PaymentWebhookHandler) handleNotify(c *gin.Context, providerKey string)
 		headers[strings.ToLower(k)] = c.GetHeader(k)
 	}
 
-	resolvedProviderKey, notification, err := verifyNotificationWithProviders(c.Request.Context(), providers, rawBody, headers)
+	notification, err := provider.VerifyNotification(c.Request.Context(), rawBody, headers)
 	if err != nil {
 		truncatedBody := rawBody
 		if len(truncatedBody) > webhookLogTruncateLen {
@@ -110,41 +116,45 @@ func (h *PaymentWebhookHandler) handleNotify(c *gin.Context, providerKey string)
 
 	// nil notification means irrelevant event (e.g. Stripe non-payment event); return success.
 	if notification == nil {
-		writeSuccessResponse(c, resolvedProviderKey)
+		writeSuccessResponse(c, providerKey)
 		return
 	}
 
-	if err := h.paymentService.HandlePaymentNotification(c.Request.Context(), notification, resolvedProviderKey); err != nil {
-		// Unknown order: ack with 2xx so the provider stops retrying. This
-		// guards against foreign environments whose webhook endpoints are
-		// (mis)configured to point at us — without a 2xx, the provider will
-		// retry for days and spam our error logs. We still emit a WARN so the
-		// event is discoverable in logs.
-		if errors.Is(err, service.ErrOrderNotFound) {
-			slog.Warn("[Payment Webhook] unknown order, acking to stop retries",
-				"provider", resolvedProviderKey,
-				"outTradeNo", notification.OrderID,
-				"tradeNo", notification.TradeNo,
-			)
-			writeSuccessResponse(c, resolvedProviderKey)
-			return
-		}
-		slog.Error("[Payment Webhook] handle notification failed", "provider", resolvedProviderKey, "error", err)
+	if err := h.paymentService.HandlePaymentNotification(c.Request.Context(), notification, providerKey); err != nil {
+		slog.Error("[Payment Webhook] handle notification failed", "provider", providerKey, "error", err)
 		c.String(http.StatusInternalServerError, "handle failed")
 		return
 	}
 
-	writeSuccessResponse(c, resolvedProviderKey)
+	writeSuccessResponse(c, providerKey)
 }
 
 // extractOutTradeNo parses the webhook body to find the out_trade_no.
 // This allows looking up the correct provider instance before verification.
 func extractOutTradeNo(rawBody, providerKey string) string {
 	switch providerKey {
-	case payment.TypeEasyPay, payment.TypeAlipay:
+	case payment.TypeEasyPay:
 		values, err := url.ParseQuery(rawBody)
 		if err == nil {
 			return values.Get("out_trade_no")
+		}
+	case payment.TypeSepay:
+		var payload struct {
+			Code string `json:"code"`
+		}
+		if err := json.Unmarshal([]byte(rawBody), &payload); err == nil {
+			return payload.Code
+		}
+	case payment.TypePaddle:
+		var payload struct {
+			Data struct {
+				CustomData struct {
+					OrderID string `json:"orderId"`
+				} `json:"custom_data"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(rawBody), &payload); err == nil {
+			return payload.Data.CustomData.OrderID
 		}
 	}
 	// For other providers (Stripe, Alipay direct, WxPay direct), the registry
@@ -152,29 +162,14 @@ func extractOutTradeNo(rawBody, providerKey string) string {
 	return ""
 }
 
-func verifyNotificationWithProviders(ctx context.Context, providers []payment.Provider, rawBody string, headers map[string]string) (string, *payment.PaymentNotification, error) {
-	var lastErr error
-	for _, provider := range providers {
-		if provider == nil {
-			continue
-		}
-		notification, err := provider.VerifyNotification(ctx, rawBody, headers)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		return provider.ProviderKey(), notification, nil
-	}
-	if lastErr != nil {
-		return "", nil, lastErr
-	}
-	return "", nil, fmt.Errorf("no webhook provider could verify notification")
-}
-
 // wxpaySuccessResponse is the JSON response expected by WeChat Pay webhook.
 type wxpaySuccessResponse struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+}
+
+type sepaySuccessResponse struct {
+	Success bool `json:"success"`
 }
 
 // WeChat Pay webhook success response constants.
@@ -192,6 +187,8 @@ func writeSuccessResponse(c *gin.Context, providerKey string) {
 		c.JSON(http.StatusOK, wxpaySuccessResponse{Code: wxpaySuccessCode, Message: wxpaySuccessMessage})
 	case payment.TypeStripe:
 		c.String(http.StatusOK, "")
+	case payment.TypeSepay:
+		c.JSON(http.StatusOK, sepaySuccessResponse{Success: true})
 	default:
 		c.String(http.StatusOK, "success")
 	}
