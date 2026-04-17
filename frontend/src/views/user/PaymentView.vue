@@ -41,6 +41,15 @@
             @redirect="onStripeRedirect"
           />
         </template>
+        <template v-else-if="paymentPhase === 'paddle'">
+          <PaddleCheckoutInline
+            :checkout-id="paymentState.checkoutId"
+            :client-token="checkout.paddle_client_token"
+            :environment="checkout.paddle_environment"
+            @back="resetPayment"
+            @completed="onPaddleCompleted"
+          />
+        </template>
         <!-- Tab content (select phase) -->
         <template v-else>
           <!-- Top-up Tab -->
@@ -335,6 +344,7 @@ import { platformAccentBarClass, platformBadgeLightClass, platformBadgeClass, pl
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 import StripePaymentInline from '@/components/payment/StripePaymentInline.vue'
+import PaddleCheckoutInline from '@/components/payment/PaddleCheckoutInline.vue'
 import Icon from '@/components/icons/Icon.vue'
 import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSelector.vue'
 
@@ -363,8 +373,8 @@ const selectedPaymentCurrency = ref('')
 const selectedPlan = ref<SubscriptionPlan | null>(null)
 const previewImage = ref('')
 
-// Payment phase: 'select' → 'paying' (QR/redirect) or 'stripe' (inline Stripe)
-const paymentPhase = ref<'select' | 'paying' | 'stripe'>('select')
+// Payment phase: 'select' → 'paying' (QR/redirect) or provider-specific inline steps
+const paymentPhase = ref<'select' | 'paying' | 'stripe' | 'paddle'>('select')
 const paymentState = ref<{
   orderId: number
   amount: number
@@ -373,13 +383,14 @@ const paymentState = ref<{
   paymentType: string
   payUrl: string
   clientSecret: string
+  checkoutId: string
   payAmount: number
   orderType: OrderType | ''
-}>({ orderId: 0, amount: 0, qrCode: '', expiresAt: '', paymentType: '', payUrl: '', clientSecret: '', payAmount: 0, orderType: '' })
+}>({ orderId: 0, amount: 0, qrCode: '', expiresAt: '', paymentType: '', payUrl: '', clientSecret: '', checkoutId: '', payAmount: 0, orderType: '' })
 
 function resetPayment() {
   paymentPhase.value = 'select'
-  paymentState.value = { orderId: 0, amount: 0, qrCode: '', expiresAt: '', paymentType: '', payUrl: '', clientSecret: '', payAmount: 0, orderType: '' }
+  paymentState.value = { orderId: 0, amount: 0, qrCode: '', expiresAt: '', paymentType: '', payUrl: '', clientSecret: '', checkoutId: '', payAmount: 0, orderType: '' }
 }
 
 function onPaymentDone() {
@@ -412,10 +423,16 @@ function onStripeRedirect(orderId: number, payUrl: string) {
   paymentPhase.value = 'paying'
 }
 
+function onPaddleCompleted() {
+  paymentState.value = { ...paymentState.value, payUrl: '', qrCode: '', clientSecret: '' }
+  paymentPhase.value = 'paying'
+}
+
 // All checkout data from single API call
 const checkout = ref<CheckoutInfoResponse>({
   methods: {}, global_min: 0, global_max: 0,
   plans: [], balance_disabled: false, balance_recharge_multiplier: 1, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '',
+  paddle_client_token: '', paddle_environment: '',
   ledger_currency: 'USD', allowed_payment_currencies: ['USD'], manual_fx_rates: { USD: 1 },
 })
 
@@ -642,16 +659,24 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
       paymentState.value = {
         orderId: result.order_id, amount: result.amount, qrCode: '', expiresAt: result.expires_at || '',
         paymentType: selectedMethod.value, payUrl: '',
-        clientSecret: result.client_secret, payAmount: result.pay_amount,
+        clientSecret: result.client_secret, checkoutId: '', payAmount: result.pay_amount,
         orderType,
       }
       paymentPhase.value = 'stripe'
+    } else if (result.checkout_id) {
+      paymentState.value = {
+        orderId: result.order_id, amount: result.amount, qrCode: '', expiresAt: result.expires_at || '',
+        paymentType: selectedMethod.value, payUrl: '', clientSecret: '', checkoutId: result.checkout_id,
+        payAmount: result.pay_amount,
+        orderType,
+      }
+      paymentPhase.value = 'paddle'
     } else if (isMobileDevice() && result.pay_url) {
       // Mobile + pay_url: redirect directly instead of QR/popup (mobile browsers block popups)
       paymentState.value = {
         orderId: result.order_id, amount: result.amount, qrCode: '', expiresAt: result.expires_at || '',
         paymentType: selectedMethod.value, payUrl: result.pay_url,
-        clientSecret: '', payAmount: 0,
+        clientSecret: '', checkoutId: '', payAmount: 0,
         orderType,
       }
       paymentPhase.value = 'paying'
@@ -662,7 +687,7 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
       paymentState.value = {
         orderId: result.order_id, amount: result.amount, qrCode: result.qr_code,
         expiresAt: result.expires_at || '', paymentType: selectedMethod.value, payUrl: '',
-        clientSecret: '', payAmount: 0,
+        clientSecret: '', checkoutId: '', payAmount: 0,
         orderType,
       }
       paymentPhase.value = 'paying'
@@ -672,7 +697,7 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
       paymentState.value = {
         orderId: result.order_id, amount: result.amount, qrCode: '', expiresAt: result.expires_at || '',
         paymentType: selectedMethod.value, payUrl: result.pay_url,
-        clientSecret: '', payAmount: 0,
+        clientSecret: '', checkoutId: '', payAmount: 0,
         orderType,
       }
       paymentPhase.value = 'paying'

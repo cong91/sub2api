@@ -64,6 +64,12 @@ func (h *PaymentWebhookHandler) SepayWebhook(c *gin.Context) {
 	h.handleNotify(c, payment.TypeSepay)
 }
 
+// PaddleWebhook handles Paddle webhook events.
+// POST /api/v1/payment/webhook/paddle
+func (h *PaymentWebhookHandler) PaddleWebhook(c *gin.Context) {
+	h.handleNotify(c, payment.TypePaddle)
+}
+
 // handleNotify is the shared logic for all provider webhook handlers.
 func (h *PaymentWebhookHandler) handleNotify(c *gin.Context, providerKey string) {
 	var rawBody string
@@ -138,6 +144,17 @@ func extractOutTradeNo(rawBody, providerKey string) string {
 		}
 		if err := json.Unmarshal([]byte(rawBody), &payload); err == nil {
 			return payload.Code
+		}
+	case payment.TypePaddle:
+		var payload struct {
+			Data struct {
+				CustomData struct {
+					OrderID string `json:"orderId"`
+				} `json:"custom_data"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(rawBody), &payload); err == nil {
+			return payload.Data.CustomData.OrderID
 		}
 	}
 	// For other providers (Stripe, Alipay direct, WxPay direct), the registry

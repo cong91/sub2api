@@ -136,6 +136,8 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		HelpText:                  cfg.HelpText,
 		HelpImageURL:              cfg.HelpImageURL,
 		StripePublishableKey:      cfg.StripePublishableKey,
+		PaddleClientToken:         cfg.PaddleClientToken,
+		PaddleEnvironment:         cfg.PaddleEnvironment,
 		LedgerCurrency:            cfg.LedgerCurrency,
 		AllowedPaymentCurrencies:  cfg.AllowedPaymentCurrencies,
 		ManualFXRates:             cfg.ManualFXRates,
@@ -153,6 +155,8 @@ type checkoutInfoResponse struct {
 	HelpText                  string                          `json:"help_text"`
 	HelpImageURL              string                          `json:"help_image_url"`
 	StripePublishableKey      string                          `json:"stripe_publishable_key"`
+	PaddleClientToken         string                          `json:"paddle_client_token,omitempty"`
+	PaddleEnvironment         string                          `json:"paddle_environment,omitempty"`
 	LedgerCurrency            string                          `json:"ledger_currency"`
 	AllowedPaymentCurrencies  []string                        `json:"allowed_payment_currencies"`
 	ManualFXRates             map[string]float64              `json:"manual_fx_rates"`
