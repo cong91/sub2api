@@ -62,6 +62,7 @@ func RegisterPaymentRoutes(
 		webhook.POST("/alipay", webhookHandler.AlipayNotify)
 		webhook.POST("/wxpay", webhookHandler.WxpayNotify)
 		webhook.POST("/stripe", webhookHandler.StripeWebhook)
+		webhook.POST("/paddle", webhookHandler.PaddleWebhook)
 		webhook.POST("/sepay", webhookHandler.SepayWebhook)
 	}
 
