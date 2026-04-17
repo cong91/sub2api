@@ -4017,6 +4017,7 @@ const allPaymentTypes = computed(() => [
   { value: 'wxpay', label: t('payment.methods.wxpay') },
   { value: 'sepay', label: t('payment.methods.sepay') },
   { value: 'stripe', label: t('payment.methods.stripe') },
+  { value: 'paddle', label: t('payment.methods.paddle') },
 ])
 
 function isPaymentTypeEnabled(type: string): boolean {
@@ -4064,6 +4065,7 @@ const providerKeyOptions = computed(() => [
   { value: 'wxpay', label: t('admin.settings.payment.providerWxpay') },
   { value: 'sepay', label: t('admin.settings.payment.providerSepay') },
   { value: 'stripe', label: t('admin.settings.payment.providerStripe') },
+  { value: 'paddle', label: t('admin.settings.payment.providerPaddle') },
 ])
 
 const enabledProviderKeyOptions = computed(() => {

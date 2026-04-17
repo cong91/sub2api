@@ -67,6 +67,8 @@ type PaymentConfig struct {
 	HelpImageURL              string             `json:"help_image_url"`
 	HelpText                  string             `json:"help_text"`
 	StripePublishableKey      string             `json:"stripe_publishable_key,omitempty"`
+	PaddleClientToken         string             `json:"paddle_client_token,omitempty"`
+	PaddleEnvironment         string             `json:"paddle_environment,omitempty"`
 	LedgerCurrency            string             `json:"ledger_currency"`
 	AllowedPaymentCurrencies  []string           `json:"allowed_payment_currencies"`
 	ManualFXRates             map[string]float64 `json:"manual_fx_rates"`
@@ -218,6 +220,7 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 	cfg := s.parsePaymentConfig(vals)
 	// Load Stripe publishable key from the first enabled Stripe provider instance
 	cfg.StripePublishableKey = s.getStripePublishableKey(ctx)
+	cfg.PaddleClientToken, cfg.PaddleEnvironment = s.getPaddleFrontendConfig(ctx)
 	return cfg, nil
 }
 
@@ -285,6 +288,22 @@ func (s *PaymentConfigService) getStripePublishableKey(ctx context.Context) stri
 		return ""
 	}
 	return cfg[payment.ConfigKeyPublishableKey]
+}
+
+func (s *PaymentConfigService) getPaddleFrontendConfig(ctx context.Context) (string, string) {
+	instances, err := s.entClient.PaymentProviderInstance.Query().
+		Where(
+			paymentproviderinstance.EnabledEQ(true),
+			paymentproviderinstance.ProviderKeyEQ(payment.TypePaddle),
+		).Limit(1).All(ctx)
+	if err != nil || len(instances) == 0 {
+		return "", ""
+	}
+	cfg, err := s.decryptConfig(instances[0].Config)
+	if err != nil || cfg == nil {
+		return "", ""
+	}
+	return strings.TrimSpace(cfg["clientToken"]), strings.TrimSpace(cfg["environment"])
 }
 
 // UpdatePaymentConfig updates the payment configuration settings.
