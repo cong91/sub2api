@@ -276,6 +276,7 @@ func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.Paymen
 		PayURL:          pr.PayURL,
 		QRCode:          pr.QRCode,
 		ClientSecret:    pr.ClientSecret,
+		CheckoutID:      pr.CheckoutID,
 		ExpiresAt:       order.ExpiresAt,
 		PaymentMode:     sel.PaymentMode,
 	}, nil

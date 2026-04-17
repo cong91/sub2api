@@ -18,7 +18,7 @@ export type OrderStatus =
   | 'REFUNDED'
   | 'REFUND_FAILED'
 
-export type PaymentType = 'alipay' | 'wxpay' | 'alipay_direct' | 'wxpay_direct' | 'stripe' | 'easypay' | 'sepay'
+export type PaymentType = 'alipay' | 'wxpay' | 'alipay_direct' | 'wxpay_direct' | 'stripe' | 'paddle' | 'easypay' | 'sepay'
 
 export type OrderType = 'balance' | 'subscription'
 
@@ -37,6 +37,8 @@ export interface PaymentConfig {
   help_image_url: string
   help_text: string
   stripe_publishable_key: string
+  paddle_client_token: string
+  paddle_environment: string
   ledger_currency: string
   allowed_payment_currencies: string[]
   manual_fx_rates: Record<string, number>
@@ -71,6 +73,8 @@ export interface CheckoutInfoResponse {
   help_text: string
   help_image_url: string
   stripe_publishable_key: string
+  paddle_client_token: string
+  paddle_environment: string
   ledger_currency: string
   allowed_payment_currencies: string[]
   manual_fx_rates: Record<string, number>
@@ -183,6 +187,7 @@ export interface CreateOrderResult {
   pay_url?: string
   qr_code?: string
   client_secret?: string
+  checkout_id?: string
   pay_amount: number
   fee_rate: number
   expires_at: string

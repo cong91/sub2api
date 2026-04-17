@@ -17,6 +17,8 @@ func CreateProvider(providerKey string, instanceID string, config map[string]str
 		return NewWxpay(instanceID, config)
 	case payment.TypeStripe:
 		return NewStripe(instanceID, config)
+	case payment.TypePaddle:
+		return NewPaddle(instanceID, config)
 	case payment.TypeSepay:
 		return NewSepay(instanceID, config)
 	default:

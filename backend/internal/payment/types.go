@@ -16,6 +16,7 @@ const (
 	TypeStripe       PaymentType = "stripe"
 	TypeCard         PaymentType = "card"
 	TypeLink         PaymentType = "link"
+	TypePaddle       PaymentType = "paddle"
 	TypeEasyPay      PaymentType = "easypay"
 	TypeSepay        PaymentType = "sepay"
 )
@@ -116,6 +117,7 @@ type CreatePaymentResponse struct {
 	PayURL       string // H5 payment URL (alipay/wxpay)
 	QRCode       string // QR code content for scanning
 	ClientSecret string // Stripe PaymentIntent client secret
+	CheckoutID   string // Provider-specific hosted checkout/session/transaction ID
 }
 
 // QueryOrderResponse describes the payment status from the upstream provider.
