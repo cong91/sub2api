@@ -92,22 +92,34 @@ func TestParsePaymentConfig(t *testing.T) {
 		if len(cfg.EnabledTypes) != 0 {
 			t.Fatalf("expected empty EnabledTypes, got %v", cfg.EnabledTypes)
 		}
+		if cfg.LedgerCurrency != defaultLedgerCurrency {
+			t.Fatalf("expected LedgerCurrency=%s, got %q", defaultLedgerCurrency, cfg.LedgerCurrency)
+		}
+		if len(cfg.AllowedPaymentCurrencies) == 0 {
+			t.Fatal("expected non-empty AllowedPaymentCurrencies by default")
+		}
+		if cfg.ManualFXRates[defaultLedgerCurrency] != 1 {
+			t.Fatalf("expected default ManualFXRates[%s]=1, got %v", defaultLedgerCurrency, cfg.ManualFXRates[defaultLedgerCurrency])
+		}
 	})
 
 	t.Run("all values populated", func(t *testing.T) {
 		t.Parallel()
 		vals := map[string]string{
-			SettingPaymentEnabled:      "true",
-			SettingMinRechargeAmount:   "5.00",
-			SettingMaxRechargeAmount:   "1000.00",
-			SettingDailyRechargeLimit:  "5000.00",
-			SettingOrderTimeoutMinutes: "15",
-			SettingMaxPendingOrders:    "5",
-			SettingEnabledPaymentTypes: "alipay,wxpay,stripe",
-			SettingBalancePayDisabled:  "true",
-			SettingLoadBalanceStrategy: "least_amount",
-			SettingProductNamePrefix:   "PRE",
-			SettingProductNameSuffix:   "SUF",
+			SettingPaymentEnabled:           "true",
+			SettingMinRechargeAmount:        "5.00",
+			SettingMaxRechargeAmount:        "1000.00",
+			SettingDailyRechargeLimit:       "5000.00",
+			SettingOrderTimeoutMinutes:      "15",
+			SettingMaxPendingOrders:         "5",
+			SettingEnabledPaymentTypes:      "alipay,wxpay,stripe",
+			SettingBalancePayDisabled:       "true",
+			SettingLoadBalanceStrategy:      "least_amount",
+			SettingProductNamePrefix:        "PRE",
+			SettingProductNameSuffix:        "SUF",
+			SettingLedgerCurrency:           "usd",
+			SettingAllowedPaymentCurrencies: "usd, cny, krw",
+			SettingManualFXRates:            `{"CNY":0.14,"KRW":0.00074,"USD":1}`,
 		}
 		cfg := svc.parsePaymentConfig(vals)
 
@@ -146,6 +158,18 @@ func TestParsePaymentConfig(t *testing.T) {
 		}
 		if cfg.ProductNameSuffix != "SUF" {
 			t.Fatalf("ProductNameSuffix = %q, want %q", cfg.ProductNameSuffix, "SUF")
+		}
+		if cfg.LedgerCurrency != "USD" {
+			t.Fatalf("LedgerCurrency = %q, want %q", cfg.LedgerCurrency, "USD")
+		}
+		if len(cfg.AllowedPaymentCurrencies) != 3 {
+			t.Fatalf("AllowedPaymentCurrencies len = %d, want 3", len(cfg.AllowedPaymentCurrencies))
+		}
+		if cfg.AllowedPaymentCurrencies[2] != "KRW" {
+			t.Fatalf("AllowedPaymentCurrencies = %v, expected KRW in normalized list", cfg.AllowedPaymentCurrencies)
+		}
+		if cfg.ManualFXRates["CNY"] != 0.14 {
+			t.Fatalf("ManualFXRates[CNY] = %v, want 0.14", cfg.ManualFXRates["CNY"])
 		}
 	})
 

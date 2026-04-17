@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title>SePay</title>
+  <desc>SePay payment icon</desc>
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#14b8a6"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#g)"/>
+  <path d="M20 24c0-4.4 3.6-8 8-8h16v8H28v4h10c5.5 0 10 4.5 10 10s-4.5 10-10 10H20v-8h18a2 2 0 1 0 0-4H28c-4.4 0-8-3.6-8-8z" fill="#fff"/>
+</svg>
