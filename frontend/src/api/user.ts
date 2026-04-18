@@ -33,6 +33,7 @@ export async function getProfile(): Promise<User> {
  * @returns Updated user profile data
  */
 export async function updateProfile(profile: {
+  email?: string
   username?: string
   avatar_url?: string | null
   balance_notify_enabled?: boolean

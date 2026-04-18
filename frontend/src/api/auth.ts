@@ -6,6 +6,7 @@
 import { apiClient } from './client'
 import type {
   LoginRequest,
+  InviteLoginRequest,
   RegisterRequest,
   AuthResponse,
   CurrentUserResponse,
@@ -88,21 +89,35 @@ export function clearAuthToken(): void {
  * @param credentials - Email and password
  * @returns Authentication response with token and user data, or 2FA required response
  */
+function persistAuthResponse(data: AuthResponse): void {
+  setAuthToken(data.access_token)
+  if (data.refresh_token) {
+    setRefreshToken(data.refresh_token)
+  }
+  if (data.expires_in) {
+    setTokenExpiresAt(data.expires_in)
+  }
+  localStorage.setItem('auth_user', JSON.stringify(data.user))
+}
+
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
   const { data } = await apiClient.post<LoginResponse>('/auth/login', credentials)
 
   // Only store token if 2FA is not required
   if (!isTotp2FARequired(data)) {
-    setAuthToken(data.access_token)
-    if (data.refresh_token) {
-      setRefreshToken(data.refresh_token)
-    }
-    if (data.expires_in) {
-      setTokenExpiresAt(data.expires_in)
-    }
-    localStorage.setItem('auth_user', JSON.stringify(data.user))
+    persistAuthResponse(data)
   }
 
+  return data
+}
+
+/**
+ * First-time login with redeem/invitation code.
+ * Creates a bootstrap account and authenticates the user immediately.
+ */
+export async function inviteLogin(request: InviteLoginRequest): Promise<AuthResponse> {
+  const { data } = await apiClient.post<AuthResponse>('/auth/invite-login', request)
+  persistAuthResponse(data)
   return data
 }
 
@@ -642,6 +657,7 @@ export async function exchangePendingOAuthCompletion(
 
 export const authAPI = {
   login,
+  inviteLogin,
   login2FA,
   isTotp2FARequired,
   register,

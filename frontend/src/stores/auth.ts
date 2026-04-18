@@ -6,7 +6,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
 import { authAPI, isTotp2FARequired, type LoginResponse } from '@/api'
-import type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types'
+import type { User, LoginRequest, InviteLoginRequest, RegisterRequest, AuthResponse } from '@/types'
 
 const AUTH_TOKEN_KEY = 'auth_token'
 const AUTH_USER_KEY = 'auth_user'
@@ -258,6 +258,21 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * First-time login with redeem code.
+   * Creates a bootstrap account and authenticates immediately.
+   */
+  async function inviteLogin(request: InviteLoginRequest): Promise<User> {
+    try {
+      const response = await authAPI.inviteLogin(request)
+      setAuthFromResponse(response)
+      return user.value!
+    } catch (error) {
+      clearAuth()
+      throw error
+    }
+  }
+
+  /**
    * Complete login with 2FA code
    * @param tempToken - Temporary token from initial login
    * @param totpCode - 6-digit TOTP code
@@ -481,6 +496,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Actions
     login,
+    inviteLogin,
     login2FA,
     register,
     setToken,
