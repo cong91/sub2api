@@ -19,14 +19,27 @@ import (
 type mockUserRepo struct {
 	updateBalanceErr error
 	updateBalanceFn  func(ctx context.Context, id int64, amount float64) error
+	getByIDFn        func(ctx context.Context, id int64) (*User, error)
+	existsByEmailFn  func(ctx context.Context, email string) (bool, error)
+	updateFn         func(ctx context.Context, user *User) error
 }
 
-func (m *mockUserRepo) Create(context.Context, *User) error               { return nil }
-func (m *mockUserRepo) GetByID(context.Context, int64) (*User, error)     { return &User{}, nil }
+func (m *mockUserRepo) Create(context.Context, *User) error { return nil }
+func (m *mockUserRepo) GetByID(ctx context.Context, id int64) (*User, error) {
+	if m.getByIDFn != nil {
+		return m.getByIDFn(ctx, id)
+	}
+	return &User{}, nil
+}
 func (m *mockUserRepo) GetByEmail(context.Context, string) (*User, error) { return &User{}, nil }
 func (m *mockUserRepo) GetFirstAdmin(context.Context) (*User, error)      { return &User{}, nil }
-func (m *mockUserRepo) Update(context.Context, *User) error               { return nil }
-func (m *mockUserRepo) Delete(context.Context, int64) error               { return nil }
+func (m *mockUserRepo) Update(ctx context.Context, user *User) error {
+	if m.updateFn != nil {
+		return m.updateFn(ctx, user)
+	}
+	return nil
+}
+func (m *mockUserRepo) Delete(context.Context, int64) error { return nil }
 func (m *mockUserRepo) List(context.Context, pagination.PaginationParams) ([]User, *pagination.PaginationResult, error) {
 	return nil, nil, nil
 }
@@ -41,7 +54,12 @@ func (m *mockUserRepo) UpdateBalance(ctx context.Context, id int64, amount float
 }
 func (m *mockUserRepo) DeductBalance(context.Context, int64, float64) error { return nil }
 func (m *mockUserRepo) UpdateConcurrency(context.Context, int64, int) error { return nil }
-func (m *mockUserRepo) ExistsByEmail(context.Context, string) (bool, error) { return false, nil }
+func (m *mockUserRepo) ExistsByEmail(ctx context.Context, email string) (bool, error) {
+	if m.existsByEmailFn != nil {
+		return m.existsByEmailFn(ctx, email)
+	}
+	return false, nil
+}
 func (m *mockUserRepo) RemoveGroupFromAllowedGroups(context.Context, int64) (int64, error) {
 	return 0, nil
 }
@@ -200,3 +218,38 @@ func TestNewUserService_FieldsAssignment(t *testing.T) {
 	require.Equal(t, auth, svc.authCacheInvalidator)
 	require.Equal(t, cache, svc.billingCache)
 }
+
+func TestUpdateProfile_AllowsBootstrapEmailChange(t *testing.T) {
+	updatedUser := &User{}
+	repo := &mockUserRepo{
+		getByIDFn: func(context.Context, int64) (*User, error) {
+			return &User{ID: 1, Email: "invite-123@invite-login.invalid", Username: "old"}, nil
+		},
+		existsByEmailFn: func(context.Context, string) (bool, error) { return false, nil },
+		updateFn: func(_ context.Context, user *User) error {
+			*updatedUser = *user
+			return nil
+		},
+	}
+	svc := NewUserService(repo, nil, nil, nil)
+
+	got, err := svc.UpdateProfile(context.Background(), 1, UpdateProfileRequest{Email: updateProfileStringPtr("new@example.com")})
+	require.NoError(t, err)
+	require.Equal(t, "new@example.com", got.Email)
+	require.Equal(t, "new@example.com", updatedUser.Email)
+}
+
+func TestUpdateProfile_RejectsEmailChangeAfterBootstrap(t *testing.T) {
+	repo := &mockUserRepo{
+		getByIDFn: func(context.Context, int64) (*User, error) {
+			return &User{ID: 1, Email: "real@example.com", Username: "old"}, nil
+		},
+		existsByEmailFn: func(context.Context, string) (bool, error) { return false, nil },
+	}
+	svc := NewUserService(repo, nil, nil, nil)
+
+	_, err := svc.UpdateProfile(context.Background(), 1, UpdateProfileRequest{Email: updateProfileStringPtr("new@example.com")})
+	require.ErrorIs(t, err, ErrEmailChangeRequiresAdmin)
+}
+
+func updateProfileStringPtr(v string) *string { return &v }
