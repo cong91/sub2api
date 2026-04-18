@@ -28,11 +28,13 @@ vi.mock('@/api/admin', () => ({
       checkMixedChannelRisk: checkMixedChannelRiskMock
     },
     settings: {
-      getWebSearchEmulationConfig: vi.fn().mockResolvedValue({ enabled: false, providers: [] }),
-      getSettings: vi.fn().mockResolvedValue({})
-    },
-    tlsFingerprintProfiles: {
-      list: vi.fn().mockResolvedValue([])
+      getWebSearchEmulationConfig: vi.fn().mockResolvedValue({
+        enabled: false,
+        providers: []
+      }),
+      getSettings: vi.fn().mockResolvedValue({
+        account_quota_notify_enabled: false
+      })
     }
   }
 }))
@@ -86,32 +88,6 @@ const ModelWhitelistSelectorStub = defineComponent({
         {{ Array.isArray(modelValue) ? modelValue.join(',') : '' }}
       </span>
     </div>
-  `
-})
-
-const SelectStub = defineComponent({
-  name: 'SelectStub',
-  props: {
-    modelValue: {
-      type: [String, Number, Boolean, null],
-      default: ''
-    },
-    options: {
-      type: Array,
-      default: () => []
-    }
-  },
-  emits: ['update:modelValue'],
-  template: `
-    <select
-      v-bind="$attrs"
-      :value="modelValue"
-      @change="$emit('update:modelValue', $event.target.value)"
-    >
-      <option v-for="option in options" :key="option.value" :value="option.value">
-        {{ option.label }}
-      </option>
-    </select>
   `
 })
 
@@ -178,7 +154,7 @@ function mountModal(account = buildAccount()) {
     global: {
       stubs: {
         BaseDialog: BaseDialogStub,
-        Select: SelectStub,
+        Select: true,
         Icon: true,
         ProxySelector: true,
         GroupSelector: true,
