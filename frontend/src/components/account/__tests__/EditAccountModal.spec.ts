@@ -28,8 +28,13 @@ vi.mock('@/api/admin', () => ({
       checkMixedChannelRisk: checkMixedChannelRiskMock
     },
     settings: {
-      getWebSearchEmulationConfig: vi.fn().mockResolvedValue({ enabled: false, providers: [] }),
-      getSettings: vi.fn().mockResolvedValue({})
+      getWebSearchEmulationConfig: vi.fn().mockResolvedValue({
+        enabled: false,
+        providers: []
+      }),
+      getSettings: vi.fn().mockResolvedValue({
+        account_quota_notify_enabled: false
+      })
     },
     tlsFingerprintProfiles: {
       list: vi.fn().mockResolvedValue([])
