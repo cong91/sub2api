@@ -11,6 +11,7 @@ Login page for existing users to authenticate.
 **Features:**
 
 - Username and password inputs with validation
+- Redeem-code login tab for first-time bootstrap accounts
 - Remember me checkbox for persistent sessions
 - Form validation with real-time error display
 - Loading state during authentication
@@ -44,10 +45,20 @@ import { LoginView } from '@/views/auth'
 **Behavior:**
 
 - Calls `authStore.login()` with credentials
+- Calls `authStore.inviteLogin()` when redeem-code login is selected
 - Shows success toast on successful login
 - Shows error toast and inline error message on failure
 - Redirects to `/dashboard` or intended route from query parameter
 - Redirects authenticated users away from login page
+
+### Redeem-code bootstrap flow
+
+- The first redeem-code login creates a temporary bootstrap account.
+- Bootstrap accounts are shown a profile guide immediately after login.
+- The guide should tell users to finish their profile, replace the temporary system email with their own email, and set a password.
+- While the account is still on the temporary system email, the profile form exposes the email field so the user can make that switch.
+- Redeem-code login remains available only while the account still uses the temporary system email.
+- After the user switches to their own email, any later email change must be handled by an admin.
 
 ### RegisterView.vue
 

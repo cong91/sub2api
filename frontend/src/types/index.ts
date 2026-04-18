@@ -115,6 +115,19 @@ export interface LoginRequest {
   turnstile_token?: string
 }
 
+export interface InviteLoginRequest {
+  invitation_code: string
+  turnstile_token?: string
+}
+
+export interface BootstrapAPIKey {
+  id: number
+  name: string
+  key: string
+  group_id: number
+  platform: string
+}
+
 export interface RegisterRequest {
   email: string
   password: string
@@ -197,6 +210,7 @@ export interface AuthResponse {
   expires_in?: number     // New: Access Token expiry time in seconds
   token_type: string
   user: User & { run_mode?: 'standard' | 'simple' }
+  bootstrap_api_keys?: BootstrapAPIKey[]
 }
 
 export interface CurrentUserResponse extends User {
