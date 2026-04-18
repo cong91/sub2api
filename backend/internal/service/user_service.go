@@ -13,10 +13,11 @@ import (
 )
 
 var (
-	ErrUserNotFound            = infraerrors.NotFound("USER_NOT_FOUND", "user not found")
-	ErrPasswordIncorrect       = infraerrors.BadRequest("PASSWORD_INCORRECT", "current password is incorrect")
-	ErrInsufficientPerms       = infraerrors.Forbidden("INSUFFICIENT_PERMISSIONS", "insufficient permissions")
-	ErrNotifyCodeUserRateLimit = infraerrors.TooManyRequests("NOTIFY_CODE_USER_RATE_LIMIT", "too many verification codes requested, please try again later")
+	ErrUserNotFound             = infraerrors.NotFound("USER_NOT_FOUND", "user not found")
+	ErrPasswordIncorrect        = infraerrors.BadRequest("PASSWORD_INCORRECT", "current password is incorrect")
+	ErrInsufficientPerms        = infraerrors.Forbidden("INSUFFICIENT_PERMISSIONS", "insufficient permissions")
+	ErrEmailChangeRequiresAdmin = infraerrors.Forbidden("EMAIL_CHANGE_REQUIRES_ADMIN", "email can only be changed by an admin after the bootstrap email has been replaced")
+	ErrNotifyCodeUserRateLimit  = infraerrors.TooManyRequests("NOTIFY_CODE_USER_RATE_LIMIT", "too many verification codes requested, please try again later")
 )
 
 const (
@@ -128,15 +129,22 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID int64, req Updat
 
 	// 更新字段
 	if req.Email != nil {
+		newEmail := strings.TrimSpace(*req.Email)
+		if newEmail == "" {
+			return nil, infraerrors.BadRequest("INVALID_EMAIL", "invalid email")
+		}
+		if !isBootstrapInviteEmail(user.Email) && newEmail != user.Email {
+			return nil, ErrEmailChangeRequiresAdmin
+		}
 		// 检查新邮箱是否已被使用
-		exists, err := s.userRepo.ExistsByEmail(ctx, *req.Email)
+		exists, err := s.userRepo.ExistsByEmail(ctx, newEmail)
 		if err != nil {
 			return nil, fmt.Errorf("check email exists: %w", err)
 		}
-		if exists && *req.Email != user.Email {
+		if exists && newEmail != user.Email {
 			return nil, ErrEmailExists
 		}
-		user.Email = *req.Email
+		user.Email = newEmail
 	}
 
 	if req.Username != nil {
@@ -278,6 +286,10 @@ func (s *UserService) Delete(ctx context.Context, userID int64) error {
 		return fmt.Errorf("delete user: %w", err)
 	}
 	return nil
+}
+
+func isBootstrapInviteEmail(email string) bool {
+	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(email)), "@invite-login.invalid")
 }
 
 // SendNotifyEmailCode sends a verification code to the extra notification email.
