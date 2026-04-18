@@ -1185,9 +1185,16 @@ const loadUsage = async (options?: { source?: 'passive' | 'active'; bypassCache?
   error.value = null
 
   try {
-    const fetchFn = () => options?.source
-      ? adminAPI.accounts.getUsage(props.account.id, options.source)
-      : adminAPI.accounts.getUsage(props.account.id)
+    const fetchFn = () => {
+      if (options?.source || options?.bypassCache) {
+        return adminAPI.accounts.getUsage(
+          props.account.id,
+          options.source,
+          options.bypassCache ? true : undefined
+        )
+      }
+      return adminAPI.accounts.getUsage(props.account.id)
+    }
     const result = await enqueueUsageRequest(props.account, fetchFn)
     if (!unmounted.value) {
       usageInfo.value = result
@@ -1375,7 +1382,9 @@ watch(openAIUsageRefreshKey, (nextKey, prevKey) => {
   if (props.account.platform !== 'openai' || props.account.type !== 'oauth') return
 
   _usageCache.delete(props.account.id)
-  requestAutoLoad()
+  loadUsage({ bypassCache: true }).catch((e) => {
+    console.error('Failed to reload usage after account data changed:', e)
+  })
 })
 
 watch(
