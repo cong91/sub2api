@@ -381,10 +381,44 @@ func ProvideSettingService(settingRepo SettingRepository, groupRepo GroupReposit
 	return svc
 }
 
+func ProvideAuthService(
+	entClient *dbent.Client,
+	userRepo UserRepository,
+	redeemRepo RedeemCodeRepository,
+	refreshTokenCache RefreshTokenCache,
+	cfg *config.Config,
+	settingService *SettingService,
+	emailService *EmailService,
+	turnstileService *TurnstileService,
+	emailQueueService *EmailQueueService,
+	promoService *PromoService,
+	defaultSubAssigner DefaultSubscriptionAssigner,
+	userDeviceRepo UserDeviceRepository,
+	groupRepo GroupRepository,
+	apiKeyService *APIKeyService,
+) *AuthService {
+	svc := NewAuthService(entClient, userRepo, redeemRepo, refreshTokenCache, cfg, settingService, emailService, turnstileService, emailQueueService, promoService, defaultSubAssigner)
+	svc.SetUserDeviceRepository(userDeviceRepo)
+	svc.SetInviteBootstrapGroupRepository(groupRepo)
+	svc.SetInviteBootstrapAPIKeyService(apiKeyService)
+	return svc
+}
+
+func ProvideVClawClaimService(
+	entClient *dbent.Client,
+	userRepo UserRepository,
+	redeemRepo RedeemCodeRepository,
+	userDeviceRepo UserDeviceRepository,
+	cfg *config.Config,
+	settingService *SettingService,
+) *VClawClaimService {
+	return NewVClawClaimService(entClient, userRepo, redeemRepo, userDeviceRepo, cfg, settingService)
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
-	NewAuthService,
+	ProvideAuthService,
 	NewUserService,
 	NewAPIKeyService,
 	ProvideAPIKeyAuthCacheInvalidator,
@@ -392,6 +426,7 @@ var ProviderSet = wire.NewSet(
 	NewAccountService,
 	NewProxyService,
 	NewRedeemService,
+	ProvideVClawClaimService,
 	NewPromoService,
 	NewUsageService,
 	NewDashboardService,

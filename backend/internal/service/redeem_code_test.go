@@ -18,6 +18,8 @@ func TestGenerateRedeemCodeForType_UsesExpectedPrefixesAndFormat(t *testing.T) {
 		{name: "balance", codeType: RedeemTypeBalance, pattern: `^BAL-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$`},
 		{name: "subscription", codeType: RedeemTypeSubscription, pattern: `^SUB-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$`},
 		{name: "invitation", codeType: RedeemTypeInvitation, pattern: `^INV-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$`},
+		{name: "device claim", codeType: RedeemTypeDeviceClaim, pattern: `^DCL-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$`},
+		{name: "device login", codeType: RedeemTypeDeviceLogin, pattern: `^DLG-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$`},
 		{name: "concurrency", codeType: RedeemTypeConcurrency, pattern: `^CON-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$`},
 		{name: "admin balance adjustment", codeType: AdjustmentTypeAdminBalance, pattern: `^BAL-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$`},
 		{name: "admin concurrency adjustment", codeType: AdjustmentTypeAdminConcurrency, pattern: `^CON-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$`},

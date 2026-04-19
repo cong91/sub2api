@@ -24,6 +24,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
+	"github.com/Wei-Shaw/sub2api/ent/userdevice"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 )
 
@@ -36,6 +37,7 @@ type UserQuery struct {
 	predicates                []predicate.User
 	withAPIKeys               *APIKeyQuery
 	withRedeemCodes           *RedeemCodeQuery
+	withDevices               *UserDeviceQuery
 	withSubscriptions         *UserSubscriptionQuery
 	withAssignedSubscriptions *UserSubscriptionQuery
 	withAnnouncementReads     *AnnouncementReadQuery
@@ -119,6 +121,28 @@ func (_q *UserQuery) QueryRedeemCodes() *RedeemCodeQuery {
 			sqlgraph.From(user.Table, user.FieldID, selector),
 			sqlgraph.To(redeemcode.Table, redeemcode.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, user.RedeemCodesTable, user.RedeemCodesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryDevices chains the current query on the "devices" edge.
+func (_q *UserQuery) QueryDevices() *UserDeviceQuery {
+	query := (&UserDeviceClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(userdevice.Table, userdevice.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.DevicesTable, user.DevicesColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -518,6 +542,7 @@ func (_q *UserQuery) Clone() *UserQuery {
 		predicates:                append([]predicate.User{}, _q.predicates...),
 		withAPIKeys:               _q.withAPIKeys.Clone(),
 		withRedeemCodes:           _q.withRedeemCodes.Clone(),
+		withDevices:               _q.withDevices.Clone(),
 		withSubscriptions:         _q.withSubscriptions.Clone(),
 		withAssignedSubscriptions: _q.withAssignedSubscriptions.Clone(),
 		withAnnouncementReads:     _q.withAnnouncementReads.Clone(),
@@ -552,6 +577,17 @@ func (_q *UserQuery) WithRedeemCodes(opts ...func(*RedeemCodeQuery)) *UserQuery 
 		opt(query)
 	}
 	_q.withRedeemCodes = query
+	return _q
+}
+
+// WithDevices tells the query-builder to eager-load the nodes that are connected to
+// the "devices" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *UserQuery) WithDevices(opts ...func(*UserDeviceQuery)) *UserQuery {
+	query := (&UserDeviceClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withDevices = query
 	return _q
 }
 
@@ -732,9 +768,10 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 	var (
 		nodes       = []*User{}
 		_spec       = _q.querySpec()
-		loadedTypes = [11]bool{
+		loadedTypes = [12]bool{
 			_q.withAPIKeys != nil,
 			_q.withRedeemCodes != nil,
+			_q.withDevices != nil,
 			_q.withSubscriptions != nil,
 			_q.withAssignedSubscriptions != nil,
 			_q.withAnnouncementReads != nil,
@@ -778,6 +815,13 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		if err := _q.loadRedeemCodes(ctx, query, nodes,
 			func(n *User) { n.Edges.RedeemCodes = []*RedeemCode{} },
 			func(n *User, e *RedeemCode) { n.Edges.RedeemCodes = append(n.Edges.RedeemCodes, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withDevices; query != nil {
+		if err := _q.loadDevices(ctx, query, nodes,
+			func(n *User) { n.Edges.Devices = []*UserDevice{} },
+			func(n *User, e *UserDevice) { n.Edges.Devices = append(n.Edges.Devices, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -907,6 +951,36 @@ func (_q *UserQuery) loadRedeemCodes(ctx context.Context, query *RedeemCodeQuery
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "used_by" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *UserQuery) loadDevices(ctx context.Context, query *UserDeviceQuery, nodes []*User, init func(*User), assign func(*User, *UserDevice)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(userdevice.FieldUserID)
+	}
+	query.Where(predicate.UserDevice(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.DevicesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.UserID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "user_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}

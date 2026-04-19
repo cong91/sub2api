@@ -40,6 +40,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/userattributedefinition"
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
+	"github.com/Wei-Shaw/sub2api/ent/userdevice"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 
 	stdsql "database/sql"
@@ -100,6 +101,8 @@ type Client struct {
 	UserAttributeDefinition *UserAttributeDefinitionClient
 	// UserAttributeValue is the client for interacting with the UserAttributeValue builders.
 	UserAttributeValue *UserAttributeValueClient
+	// UserDevice is the client for interacting with the UserDevice builders.
+	UserDevice *UserDeviceClient
 	// UserSubscription is the client for interacting with the UserSubscription builders.
 	UserSubscription *UserSubscriptionClient
 }
@@ -138,6 +141,7 @@ func (c *Client) init() {
 	c.UserAllowedGroup = NewUserAllowedGroupClient(c.config)
 	c.UserAttributeDefinition = NewUserAttributeDefinitionClient(c.config)
 	c.UserAttributeValue = NewUserAttributeValueClient(c.config)
+	c.UserDevice = NewUserDeviceClient(c.config)
 	c.UserSubscription = NewUserSubscriptionClient(c.config)
 }
 
@@ -256,6 +260,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		UserAllowedGroup:        NewUserAllowedGroupClient(cfg),
 		UserAttributeDefinition: NewUserAttributeDefinitionClient(cfg),
 		UserAttributeValue:      NewUserAttributeValueClient(cfg),
+		UserDevice:              NewUserDeviceClient(cfg),
 		UserSubscription:        NewUserSubscriptionClient(cfg),
 	}, nil
 }
@@ -301,6 +306,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		UserAllowedGroup:        NewUserAllowedGroupClient(cfg),
 		UserAttributeDefinition: NewUserAttributeDefinitionClient(cfg),
 		UserAttributeValue:      NewUserAttributeValueClient(cfg),
+		UserDevice:              NewUserDeviceClient(cfg),
 		UserSubscription:        NewUserSubscriptionClient(cfg),
 	}, nil
 }
@@ -337,7 +343,7 @@ func (c *Client) Use(hooks ...Hook) {
 		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
 		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
 		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserSubscription,
+		c.UserDevice, c.UserSubscription,
 	} {
 		n.Use(hooks...)
 	}
@@ -353,7 +359,7 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
 		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
 		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserSubscription,
+		c.UserDevice, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -412,6 +418,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.UserAttributeDefinition.mutate(ctx, m)
 	case *UserAttributeValueMutation:
 		return c.UserAttributeValue.mutate(ctx, m)
+	case *UserDeviceMutation:
+		return c.UserDevice.mutate(ctx, m)
 	case *UserSubscriptionMutation:
 		return c.UserSubscription.mutate(ctx, m)
 	default:
@@ -2764,6 +2772,38 @@ func (c *RedeemCodeClient) QueryUser(_m *RedeemCode) *UserQuery {
 	return query
 }
 
+// QueryClaimedDevices queries the claimed_devices edge of a RedeemCode.
+func (c *RedeemCodeClient) QueryClaimedDevices(_m *RedeemCode) *UserDeviceQuery {
+	query := (&UserDeviceClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(redeemcode.Table, redeemcode.FieldID, id),
+			sqlgraph.To(userdevice.Table, userdevice.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, redeemcode.ClaimedDevicesTable, redeemcode.ClaimedDevicesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryLoginDevices queries the login_devices edge of a RedeemCode.
+func (c *RedeemCodeClient) QueryLoginDevices(_m *RedeemCode) *UserDeviceQuery {
+	query := (&UserDeviceClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(redeemcode.Table, redeemcode.FieldID, id),
+			sqlgraph.To(userdevice.Table, userdevice.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, redeemcode.LoginDevicesTable, redeemcode.LoginDevicesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryGroup queries the group edge of a RedeemCode.
 func (c *RedeemCodeClient) QueryGroup(_m *RedeemCode) *GroupQuery {
 	query := (&GroupClient{config: c.config}).Query()
@@ -3823,6 +3863,22 @@ func (c *UserClient) QueryRedeemCodes(_m *User) *RedeemCodeQuery {
 	return query
 }
 
+// QueryDevices queries the devices edge of a User.
+func (c *UserClient) QueryDevices(_m *User) *UserDeviceQuery {
+	query := (&UserDeviceClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(userdevice.Table, userdevice.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.DevicesTable, user.DevicesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QuerySubscriptions queries the subscriptions edge of a User.
 func (c *UserClient) QuerySubscriptions(_m *User) *UserSubscriptionQuery {
 	query := (&UserSubscriptionClient{config: c.config}).Query()
@@ -4426,6 +4482,187 @@ func (c *UserAttributeValueClient) mutate(ctx context.Context, m *UserAttributeV
 	}
 }
 
+// UserDeviceClient is a client for the UserDevice schema.
+type UserDeviceClient struct {
+	config
+}
+
+// NewUserDeviceClient returns a client for the UserDevice from the given config.
+func NewUserDeviceClient(c config) *UserDeviceClient {
+	return &UserDeviceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `userdevice.Hooks(f(g(h())))`.
+func (c *UserDeviceClient) Use(hooks ...Hook) {
+	c.hooks.UserDevice = append(c.hooks.UserDevice, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `userdevice.Intercept(f(g(h())))`.
+func (c *UserDeviceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.UserDevice = append(c.inters.UserDevice, interceptors...)
+}
+
+// Create returns a builder for creating a UserDevice entity.
+func (c *UserDeviceClient) Create() *UserDeviceCreate {
+	mutation := newUserDeviceMutation(c.config, OpCreate)
+	return &UserDeviceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of UserDevice entities.
+func (c *UserDeviceClient) CreateBulk(builders ...*UserDeviceCreate) *UserDeviceCreateBulk {
+	return &UserDeviceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *UserDeviceClient) MapCreateBulk(slice any, setFunc func(*UserDeviceCreate, int)) *UserDeviceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &UserDeviceCreateBulk{err: fmt.Errorf("calling to UserDeviceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*UserDeviceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &UserDeviceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for UserDevice.
+func (c *UserDeviceClient) Update() *UserDeviceUpdate {
+	mutation := newUserDeviceMutation(c.config, OpUpdate)
+	return &UserDeviceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *UserDeviceClient) UpdateOne(_m *UserDevice) *UserDeviceUpdateOne {
+	mutation := newUserDeviceMutation(c.config, OpUpdateOne, withUserDevice(_m))
+	return &UserDeviceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *UserDeviceClient) UpdateOneID(id int64) *UserDeviceUpdateOne {
+	mutation := newUserDeviceMutation(c.config, OpUpdateOne, withUserDeviceID(id))
+	return &UserDeviceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for UserDevice.
+func (c *UserDeviceClient) Delete() *UserDeviceDelete {
+	mutation := newUserDeviceMutation(c.config, OpDelete)
+	return &UserDeviceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *UserDeviceClient) DeleteOne(_m *UserDevice) *UserDeviceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *UserDeviceClient) DeleteOneID(id int64) *UserDeviceDeleteOne {
+	builder := c.Delete().Where(userdevice.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &UserDeviceDeleteOne{builder}
+}
+
+// Query returns a query builder for UserDevice.
+func (c *UserDeviceClient) Query() *UserDeviceQuery {
+	return &UserDeviceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeUserDevice},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a UserDevice entity by its id.
+func (c *UserDeviceClient) Get(ctx context.Context, id int64) (*UserDevice, error) {
+	return c.Query().Where(userdevice.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *UserDeviceClient) GetX(ctx context.Context, id int64) *UserDevice {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryUser queries the user edge of a UserDevice.
+func (c *UserDeviceClient) QueryUser(_m *UserDevice) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(userdevice.Table, userdevice.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, userdevice.UserTable, userdevice.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryClaimRedeemCode queries the claim_redeem_code edge of a UserDevice.
+func (c *UserDeviceClient) QueryClaimRedeemCode(_m *UserDevice) *RedeemCodeQuery {
+	query := (&RedeemCodeClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(userdevice.Table, userdevice.FieldID, id),
+			sqlgraph.To(redeemcode.Table, redeemcode.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, userdevice.ClaimRedeemCodeTable, userdevice.ClaimRedeemCodeColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryLoginRedeemCode queries the login_redeem_code edge of a UserDevice.
+func (c *UserDeviceClient) QueryLoginRedeemCode(_m *UserDevice) *RedeemCodeQuery {
+	query := (&RedeemCodeClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(userdevice.Table, userdevice.FieldID, id),
+			sqlgraph.To(redeemcode.Table, redeemcode.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, userdevice.LoginRedeemCodeTable, userdevice.LoginRedeemCodeColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *UserDeviceClient) Hooks() []Hook {
+	return c.hooks.UserDevice
+}
+
+// Interceptors returns the client interceptors.
+func (c *UserDeviceClient) Interceptors() []Interceptor {
+	return c.inters.UserDevice
+}
+
+func (c *UserDeviceClient) mutate(ctx context.Context, m *UserDeviceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&UserDeviceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&UserDeviceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&UserDeviceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&UserDeviceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown UserDevice mutation op: %q", m.Op())
+	}
+}
+
 // UserSubscriptionClient is a client for the UserSubscription schema.
 type UserSubscriptionClient struct {
 	config
@@ -4633,7 +4870,7 @@ type (
 		PaymentProviderInstance, PromoCode, PromoCodeUsage, Proxy, RedeemCode,
 		SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
 		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
-		UserAttributeValue, UserSubscription []ent.Hook
+		UserAttributeValue, UserDevice, UserSubscription []ent.Hook
 	}
 	inters struct {
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead,
@@ -4641,7 +4878,7 @@ type (
 		PaymentProviderInstance, PromoCode, PromoCodeUsage, Proxy, RedeemCode,
 		SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
 		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
-		UserAttributeValue, UserSubscription []ent.Interceptor
+		UserAttributeValue, UserDevice, UserSubscription []ent.Interceptor
 	}
 )
 
