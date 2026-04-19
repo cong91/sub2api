@@ -49,6 +49,15 @@ const (
 	RedeemTypeConcurrency  = domain.RedeemTypeConcurrency
 	RedeemTypeSubscription = domain.RedeemTypeSubscription
 	RedeemTypeInvitation   = domain.RedeemTypeInvitation
+	RedeemTypeDeviceClaim  = domain.RedeemTypeDeviceClaim
+	RedeemTypeDeviceLogin  = domain.RedeemTypeDeviceLogin
+)
+
+// User device status constants
+const (
+	UserDeviceStatusActive  = domain.UserDeviceStatusActive
+	UserDeviceStatusRevoked = domain.UserDeviceStatusRevoked
+	UserDeviceStatusBlocked = domain.UserDeviceStatusBlocked
 )
 
 // PromoCode status constants

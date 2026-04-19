@@ -3793,7 +3793,6 @@
           </div>
         </div>
 
-<<<<<<< HEAD
         <!-- Affiliate (邀请返利) feature card -->
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
@@ -4145,9 +4144,7 @@
         </div>
 
         </div><!-- /Tab: Features -->
-=======
-        </div><!-- /Tab: General -->
->>>>>>> be7a82fa (feat: add paddle checkout integration)
+        </div>
 
         <!-- Tab: Email -->
 <!-- Tab: Payment -->
@@ -4629,7 +4626,6 @@
         @close="showProviderDialog = false"
         @save="handleSaveProvider"
       />
-<<<<<<< HEAD
       <ConfirmDialog
         :show="showDeleteProviderDialog"
         :title="t('admin.settings.payment.deleteProvider')"
@@ -4648,15 +4644,11 @@
         @confirm="handleAffiliateConfirm"
         @cancel="cancelAffiliateConfirm"
       />
-=======
-      <ConfirmDialog :show="showDeleteProviderDialog" :title="t('admin.settings.payment.deleteProvider')" :message="t('admin.settings.payment.deleteProviderConfirm')" :confirm-text="t('common.delete')" danger @confirm="handleDeleteProvider" @cancel="showDeleteProviderDialog = false" />
->>>>>>> be7a82fa (feat: add paddle checkout integration)
     </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-<<<<<<< HEAD
 import { ref, reactive, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { adminAPI } from "@/api";
@@ -4668,11 +4660,6 @@ import {
   normalizeDefaultSubscriptionSettings,
   resolveWeChatConnectModeCapabilities,
 } from "@/api/admin/settings";
-=======
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { adminAPI } from '@/api'
->>>>>>> be7a82fa (feat: add paddle checkout integration)
 import type {
   SystemSettings,
   UpdateSettingsRequest,
@@ -4680,7 +4667,6 @@ import type {
   WebSearchEmulationConfig,
   WebSearchProviderConfig,
   WebSearchTestResult,
-<<<<<<< HEAD
 } from "@/api/admin/settings";
 import type { AdminGroup, Proxy, NotifyEmailEntry } from "@/types";
 import type { ProviderInstance } from "@/types/payment";
@@ -4702,27 +4688,6 @@ import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiErro
 import { useAppStore } from "@/stores";
 import { useAdminSettingsStore } from "@/stores/adminSettings";
 import { normalizeVisibleMethod } from "@/components/payment/paymentFlow";
-=======
-} from '@/api/admin/settings'
-import type { AdminGroup, Proxy, NotifyEmailEntry } from '@/types'
-import type { ProviderInstance } from '@/types/payment'
-import AppLayout from '@/components/layout/AppLayout.vue'
-import Icon from '@/components/icons/Icon.vue'
-import Select from '@/components/common/Select.vue'
-import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import PaymentProviderList from '@/components/payment/PaymentProviderList.vue'
-import PaymentProviderDialog from '@/components/payment/PaymentProviderDialog.vue'
-import GroupBadge from '@/components/common/GroupBadge.vue'
-import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
-import Toggle from '@/components/common/Toggle.vue'
-import ProxySelector from '@/components/common/ProxySelector.vue'
-import ImageUpload from '@/components/common/ImageUpload.vue'
-import BackupSettings from '@/views/admin/BackupView.vue'
-import { useClipboard } from '@/composables/useClipboard'
-import { extractApiErrorMessage } from '@/utils/apiError'
-import { useAppStore } from '@/stores'
-import { useAdminSettingsStore } from '@/stores/adminSettings'
->>>>>>> be7a82fa (feat: add paddle checkout integration)
 import {
   isRegistrationEmailSuffixDomainValid,
   normalizeRegistrationEmailSuffixDomain,
@@ -4930,7 +4895,6 @@ const form = reactive<SettingsForm>({
   balance_low_notify_threshold: 0,
   balance_low_notify_recharge_url: '',
   account_quota_notify_enabled: false,
-<<<<<<< HEAD
   account_quota_notify_emails: [] as NotifyEmailEntry[],
   // Channel Monitor feature switch
   channel_monitor_enabled: true,
@@ -4967,10 +4931,6 @@ const authSourceDefaultsMeta = computed(() => [
     description: t("admin.settings.authSourceDefaults.sources.wechat.description"),
   },
 ]);
-=======
-  account_quota_notify_emails: [] as NotifyEmailEntry[]
-})
->>>>>>> be7a82fa (feat: add paddle checkout integration)
 
 // Proxies for web search emulation ProxySelector
 const webSearchProxies = ref<Proxy[]>([])
@@ -5569,7 +5529,6 @@ async function saveSettings() {
       balance_low_notify_threshold: Number(form.balance_low_notify_threshold) || 0,
       balance_low_notify_recharge_url: (form.balance_low_notify_recharge_url = form.balance_low_notify_recharge_url || currentOrigin),
       account_quota_notify_enabled: form.account_quota_notify_enabled,
-<<<<<<< HEAD
       account_quota_notify_emails: (
         form.account_quota_notify_emails || []
       ).filter((e) => e.email.trim() !== ""),
@@ -5582,10 +5541,6 @@ async function saveSettings() {
       // Affiliate (邀请返利) feature switch
       affiliate_enabled: form.affiliate_enabled,
     };
-=======
-      account_quota_notify_emails: (form.account_quota_notify_emails || []).filter((e) => e.email.trim() !== ''),
-    }
->>>>>>> be7a82fa (feat: add paddle checkout integration)
 
     const updated = await adminAPI.settings.updateSettings(payload)
     for (const [key, value] of Object.entries(updated)) {
@@ -6121,7 +6076,6 @@ async function handleDeleteProvider() {
 }
 
 onMounted(() => {
-<<<<<<< HEAD
   loadSettings();
   loadSubscriptionGroups();
   loadAdminApiKey();
@@ -6484,17 +6438,6 @@ watch(
     }
   },
 );
-=======
-  loadSettings()
-  loadSubscriptionGroups()
-  loadAdminApiKey()
-  loadOverloadCooldownSettings()
-  loadStreamTimeoutSettings()
-  loadRectifierSettings()
-  loadBetaPolicySettings()
-  loadProviders()
-})
->>>>>>> be7a82fa (feat: add paddle checkout integration)
 </script>
 
 <style scoped>
