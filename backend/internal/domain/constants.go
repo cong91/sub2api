@@ -39,6 +39,15 @@ const (
 	RedeemTypeConcurrency  = "concurrency"
 	RedeemTypeSubscription = "subscription"
 	RedeemTypeInvitation   = "invitation"
+	RedeemTypeDeviceClaim  = "device_claim"
+	RedeemTypeDeviceLogin  = "device_login"
+)
+
+// Device binding status constants
+const (
+	UserDeviceStatusActive  = "active"
+	UserDeviceStatusRevoked = "revoked"
+	UserDeviceStatusBlocked = "blocked"
 )
 
 // PromoCode status constants

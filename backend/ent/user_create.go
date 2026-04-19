@@ -20,6 +20,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
+	"github.com/Wei-Shaw/sub2api/ent/userdevice"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 )
 
@@ -309,6 +310,21 @@ func (_c *UserCreate) AddRedeemCodes(v ...*RedeemCode) *UserCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddRedeemCodeIDs(ids...)
+}
+
+// AddDeviceIDs adds the "devices" edge to the UserDevice entity by IDs.
+func (_c *UserCreate) AddDeviceIDs(ids ...int64) *UserCreate {
+	_c.mutation.AddDeviceIDs(ids...)
+	return _c
+}
+
+// AddDevices adds the "devices" edges to the UserDevice entity.
+func (_c *UserCreate) AddDevices(v ...*UserDevice) *UserCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddDeviceIDs(ids...)
 }
 
 // AddSubscriptionIDs adds the "subscriptions" edge to the UserSubscription entity by IDs.
@@ -729,6 +745,22 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(redeemcode.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.DevicesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.DevicesTable,
+			Columns: []string{user.DevicesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(userdevice.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
