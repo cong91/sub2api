@@ -371,6 +371,14 @@ export default {
     signInToAccount: 'Sign in to your account to continue',
     signIn: 'Sign In',
     signingIn: 'Signing in...',
+    loginWithEmail: 'Email login',
+    loginWithRedeemCode: 'Redeem code login',
+    redeemCodeLabel: 'Redeem Code',
+    redeemCodePlaceholder: 'Enter redeem code',
+    redeemCodeRequired: 'Redeem code is required',
+    redeemCodeHint: 'Use your redeem code for the first login. We will create a temporary account, then guide you to finish your profile and replace the system email with your own.',
+    redeemSignIn: 'Sign in with redeem code',
+    redeemSigningIn: 'Signing in with redeem code...',
     createAccount: 'Create Account',
     signUpToStart: 'Sign up to start using {siteName}',
     signUp: 'Sign up',
@@ -396,6 +404,8 @@ export default {
     emailSuffixNotAllowedWithAllowed:
       'This email domain is not allowed. Allowed domains: {suffixes}',
     loginSuccess: 'Login successful! Welcome back.',
+    redeemLoginSuccess: 'Redeem code login successful. Please finish your profile and replace the temporary email with your own.',
+    redeemLoginFailed: 'Redeem code login failed. Please check the code and try again.',
     accountCreatedSuccess: 'Account created successfully! Welcome to {siteName}.',
     reloginRequired: 'Session expired. Please log in again.',
     turnstileExpired: 'Verification expired, please try again',
@@ -853,6 +863,11 @@ export default {
     user: 'User',
     username: 'Username',
     enterUsername: 'Enter username',
+    email: 'Email',
+    enterEmail: 'Enter email address',
+    emailBootstrapHint: 'This account is still using a temporary system email. Replace it with your own here.',
+    emailChangeAdminNote: 'After you switch to your own email, future email changes must be handled by an admin.',
+    emailRequired: 'Email is required',
     editProfile: 'Edit Profile',
     updateProfile: 'Update Profile',
     updating: 'Updating...',
@@ -908,6 +923,18 @@ export default {
       sendCode: 'Send Code',
       codeSent: 'Verification code sent to your email',
       sendCodeFailed: 'Failed to send verification code'
+    },
+    inviteBootstrap: {
+      title: 'Complete your invited account setup',
+      description: 'You have just logged in with a redeem code and are using a temporary system email. Please finish your profile and replace that email with your own before you continue using the account normally.',
+      temporaryEmailLabel: 'Temporary system email',
+      notice: 'Redeem-code login only works while this account is still using the temporary system email. After you switch to your own email, redeem-code login will no longer work for this account, and any later email change must be handled by an admin.',
+      steps: {
+        username: 'Update your username in the profile form below.',
+        password: 'Set a password in the password form below so you can log in normally next time.',
+        email: 'Replace the temporary email with your own email in your profile.',
+        adminAfterSwitch: 'After you switch to your own email, any later email change must be handled by an admin.'
+      }
     },
     balanceNotify: {
       title: 'Balance Low Notification',
