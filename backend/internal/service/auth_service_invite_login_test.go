@@ -316,7 +316,7 @@ func TestSelectInviteBootstrapGroupsForRedeem_InvitationUsesSubscriptionGroups(t
 func TestAuthService_InviteLogin_CodeRequired(t *testing.T) {
 	svc := newAuthServiceForInviteLoginTest(&userRepoStub{}, &inviteRedeemRepoStub{})
 
-	_, _, _, err := svc.InviteLogin(context.Background(), "   ")
+	_, _, _, err := svc.InviteLogin(context.Background(), InviteLoginInput{InvitationCode: "   "})
 	require.ErrorIs(t, err, ErrInvitationCodeRequired)
 }
 
@@ -342,7 +342,7 @@ func TestAuthService_InviteLogin_SuccessWithPartialBootstrapKeys(t *testing.T) {
 		{ID: 2, Platform: PlatformAnthropic, Status: StatusActive, ActiveAccountCount: 1, SubscriptionType: SubscriptionTypeSubscription, DefaultValidityDays: 7, SortOrder: 1},
 	}})
 
-	tokenPair, user, keys, err := svc.InviteLogin(context.Background(), "INVITE-001")
+	tokenPair, user, keys, err := svc.InviteLogin(context.Background(), InviteLoginInput{InvitationCode: "INVITE-001"})
 	require.NoError(t, err)
 	require.NotNil(t, tokenPair)
 	require.NotNil(t, user)
@@ -365,7 +365,7 @@ func TestAuthService_InviteLogin_FailsWhenNoBootstrapKeyCreated(t *testing.T) {
 	})
 	svc.SetInviteBootstrapGroupRepository(&inviteGroupRepoStub{groups: []Group{{ID: 9, Platform: PlatformOpenAI, Status: StatusActive, ActiveAccountCount: 1, SubscriptionType: SubscriptionTypeSubscription, DefaultValidityDays: 30, SortOrder: 1}}})
 
-	_, _, _, err := svc.InviteLogin(context.Background(), "INVITE-002")
+	_, _, _, err := svc.InviteLogin(context.Background(), InviteLoginInput{InvitationCode: "INVITE-002"})
 	require.ErrorIs(t, err, ErrBootstrapAPIKeyUnavailable)
 }
 
@@ -382,7 +382,7 @@ func TestAuthService_InviteLogin_BalanceUsesNonSubscriptionBootstrapGroups(t *te
 		keys: []*APIKey{{ID: 4001, Name: "bootstrap-openai", Key: "sk-openai"}},
 	})
 
-	_, user, keys, err := svc.InviteLogin(context.Background(), "BALANCE-001")
+	_, user, keys, err := svc.InviteLogin(context.Background(), InviteLoginInput{InvitationCode: "BALANCE-001"})
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
 	require.Equal(t, int64(8), keys[0].GroupID)
@@ -445,7 +445,7 @@ func TestAuthService_InviteLogin_SubscriptionRedeemAssignsSubscriptionBeforeCrea
 	svc.SetInviteBootstrapAPIKeyService(bootstrapSvc)
 	svc.SetInviteBootstrapGroupRepository(&inviteGroupRepoStub{groups: []Group{{ID: groupID, Platform: PlatformOpenAI, Status: StatusActive, ActiveAccountCount: 1, SubscriptionType: SubscriptionTypeSubscription, DefaultValidityDays: 30, SortOrder: 1}}})
 
-	_, user, keys, err := svc.InviteLogin(context.Background(), "SUB-001")
+	_, user, keys, err := svc.InviteLogin(context.Background(), InviteLoginInput{InvitationCode: "SUB-001"})
 	require.NoError(t, err)
 	require.NotNil(t, user)
 	require.Len(t, keys, 1)
@@ -471,7 +471,7 @@ func TestAuthService_InviteLogin_InvitationRedeemAssignsSubscriptionBeforeCreate
 	svc.SetInviteBootstrapAPIKeyService(bootstrapSvc)
 	svc.SetInviteBootstrapGroupRepository(&inviteGroupRepoStub{groups: []Group{{ID: 77, Platform: PlatformOpenAI, Status: StatusActive, ActiveAccountCount: 1, SubscriptionType: SubscriptionTypeSubscription, DefaultValidityDays: 30, SortOrder: 1}}})
 
-	_, user, keys, err := svc.InviteLogin(context.Background(), "INV-ASSIGN-001")
+	_, user, keys, err := svc.InviteLogin(context.Background(), InviteLoginInput{InvitationCode: "INV-ASSIGN-001"})
 	require.NoError(t, err)
 	require.NotNil(t, user)
 	require.Len(t, keys, 1)

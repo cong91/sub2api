@@ -36,6 +36,10 @@ const (
 	FieldValidityDays = "validity_days"
 	// EdgeUser holds the string denoting the user edge name in mutations.
 	EdgeUser = "user"
+	// EdgeClaimedDevices holds the string denoting the claimed_devices edge name in mutations.
+	EdgeClaimedDevices = "claimed_devices"
+	// EdgeLoginDevices holds the string denoting the login_devices edge name in mutations.
+	EdgeLoginDevices = "login_devices"
 	// EdgeGroup holds the string denoting the group edge name in mutations.
 	EdgeGroup = "group"
 	// Table holds the table name of the redeemcode in the database.
@@ -47,6 +51,20 @@ const (
 	UserInverseTable = "users"
 	// UserColumn is the table column denoting the user relation/edge.
 	UserColumn = "used_by"
+	// ClaimedDevicesTable is the table that holds the claimed_devices relation/edge.
+	ClaimedDevicesTable = "user_devices"
+	// ClaimedDevicesInverseTable is the table name for the UserDevice entity.
+	// It exists in this package in order to avoid circular dependency with the "userdevice" package.
+	ClaimedDevicesInverseTable = "user_devices"
+	// ClaimedDevicesColumn is the table column denoting the claimed_devices relation/edge.
+	ClaimedDevicesColumn = "claim_redeem_code_id"
+	// LoginDevicesTable is the table that holds the login_devices relation/edge.
+	LoginDevicesTable = "user_devices"
+	// LoginDevicesInverseTable is the table name for the UserDevice entity.
+	// It exists in this package in order to avoid circular dependency with the "userdevice" package.
+	LoginDevicesInverseTable = "user_devices"
+	// LoginDevicesColumn is the table column denoting the login_devices relation/edge.
+	LoginDevicesColumn = "login_redeem_code_id"
 	// GroupTable is the table that holds the group relation/edge.
 	GroupTable = "redeem_codes"
 	// GroupInverseTable is the table name for the Group entity.
@@ -165,6 +183,34 @@ func ByUserField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
+// ByClaimedDevicesCount orders the results by claimed_devices count.
+func ByClaimedDevicesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newClaimedDevicesStep(), opts...)
+	}
+}
+
+// ByClaimedDevices orders the results by claimed_devices terms.
+func ByClaimedDevices(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newClaimedDevicesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByLoginDevicesCount orders the results by login_devices count.
+func ByLoginDevicesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newLoginDevicesStep(), opts...)
+	}
+}
+
+// ByLoginDevices orders the results by login_devices terms.
+func ByLoginDevices(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newLoginDevicesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByGroupField orders the results by group field.
 func ByGroupField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -176,6 +222,20 @@ func newUserStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UserInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, UserTable, UserColumn),
+	)
+}
+func newClaimedDevicesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ClaimedDevicesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ClaimedDevicesTable, ClaimedDevicesColumn),
+	)
+}
+func newLoginDevicesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(LoginDevicesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, LoginDevicesTable, LoginDevicesColumn),
 	)
 }
 func newGroupStep() *sqlgraph.Step {
