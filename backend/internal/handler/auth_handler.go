@@ -90,6 +90,8 @@ type BootstrapAPIKeyResponse struct {
 // InviteLoginRequest first-time invite bootstrap login request.
 type InviteLoginRequest struct {
 	InvitationCode string `json:"invitation_code" binding:"required"`
+	DeviceHash     string `json:"device_hash"`
+	InstallID      string `json:"install_id"`
 	TurnstileToken string `json:"turnstile_token"`
 }
 
@@ -202,7 +204,11 @@ func (h *AuthHandler) InviteLogin(c *gin.Context) {
 		return
 	}
 
-	tokenPair, user, bootstrapKeys, err := h.authService.InviteLogin(c.Request.Context(), req.InvitationCode)
+	tokenPair, user, bootstrapKeys, err := h.authService.InviteLogin(c.Request.Context(), service.InviteLoginInput{
+		InvitationCode: req.InvitationCode,
+		DeviceHash:     req.DeviceHash,
+		InstallID:      req.InstallID,
+	})
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

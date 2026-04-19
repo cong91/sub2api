@@ -49,11 +49,15 @@ type RedeemCode struct {
 type RedeemCodeEdges struct {
 	// User holds the value of the user edge.
 	User *User `json:"user,omitempty"`
+	// ClaimedDevices holds the value of the claimed_devices edge.
+	ClaimedDevices []*UserDevice `json:"claimed_devices,omitempty"`
+	// LoginDevices holds the value of the login_devices edge.
+	LoginDevices []*UserDevice `json:"login_devices,omitempty"`
 	// Group holds the value of the group edge.
 	Group *Group `json:"group,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [4]bool
 }
 
 // UserOrErr returns the User value or an error if the edge
@@ -67,12 +71,30 @@ func (e RedeemCodeEdges) UserOrErr() (*User, error) {
 	return nil, &NotLoadedError{edge: "user"}
 }
 
+// ClaimedDevicesOrErr returns the ClaimedDevices value or an error if the edge
+// was not loaded in eager-loading.
+func (e RedeemCodeEdges) ClaimedDevicesOrErr() ([]*UserDevice, error) {
+	if e.loadedTypes[1] {
+		return e.ClaimedDevices, nil
+	}
+	return nil, &NotLoadedError{edge: "claimed_devices"}
+}
+
+// LoginDevicesOrErr returns the LoginDevices value or an error if the edge
+// was not loaded in eager-loading.
+func (e RedeemCodeEdges) LoginDevicesOrErr() ([]*UserDevice, error) {
+	if e.loadedTypes[2] {
+		return e.LoginDevices, nil
+	}
+	return nil, &NotLoadedError{edge: "login_devices"}
+}
+
 // GroupOrErr returns the Group value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e RedeemCodeEdges) GroupOrErr() (*Group, error) {
 	if e.Group != nil {
 		return e.Group, nil
-	} else if e.loadedTypes[1] {
+	} else if e.loadedTypes[3] {
 		return nil, &NotFoundError{label: group.Label}
 	}
 	return nil, &NotLoadedError{edge: "group"}
@@ -192,6 +214,16 @@ func (_m *RedeemCode) GetValue(name string) (ent.Value, error) {
 // QueryUser queries the "user" edge of the RedeemCode entity.
 func (_m *RedeemCode) QueryUser() *UserQuery {
 	return NewRedeemCodeClient(_m.config).QueryUser(_m)
+}
+
+// QueryClaimedDevices queries the "claimed_devices" edge of the RedeemCode entity.
+func (_m *RedeemCode) QueryClaimedDevices() *UserDeviceQuery {
+	return NewRedeemCodeClient(_m.config).QueryClaimedDevices(_m)
+}
+
+// QueryLoginDevices queries the "login_devices" edge of the RedeemCode entity.
+func (_m *RedeemCode) QueryLoginDevices() *UserDeviceQuery {
+	return NewRedeemCodeClient(_m.config).QueryLoginDevices(_m)
 }
 
 // QueryGroup queries the "group" edge of the RedeemCode entity.
