@@ -376,7 +376,7 @@ export default {
     redeemCodeLabel: 'Redeem Code',
     redeemCodePlaceholder: 'Enter redeem code',
     redeemCodeRequired: 'Redeem code is required',
-    redeemCodeHint: 'Use your redeem code for the first login. We will create a temporary account, then guide you to finish your profile and replace the system email with your own.',
+    redeemCodeHint: 'Use your redeem code to sign in. If this is your first login, we will create a temporary account and guide you to finish your profile. If this code is already linked to your device account, you can still use it here without a device hash to manage billing and account details.',
     redeemSignIn: 'Sign in with redeem code',
     redeemSigningIn: 'Signing in with redeem code...',
     createAccount: 'Create Account',
@@ -404,7 +404,7 @@ export default {
     emailSuffixNotAllowedWithAllowed:
       'This email domain is not allowed. Allowed domains: {suffixes}',
     loginSuccess: 'Login successful! Welcome back.',
-    redeemLoginSuccess: 'Redeem code login successful. Please finish your profile and replace the temporary email with your own.',
+    redeemLoginSuccess: 'Redeem code login successful.',
     redeemLoginFailed: 'Redeem code login failed. Please check the code and try again.',
     accountCreatedSuccess: 'Account created successfully! Welcome to {siteName}.',
     reloginRequired: 'Session expired. Please log in again.',

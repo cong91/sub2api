@@ -273,6 +273,7 @@ type InviteLoginInput struct {
 	InvitationCode string
 	DeviceHash     string
 	InstallID      string
+	ClientKind     string
 }
 
 // InviteLogin handles both first-time invitation bootstrap and device_login resume flows.
@@ -338,7 +339,9 @@ func (s *AuthService) inviteLoginWithDeviceCode(ctx context.Context, redeemCode 
 		return nil, nil, nil, ErrServiceUnavailable
 	}
 	deviceHash := normalizeDeviceHash(input.DeviceHash)
-	if deviceHash == "" {
+	clientKind := strings.TrimSpace(strings.ToLower(input.ClientKind))
+	allowWebLoginWithoutDeviceHash := deviceHash == "" && clientKind == "web"
+	if deviceHash == "" && !allowWebLoginWithoutDeviceHash {
 		return nil, nil, nil, ErrDeviceHashRequired
 	}
 	binding, err := s.userDeviceRepo.GetByLoginRedeemCodeID(ctx, redeemCode.ID)
@@ -348,16 +351,19 @@ func (s *AuthService) inviteLoginWithDeviceCode(ctx context.Context, redeemCode 
 	if binding.Status != UserDeviceStatusActive {
 		return nil, nil, nil, ErrDeviceRevoked
 	}
-	if normalizeDeviceHash(binding.DeviceHash) != deviceHash {
+	if deviceHash != "" && normalizeDeviceHash(binding.DeviceHash) != deviceHash {
 		return nil, nil, nil, ErrDeviceMismatch
 	}
 	user, err := s.userRepo.GetByID(ctx, binding.UserID)
 	if err != nil || user == nil {
 		return nil, nil, nil, ErrServiceUnavailable
 	}
-	bootstrapKeys, err := s.provisionInviteBootstrapAPIKeys(ctx, user.ID, redeemCode)
-	if err != nil {
-		return nil, nil, nil, err
+	var bootstrapKeys []InviteBootstrapAPIKey
+	if !allowWebLoginWithoutDeviceHash {
+		bootstrapKeys, err = s.provisionInviteBootstrapAPIKeys(ctx, user.ID, redeemCode)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 	if err := s.userDeviceRepo.UpdateLastLoginAt(ctx, binding.ID, time.Now().UTC()); err != nil {
 		return nil, nil, nil, ErrServiceUnavailable

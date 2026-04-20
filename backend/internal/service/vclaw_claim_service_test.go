@@ -285,17 +285,57 @@ func TestAuthService_InviteLogin_DeviceLoginRejectsDeviceMismatch(t *testing.T) 
 	require.ErrorIs(t, err, ErrDeviceMismatch)
 }
 
-func TestAuthService_InviteLogin_DeviceLoginRequiresDeviceHash(t *testing.T) {
+func TestAuthService_InviteLogin_DeviceLoginAllowsWebLoginWithoutDeviceHash(t *testing.T) {
 	t.Parallel()
 
 	userID := int64(902)
 	loginCodeID := int64(335)
 	userRepo := &userRepoStub{user: &User{ID: userID, Email: "device@example.com", Role: RoleUser, Status: StatusActive}}
 	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{ID: loginCodeID, Code: "DLG-QQQQ-WWWW-EEEE", Type: RedeemTypeDeviceLogin, Status: StatusUsed, UsedBy: &userID}}
+	deviceRepo := &vclawUserDeviceRepoStub{
+		byLoginRedeemCodeID: map[int64]*UserDevice{
+			loginCodeID: {
+				ID:                24,
+				UserID:            userID,
+				DeviceHash:        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+				Status:            UserDeviceStatusActive,
+				LoginRedeemCodeID: loginCodeID,
+			},
+		},
+	}
 	svc := newAuthServiceForInviteLoginTest(userRepo, redeemRepo)
-	svc.SetUserDeviceRepository(&vclawUserDeviceRepoStub{})
+	svc.SetUserDeviceRepository(deviceRepo)
 
-	_, _, _, err := svc.InviteLogin(context.Background(), InviteLoginInput{InvitationCode: "DLG-QQQQ-WWWW-EEEE"})
+	tokenPair, user, keys, err := svc.InviteLogin(context.Background(), InviteLoginInput{InvitationCode: "DLG-QQQQ-WWWW-EEEE", ClientKind: "web"})
+	require.NoError(t, err)
+	require.NotNil(t, tokenPair)
+	require.Equal(t, userID, user.ID)
+	require.Empty(t, keys)
+	require.Equal(t, []int64{24}, deviceRepo.updatedLastLoginIDs)
+}
+
+func TestAuthService_InviteLogin_DeviceLoginStillRequiresDeviceHashOutsideWeb(t *testing.T) {
+	t.Parallel()
+
+	userID := int64(903)
+	loginCodeID := int64(336)
+	userRepo := &userRepoStub{user: &User{ID: userID, Email: "device@example.com", Role: RoleUser, Status: StatusActive}}
+	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{ID: loginCodeID, Code: "DLG-RRRR-TTTT-YYYY", Type: RedeemTypeDeviceLogin, Status: StatusUsed, UsedBy: &userID}}
+	deviceRepo := &vclawUserDeviceRepoStub{
+		byLoginRedeemCodeID: map[int64]*UserDevice{
+			loginCodeID: {
+				ID:                25,
+				UserID:            userID,
+				DeviceHash:        "abababababababababababababababababababababababababababababababab",
+				Status:            UserDeviceStatusActive,
+				LoginRedeemCodeID: loginCodeID,
+			},
+		},
+	}
+	svc := newAuthServiceForInviteLoginTest(userRepo, redeemRepo)
+	svc.SetUserDeviceRepository(deviceRepo)
+
+	_, _, _, err := svc.InviteLogin(context.Background(), InviteLoginInput{InvitationCode: "DLG-RRRR-TTTT-YYYY"})
 	require.ErrorIs(t, err, ErrDeviceHashRequired)
 }
 

@@ -90,6 +90,7 @@ type InviteLoginRequest struct {
 	InvitationCode string `json:"invitation_code" binding:"required"`
 	DeviceHash     string `json:"device_hash"`
 	InstallID      string `json:"install_id"`
+	ClientKind     string `json:"client_kind"`
 	TurnstileToken string `json:"turnstile_token"`
 }
 
@@ -163,6 +164,7 @@ func (h *AuthHandler) InviteLogin(c *gin.Context) {
 		InvitationCode: req.InvitationCode,
 		DeviceHash:     req.DeviceHash,
 		InstallID:      req.InstallID,
+		ClientKind:     req.ClientKind,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
