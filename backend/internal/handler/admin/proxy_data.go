@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -83,7 +84,12 @@ func (h *ProxyHandler) ImportData(c *gin.Context) {
 		return
 	}
 
-	if err := validateDataHeader(req.Data); err != nil {
+	rawData, err := json.Marshal(req.Data)
+	if err != nil {
+		response.BadRequest(c, "invalid import data")
+		return
+	}
+	if err := validateDataHeader(rawData); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}

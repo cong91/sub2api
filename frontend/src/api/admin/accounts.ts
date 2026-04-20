@@ -15,6 +15,7 @@ import type {
   AccountUsageStatsResponse,
   TempUnschedulableStatus,
   AdminDataPayload,
+  AdminImportData,
   AdminDataImportResult,
   CheckMixedChannelRequest,
   CheckMixedChannelResponse
@@ -534,7 +535,7 @@ export async function exportData(options?: {
 }
 
 export async function importData(payload: {
-  data: AdminDataPayload
+  data: AdminImportData
   skip_default_group_bind?: boolean
 }): Promise<AdminDataImportResult> {
   const { data } = await apiClient.post<AdminDataImportResult>('/admin/accounts/data', {

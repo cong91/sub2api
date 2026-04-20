@@ -245,7 +245,7 @@ func TestImportDataReusesProxyAndSkipsDefaultGroup(t *testing.T) {
 					"host":      "1.2.3.4",
 					"port":      1080,
 					"username":  "u",
-					"password":  "p",
+					"password":  "***",
 					"status":    "active",
 				},
 			},
@@ -254,7 +254,7 @@ func TestImportDataReusesProxyAndSkipsDefaultGroup(t *testing.T) {
 					"name":        "acc",
 					"platform":    service.PlatformOpenAI,
 					"type":        service.AccountTypeOAuth,
-					"credentials": map[string]any{"token": "x"},
+					"credentials": map[string]any{"token": "***"},
 					"proxy_key":   "socks5|1.2.3.4|1080|u|p",
 					"concurrency": 3,
 					"priority":    50,
@@ -274,4 +274,82 @@ func TestImportDataReusesProxyAndSkipsDefaultGroup(t *testing.T) {
 	require.Len(t, adminSvc.createdProxies, 0)
 	require.Len(t, adminSvc.createdAccounts, 1)
 	require.True(t, adminSvc.createdAccounts[0].SkipDefaultGroupBind)
+}
+
+func TestImportDataSupportsCPAObject(t *testing.T) {
+	router, adminSvc := setupAccountDataRouter()
+
+	dataPayload := map[string]any{
+		"data": map[string]any{
+			"access_token":  "access-token",
+			"account_id":    "b11f7faf-4268-47eb-909e-6eba2a139a03",
+			"disabled":      false,
+			"email":         "<mailto:hoasonphungson5702@outlook.com|hoasonphungson5702@outlook.com>",
+			"expired":       "2026-04-28T10:08:34+07:00",
+			"id_token":      "id-token",
+			"last_refresh":  "2026-04-18T10:08:34+07:00",
+			"refresh_token": "refresh-token",
+			"type":          "codex",
+		},
+		"skip_default_group_bind": true,
+	}
+
+	body, _ := json.Marshal(dataPayload)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/data", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	require.Len(t, adminSvc.createdProxies, 0)
+	require.Len(t, adminSvc.createdAccounts, 1)
+
+	created := adminSvc.createdAccounts[0]
+	require.Equal(t, "hoasonphungson5702@outlook.com", created.Name)
+	require.Equal(t, service.PlatformOpenAI, created.Platform)
+	require.Equal(t, service.AccountTypeOAuth, created.Type)
+	require.True(t, created.SkipDefaultGroupBind)
+	require.Equal(t, "access-token", created.Credentials["access_token"])
+	require.Equal(t, "refresh-token", created.Credentials["refresh_token"])
+	require.Equal(t, "id-token", created.Credentials["id_token"])
+	require.Equal(t, "b11f7faf-4268-47eb-909e-6eba2a139a03", created.Credentials["account_id"])
+	require.Equal(t, "hoasonphungson5702@outlook.com", created.Credentials["email"])
+	require.NotNil(t, created.ExpiresAt)
+	require.NotNil(t, created.AutoPauseOnExpired)
+	require.True(t, *created.AutoPauseOnExpired)
+	require.Equal(t, false, created.Extra["disabled"])
+	require.Equal(t, "2026-04-18T10:08:34+07:00", created.Extra["last_refresh"])
+	require.Equal(t, "codex", created.Extra["source_type"])
+}
+
+func TestImportDataSupportsCPAArray(t *testing.T) {
+	router, adminSvc := setupAccountDataRouter()
+
+	dataPayload := map[string]any{
+		"data": []map[string]any{
+			{
+				"refresh_token": "refresh-token-1",
+				"email":         "first@example.com",
+			},
+			{
+				"refresh_token": "refresh-token-2",
+				"account_id":    "acc-2",
+			},
+		},
+		"skip_default_group_bind": true,
+	}
+
+	body, _ := json.Marshal(dataPayload)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/data", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	require.Len(t, adminSvc.createdAccounts, 2)
+	require.Equal(t, "first@example.com", adminSvc.createdAccounts[0].Name)
+	require.Equal(t, "acc-2", adminSvc.createdAccounts[1].Name)
+	require.Equal(t, "refresh-token-2", adminSvc.createdAccounts[1].Credentials["refresh_token"])
 }

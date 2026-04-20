@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -59,8 +60,8 @@ type DataAccount struct {
 }
 
 type DataImportRequest struct {
-	Data                 DataPayload `json:"data"`
-	SkipDefaultGroupBind *bool       `json:"skip_default_group_bind"`
+	Data                 json.RawMessage `json:"data"`
+	SkipDefaultGroupBind *bool           `json:"skip_default_group_bind"`
 }
 
 type DataImportResult struct {
@@ -179,9 +180,19 @@ func (h *AccountHandler) ImportData(c *gin.Context) {
 		return
 	}
 
-	if err := validateDataHeader(req.Data); err != nil {
+	normalizedData, err := normalizeImportedData(req.Data)
+	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
+	}
+	if err := validateDataHeader(normalizedData); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if req.Data == nil {
+		req.Data = normalizedData
+	} else {
+		req.Data = normalizedData
 	}
 
 	executeAdminIdempotentJSON(c, "admin.accounts.import_data", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
@@ -195,8 +206,11 @@ func (h *AccountHandler) importData(ctx context.Context, req DataImportRequest) 
 		skipDefaultGroupBind = *req.SkipDefaultGroupBind
 	}
 
-	dataPayload := req.Data
 	result := DataImportResult{}
+	var dataPayload DataPayload
+	if err := json.Unmarshal(req.Data, &dataPayload); err != nil {
+		return result, infraerrors.BadRequest("INVALID_IMPORT_DATA", "invalid import data")
+	}
 
 	existingProxies, err := h.listAllProxies(ctx)
 	if err != nil {
@@ -506,7 +520,11 @@ func parseIncludeProxies(c *gin.Context) (bool, error) {
 	}
 }
 
-func validateDataHeader(payload DataPayload) error {
+func validateDataHeader(raw json.RawMessage) error {
+	var payload DataPayload
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return errors.New("invalid import data")
+	}
 	if payload.Type != "" && payload.Type != dataType && payload.Type != legacyDataType {
 		return fmt.Errorf("unsupported data type: %s", payload.Type)
 	}
@@ -520,6 +538,163 @@ func validateDataHeader(payload DataPayload) error {
 		return errors.New("accounts is required")
 	}
 	return nil
+}
+
+type cpaAccount struct {
+	AccessToken  string `json:"access_token"`
+	AccountID    string `json:"account_id"`
+	Disabled     *bool  `json:"disabled"`
+	Email        string `json:"email"`
+	Expired      string `json:"expired"`
+	IDToken      string `json:"id_token"`
+	LastRefresh  string `json:"last_refresh"`
+	RefreshToken string `json:"refresh_token"`
+	Type         string `json:"type"`
+}
+
+func normalizeImportedData(raw json.RawMessage) (json.RawMessage, error) {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return nil, errors.New("data is required")
+	}
+
+	var payload DataPayload
+	if err := json.Unmarshal(raw, &payload); err == nil && (payload.Proxies != nil || payload.Accounts != nil) {
+		return raw, nil
+	}
+
+	var single cpaAccount
+	if err := json.Unmarshal(raw, &single); err == nil && looksLikeCPAAccount(single) {
+		payload, err := buildPayloadFromCPA([]cpaAccount{single})
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(payload)
+	}
+
+	var many []cpaAccount
+	if err := json.Unmarshal(raw, &many); err == nil && len(many) > 0 {
+		payload, err := buildPayloadFromCPA(many)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(payload)
+	}
+
+	return nil, errors.New("unsupported import format")
+}
+
+func looksLikeCPAAccount(item cpaAccount) bool {
+	return strings.TrimSpace(item.RefreshToken) != "" || strings.TrimSpace(item.AccessToken) != "" || strings.TrimSpace(item.IDToken) != "" || strings.TrimSpace(item.AccountID) != ""
+}
+
+func buildPayloadFromCPA(items []cpaAccount) (DataPayload, error) {
+	accounts := make([]DataAccount, 0, len(items))
+	for _, item := range items {
+		account, err := normalizeCPAAccount(item)
+		if err != nil {
+			return DataPayload{}, err
+		}
+		accounts = append(accounts, account)
+	}
+
+	return DataPayload{
+		Accounts: accounts,
+		Proxies:  []DataProxy{},
+	}, nil
+}
+
+func normalizeCPAAccount(item cpaAccount) (DataAccount, error) {
+	if !looksLikeCPAAccount(item) {
+		return DataAccount{}, errors.New("unsupported import format")
+	}
+
+	credentials := map[string]any{}
+	setStringIfPresent(credentials, "access_token", item.AccessToken)
+	setStringIfPresent(credentials, "account_id", item.AccountID)
+	setStringIfPresent(credentials, "email", normalizeImportedEmail(item.Email))
+	setStringIfPresent(credentials, "id_token", item.IDToken)
+	setStringIfPresent(credentials, "refresh_token", item.RefreshToken)
+
+	extra := map[string]any{}
+	if item.Disabled != nil {
+		extra["disabled"] = *item.Disabled
+	}
+	setStringIfPresent(extra, "last_refresh", item.LastRefresh)
+	setStringIfPresent(extra, "source_type", item.Type)
+
+	name := deriveImportedAccountName(item)
+	if name == "" {
+		return DataAccount{}, errors.New("account name is required")
+	}
+
+	account := DataAccount{
+		Name:               name,
+		Platform:           service.PlatformOpenAI,
+		Type:               service.AccountTypeOAuth,
+		Credentials:        credentials,
+		Extra:              extra,
+		Concurrency:        0,
+		Priority:           0,
+		AutoPauseOnExpired: boolPtr(true),
+	}
+
+	if expiredAt := parseImportedTime(item.Expired); expiredAt != nil {
+		account.ExpiresAt = expiredAt
+	}
+
+	return account, nil
+}
+
+func deriveImportedAccountName(item cpaAccount) string {
+	if email := normalizeImportedEmail(item.Email); email != "" {
+		return email
+	}
+	if accountID := strings.TrimSpace(item.AccountID); accountID != "" {
+		return accountID
+	}
+	if token := strings.TrimSpace(item.RefreshToken); token != "" {
+		return token
+	}
+	return strings.TrimSpace(item.AccessToken)
+}
+
+func normalizeImportedEmail(raw string) string {
+	value := strings.TrimSpace(raw)
+	if strings.HasPrefix(value, "<mailto:") && strings.HasSuffix(value, ">") {
+		inner := strings.TrimSuffix(strings.TrimPrefix(value, "<mailto:"), ">")
+		parts := strings.SplitN(inner, "|", 2)
+		if len(parts) == 2 {
+			return strings.TrimSpace(parts[1])
+		}
+		return strings.TrimSpace(parts[0])
+	}
+	return value
+}
+
+func parseImportedTime(raw string) *int64 {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil
+	}
+	unix := parsed.Unix()
+	return &unix
+}
+
+func setStringIfPresent(target map[string]any, key, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return
+	}
+	target[key] = value
+}
+
+func boolPtr(v bool) *bool {
+	return &v
 }
 
 func validateDataProxy(item DataProxy) error {
