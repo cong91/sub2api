@@ -22,8 +22,13 @@ Request body:
 ```
 
 Behavior:
-- first claim with valid `device_claim` code:
+- first launch on a new device with no existing binding and no `claim_code`:
   - bootstrap/create user
+  - create durable `user_devices` binding
+  - mint `device_login_code`
+  - return `mode=first_claim`
+- first claim with valid `device_claim` code:
+  - bootstrap/create user using the explicit claim code lane
   - create durable `user_devices` binding
   - mint/reuse `device_login_code`
   - return `mode=first_claim`
@@ -79,13 +84,13 @@ Behavior:
 4. Ship Electron client update after backend is live.
 5. Confirm three scenarios in staging:
    - normal invite code login without device fields
-   - first claim with `DCL-*` then auto-login through returned `DLG-*`
+   - first launch on a new machine auto-claims with no manual code entry
    - reopen/reinstall same machine and auto-resume via claim endpoint without claim code
 
 ## Smoke test checklist
 
 - old invite code still logs in successfully
-- `device_claim` code cannot be used by a second machine
+- first launch on a brand new machine auto-creates one binding and one `device_login_code`
 - same machine can resume and receive the same `device_login_code`
 - clearing local app data does not create a second user for the same machine
 - revoked device returns a clear error and does not mint a new login code
@@ -108,8 +113,8 @@ If backend must be rolled back:
 - keep server-side one-machine-one-claim enforcement authoritative
 - do not expose admin redeem endpoints to the Electron app
 - do not require `device_hash` for legacy invite-only login
+- auto-first-claim with no `claim_code` is now the default new-device path; explicit `DCL-*` codes remain optional/manual
 - monitor error codes:
-  - `CLAIM_CODE_REQUIRED`
   - `CLAIM_CODE_INVALID`
   - `DEVICE_REVOKED`
   - `DEVICE_MISMATCH`
