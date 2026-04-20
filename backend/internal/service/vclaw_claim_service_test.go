@@ -188,20 +188,36 @@ func TestVClawClaimService_Claim_FirstClaimCreatesBindingAndLoginCode(t *testing
 	require.Equal(t, claimUserID, redeemRepo.usedUser)
 }
 
-func TestVClawClaimService_Claim_FirstClaimRequiresClaimCode(t *testing.T) {
+func TestVClawClaimService_Claim_FirstLaunchWithoutClaimCodeAutoCreatesBindingAndLoginCode(t *testing.T) {
 	t.Parallel()
 
-	svc := newVClawClaimServiceForTest(&userRepoStub{}, &vclawRedeemRepoStub{}, &vclawUserDeviceRepoStub{})
+	userRepo := &userRepoStub{nextID: 777}
+	deviceRepo := &vclawUserDeviceRepoStub{}
+	redeemRepo := &vclawRedeemRepoStub{}
+	svc := newVClawClaimServiceForTest(userRepo, redeemRepo, deviceRepo)
 
-	_, err := svc.Claim(context.Background(), VClawClaimRequest{
+	result, err := svc.Claim(context.Background(), VClawClaimRequest{
 		Device: VClawDeviceInput{
 			DeviceHash:         "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 			FingerprintVersion: 1,
+			InstallID:          "install-auto-1",
 			Platform:           "win32",
 			Arch:               "x64",
+			AppVersion:         "1.0.0",
 		},
 	})
-	require.ErrorIs(t, err, ErrClaimCodeRequired)
+	require.NoError(t, err)
+	require.Equal(t, "first_claim", result.Mode)
+	require.Equal(t, int64(777), result.UserID)
+	require.NotEmpty(t, result.DeviceLoginCode)
+	require.Len(t, userRepo.created, 1)
+	require.Len(t, redeemRepo.created, 1)
+	require.Equal(t, RedeemTypeDeviceLogin, redeemRepo.created[0].Type)
+	require.Equal(t, StatusUsed, redeemRepo.created[0].Status)
+	require.Len(t, deviceRepo.created, 1)
+	require.Equal(t, int64(777), deviceRepo.created[0].UserID)
+	require.Nil(t, deviceRepo.created[0].ClaimRedeemCodeID)
+	require.Equal(t, redeemRepo.created[0].ID, deviceRepo.created[0].LoginRedeemCodeID)
 }
 
 func TestAuthService_InviteLogin_DeviceLoginUsesExistingBoundUser(t *testing.T) {

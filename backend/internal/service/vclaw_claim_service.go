@@ -88,7 +88,7 @@ func (s *VClawClaimService) Claim(ctx context.Context, req VClawClaimRequest) (*
 
 	claimCode := NormalizeRedeemCode(req.ClaimCode)
 	if claimCode == "" {
-		return nil, ErrClaimCodeRequired
+		return s.createFirstClaim(ctx, req, deviceHash, nil, now)
 	}
 	claimRedeemCode, err := s.redeemRepo.GetByCode(ctx, claimCode)
 	if err != nil || claimRedeemCode == nil {
@@ -147,7 +147,15 @@ func (s *VClawClaimService) resumeExistingClaim(ctx context.Context, binding *Us
 
 func (s *VClawClaimService) createFirstClaim(ctx context.Context, req VClawClaimRequest, deviceHash string, claimRedeemCode *RedeemCode, now time.Time) (*VClawClaimResult, error) {
 	create := func(runCtx context.Context) (*VClawClaimResult, error) {
-		user, err := createInviteBootstrapUserWithRedeem(runCtx, s.entClient, s.userRepo, s.redeemRepo, s.cfg, s.settingService, claimRedeemCode)
+		var (
+			user *User
+			err  error
+		)
+		if claimRedeemCode != nil {
+			user, err = createInviteBootstrapUserWithRedeem(runCtx, s.entClient, s.userRepo, s.redeemRepo, s.cfg, s.settingService, claimRedeemCode)
+		} else {
+			user, err = createInviteBootstrapUserWithoutRedeem(runCtx, s.userRepo, s.cfg, s.settingService)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -170,7 +178,11 @@ func (s *VClawClaimService) createFirstClaim(ctx context.Context, req VClawClaim
 
 		installID := optionalTrimmedString(req.Device.InstallID)
 		appVersion := optionalTrimmedString(req.Device.AppVersion)
-		claimRedeemCodeID := claimRedeemCode.ID
+		var claimRedeemCodeID *int64
+		if claimRedeemCode != nil {
+			id := claimRedeemCode.ID
+			claimRedeemCodeID = &id
+		}
 		binding := &UserDevice{
 			UserID:             user.ID,
 			DeviceHash:         deviceHash,
@@ -179,7 +191,7 @@ func (s *VClawClaimService) createFirstClaim(ctx context.Context, req VClawClaim
 			Platform:           strings.TrimSpace(req.Device.Platform),
 			Arch:               strings.TrimSpace(req.Device.Arch),
 			AppVersion:         appVersion,
-			ClaimRedeemCodeID:  &claimRedeemCodeID,
+			ClaimRedeemCodeID:  claimRedeemCodeID,
 			LoginRedeemCodeID:  loginRedeemCode.ID,
 			Status:             UserDeviceStatusActive,
 			FirstClaimedAt:     now,
