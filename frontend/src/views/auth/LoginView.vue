@@ -449,9 +449,8 @@ async function handlePasswordLogin(): Promise<void> {
 }
 
 async function handleRedeemLogin(): Promise<void> {
-  await authStore.inviteLogin({
+  await authStore.redeemLogin({
     invitation_code: inviteForm.invitation_code,
-    client_kind: 'web',
     turnstile_token: turnstileEnabled.value ? turnstileToken.value : undefined
   })
 
