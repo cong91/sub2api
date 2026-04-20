@@ -23,7 +23,7 @@
         >
           <div class="min-w-0">
             <div class="truncate text-sm text-gray-700 dark:text-dark-200">
-              {{ fileName || t('admin.accounts.dataImportSelectFile') }}
+              {{ selectedFilesLabel || t('admin.accounts.dataImportSelectFile') }}
             </div>
             <div class="text-xs text-gray-500 dark:text-dark-400">JSON (.json)</div>
           </div>
@@ -36,6 +36,7 @@
           type="file"
           class="hidden"
           accept="application/json,.json"
+          multiple
           @change="handleFileChange"
         />
       </div>
@@ -90,7 +91,230 @@ import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import { adminAPI } from '@/api/admin'
 import { useAppStore } from '@/stores/app'
-import type { AdminDataImportResult } from '@/types'
+import type { AdminDataImportResult, AdminImportData } from '@/types'
+
+const IMPORT_FORMAT_FILE_PREFIX = 'sub2api-account'
+const STRUCTURED_EXPORT_ONLY_ERROR = 'Structured export file must be imported alone'
+
+const IMPORT_FORMAT_TYPE = 'sub2api-account-data'
+
+interface ImportAggregateResult extends AdminDataImportResult {
+  errors: NonNullable<AdminDataImportResult['errors']>
+}
+
+interface ParsedImportFile {
+  data: AdminImportData
+}
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+const isStructuredDataPayload = (value: unknown): value is Record<string, unknown> => {
+  return isPlainObject(value) && Array.isArray(value.proxies) && Array.isArray(value.accounts)
+}
+
+const isCPAAccountObject = (value: unknown): value is Record<string, unknown> => {
+  return isPlainObject(value) && (
+    typeof value.refresh_token === 'string'
+    || typeof value.access_token === 'string'
+    || typeof value.id_token === 'string'
+    || typeof value.account_id === 'string'
+  )
+}
+
+const mergeImportResults = (results: AdminDataImportResult[]): ImportAggregateResult => {
+  return results.reduce<ImportAggregateResult>((acc, item) => {
+    acc.proxy_created += item.proxy_created
+    acc.proxy_reused += item.proxy_reused
+    acc.proxy_failed += item.proxy_failed
+    acc.account_created += item.account_created
+    acc.account_failed += item.account_failed
+    if (item.errors?.length) {
+      acc.errors.push(...item.errors)
+    }
+    return acc
+  }, {
+    proxy_created: 0,
+    proxy_reused: 0,
+    proxy_failed: 0,
+    account_created: 0,
+    account_failed: 0,
+    errors: []
+  })
+}
+
+const parseImportPayload = (raw: unknown): AdminImportData => {
+  if (Array.isArray(raw)) {
+    if (raw.every(isCPAAccountObject)) {
+      return raw
+    }
+    throw new SyntaxError('Unsupported import array format')
+  }
+
+  if (isStructuredDataPayload(raw)) {
+    return raw as AdminImportData
+  }
+
+  if (isCPAAccountObject(raw)) {
+    return raw
+  }
+
+  throw new SyntaxError('Unsupported import object format')
+}
+
+const parseImportFiles = (entries: ParsedImportFile[]): AdminImportData[] => {
+  const structuredPayloads: AdminImportData[] = []
+  const cpaAccounts: Record<string, unknown>[] = []
+
+  for (const entry of entries) {
+    if (Array.isArray(entry.data)) {
+      cpaAccounts.push(...entry.data)
+      continue
+    }
+
+    if (isStructuredDataPayload(entry.data)) {
+      structuredPayloads.push(entry.data)
+      continue
+    }
+
+    cpaAccounts.push(entry.data)
+  }
+
+  if (cpaAccounts.length > 0) {
+    structuredPayloads.push(cpaAccounts)
+  }
+
+  return structuredPayloads
+}
+
+const parseImportFilesFromText = async (files: File[]): Promise<AdminImportData[]> => {
+  const parsedEntries = await Promise.all(files.map(async (sourceFile) => {
+    const text = await readFileAsText(sourceFile)
+    const raw = JSON.parse(text) as unknown
+    return {
+      data: parseImportPayload(raw)
+    } satisfies ParsedImportFile
+  }))
+
+  return parseImportFiles(parsedEntries)
+}
+
+const buildSelectedFilesLabel = (files: File[]): string => {
+  if (files.length === 0) {
+    return ''
+  }
+  if (files.length === 1) {
+    return files[0].name
+  }
+  return `${files.length} JSON files selected`
+}
+
+const importDataPayloads = async (payloads: AdminImportData[]): Promise<ImportAggregateResult> => {
+  const responses = await Promise.all(payloads.map((data) => adminAPI.accounts.importData({
+    data,
+    skip_default_group_bind: true
+  })))
+
+  return mergeImportResults(responses)
+}
+
+const resetInputValue = (input: HTMLInputElement | null) => {
+  if (input) {
+    input.value = ''
+  }
+}
+
+const clearSelection = () => {
+  files.value = []
+  result.value = null
+  resetInputValue(fileInput.value)
+}
+
+const isStructuredExportFilename = (fileName: string) => {
+  const normalized = fileName.toLowerCase()
+  return normalized.startsWith(IMPORT_FORMAT_FILE_PREFIX) || normalized.startsWith(IMPORT_FORMAT_TYPE)
+}
+
+const normalizeSelectedFiles = (fileList: FileList | null): File[] => {
+  if (!fileList) {
+    return []
+  }
+
+  const selected = Array.from(fileList)
+  const hasStructuredDataFile = selected.some((file) => isStructuredExportFilename(file.name))
+  if (hasStructuredDataFile && selected.length > 1) {
+    throw new Error(STRUCTURED_EXPORT_ONLY_ERROR)
+  }
+  return selected
+}
+
+const isParseError = (error: unknown): error is SyntaxError => error instanceof SyntaxError
+
+const getImportErrorMessage = (error: unknown, t: (key: string) => string): string => {
+  if (isParseError(error)) {
+    return t('admin.accounts.dataImportParseFailed')
+  }
+  return error instanceof Error ? error.message : t('admin.accounts.dataImportFailed')
+}
+
+const showImportToast = (
+  result: ImportAggregateResult,
+  showError: (message: string) => void,
+  showSuccess: (message: string) => void,
+  t: (key: string, params?: Record<string, unknown>) => string
+) => {
+  const msgParams: Record<string, unknown> = {
+    account_created: result.account_created,
+    account_failed: result.account_failed,
+    proxy_created: result.proxy_created,
+    proxy_reused: result.proxy_reused,
+    proxy_failed: result.proxy_failed,
+  }
+  if (result.account_failed > 0 || result.proxy_failed > 0) {
+    showError(t('admin.accounts.dataImportCompletedWithErrors', msgParams))
+    return
+  }
+  showSuccess(t('admin.accounts.dataImportSuccess', msgParams))
+}
+
+const emitImportedIfSuccessful = (result: ImportAggregateResult, emit: Emits) => {
+  if (result.account_failed === 0 && result.proxy_failed === 0) {
+    emit('imported')
+  }
+}
+
+const assignImportResult = (target: typeof result, value: ImportAggregateResult) => {
+  target.value = value
+}
+
+const readAndImportSelectedFiles = async (selectedFiles: File[]): Promise<ImportAggregateResult> => {
+  const payloads = await parseImportFilesFromText(selectedFiles)
+  return importDataPayloads(payloads)
+}
+
+const ensureFilesSelected = (selectedFiles: File[], showError: (message: string) => void, t: (key: string) => string) => {
+  if (selectedFiles.length === 0) {
+    showError(t('admin.accounts.dataImportSelectFile'))
+    throw new Error('No files selected')
+  }
+}
+
+const shouldStopImporting = (error: unknown) => error instanceof Error && error.message === 'No files selected'
+
+const finalizeImportState = (flag: typeof importing) => {
+  flag.value = false
+}
+
+const startImportState = (flag: typeof importing) => {
+  flag.value = true
+}
+
+const setSelectedFiles = (selectedFiles: File[]) => {
+  files.value = selectedFiles
+}
+
+const selectedFilesLabel = computed(() => buildSelectedFilesLabel(files.value))
 
 interface Props {
   show: boolean
@@ -108,11 +332,10 @@ const { t } = useI18n()
 const appStore = useAppStore()
 
 const importing = ref(false)
-const file = ref<File | null>(null)
+const files = ref<File[]>([])
 const result = ref<AdminDataImportResult | null>(null)
 
 const fileInput = ref<HTMLInputElement | null>(null)
-const fileName = computed(() => file.value?.name || '')
 
 const errorItems = computed(() => result.value?.errors || [])
 
@@ -120,11 +343,7 @@ watch(
   () => props.show,
   (open) => {
     if (open) {
-      file.value = null
-      result.value = null
-      if (fileInput.value) {
-        fileInput.value.value = ''
-      }
+      clearSelection()
     }
   }
 )
@@ -135,7 +354,16 @@ const openFilePicker = () => {
 
 const handleFileChange = (event: Event) => {
   const target = event.target as HTMLInputElement
-  file.value = target.files?.[0] || null
+
+  try {
+    setSelectedFiles(normalizeSelectedFiles(target.files))
+    result.value = null
+  } catch (error) {
+    resetInputValue(target)
+    setSelectedFiles([])
+    result.value = null
+    appStore.showError(getImportErrorMessage(error, t))
+  }
 }
 
 const handleClose = () => {
@@ -162,44 +390,25 @@ const readFileAsText = async (sourceFile: File): Promise<string> => {
 }
 
 const handleImport = async () => {
-  if (!file.value) {
-    appStore.showError(t('admin.accounts.dataImportSelectFile'))
+  try {
+    ensureFilesSelected(files.value, appStore.showError, t)
+  } catch (error) {
+    if (!shouldStopImporting(error)) {
+      appStore.showError(getImportErrorMessage(error, t))
+    }
     return
   }
 
-  importing.value = true
+  startImportState(importing)
   try {
-    const text = await readFileAsText(file.value)
-    const dataPayload = JSON.parse(text)
-
-    const res = await adminAPI.accounts.importData({
-      data: dataPayload,
-      skip_default_group_bind: true
-    })
-
-    result.value = res
-
-    const msgParams: Record<string, unknown> = {
-      account_created: res.account_created,
-      account_failed: res.account_failed,
-      proxy_created: res.proxy_created,
-      proxy_reused: res.proxy_reused,
-      proxy_failed: res.proxy_failed,
-    }
-    if (res.account_failed > 0 || res.proxy_failed > 0) {
-      appStore.showError(t('admin.accounts.dataImportCompletedWithErrors', msgParams))
-    } else {
-      appStore.showSuccess(t('admin.accounts.dataImportSuccess', msgParams))
-      emit('imported')
-    }
-  } catch (error: any) {
-    if (error instanceof SyntaxError) {
-      appStore.showError(t('admin.accounts.dataImportParseFailed'))
-    } else {
-      appStore.showError(error?.message || t('admin.accounts.dataImportFailed'))
-    }
+    const aggregatedResult = await readAndImportSelectedFiles(files.value)
+    assignImportResult(result, aggregatedResult)
+    showImportToast(aggregatedResult, appStore.showError, appStore.showSuccess, t)
+    emitImportedIfSuccessful(aggregatedResult, emit)
+  } catch (error) {
+    appStore.showError(getImportErrorMessage(error, t))
   } finally {
-    importing.value = false
+    finalizeImportState(importing)
   }
 }
 </script>
