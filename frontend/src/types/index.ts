@@ -117,6 +117,7 @@ export interface LoginRequest {
 
 export interface InviteLoginRequest {
   invitation_code: string
+  client_kind?: 'web'
   turnstile_token?: string
 }
 

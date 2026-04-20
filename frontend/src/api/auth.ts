@@ -112,8 +112,8 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
 }
 
 /**
- * First-time login with redeem/invitation code.
- * Creates a bootstrap account and authenticates the user immediately.
+ * Redeem-code login for the web UI.
+ * Supports both first-time bootstrap codes and device-login codes that reopen an existing account.
  */
 export async function inviteLogin(request: InviteLoginRequest): Promise<AuthResponse> {
   const { data } = await apiClient.post<AuthResponse>('/auth/invite-login', request)
