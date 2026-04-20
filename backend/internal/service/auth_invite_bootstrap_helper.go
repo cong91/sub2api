@@ -22,7 +22,51 @@ func createInviteBootstrapUserWithRedeem(
 	if invitationRedeemCode == nil {
 		return nil, ErrInvitationCodeInvalid
 	}
+	if redeemRepo == nil {
+		return nil, ErrServiceUnavailable
+	}
 
+	createUser := func(runCtx context.Context) (*User, error) {
+		return createInviteBootstrapUserWithoutRedeem(runCtx, userRepo, cfg, settingService)
+	}
+
+	if entClient != nil && dbent.TxFromContext(ctx) == nil {
+		tx, err := entClient.Tx(ctx)
+		if err != nil {
+			return nil, ErrServiceUnavailable
+		}
+		txCtx := dbent.NewTxContext(ctx, tx)
+		candidateUser, err := createUser(txCtx)
+		if err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+		if err := redeemRepo.Use(txCtx, invitationRedeemCode.ID, candidateUser.ID); err != nil {
+			_ = tx.Rollback()
+			return nil, ErrInvitationCodeInvalid
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, ErrServiceUnavailable
+		}
+		return candidateUser, nil
+	}
+
+	candidateUser, err := createUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := redeemRepo.Use(ctx, invitationRedeemCode.ID, candidateUser.ID); err != nil {
+		return nil, ErrInvitationCodeInvalid
+	}
+	return candidateUser, nil
+}
+
+func createInviteBootstrapUserWithoutRedeem(
+	ctx context.Context,
+	userRepo UserRepository,
+	cfg *config.Config,
+	settingService *SettingService,
+) (*User, error) {
 	defaultBalance := 0.0
 	defaultConcurrency := 0
 	if cfg != nil {
@@ -58,39 +102,11 @@ func createInviteBootstrapUserWithRedeem(
 			Concurrency:  defaultConcurrency,
 			Status:       StatusActive,
 		}
-
-		if entClient != nil && dbent.TxFromContext(ctx) == nil {
-			tx, err := entClient.Tx(ctx)
-			if err != nil {
-				return nil, ErrServiceUnavailable
-			}
-			txCtx := dbent.NewTxContext(ctx, tx)
-
-			if err := userRepo.Create(txCtx, candidateUser); err != nil {
-				_ = tx.Rollback()
-				if errors.Is(err, ErrEmailExists) {
-					continue
-				}
-				return nil, ErrServiceUnavailable
-			}
-			if err := redeemRepo.Use(txCtx, invitationRedeemCode.ID, candidateUser.ID); err != nil {
-				_ = tx.Rollback()
-				return nil, ErrInvitationCodeInvalid
-			}
-			if err := tx.Commit(); err != nil {
-				return nil, ErrServiceUnavailable
-			}
-			return candidateUser, nil
-		}
-
 		if err := userRepo.Create(ctx, candidateUser); err != nil {
 			if errors.Is(err, ErrEmailExists) {
 				continue
 			}
 			return nil, ErrServiceUnavailable
-		}
-		if err := redeemRepo.Use(ctx, invitationRedeemCode.ID, candidateUser.ID); err != nil {
-			return nil, ErrInvitationCodeInvalid
 		}
 		return candidateUser, nil
 	}
