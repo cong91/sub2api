@@ -285,17 +285,58 @@ func TestAuthService_InviteLogin_DeviceLoginRejectsDeviceMismatch(t *testing.T) 
 	require.ErrorIs(t, err, ErrDeviceMismatch)
 }
 
-func TestAuthService_InviteLogin_DeviceLoginRequiresDeviceHash(t *testing.T) {
+func TestAuthService_RedeemLogin_SucceedsWithBootstrapInvitation(t *testing.T) {
 	t.Parallel()
 
-	userID := int64(902)
-	loginCodeID := int64(335)
-	userRepo := &userRepoStub{user: &User{ID: userID, Email: "device@example.com", Role: RoleUser, Status: StatusActive}}
-	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{ID: loginCodeID, Code: "DLG-QQQQ-WWWW-EEEE", Type: RedeemTypeDeviceLogin, Status: StatusUsed, UsedBy: &userID}}
+	userRepo := &userRepoStub{user: &User{ID: 43, Email: "web@example.com", Role: RoleUser, Status: StatusActive}, nextID: 43}
+	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{ID: 335, Code: "INV-QQQQ-WWWW-EEEE", Type: RedeemTypeInvitation, Status: StatusUnused, UsedBy: nil}}
 	svc := newAuthServiceForInviteLoginTest(userRepo, redeemRepo)
-	svc.SetUserDeviceRepository(&vclawUserDeviceRepoStub{})
+	svc.defaultSubAssigner = &inviteDefaultSubAssignerStub{}
+	svc.SetInviteBootstrapGroupRepository(&inviteGroupRepoStub{groups: []Group{{ID: 1, Platform: PlatformOpenAI, Status: StatusActive, ActiveAccountCount: 1, SubscriptionType: SubscriptionTypeSubscription, DefaultValidityDays: 30, SortOrder: 1}}})
+	svc.SetInviteBootstrapAPIKeyService(&inviteBootstrapAPIKeySvcStub{keys: []*APIKey{{ID: 1, Name: "bootstrap-openai", Key: "sk-openai"}}})
 
-	_, _, _, err := svc.InviteLogin(context.Background(), InviteLoginInput{InvitationCode: "DLG-QQQQ-WWWW-EEEE"})
+	tokenPair, user, keys, err := svc.RedeemLogin(context.Background(), "INV-QQQQ-WWWW-EEEE")
+	require.NoError(t, err)
+	require.NotNil(t, tokenPair)
+	require.NotNil(t, user)
+	require.Equal(t, int64(43), user.ID)
+	require.Len(t, keys, 1)
+}
+
+func TestAuthService_RedeemLogin_RejectsDeviceLoginCode(t *testing.T) {
+	t.Parallel()
+
+	userRepo := &userRepoStub{user: &User{ID: 44, Email: "web@example.com", Role: RoleUser, Status: StatusActive}}
+	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{ID: 336, Code: "DLG-RRRR-TTTT-YYYY", Type: RedeemTypeDeviceLogin, Status: StatusUsed}}
+	svc := newAuthServiceForInviteLoginTest(userRepo, redeemRepo)
+
+	_, _, _, err := svc.RedeemLogin(context.Background(), "DLG-RRRR-TTTT-YYYY")
+	require.ErrorIs(t, err, ErrInvitationCodeInvalid)
+}
+
+func TestAuthService_InviteLogin_DeviceLoginStillRequiresDeviceHashOutsideWeb(t *testing.T) {
+
+	t.Parallel()
+
+	userID := int64(903)
+	loginCodeID := int64(336)
+	userRepo := &userRepoStub{user: &User{ID: userID, Email: "device@example.com", Role: RoleUser, Status: StatusActive}}
+	redeemRepo := &inviteRedeemRepoStub{code: &RedeemCode{ID: loginCodeID, Code: "DLG-RRRR-TTTT-YYYY", Type: RedeemTypeDeviceLogin, Status: StatusUsed, UsedBy: &userID}}
+	deviceRepo := &vclawUserDeviceRepoStub{
+		byLoginRedeemCodeID: map[int64]*UserDevice{
+			loginCodeID: {
+				ID:                25,
+				UserID:            userID,
+				DeviceHash:        "abababababababababababababababababababababababababababababababab",
+				Status:            UserDeviceStatusActive,
+				LoginRedeemCodeID: loginCodeID,
+			},
+		},
+	}
+	svc := newAuthServiceForInviteLoginTest(userRepo, redeemRepo)
+	svc.SetUserDeviceRepository(deviceRepo)
+
+	_, _, _, err := svc.InviteLogin(context.Background(), InviteLoginInput{InvitationCode: "DLG-RRRR-TTTT-YYYY"})
 	require.ErrorIs(t, err, ErrDeviceHashRequired)
 }
 
