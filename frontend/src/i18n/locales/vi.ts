@@ -3056,6 +3056,8 @@ export default {
         "concurrency": "Concurrency",
         "subscription": "Subscription",
         "invitation": "Invitation",
+        "device_claim": "Nhận thiết bị",
+        "device_login": "Đăng nhập thiết bị",
         "admin_balance": "Balance (Admin)",
         "admin_concurrency": "Concurrency (Admin)"
       },
@@ -4166,6 +4168,8 @@ export default {
         "defaultBalanceHint": "Số dư ban đầu cho người dùng mới",
         "defaultConcurrency": "Mức đồng thời mặc định",
         "defaultConcurrencyHint": "Số yêu cầu đồng thời tối đa cho người dùng mới",
+        "deviceClaimBonusBalance": "Số dư thưởng khi claim thiết bị",
+        "deviceClaimBonusBalanceHint": "Số dư được cộng một lần khi một thiết bị hoàn tất claim V-Claw đầu tiên. Đặt 0 để tắt thưởng.",
         "defaultSubscriptions": "Gói mặc định",
         "defaultSubscriptionsHint": "Tự động gán các gói này khi người dùng mới được tạo hoặc đăng ký",
         "addDefaultSubscription": "Thêm gói mặc định",

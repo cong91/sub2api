@@ -3365,6 +3365,8 @@ export default {
         concurrency: '并发数',
         subscription: '订阅',
         invitation: '邀请码',
+        device_claim: '设备认领',
+        device_login: '设备登录',
         // 管理员在用户管理页面调整余额/并发时产生的记录
         admin_balance: '余额（管理员）',
         admin_concurrency: '并发数（管理员）'
@@ -4581,6 +4583,8 @@ export default {
         defaultBalanceHint: '新用户的初始余额',
         defaultConcurrency: '默认并发数',
         defaultConcurrencyHint: '新用户的最大并发请求数',
+        deviceClaimBonusBalance: '设备认领奖励余额',
+        deviceClaimBonusBalanceHint: '全新设备首次完成 V-Claw 认领时额外赠送的一次性余额。设为 0 可关闭该奖励。',
         defaultSubscriptions: '默认订阅列表',
         defaultSubscriptionsHint: '新用户创建或注册时自动分配这些订阅',
         addDefaultSubscription: '添加默认订阅',

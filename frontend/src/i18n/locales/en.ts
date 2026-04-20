@@ -3279,7 +3279,9 @@ export default {
         concurrency: 'Concurrency',
         subscription: 'Subscription',
         invitation: 'Invitation',
-        // Admin adjustment types (created when admin modifies user balance/concurrency)
+        device_claim: 'Device Claim',
+        device_login: 'Device Login',
+        // Admin-generated records when balance/concurrency is adjusted from user management
         admin_balance: 'Balance (Admin)',
         admin_concurrency: 'Concurrency (Admin)'
       },
@@ -4416,6 +4418,9 @@ export default {
         defaultBalanceHint: 'Initial balance for new users',
         defaultConcurrency: 'Default Concurrency',
         defaultConcurrencyHint: 'Maximum concurrent requests for new users',
+        deviceClaimBonusBalance: 'Device Claim Bonus Balance',
+        deviceClaimBonusBalanceHint:
+          'Extra balance granted once when a brand-new device completes its first V-Claw claim. Set to 0 to disable the bonus.',
         defaultSubscriptions: 'Default Subscriptions',
         defaultSubscriptionsHint: 'Auto-assign these subscriptions when a new user is created or registered',
         addDefaultSubscription: 'Add Default Subscription',
