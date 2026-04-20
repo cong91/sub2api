@@ -258,8 +258,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * First-time login with redeem code.
-   * Creates a bootstrap account and authenticates immediately.
+   * Redeem-code login for the web UI.
+   * Supports first-time bootstrap login and existing-account device-login codes.
    */
   async function inviteLogin(request: InviteLoginRequest): Promise<User> {
     try {
