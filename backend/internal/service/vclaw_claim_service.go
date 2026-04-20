@@ -159,6 +159,9 @@ func (s *VClawClaimService) createFirstClaim(ctx context.Context, req VClawClaim
 		if err != nil {
 			return nil, err
 		}
+		if err := s.applyDeviceClaimBonus(runCtx, user, deviceHash, now); err != nil {
+			return nil, err
+		}
 		loginCodeText, err := GenerateRedeemCodeForType(RedeemTypeDeviceLogin)
 		if err != nil {
 			return nil, fmt.Errorf("generate device login code: %w", err)
@@ -240,4 +243,39 @@ func optionalTrimmedString(value string) *string {
 		return nil
 	}
 	return &trimmed
+}
+
+func (s *VClawClaimService) applyDeviceClaimBonus(ctx context.Context, user *User, deviceHash string, now time.Time) error {
+	if user == nil || s.userRepo == nil || s.redeemRepo == nil {
+		return ErrServiceUnavailable
+	}
+	bonus := 0.0
+	if s.settingService != nil {
+		bonus = s.settingService.GetDeviceClaimBonusBalance(ctx)
+	}
+	if bonus <= 0 {
+		return nil
+	}
+	if err := s.userRepo.UpdateBalance(ctx, user.ID, bonus); err != nil {
+		return ErrServiceUnavailable
+	}
+	user.Balance += bonus
+	bonusCode, err := GenerateRedeemCodeForType(AdjustmentTypeAdminBalance)
+	if err != nil {
+		return fmt.Errorf("generate device claim bonus record: %w", err)
+	}
+	usedAt := now
+	adjustment := &RedeemCode{
+		Code:   bonusCode,
+		Type:   AdjustmentTypeAdminBalance,
+		Value:  bonus,
+		Status: StatusUsed,
+		UsedBy: &user.ID,
+		UsedAt: &usedAt,
+		Notes:  fmt.Sprintf("vclaw device claim bonus for device_hash=%s", deviceHash),
+	}
+	if err := s.redeemRepo.Create(ctx, adjustment); err != nil {
+		return ErrServiceUnavailable
+	}
+	return nil
 }
