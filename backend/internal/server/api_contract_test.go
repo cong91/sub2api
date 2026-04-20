@@ -718,6 +718,7 @@ func TestAPIContracts(t *testing.T) {
 					"affiliate_rebate_rate": 20,
 					"default_user_rpm_limit": 0,
 					"default_subscriptions": [],
+					"device_claim_bonus_balance": 0,
 					"enable_model_fallback": false,
 					"fallback_model_anthropic": "claude-3-5-sonnet-20241022",
 					"fallback_model_antigravity": "gemini-2.5-pro",
