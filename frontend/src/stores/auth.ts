@@ -6,7 +6,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
 import { authAPI, isTotp2FARequired, type LoginResponse } from '@/api'
-import type { User, LoginRequest, InviteLoginRequest, RegisterRequest, AuthResponse } from '@/types'
+import type { User, LoginRequest, InviteLoginRequest, RedeemLoginRequest, RegisterRequest, AuthResponse } from '@/types'
 
 const AUTH_TOKEN_KEY = 'auth_token'
 const AUTH_USER_KEY = 'auth_user'
@@ -261,6 +261,21 @@ export const useAuthStore = defineStore('auth', () => {
    * Redeem-code login for the web UI.
    * Supports first-time bootstrap login and existing-account device-login codes.
    */
+  async function redeemLogin(request: RedeemLoginRequest): Promise<User> {
+    try {
+      const response = await authAPI.redeemLogin(request)
+      setAuthFromResponse(response)
+      return user.value!
+    } catch (error) {
+      clearAuth()
+      throw error
+    }
+  }
+
+  /**
+   * Device-bound invite login used by V-Claw.
+   * Supports first-time bootstrap login and device-login resume codes.
+   */
   async function inviteLogin(request: InviteLoginRequest): Promise<User> {
     try {
       const response = await authAPI.inviteLogin(request)
@@ -496,6 +511,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Actions
     login,
+    redeemLogin,
     inviteLogin,
     login2FA,
     register,

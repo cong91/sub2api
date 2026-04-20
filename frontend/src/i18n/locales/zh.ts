@@ -390,7 +390,7 @@ export default {
     redeemCodeLabel: '兑换码',
     redeemCodePlaceholder: '请输入兑换码',
     redeemCodeRequired: '请输入兑换码',
-    redeemCodeHint: '使用兑换码登录。如果这是首次登录，系统会先创建临时账户并引导您完善资料；如果该兑换码已经绑定到设备账户，您也可以在网页端直接使用它登录，无需 device hash，即可管理充值和账户资料。',
+    redeemCodeHint: '使用兑换码登录。如果这是第一次登录，系统会创建临时账号并引导你完善资料。Web 端有独立的兑换登录流程，V-Claw/设备登录仍然保持设备绑定。',
     redeemSignIn: '使用兑换码登录',
     redeemSigningIn: '正在使用兑换码登录...',
     createAccount: '创建账户',

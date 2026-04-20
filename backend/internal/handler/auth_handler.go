@@ -87,12 +87,17 @@ type BootstrapAPIKeyResponse struct {
 	Platform string `json:"platform"`
 }
 
-// InviteLoginRequest first-time invite bootstrap login request.
+// InviteLoginRequest device-bound invite bootstrap login request.
 type InviteLoginRequest struct {
 	InvitationCode string `json:"invitation_code" binding:"required"`
 	DeviceHash     string `json:"device_hash"`
 	InstallID      string `json:"install_id"`
-	ClientKind     string `json:"client_kind"`
+	TurnstileToken string `json:"turnstile_token"`
+}
+
+// RedeemLoginRequest web redeem login request.
+type RedeemLoginRequest struct {
+	InvitationCode string `json:"invitation_code" binding:"required"`
 	TurnstileToken string `json:"turnstile_token"`
 }
 
@@ -191,7 +196,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	h.respondWithTokenPair(c, user)
 }
 
-// InviteLogin handles first-time invite bootstrap login.
+// InviteLogin handles device-bound invite login and resume.
 // POST /api/v1/auth/invite-login
 func (h *AuthHandler) InviteLogin(c *gin.Context) {
 	var req InviteLoginRequest
@@ -209,8 +214,48 @@ func (h *AuthHandler) InviteLogin(c *gin.Context) {
 		InvitationCode: req.InvitationCode,
 		DeviceHash:     req.DeviceHash,
 		InstallID:      req.InstallID,
-		ClientKind:     req.ClientKind,
 	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	apiKeysResp := make([]BootstrapAPIKeyResponse, 0, len(bootstrapKeys))
+	for _, key := range bootstrapKeys {
+		apiKeysResp = append(apiKeysResp, BootstrapAPIKeyResponse{
+			ID:       key.ID,
+			Name:     key.Name,
+			Key:      key.Key,
+			GroupID:  key.GroupID,
+			Platform: key.Platform,
+		})
+	}
+
+	response.Success(c, AuthResponse{
+		AccessToken:      tokenPair.AccessToken,
+		RefreshToken:     tokenPair.RefreshToken,
+		ExpiresIn:        tokenPair.ExpiresIn,
+		TokenType:        "Bearer",
+		User:             dto.UserFromService(user),
+		BootstrapAPIKeys: apiKeysResp,
+	})
+}
+
+// RedeemLogin handles the web redeem login.
+// POST /api/v1/auth/redeem-login
+func (h *AuthHandler) RedeemLogin(c *gin.Context) {
+	var req RedeemLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	if err := h.authService.VerifyTurnstile(c.Request.Context(), req.TurnstileToken, ip.GetClientIP(c)); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	tokenPair, user, bootstrapKeys, err := h.authService.RedeemLogin(c.Request.Context(), req.InvitationCode)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

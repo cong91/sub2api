@@ -45,7 +45,7 @@ import { LoginView } from '@/views/auth'
 **Behavior:**
 
 - Calls `authStore.login()` with credentials
-- Calls `authStore.inviteLogin()` when redeem-code login is selected
+- Calls `authStore.redeemLogin()` when redeem-code login is selected
 - Shows success toast on successful login
 - Shows error toast and inline error message on failure
 - Redirects to `/dashboard` or intended route from query parameter

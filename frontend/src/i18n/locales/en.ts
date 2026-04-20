@@ -390,7 +390,7 @@ export default {
     redeemCodeLabel: 'Redeem Code',
     redeemCodePlaceholder: 'Enter redeem code',
     redeemCodeRequired: 'Redeem code is required',
-    redeemCodeHint: 'Use your redeem code to sign in. If this is your first login, we will create a temporary account and guide you to finish your profile. If this code is already linked to your device account, you can still use it here without a device hash to manage billing and account details.',
+    redeemCodeHint: 'Use your redeem code to sign in. If this is your first login, we will create a temporary account and guide you to finish your profile. Web login uses a separate redeem flow, while V-Claw/device login stays device-bound.',
     redeemSignIn: 'Sign in with redeem code',
     redeemSigningIn: 'Signing in with redeem code...',
     createAccount: 'Create Account',
