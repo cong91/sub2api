@@ -298,10 +298,9 @@ type InviteLoginInput struct {
 	InvitationCode string
 	DeviceHash     string
 	InstallID      string
-	ClientKind     string
 }
 
-// InviteLogin handles both first-time invitation bootstrap and device_login resume flows.
+// InviteLogin handles device-bound invite login and resume flows.
 func (s *AuthService) InviteLogin(ctx context.Context, input InviteLoginInput) (*TokenPair, *User, []InviteBootstrapAPIKey, error) {
 	code := strings.TrimSpace(input.InvitationCode)
 	if code == "" {
@@ -328,6 +327,80 @@ func (s *AuthService) InviteLogin(ctx context.Context, input InviteLoginInput) (
 		return nil, nil, nil, ErrInvitationCodeInvalid
 	}
 
+	return s.completeInviteBootstrapLogin(ctx, redeemCode)
+}
+
+// RedeemLogin handles the web redeem login flow.
+func (s *AuthService) RedeemLogin(ctx context.Context, invitationCode string) (*TokenPair, *User, []InviteBootstrapAPIKey, error) {
+	code := strings.TrimSpace(invitationCode)
+	if code == "" {
+		return nil, nil, nil, ErrInvitationCodeRequired
+	}
+	if s.redeemRepo == nil {
+		return nil, nil, nil, ErrServiceUnavailable
+	}
+
+	redeemCode, err := s.redeemRepo.GetByCode(ctx, code)
+	if err != nil || redeemCode == nil {
+		return nil, nil, nil, ErrInvitationCodeInvalid
+	}
+	if redeemCode.Type == RedeemTypeDeviceLogin {
+		return nil, nil, nil, ErrInvitationCodeInvalid
+	}
+	if redeemCode.Status != StatusUnused {
+		return nil, nil, nil, ErrInvitationCodeInvalid
+	}
+	if !isInviteLoginBootstrapRedeemType(redeemCode.Type) {
+		return nil, nil, nil, ErrInvitationCodeInvalid
+	}
+
+	return s.completeInviteBootstrapLogin(ctx, redeemCode)
+}
+
+func (s *AuthService) createInviteBootstrapUser(ctx context.Context, invitationRedeemCode *RedeemCode) (*User, error) {
+	return createInviteBootstrapUserWithRedeem(ctx, s.entClient, s.userRepo, s.redeemRepo, s.cfg, s.settingService, invitationRedeemCode)
+}
+
+func (s *AuthService) inviteLoginWithDeviceCode(ctx context.Context, redeemCode *RedeemCode, input InviteLoginInput) (*TokenPair, *User, []InviteBootstrapAPIKey, error) {
+	if redeemCode == nil || redeemCode.Type != RedeemTypeDeviceLogin {
+		return nil, nil, nil, ErrInvitationCodeInvalid
+	}
+	if s.userDeviceRepo == nil {
+		return nil, nil, nil, ErrServiceUnavailable
+	}
+	deviceHash := normalizeDeviceHash(input.DeviceHash)
+	if deviceHash == "" {
+		return nil, nil, nil, ErrDeviceHashRequired
+	}
+	binding, err := s.userDeviceRepo.GetByLoginRedeemCodeID(ctx, redeemCode.ID)
+	if err != nil || binding == nil {
+		return nil, nil, nil, ErrInvitationCodeInvalid
+	}
+	if binding.Status != UserDeviceStatusActive {
+		return nil, nil, nil, ErrDeviceRevoked
+	}
+	if normalizeDeviceHash(binding.DeviceHash) != deviceHash {
+		return nil, nil, nil, ErrDeviceMismatch
+	}
+	user, err := s.userRepo.GetByID(ctx, binding.UserID)
+	if err != nil || user == nil {
+		return nil, nil, nil, ErrServiceUnavailable
+	}
+	bootstrapKeys, err := s.provisionInviteBootstrapAPIKeys(ctx, user.ID, redeemCode)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if err := s.userDeviceRepo.UpdateLastLoginAt(ctx, binding.ID, time.Now().UTC()); err != nil {
+		return nil, nil, nil, ErrServiceUnavailable
+	}
+	tokenPair, err := s.GenerateTokenPair(ctx, user, "")
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("generate token pair: %w", err)
+	}
+	return tokenPair, user, bootstrapKeys, nil
+}
+
+func (s *AuthService) completeInviteBootstrapLogin(ctx context.Context, redeemCode *RedeemCode) (*TokenPair, *User, []InviteBootstrapAPIKey, error) {
 	user, err := s.createInviteBootstrapUser(ctx, redeemCode)
 	if err != nil {
 		return nil, nil, nil, err
@@ -345,54 +418,6 @@ func (s *AuthService) InviteLogin(ctx context.Context, input InviteLoginInput) (
 		return nil, nil, nil, err
 	}
 
-	tokenPair, err := s.GenerateTokenPair(ctx, user, "")
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("generate token pair: %w", err)
-	}
-	return tokenPair, user, bootstrapKeys, nil
-}
-
-func (s *AuthService) createInviteBootstrapUser(ctx context.Context, invitationRedeemCode *RedeemCode) (*User, error) {
-	return createInviteBootstrapUserWithRedeem(ctx, s.entClient, s.userRepo, s.redeemRepo, s.cfg, s.settingService, invitationRedeemCode)
-}
-
-func (s *AuthService) inviteLoginWithDeviceCode(ctx context.Context, redeemCode *RedeemCode, input InviteLoginInput) (*TokenPair, *User, []InviteBootstrapAPIKey, error) {
-	if redeemCode == nil || redeemCode.Type != RedeemTypeDeviceLogin {
-		return nil, nil, nil, ErrInvitationCodeInvalid
-	}
-	if s.userDeviceRepo == nil {
-		return nil, nil, nil, ErrServiceUnavailable
-	}
-	deviceHash := normalizeDeviceHash(input.DeviceHash)
-	clientKind := strings.TrimSpace(strings.ToLower(input.ClientKind))
-	allowWebLoginWithoutDeviceHash := deviceHash == "" && clientKind == "web"
-	if deviceHash == "" && !allowWebLoginWithoutDeviceHash {
-		return nil, nil, nil, ErrDeviceHashRequired
-	}
-	binding, err := s.userDeviceRepo.GetByLoginRedeemCodeID(ctx, redeemCode.ID)
-	if err != nil || binding == nil {
-		return nil, nil, nil, ErrInvitationCodeInvalid
-	}
-	if binding.Status != UserDeviceStatusActive {
-		return nil, nil, nil, ErrDeviceRevoked
-	}
-	if deviceHash != "" && normalizeDeviceHash(binding.DeviceHash) != deviceHash {
-		return nil, nil, nil, ErrDeviceMismatch
-	}
-	user, err := s.userRepo.GetByID(ctx, binding.UserID)
-	if err != nil || user == nil {
-		return nil, nil, nil, ErrServiceUnavailable
-	}
-	var bootstrapKeys []InviteBootstrapAPIKey
-	if !allowWebLoginWithoutDeviceHash {
-		bootstrapKeys, err = s.provisionInviteBootstrapAPIKeys(ctx, user.ID, redeemCode)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-	}
-	if err := s.userDeviceRepo.UpdateLastLoginAt(ctx, binding.ID, time.Now().UTC()); err != nil {
-		return nil, nil, nil, ErrServiceUnavailable
-	}
 	tokenPair, err := s.GenerateTokenPair(ctx, user, "")
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("generate token pair: %w", err)

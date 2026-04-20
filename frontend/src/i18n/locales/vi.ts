@@ -351,7 +351,7 @@ export default {
     "redeemCodeLabel": "Mã đổi thưởng",
     "redeemCodePlaceholder": "Nhập mã đổi thưởng",
     "redeemCodeRequired": "Mã đổi thưởng là bắt buộc",
-    "redeemCodeHint": "Dùng mã đổi thưởng để đăng nhập. Nếu đây là lần đăng nhập đầu tiên, hệ thống sẽ tạo tài khoản tạm và hướng dẫn bạn hoàn tất hồ sơ. Nếu mã này đã được liên kết với tài khoản thiết bị, bạn vẫn có thể dùng nó trên web mà không cần device hash để nạp tiền hoặc cập nhật thông tin tài khoản.",
+    "redeemCodeHint": "Dùng mã đổi thưởng để đăng nhập. Nếu đây là lần đăng nhập đầu tiên, hệ thống sẽ tạo tài khoản tạm và hướng dẫn bạn hoàn tất hồ sơ. Web có luồng đổi mã riêng, còn đăng nhập thiết bị V-Claw vẫn là luồng gắn với thiết bị.",
     "redeemSignIn": "Đăng nhập bằng mã đổi thưởng",
     "redeemSigningIn": "Đang đăng nhập bằng mã đổi thưởng...",
     "createAccount": "Tạo tài khoản",

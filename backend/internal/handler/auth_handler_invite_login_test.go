@@ -10,17 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAuthHandler_InviteLogin_RequiresInvitationCode(t *testing.T) {
+func TestAuthHandler_RedeemLogin_RequiresInvitationCode(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := &AuthHandler{}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/invite-login", bytes.NewBufferString(`{"invitation_code":""}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/redeem-login", bytes.NewBufferString(`{"invitation_code":""}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Request = req
 
-	h.InviteLogin(c)
+	h.RedeemLogin(c)
 
 	require.Equal(t, http.StatusBadRequest, w.Code)
 	require.Contains(t, w.Body.String(), "Invalid request")
