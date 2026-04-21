@@ -91,7 +91,7 @@ import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import { adminAPI } from '@/api/admin'
 import { useAppStore } from '@/stores/app'
-import type { AdminDataImportResult, AdminImportData } from '@/types'
+import type { AdminDataImportResult, AdminImportData, AdminDataPayload } from '@/types'
 
 const IMPORT_FORMAT_FILE_PREFIX = 'sub2api-account'
 const STRUCTURED_EXPORT_ONLY_ERROR = 'Structured export file must be imported alone'
@@ -110,7 +110,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> => {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-const isStructuredDataPayload = (value: unknown): value is Record<string, unknown> => {
+const isStructuredDataPayload = (value: unknown): value is AdminDataPayload => {
   return isPlainObject(value) && Array.isArray(value.proxies) && Array.isArray(value.accounts)
 }
 
