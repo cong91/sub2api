@@ -1010,6 +1010,9 @@ func findActiveUserByID(ctx context.Context, client *dbent.Client, userID int64)
 		}
 		return nil, infraerrors.InternalServer("AUTH_IDENTITY_USER_LOOKUP_FAILED", "failed to load auth identity user").WithCause(err)
 	}
+	if userEntity.DeletedAt != nil {
+		return nil, nil
+	}
 	if !strings.EqualFold(strings.TrimSpace(userEntity.Status), service.StatusActive) {
 		return nil, service.ErrUserNotActive
 	}
@@ -1734,12 +1737,27 @@ func (h *AuthHandler) createPendingOAuthAccount(c *gin.Context, provider string)
 		response.ErrorFrom(c, infraerrors.InternalServer("PENDING_AUTH_BIND_APPLY_FAILED", "failed to bind pending oauth identity").WithCause(err))
 		return
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback()
+		}
+	}()
 	txCtx := dbent.NewTxContext(c.Request.Context(), tx)
 
+	rollbackCreatedUserTx := func(originalErr error) bool {
+		if tx != nil {
+			_ = tx.Rollback()
+			tx = nil
+		}
+		if rollbackCreatedUser(originalErr) {
+			return true
+		}
+		user = nil
+		return false
+	}
+
 	if err := applyPendingOAuthBinding(txCtx, client, h.authService, h.userService, session, decision, &user.ID, true, false); err != nil {
-		_ = tx.Rollback()
-		if rollbackCreatedUser(err) {
+		if rollbackCreatedUserTx(err) {
 			return
 		}
 		respondPendingOAuthBindingApplyError(c, err)
@@ -1752,8 +1770,7 @@ func (h *AuthHandler) createPendingOAuthAccount(c *gin.Context, provider string)
 		strings.TrimSpace(req.InvitationCode),
 		strings.TrimSpace(session.ProviderType),
 	); err != nil {
-		_ = tx.Rollback()
-		if rollbackCreatedUser(err) {
+		if rollbackCreatedUserTx(err) {
 			return
 		}
 		response.ErrorFrom(c, err)
@@ -1761,8 +1778,7 @@ func (h *AuthHandler) createPendingOAuthAccount(c *gin.Context, provider string)
 	}
 
 	if err := consumePendingOAuthBrowserSessionTx(txCtx, tx, session); err != nil {
-		_ = tx.Rollback()
-		if rollbackCreatedUser(err) {
+		if rollbackCreatedUserTx(err) {
 			return
 		}
 		clearCookies()
@@ -1772,8 +1788,7 @@ func (h *AuthHandler) createPendingOAuthAccount(c *gin.Context, provider string)
 
 	if pendingOAuthCreateAccountPreCommitHook != nil {
 		if err := pendingOAuthCreateAccountPreCommitHook(txCtx, session); err != nil {
-			_ = tx.Rollback()
-			if rollbackCreatedUser(err) {
+			if rollbackCreatedUserTx(err) {
 				return
 			}
 			respondPendingOAuthBindingApplyError(c, err)

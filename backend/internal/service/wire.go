@@ -123,6 +123,22 @@ func ProvideAntigravityTokenProvider(
 	return p
 }
 
+func ProvideOAuthRefreshAPI(accountRepo AccountRepository, tokenCache GeminiTokenCache) *OAuthRefreshAPI {
+	return NewOAuthRefreshAPI(accountRepo, tokenCache)
+}
+
+func ProvideChannelMonitorService(repo ChannelMonitorRepository, encryptor SecretEncryptor) *ChannelMonitorService {
+	return NewChannelMonitorService(repo, encryptor)
+}
+
+func ProvideChannelMonitorRequestTemplateService(repo ChannelMonitorRequestTemplateRepository) *ChannelMonitorRequestTemplateService {
+	return NewChannelMonitorRequestTemplateService(repo)
+}
+
+func ProvideChannelMonitorRunner(svc *ChannelMonitorService, settingService *SettingService) *ChannelMonitorRunner {
+	return NewChannelMonitorRunner(svc, settingService)
+}
+
 // ProvideDashboardAggregationService 创建并启动仪表盘聚合服务
 func ProvideDashboardAggregationService(repo DashboardAggregationRepository, timingWheel *TimingWheelService, cfg *config.Config) *DashboardAggregationService {
 	svc := NewDashboardAggregationService(repo, timingWheel, cfg)
@@ -267,8 +283,9 @@ func ProvideOpsCleanupService(
 	db *sql.DB,
 	redisClient *redis.Client,
 	cfg *config.Config,
+	channelMonitorSvc *ChannelMonitorService,
 ) *OpsCleanupService {
-	svc := NewOpsCleanupService(opsRepo, db, redisClient, cfg)
+	svc := NewOpsCleanupService(opsRepo, db, redisClient, cfg, channelMonitorSvc)
 	svc.Start()
 	return svc
 }
@@ -444,12 +461,15 @@ var ProviderSet = wire.NewSet(
 	NewCompositeTokenCacheInvalidator,
 	wire.Bind(new(TokenCacheInvalidator), new(*CompositeTokenCacheInvalidator)),
 	NewAntigravityOAuthService,
-	NewOAuthRefreshAPI,
+	ProvideOAuthRefreshAPI,
 	ProvideGeminiTokenProvider,
 	NewGeminiMessagesCompatService,
 	ProvideAntigravityTokenProvider,
 	ProvideOpenAITokenProvider,
 	ProvideClaudeTokenProvider,
+	ProvideChannelMonitorService,
+	ProvideChannelMonitorRequestTemplateService,
+	ProvideChannelMonitorRunner,
 	NewAntigravityGatewayService,
 	ProvideRateLimitService,
 	NewAccountUsageService,

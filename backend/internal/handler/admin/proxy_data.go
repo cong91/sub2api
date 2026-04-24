@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -83,7 +84,7 @@ func (h *ProxyHandler) ImportData(c *gin.Context) {
 		return
 	}
 
-	if err := validateDataHeader(req.Data); err != nil {
+	if err := validateDataHeader(json.RawMessage(mustMarshalJSON(req.Data))); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
@@ -220,6 +221,14 @@ func parseProxyIDs(c *gin.Context) ([]int64, error) {
 		}
 	}
 	return ids, nil
+}
+
+func mustMarshalJSON(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return []byte("null")
+	}
+	return b
 }
 
 func (h *ProxyHandler) listProxiesFiltered(ctx context.Context, protocol, status, search, sortBy, sortOrder string) ([]service.Proxy, error) {

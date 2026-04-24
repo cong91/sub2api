@@ -1,15 +1,18 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
-	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/Wei-Shaw/sub2api/internal/payment/provider"
@@ -42,7 +45,8 @@ const (
 	topUsersLimit      = 10
 	amountToleranceCNY = 0.01
 
-	orderIDPrefix = "sub2_"
+	orderIDPrefix              = "sub2_"
+	paymentResumeSigningKeyEnv = "PAYMENT_RESUME_SIGNING_KEY"
 )
 
 // --- Types ---
@@ -71,6 +75,8 @@ type CreateOrderRequest struct {
 	PaymentType     string
 	ClientIP        string
 	IsMobile        bool
+	IsWeChatBrowser bool
+	OpenID          string
 	SrcHost         string
 	SrcURL          string
 	OrderType       string
@@ -78,25 +84,31 @@ type CreateOrderRequest struct {
 }
 
 type CreateOrderResponse struct {
-	OrderID         int64     `json:"order_id"`
-	Amount          float64   `json:"amount"`
-	PaymentAmount   float64   `json:"payment_amount"`
-	PaymentCurrency string    `json:"payment_currency"`
-	LedgerAmount    float64   `json:"ledger_amount"`
-	LedgerCurrency  string    `json:"ledger_currency"`
-	FXRate          float64   `json:"fx_rate"`
-	FXSource        string    `json:"fx_source"`
-	FXTimestamp     time.Time `json:"fx_timestamp"`
-	PayAmount       float64   `json:"pay_amount"`
-	FeeRate         float64   `json:"fee_rate"`
-	Status          string    `json:"status"`
-	PaymentType     string    `json:"payment_type"`
-	PayURL          string    `json:"pay_url,omitempty"`
-	QRCode          string    `json:"qr_code,omitempty"`
-	ClientSecret    string    `json:"client_secret,omitempty"`
-	CheckoutID      string    `json:"checkout_id,omitempty"`
-	ExpiresAt       time.Time `json:"expires_at"`
-	PaymentMode     string    `json:"payment_mode,omitempty"`
+	OrderID         int64                           `json:"order_id"`
+	Amount          float64                         `json:"amount"`
+	PaymentAmount   float64                         `json:"payment_amount"`
+	PaymentCurrency string                          `json:"payment_currency"`
+	LedgerAmount    float64                         `json:"ledger_amount"`
+	LedgerCurrency  string                          `json:"ledger_currency"`
+	FXRate          float64                         `json:"fx_rate"`
+	FXSource        string                          `json:"fx_source"`
+	FXTimestamp     time.Time                       `json:"fx_timestamp"`
+	PayAmount       float64                         `json:"pay_amount"`
+	FeeRate         float64                         `json:"fee_rate"`
+	Status          string                          `json:"status"`
+	ResultType      payment.CreatePaymentResultType `json:"result_type,omitempty"`
+	PaymentType     string                          `json:"payment_type"`
+	OutTradeNo      string                          `json:"out_trade_no,omitempty"`
+	PayURL          string                          `json:"pay_url,omitempty"`
+	QRCode          string                          `json:"qr_code,omitempty"`
+	ClientSecret    string                          `json:"client_secret,omitempty"`
+	CheckoutID      string                          `json:"checkout_id,omitempty"`
+	OAuth           *payment.WechatOAuthInfo        `json:"oauth,omitempty"`
+	JSAPI           *payment.WechatJSAPIPayload     `json:"jsapi,omitempty"`
+	JSAPIPayload    *payment.WechatJSAPIPayload     `json:"jsapi_payload,omitempty"`
+	ExpiresAt       time.Time                       `json:"expires_at"`
+	PaymentMode     string                          `json:"payment_mode,omitempty"`
+	ResumeToken     string                          `json:"resume_token,omitempty"`
 }
 
 type OrderListParams struct {
@@ -174,10 +186,13 @@ type PaymentService struct {
 	configService   *PaymentConfigService
 	userRepo        UserRepository
 	groupRepo       GroupRepository
+	resumeService   *PaymentResumeService
 }
 
 func NewPaymentService(entClient *dbent.Client, registry *payment.Registry, loadBalancer payment.LoadBalancer, redeemService *RedeemService, subscriptionSvc *SubscriptionService, configService *PaymentConfigService, userRepo UserRepository, groupRepo GroupRepository) *PaymentService {
-	return &PaymentService{entClient: entClient, registry: registry, loadBalancer: loadBalancer, redeemService: redeemService, subscriptionSvc: subscriptionSvc, configService: configService, userRepo: userRepo, groupRepo: groupRepo}
+	svc := &PaymentService{entClient: entClient, registry: registry, loadBalancer: newVisibleMethodLoadBalancer(loadBalancer, configService), redeemService: redeemService, subscriptionSvc: subscriptionSvc, configService: configService, userRepo: userRepo, groupRepo: groupRepo}
+	svc.resumeService = psNewPaymentResumeService(configService)
+	return svc
 }
 
 // --- Provider Registry ---
@@ -201,53 +216,52 @@ func (s *PaymentService) RefreshProviders(ctx context.Context) {
 	s.providersLoaded = true
 }
 
+func (s *PaymentService) GetWebhookProvider(ctx context.Context, providerKey, outTradeNo string) (payment.Provider, error) {
+	if s == nil || s.registry == nil {
+		return nil, fmt.Errorf("payment registry not ready")
+	}
+	s.EnsureProviders(ctx)
+	provider, err := s.registry.GetProviderByKey(providerKey)
+	if err != nil {
+		return nil, err
+	}
+	return provider, nil
+}
+
 func (s *PaymentService) loadProviders(ctx context.Context) {
 	instances, err := s.entClient.PaymentProviderInstance.Query().
-		Where(paymentproviderinstance.EnabledEQ(true)).
+		Where(paymentproviderinstance.Enabled(true)).
 		All(ctx)
 	if err != nil {
 		slog.Error("[PaymentService] failed to query provider instances", "error", err)
 		return
 	}
+
+	var loaded int
 	for _, inst := range instances {
-		cfg, err := s.loadBalancer.GetInstanceConfig(ctx, int64(inst.ID))
-		if err != nil {
-			slog.Warn("[PaymentService] failed to decrypt config for instance", "instanceID", inst.ID, "error", err)
-			continue
+		cfg := map[string]string{}
+		if strings.TrimSpace(inst.Config) != "" {
+			decrypted, err := s.configService.decryptConfig(inst.Config)
+			if err != nil {
+				slog.Error("[PaymentService] failed to decrypt provider config", "provider", inst.ProviderKey, "instance", inst.ID, "error", err)
+				continue
+			}
+			if decrypted != nil {
+				cfg = decrypted
+			}
 		}
-		if inst.PaymentMode != "" {
-			cfg["paymentMode"] = inst.PaymentMode
-		}
-		instID := fmt.Sprintf("%d", inst.ID)
-		p, err := provider.CreateProvider(inst.ProviderKey, instID, cfg)
+		instanceID := fmt.Sprintf("%d", inst.ID)
+		p, err := provider.CreateProvider(inst.ProviderKey, instanceID, cfg)
 		if err != nil {
-			slog.Warn("[PaymentService] failed to create provider for instance", "instanceID", inst.ID, "key", inst.ProviderKey, "error", err)
+			slog.Error("[PaymentService] failed to create provider", "provider", inst.ProviderKey, "instance", instanceID, "error", err)
 			continue
 		}
 		s.registry.Register(p)
+		loaded++
+		slog.Info("[PaymentService] provider loaded", "provider", inst.ProviderKey, "instance", instanceID)
 	}
+	slog.Info("[PaymentService] providers initialized", "loaded", loaded)
 }
-
-// GetWebhookProvider returns the provider instance that should verify a webhook.
-// It extracts out_trade_no from the raw body, looks up the order to find the
-// original provider instance, and creates a provider with that instance's credentials.
-// Falls back to the registry provider when the order cannot be found.
-func (s *PaymentService) GetWebhookProvider(ctx context.Context, providerKey, outTradeNo string) (payment.Provider, error) {
-	if outTradeNo != "" {
-		order, err := s.entClient.PaymentOrder.Query().Where(paymentorder.OutTradeNo(outTradeNo)).Only(ctx)
-		if err == nil {
-			p, pErr := s.getOrderProvider(ctx, order)
-			if pErr == nil {
-				return p, nil
-			}
-			slog.Warn("[Webhook] order provider creation failed, falling back to registry", "outTradeNo", outTradeNo, "error", pErr)
-		}
-	}
-	s.EnsureProviders(ctx)
-	return s.registry.GetProviderByKey(providerKey)
-}
-
-// --- Helpers ---
 
 func psIsRefundStatus(s string) bool {
 	switch s {
@@ -265,10 +279,57 @@ func psErrMsg(err error) string {
 }
 
 func psNilIfEmpty(s string) *string {
+	s = strings.TrimSpace(s)
 	if s == "" {
 		return nil
 	}
 	return &s
+}
+
+func (s *PaymentService) usesOfficialWxpayVisibleMethod(ctx context.Context) bool {
+	if s == nil || s.configService == nil || s.configService.entClient == nil {
+		return false
+	}
+
+	instances, err := s.configService.entClient.PaymentProviderInstance.Query().
+		Where(paymentproviderinstance.EnabledEQ(true)).
+		All(ctx)
+	if err != nil {
+		return false
+	}
+
+	hasOfficial := false
+	hasEasyPay := false
+	for _, inst := range instances {
+		switch inst.ProviderKey {
+		case payment.TypeWxpay:
+			if inst.SupportedTypes == "" || payment.InstanceSupportsType(inst.SupportedTypes, payment.TypeWxpay) || payment.InstanceSupportsType(inst.SupportedTypes, payment.TypeWxpayDirect) {
+				hasOfficial = true
+			}
+		case payment.TypeEasyPay:
+			for _, supportedType := range splitTypes(inst.SupportedTypes) {
+				if NormalizeVisibleMethod(supportedType) == payment.TypeWxpay {
+					hasEasyPay = true
+					break
+				}
+			}
+		}
+	}
+
+	if !hasOfficial {
+		return false
+	}
+	if !hasEasyPay {
+		return true
+	}
+
+	source := ""
+	if s.configService.settingRepo != nil {
+		if raw, err := s.configService.settingRepo.GetValue(ctx, SettingPaymentVisibleMethodWxpaySource); err == nil {
+			source = raw
+		}
+	}
+	return NormalizeVisibleMethodSource(payment.TypeWxpay, source) == VisibleMethodSourceOfficialWechat
 }
 
 func psSliceContains(sl []string, s string) bool {
@@ -280,20 +341,18 @@ func psSliceContains(sl []string, s string) bool {
 	return false
 }
 
-// Subscription validity period unit constants.
-const (
-	validityUnitWeek  = "week"
-	validityUnitMonth = "month"
-)
-
-func psComputeValidityDays(days int, unit string) int {
-	switch unit {
-	case validityUnitWeek:
-		return days * 7
-	case validityUnitMonth:
-		return days * 30
+func psComputeValidityDays(val int, unit string) int {
+	switch strings.ToLower(strings.TrimSpace(unit)) {
+	case "day", "days", "d", "":
+		return val
+	case "week", "weeks", "w":
+		return val * 7
+	case "month", "months", "m":
+		return val * 30
+	case "year", "years", "y":
+		return val * 365
 	default:
-		return days
+		return val
 	}
 }
 
@@ -303,16 +362,88 @@ func psStartOfDayUTC(t time.Time) time.Time {
 }
 
 func applyPagination(pageSize, page int) (size, pg int) {
-	size = pageSize
-	if size <= 0 {
-		size = defaultPageSize
+	if pageSize <= 0 {
+		pageSize = defaultPageSize
 	}
-	if size > maxPageSize {
-		size = maxPageSize
+	if pageSize > maxPageSize {
+		pageSize = maxPageSize
 	}
-	pg = page
-	if pg < 1 {
-		pg = 1
+	if page <= 0 {
+		page = 1
 	}
-	return size, pg
+	return pageSize, page
+}
+
+func (s *PaymentService) paymentResume() *PaymentResumeService {
+	if s.resumeService != nil {
+		return s.resumeService
+	}
+	s.resumeService = psNewPaymentResumeService(s.configService)
+	return s.resumeService
+}
+
+func NewLegacyAwarePaymentResumeService(legacyKey []byte) *PaymentResumeService {
+	return newLegacyAwarePaymentResumeService(legacyKey)
+}
+
+func psNewPaymentResumeService(configService *PaymentConfigService) *PaymentResumeService {
+	return newLegacyAwarePaymentResumeService(psResumeLegacyVerificationKey(configService))
+}
+
+func newLegacyAwarePaymentResumeService(legacyKey []byte) *PaymentResumeService {
+	signingKey, verifyFallbacks := resolvePaymentResumeSigningKeys(legacyKey)
+	return NewPaymentResumeService(signingKey, verifyFallbacks...)
+}
+
+func psResumeLegacyVerificationKey(configService *PaymentConfigService) []byte {
+	if configService == nil {
+		return nil
+	}
+	return configService.encryptionKey
+}
+
+func resolvePaymentResumeSigningKeys(legacyKey []byte) ([]byte, [][]byte) {
+	signingKey := parsePaymentResumeSigningKey(os.Getenv(paymentResumeSigningKeyEnv))
+	if len(signingKey) == 0 {
+		if len(legacyKey) == 0 {
+			return nil, nil
+		}
+		return legacyKey, nil
+	}
+	if len(legacyKey) == 0 || bytes.Equal(legacyKey, signingKey) {
+		return signingKey, nil
+	}
+	return signingKey, [][]byte{legacyKey}
+}
+
+func parsePaymentResumeSigningKey(raw string) []byte {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	if len(raw) >= 64 && len(raw)%2 == 0 {
+		if decoded, err := hex.DecodeString(raw); err == nil && len(decoded) > 0 {
+			return decoded
+		}
+	}
+	return []byte(raw)
+}
+
+func psBuildResumeTokenLegacySecret() []byte {
+	legacy := strings.TrimSpace(os.Getenv(paymentResumeSigningKeyEnv))
+	if legacy == "" {
+		return nil
+	}
+	if raw, err := hex.DecodeString(legacy); err == nil {
+		switch len(raw) {
+		case 32, 48, 64:
+			cp := make([]byte, len(raw))
+			copy(cp, raw)
+			return cp
+		}
+	}
+	buf := bytes.Repeat([]byte(legacy), 32/len(legacy)+1)
+	out := make([]byte, 32)
+	copy(out, buf[:32])
+	return out
 }

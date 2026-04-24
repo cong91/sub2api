@@ -2237,6 +2237,26 @@ func writeProviderDefaultGrantUpdates(updates map[string]string, keys authSource
 	updates[keys.grantOnFirstBind] = strconv.FormatBool(settings.GrantOnFirstBind)
 }
 
+func authSourceSignupSettings(defaults *AuthSourceDefaultSettings, signupSource string) (ProviderDefaultGrantSettings, bool) {
+	if defaults == nil {
+		return ProviderDefaultGrantSettings{}, false
+	}
+
+	source := strings.TrimSpace(strings.ToLower(signupSource))
+	switch source {
+	case "email":
+		return defaults.Email, true
+	case "linuxdo", "linux_do":
+		return defaults.LinuxDo, true
+	case "oidc":
+		return defaults.OIDC, true
+	case "wechat", "we_chat":
+		return defaults.WeChat, true
+	default:
+		return ProviderDefaultGrantSettings{}, false
+	}
+}
+
 func mergeProviderDefaultGrantSettings(globalDefaults ProviderDefaultGrantSettings, providerDefaults ProviderDefaultGrantSettings) ProviderDefaultGrantSettings {
 	result := ProviderDefaultGrantSettings{
 		Balance:          globalDefaults.Balance,

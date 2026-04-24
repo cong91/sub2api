@@ -15,29 +15,29 @@ import (
 )
 
 const (
-	SettingPaymentEnabled           = "payment_enabled"
-	SettingMinRechargeAmount        = "MIN_RECHARGE_AMOUNT"
-	SettingMaxRechargeAmount        = "MAX_RECHARGE_AMOUNT"
-	SettingDailyRechargeLimit       = "DAILY_RECHARGE_LIMIT"
-	SettingOrderTimeoutMinutes      = "ORDER_TIMEOUT_MINUTES"
-	SettingMaxPendingOrders         = "MAX_PENDING_ORDERS"
-	SettingEnabledPaymentTypes      = "ENABLED_PAYMENT_TYPES"
-	SettingLoadBalanceStrategy      = "LOAD_BALANCE_STRATEGY"
-	SettingBalancePayDisabled       = "BALANCE_PAYMENT_DISABLED"
-	SettingBalanceRechargeMult      = "BALANCE_RECHARGE_MULTIPLIER"
-	SettingRechargeFeeRate          = "RECHARGE_FEE_RATE"
-	SettingProductNamePrefix        = "PRODUCT_NAME_PREFIX"
-	SettingProductNameSuffix        = "PRODUCT_NAME_SUFFIX"
-	SettingHelpImageURL             = "PAYMENT_HELP_IMAGE_URL"
-	SettingHelpText                 = "PAYMENT_HELP_TEXT"
-	SettingCancelRateLimitOn        = "CANCEL_RATE_LIMIT_ENABLED"
-	SettingCancelRateLimitMax       = "CANCEL_RATE_LIMIT_MAX"
-	SettingCancelWindowSize         = "CANCEL_RATE_LIMIT_WINDOW"
-	SettingCancelWindowUnit         = "CANCEL_RATE_LIMIT_UNIT"
-	SettingCancelWindowMode         = "CANCEL_RATE_LIMIT_WINDOW_MODE"
-	SettingLedgerCurrency           = "PAYMENT_LEDGER_CURRENCY"
-	SettingAllowedPaymentCurrencies = "PAYMENT_ALLOWED_CURRENCIES"
-	SettingManualFXRates            = "PAYMENT_MANUAL_FX_RATES_JSON"
+	SettingPaymentEnabled                = "payment_enabled"
+	SettingMinRechargeAmount             = "MIN_RECHARGE_AMOUNT"
+	SettingMaxRechargeAmount             = "MAX_RECHARGE_AMOUNT"
+	SettingDailyRechargeLimit            = "DAILY_RECHARGE_LIMIT"
+	SettingOrderTimeoutMinutes           = "ORDER_TIMEOUT_MINUTES"
+	SettingMaxPendingOrders              = "MAX_PENDING_ORDERS"
+	SettingEnabledPaymentTypes           = "ENABLED_PAYMENT_TYPES"
+	SettingLoadBalanceStrategy           = "LOAD_BALANCE_STRATEGY"
+	SettingBalancePayDisabled            = "BALANCE_PAYMENT_DISABLED"
+	SettingBalanceRechargeMult           = "BALANCE_RECHARGE_MULTIPLIER"
+	SettingRechargeFeeRate               = "RECHARGE_FEE_RATE"
+	SettingProductNamePrefix             = "PRODUCT_NAME_PREFIX"
+	SettingProductNameSuffix             = "PRODUCT_NAME_SUFFIX"
+	SettingHelpImageURL                  = "PAYMENT_HELP_IMAGE_URL"
+	SettingHelpText                      = "PAYMENT_HELP_TEXT"
+	SettingCancelRateLimitOn             = "CANCEL_RATE_LIMIT_ENABLED"
+	SettingCancelRateLimitMax            = "CANCEL_RATE_LIMIT_MAX"
+	SettingCancelWindowSize              = "CANCEL_RATE_LIMIT_WINDOW"
+	SettingCancelWindowUnit              = "CANCEL_RATE_LIMIT_UNIT"
+	SettingCancelWindowMode              = "CANCEL_RATE_LIMIT_WINDOW_MODE"
+	SettingLedgerCurrency                = "PAYMENT_LEDGER_CURRENCY"
+	SettingAllowedPaymentCurrencies      = "PAYMENT_ALLOWED_CURRENCIES"
+	SettingManualFXRates                 = "PAYMENT_MANUAL_FX_RATES_JSON"
 )
 
 // Default values for payment configuration settings.
@@ -72,6 +72,10 @@ type PaymentConfig struct {
 	LedgerCurrency            string             `json:"ledger_currency"`
 	AllowedPaymentCurrencies  []string           `json:"allowed_payment_currencies"`
 	ManualFXRates             map[string]float64 `json:"manual_fx_rates"`
+	VisibleMethodAlipaySource string             `json:"payment_visible_method_alipay_source"`
+	VisibleMethodWxpaySource  string             `json:"payment_visible_method_wxpay_source"`
+	VisibleMethodAlipayEnabled bool              `json:"payment_visible_method_alipay_enabled"`
+	VisibleMethodWxpayEnabled  bool              `json:"payment_visible_method_wxpay_enabled"`
 
 	// Cancel rate limit settings
 	CancelRateLimitEnabled bool   `json:"cancel_rate_limit_enabled"`
@@ -101,6 +105,10 @@ type UpdatePaymentConfigRequest struct {
 	LedgerCurrency            *string  `json:"ledger_currency"`
 	AllowedPaymentCurrencies  []string `json:"allowed_payment_currencies"`
 	ManualFXRates             *string  `json:"manual_fx_rates"`
+	VisibleMethodAlipaySource  *string `json:"payment_visible_method_alipay_source"`
+	VisibleMethodWxpaySource   *string `json:"payment_visible_method_wxpay_source"`
+	VisibleMethodAlipayEnabled *bool   `json:"payment_visible_method_alipay_enabled"`
+	VisibleMethodWxpayEnabled  *bool   `json:"payment_visible_method_wxpay_enabled"`
 
 	// Cancel rate limit settings
 	CancelRateLimitEnabled *bool   `json:"cancel_rate_limit_enabled"`
@@ -210,6 +218,8 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 		SettingProductNamePrefix, SettingProductNameSuffix,
 		SettingHelpImageURL, SettingHelpText,
 		SettingLedgerCurrency, SettingAllowedPaymentCurrencies, SettingManualFXRates,
+		SettingPaymentVisibleMethodAlipaySource, SettingPaymentVisibleMethodWxpaySource,
+		SettingPaymentVisibleMethodAlipayEnabled, SettingPaymentVisibleMethodWxpayEnabled,
 		SettingCancelRateLimitOn, SettingCancelRateLimitMax,
 		SettingCancelWindowSize, SettingCancelWindowUnit, SettingCancelWindowMode,
 	}
@@ -243,6 +253,10 @@ func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *Payme
 		LedgerCurrency:            normalizeCurrencyCode(vals[SettingLedgerCurrency], defaultLedgerCurrency),
 		AllowedPaymentCurrencies:  parseCurrencyList(vals[SettingAllowedPaymentCurrencies], defaultPaymentCurrencyCSV),
 		ManualFXRates:             parseManualFXRates(vals[SettingManualFXRates]),
+		VisibleMethodAlipaySource: NormalizeVisibleMethodSource(payment.TypeAlipay, vals[SettingPaymentVisibleMethodAlipaySource]),
+		VisibleMethodWxpaySource:  NormalizeVisibleMethodSource(payment.TypeWxpay, vals[SettingPaymentVisibleMethodWxpaySource]),
+		VisibleMethodAlipayEnabled: vals[SettingPaymentVisibleMethodAlipayEnabled] == "true",
+		VisibleMethodWxpayEnabled:  vals[SettingPaymentVisibleMethodWxpayEnabled] == "true",
 
 		CancelRateLimitEnabled: vals[SettingCancelRateLimitOn] == "true",
 		CancelRateLimitMax:     pcParseInt(vals[SettingCancelRateLimitMax], 10),
@@ -254,12 +268,20 @@ func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *Payme
 		cfg.LoadBalanceStrategy = payment.DefaultLoadBalanceStrategy
 	}
 	if raw := vals[SettingEnabledPaymentTypes]; raw != "" {
-		for _, t := range strings.Split(raw, ",") {
-			t = strings.TrimSpace(t)
-			if t != "" {
-				cfg.EnabledTypes = append(cfg.EnabledTypes, t)
+		normalized := make([]string, 0, len(splitTypes(raw)))
+		seen := make(map[string]struct{})
+		for _, paymentType := range splitTypes(raw) {
+			visibleMethod := NormalizeVisibleMethod(paymentType)
+			if visibleMethod == "" {
+				continue
 			}
+			if _, ok := seen[visibleMethod]; ok {
+				continue
+			}
+			seen[visibleMethod] = struct{}{}
+			normalized = append(normalized, visibleMethod)
 		}
+		cfg.EnabledTypes = normalized
 	}
 	if len(cfg.AllowedPaymentCurrencies) == 0 {
 		cfg.AllowedPaymentCurrencies = parseCurrencyList(defaultPaymentCurrencyCSV, defaultPaymentCurrencyCSV)
@@ -337,28 +359,32 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 		}
 	}
 	m := map[string]string{
-		SettingPaymentEnabled:           formatBoolOrEmpty(req.Enabled),
-		SettingMinRechargeAmount:        formatPositiveFloat(req.MinAmount),
-		SettingMaxRechargeAmount:        formatPositiveFloat(req.MaxAmount),
-		SettingDailyRechargeLimit:       formatPositiveFloat(req.DailyLimit),
-		SettingOrderTimeoutMinutes:      formatPositiveInt(req.OrderTimeoutMin),
-		SettingMaxPendingOrders:         formatPositiveInt(req.MaxPendingOrders),
-		SettingBalancePayDisabled:       formatBoolOrEmpty(req.BalanceDisabled),
-		SettingBalanceRechargeMult:      formatPositiveFloat(req.BalanceRechargeMultiplier),
-		SettingRechargeFeeRate:          formatNonNegativeFloat(req.RechargeFeeRate),
-		SettingLoadBalanceStrategy:      derefStr(req.LoadBalanceStrategy),
-		SettingProductNamePrefix:        derefStr(req.ProductNamePrefix),
-		SettingProductNameSuffix:        derefStr(req.ProductNameSuffix),
-		SettingHelpImageURL:             derefStr(req.HelpImageURL),
-		SettingHelpText:                 derefStr(req.HelpText),
-		SettingLedgerCurrency:           normalizeCurrencyCode(derefStr(req.LedgerCurrency), ""),
-		SettingAllowedPaymentCurrencies: strings.Join(normalizeCurrencyList(req.AllowedPaymentCurrencies), ","),
-		SettingManualFXRates:            normalizeManualFXRatesJSON(derefStr(req.ManualFXRates)),
-		SettingCancelRateLimitOn:        formatBoolOrEmpty(req.CancelRateLimitEnabled),
-		SettingCancelRateLimitMax:       formatPositiveInt(req.CancelRateLimitMax),
-		SettingCancelWindowSize:         formatPositiveInt(req.CancelRateLimitWindow),
-		SettingCancelWindowUnit:         derefStr(req.CancelRateLimitUnit),
-		SettingCancelWindowMode:         derefStr(req.CancelRateLimitMode),
+		SettingPaymentEnabled:                  formatBoolOrEmpty(req.Enabled),
+		SettingMinRechargeAmount:               formatPositiveFloat(req.MinAmount),
+		SettingMaxRechargeAmount:               formatPositiveFloat(req.MaxAmount),
+		SettingDailyRechargeLimit:              formatPositiveFloat(req.DailyLimit),
+		SettingOrderTimeoutMinutes:             formatPositiveInt(req.OrderTimeoutMin),
+		SettingMaxPendingOrders:                formatPositiveInt(req.MaxPendingOrders),
+		SettingBalancePayDisabled:              formatBoolOrEmpty(req.BalanceDisabled),
+		SettingBalanceRechargeMult:             formatPositiveFloat(req.BalanceRechargeMultiplier),
+		SettingRechargeFeeRate:                 formatNonNegativeFloat(req.RechargeFeeRate),
+		SettingLoadBalanceStrategy:             derefStr(req.LoadBalanceStrategy),
+		SettingProductNamePrefix:               derefStr(req.ProductNamePrefix),
+		SettingProductNameSuffix:               derefStr(req.ProductNameSuffix),
+		SettingHelpImageURL:                    derefStr(req.HelpImageURL),
+		SettingHelpText:                        derefStr(req.HelpText),
+		SettingLedgerCurrency:                  normalizeCurrencyCode(derefStr(req.LedgerCurrency), ""),
+		SettingAllowedPaymentCurrencies:        strings.Join(normalizeCurrencyList(req.AllowedPaymentCurrencies), ","),
+		SettingManualFXRates:                   normalizeManualFXRatesJSON(derefStr(req.ManualFXRates)),
+		SettingPaymentVisibleMethodAlipaySource:  derefStr(req.VisibleMethodAlipaySource),
+		SettingPaymentVisibleMethodWxpaySource:   derefStr(req.VisibleMethodWxpaySource),
+		SettingPaymentVisibleMethodAlipayEnabled: formatBoolOrEmpty(req.VisibleMethodAlipayEnabled),
+		SettingPaymentVisibleMethodWxpayEnabled:  formatBoolOrEmpty(req.VisibleMethodWxpayEnabled),
+		SettingCancelRateLimitOn:               formatBoolOrEmpty(req.CancelRateLimitEnabled),
+		SettingCancelRateLimitMax:              formatPositiveInt(req.CancelRateLimitMax),
+		SettingCancelWindowSize:                formatPositiveInt(req.CancelRateLimitWindow),
+		SettingCancelWindowUnit:                derefStr(req.CancelRateLimitUnit),
+		SettingCancelWindowMode:                derefStr(req.CancelRateLimitMode),
 	}
 	if req.EnabledTypes != nil {
 		m[SettingEnabledPaymentTypes] = strings.Join(req.EnabledTypes, ",")
@@ -420,6 +446,82 @@ func splitTypes(s string) []string {
 
 func joinTypes(types []string) string {
 	return strings.Join(types, ",")
+}
+
+func applyVisibleMethodRoutingToEnabledTypes(base []string, vals map[string]string, available map[string]bool) []string {
+	shouldExpose := map[string]bool{
+		payment.TypeAlipay: visibleMethodShouldBeExposed(payment.TypeAlipay, vals, available),
+		payment.TypeWxpay:  visibleMethodShouldBeExposed(payment.TypeWxpay, vals, available),
+	}
+
+	seen := make(map[string]struct{}, len(base)+2)
+	out := make([]string, 0, len(base)+2)
+	appendType := func(paymentType string) {
+		paymentType = NormalizeVisibleMethod(paymentType)
+		if paymentType == "" {
+			return
+		}
+		if _, ok := seen[paymentType]; ok {
+			return
+		}
+		seen[paymentType] = struct{}{}
+		out = append(out, paymentType)
+	}
+
+	for _, paymentType := range base {
+		visibleMethod := NormalizeVisibleMethod(paymentType)
+		switch visibleMethod {
+		case payment.TypeAlipay, payment.TypeWxpay:
+			if shouldExpose[visibleMethod] {
+				appendType(visibleMethod)
+			}
+		default:
+			appendType(visibleMethod)
+		}
+	}
+
+	for _, visibleMethod := range []string{payment.TypeAlipay, payment.TypeWxpay} {
+		if shouldExpose[visibleMethod] {
+			appendType(visibleMethod)
+		}
+	}
+	return out
+}
+
+func buildVisibleMethodSourceAvailability(instances []*dbent.PaymentProviderInstance) map[string]bool {
+	available := make(map[string]bool, 4)
+	for _, inst := range instances {
+		switch inst.ProviderKey {
+		case payment.TypeAlipay:
+			if inst.SupportedTypes == "" || payment.InstanceSupportsType(inst.SupportedTypes, payment.TypeAlipay) || payment.InstanceSupportsType(inst.SupportedTypes, payment.TypeAlipayDirect) {
+				available[VisibleMethodSourceOfficialAlipay] = true
+			}
+		case payment.TypeWxpay:
+			if inst.SupportedTypes == "" || payment.InstanceSupportsType(inst.SupportedTypes, payment.TypeWxpay) || payment.InstanceSupportsType(inst.SupportedTypes, payment.TypeWxpayDirect) {
+				available[VisibleMethodSourceOfficialWechat] = true
+			}
+		case payment.TypeEasyPay:
+			for _, supportedType := range splitTypes(inst.SupportedTypes) {
+				switch NormalizeVisibleMethod(supportedType) {
+				case payment.TypeAlipay:
+					available[VisibleMethodSourceEasyPayAlipay] = true
+				case payment.TypeWxpay:
+					available[VisibleMethodSourceEasyPayWechat] = true
+				}
+			}
+		}
+	}
+	return available
+}
+
+func visibleMethodShouldBeExposed(method string, vals map[string]string, available map[string]bool) bool {
+	enabledKey := visibleMethodEnabledSettingKey(method)
+	sourceKey := visibleMethodSourceSettingKey(method)
+	if enabledKey == "" || sourceKey == "" || vals[enabledKey] != "true" {
+		return false
+	}
+	source := NormalizeVisibleMethodSource(method, vals[sourceKey])
+	return source != "" && available[source]
 }
 
 func pcParseFloat(s string, defaultVal float64) float64 {

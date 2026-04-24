@@ -17,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
 	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
+	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -2683,7 +2684,7 @@ func (r *oauthPendingFlowUserRepo) Delete(ctx context.Context, id int64) error {
 			return errors.New("cannot delete user while auth identities still exist")
 		}
 	}
-	return r.client.User.DeleteOneID(id).Exec(ctx)
+	return r.client.User.DeleteOneID(id).Exec(mixins.SkipSoftDelete(ctx))
 }
 
 func (r *oauthPendingFlowUserRepo) GetUserAvatar(ctx context.Context, userID int64) (*service.UserAvatar, error) {

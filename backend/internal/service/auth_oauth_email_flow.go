@@ -9,7 +9,11 @@ import (
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/authidentity"
+	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
+	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
+	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 )
 
 func normalizeOAuthSignupSource(signupSource string) string {
@@ -206,7 +210,27 @@ func (s *AuthService) RollbackOAuthEmailAccountCreation(ctx context.Context, use
 	if err := s.restoreOAuthRegistrationInvitation(ctx, invitationCode, userID); err != nil {
 		return err
 	}
-	if err := s.userRepo.Delete(ctx, userID); err != nil {
+	if client := s.oauthEmailFlowClient(ctx); client != nil {
+		if _, err := client.IdentityAdoptionDecision.Update().
+			Where(identityadoptiondecision.HasIdentityWith(authidentity.UserIDEQ(userID))).
+			ClearIdentityID().
+			Save(ctx); err != nil {
+			return fmt.Errorf("clear identity adoption decisions for oauth rollback: %w", err)
+		}
+		identityIDs, err := client.AuthIdentity.Query().Where(authidentity.UserIDEQ(userID)).IDs(ctx)
+		if err != nil {
+			return fmt.Errorf("query auth identities for oauth rollback: %w", err)
+		}
+		if len(identityIDs) > 0 {
+			if _, err := client.AuthIdentityChannel.Delete().Where(authidentitychannel.IdentityIDIn(identityIDs...)).Exec(ctx); err != nil {
+				return fmt.Errorf("delete auth identity channels for oauth rollback: %w", err)
+			}
+			if _, err := client.AuthIdentity.Delete().Where(authidentity.UserIDEQ(userID)).Exec(ctx); err != nil {
+				return fmt.Errorf("delete auth identities for oauth rollback: %w", err)
+			}
+		}
+	}
+	if err := s.userRepo.Delete(mixins.SkipSoftDelete(ctx), userID); err != nil {
 		return fmt.Errorf("delete created oauth user: %w", err)
 	}
 	return nil
