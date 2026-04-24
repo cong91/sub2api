@@ -1491,6 +1491,22 @@
                   {{ t('admin.settings.defaults.defaultConcurrencyHint') }}
                 </p>
               </div>
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.defaults.deviceClaimBonusBalance') }}
+                </label>
+                <input
+                  v-model.number="form.device_claim_bonus_balance"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input"
+                  placeholder="0.00"
+                />
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.defaults.deviceClaimBonusBalanceHint') }}
+                </p>
+              </div>
             </div>
 
             <div class="border-t border-gray-100 pt-4 dark:border-dark-700">
@@ -2973,6 +2989,7 @@ const form = reactive<SettingsForm>({
   totp_encryption_key_configured: false,
   default_balance: 0,
   default_concurrency: 1,
+  device_claim_bonus_balance: 0,
   default_subscriptions: [],
   site_name: 'Sub2API',
   site_logo: '',
@@ -3570,6 +3587,7 @@ async function saveSettings() {
       totp_enabled: form.totp_enabled,
       default_balance: form.default_balance,
       default_concurrency: form.default_concurrency,
+      device_claim_bonus_balance: Number(form.device_claim_bonus_balance) || 0,
       default_subscriptions: normalizedDefaultSubscriptions,
       site_name: form.site_name,
       site_logo: form.site_logo,

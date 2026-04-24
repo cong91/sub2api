@@ -309,6 +309,7 @@ export interface SystemSettings {
   // Default settings
   default_balance: number;
   default_concurrency: number;
+  device_claim_bonus_balance: number;
   default_user_rpm_limit: number;
   default_subscriptions: DefaultSubscriptionSetting[];
   auth_source_default_email_balance?: number;
@@ -490,6 +491,7 @@ export interface UpdateSettingsRequest {
   totp_enabled?: boolean; // TOTP 双因素认证
   default_balance?: number;
   default_concurrency?: number;
+  device_claim_bonus_balance?: number;
   default_user_rpm_limit?: number;
   default_subscriptions?: DefaultSubscriptionSetting[];
   auth_source_default_email_balance?: number;
