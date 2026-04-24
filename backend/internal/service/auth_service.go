@@ -15,10 +15,12 @@ import (
 	"unicode"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/authidentity"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 
+	"entgo.io/ent/dialect"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -84,6 +86,12 @@ type DefaultSubscriptionAssigner interface {
 	AssignOrExtendSubscription(ctx context.Context, input *AssignSubscriptionInput) (*UserSubscription, bool, error)
 }
 
+type signupGrantPlan struct {
+	Balance       float64
+	Concurrency   int
+	Subscriptions []DefaultSubscriptionSetting
+}
+
 type InviteBootstrapAPIKey struct {
 	ID       int64  `json:"id"`
 	Name     string `json:"name"`
@@ -137,7 +145,6 @@ func (s *AuthService) SetInviteBootstrapAPIKeyService(svc InviteBootstrapAPIKeyS
 func (s *AuthService) SetInviteBootstrapGroupRepository(repo GroupRepository) {
 	s.groupRepo = repo
 }
-
 func (s *AuthService) SetAffiliateService(affiliateService *AffiliateService) {
 	if s == nil {
 		return
@@ -145,8 +152,17 @@ func (s *AuthService) SetAffiliateService(affiliateService *AffiliateService) {
 	s.affiliateService = affiliateService
 }
 
+// SetUserDeviceRepository sets the optional user-device repository used by device claim/login flows.
 func (s *AuthService) SetUserDeviceRepository(repo UserDeviceRepository) {
 	s.userDeviceRepo = repo
+}
+
+// EntClient exposes the underlying ent client for flows that need direct ent-backed services.
+func (s *AuthService) EntClient() *dbent.Client {
+	if s == nil {
+		return nil
+	}
+	return s.entClient
 }
 
 // Register 用户注册，返回token和用户
@@ -878,6 +894,222 @@ func (s *AuthService) IsEmailVerifyEnabled(ctx context.Context) bool {
 }
 
 // Login 用户登录，返回JWT token
+func (s *AuthService) assignSubscriptions(ctx context.Context, userID int64, items []DefaultSubscriptionSetting, notes string) {
+	if s.settingService == nil || s.defaultSubAssigner == nil || userID <= 0 {
+		return
+	}
+	for _, item := range items {
+		if _, _, err := s.defaultSubAssigner.AssignOrExtendSubscription(ctx, &AssignSubscriptionInput{
+			UserID:       userID,
+			GroupID:      item.GroupID,
+			ValidityDays: item.ValidityDays,
+			Notes:        notes,
+		}); err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to assign default subscription: user_id=%d group_id=%d err=%v", userID, item.GroupID, err)
+		}
+	}
+}
+
+func (s *AuthService) resolveSignupGrantPlan(ctx context.Context, signupSource string) signupGrantPlan {
+	plan := signupGrantPlan{}
+	if s != nil && s.cfg != nil {
+		plan.Balance = s.cfg.Default.UserBalance
+		plan.Concurrency = s.cfg.Default.UserConcurrency
+	}
+	if s == nil || s.settingService == nil {
+		return plan
+	}
+
+	plan.Balance = s.settingService.GetDefaultBalance(ctx)
+	plan.Concurrency = s.settingService.GetDefaultConcurrency(ctx)
+	plan.Subscriptions = s.settingService.GetDefaultSubscriptions(ctx)
+
+	resolved, enabled, err := s.settingService.ResolveAuthSourceGrantSettings(ctx, signupSource, false)
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to load auth source signup defaults for %s: %v", signupSource, err)
+		return plan
+	}
+	if !enabled {
+		return plan
+	}
+
+	plan.Balance = resolved.Balance
+	plan.Concurrency = resolved.Concurrency
+	plan.Subscriptions = resolved.Subscriptions
+	return plan
+}
+
+func (s *AuthService) touchUserLogin(ctx context.Context, userID int64) {
+	if s == nil || s.entClient == nil || userID <= 0 {
+		return
+	}
+	now := time.Now().UTC()
+	if err := s.entClient.User.UpdateOneID(userID).
+		SetLastLoginAt(now).
+		SetLastActiveAt(now).
+		Exec(ctx); err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to touch login timestamps: user_id=%d err=%v", userID, err)
+	}
+}
+
+func (s *AuthService) backfillEmailIdentityOnSuccessfulLogin(ctx context.Context, user *User) {
+	if s == nil || user == nil || user.ID <= 0 {
+		return
+	}
+	identity, created := s.ensureEmailAuthIdentity(ctx, user, "auth_service_login_backfill")
+	if s.shouldApplyEmailFirstBindDefaults(ctx, user.ID, identity, created) {
+		if err := s.ApplyProviderDefaultSettingsOnFirstBind(ctx, user.ID, "email"); err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to apply email first bind defaults: user_id=%d err=%v", user.ID, err)
+		}
+	}
+}
+
+func (s *AuthService) shouldApplyEmailFirstBindDefaults(
+	ctx context.Context,
+	userID int64,
+	identity *dbent.AuthIdentity,
+	created bool,
+) bool {
+	source := emailAuthIdentitySource(identity.Metadata)
+	if source == "auth_service_login_backfill" {
+		return false
+	}
+	if created {
+		return true
+	}
+	if s == nil || s.entClient == nil || userID <= 0 || identity == nil || identity.UserID != userID {
+		return false
+	}
+	if source != "auth_service_dual_write" {
+		return false
+	}
+
+	hasGrant, err := s.hasProviderGrantRecord(ctx, userID, "email", "first_bind")
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to inspect email first bind grant state: user_id=%d err=%v", userID, err)
+		return false
+	}
+	return !hasGrant
+}
+
+func emailAuthIdentitySource(metadata map[string]any) string {
+	if len(metadata) == 0 {
+		return ""
+	}
+	raw, ok := metadata["source"]
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(raw))
+}
+
+func (s *AuthService) hasProviderGrantRecord(
+	ctx context.Context,
+	userID int64,
+	providerType string,
+	grantReason string,
+) (bool, error) {
+	if s == nil || s.entClient == nil || userID <= 0 {
+		return false, nil
+	}
+
+	providerType = strings.TrimSpace(providerType)
+	grantReason = strings.TrimSpace(grantReason)
+	if providerType == "" || grantReason == "" {
+		return false, nil
+	}
+
+	client := s.entClient
+	if tx := dbent.TxFromContext(ctx); tx != nil {
+		client = tx.Client()
+	}
+
+	query := `SELECT 1 FROM user_provider_default_grants WHERE user_id = ? AND provider_type = ? AND grant_reason = ? LIMIT 1`
+	args := []any{userID, providerType, grantReason}
+	if drv := client.Driver(); drv != nil && drv.Dialect() == dialect.Postgres {
+		query = `SELECT 1 FROM user_provider_default_grants WHERE user_id = $1 AND provider_type = $2 AND grant_reason = $3 LIMIT 1`
+	}
+
+	rows, err := client.QueryContext(ctx, query, args...)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = rows.Close() }()
+	return rows.Next(), rows.Err()
+}
+
+func (s *AuthService) ensureEmailAuthIdentity(ctx context.Context, user *User, source string) (*dbent.AuthIdentity, bool) {
+	if s == nil || s.entClient == nil || user == nil || user.ID <= 0 {
+		return nil, false
+	}
+
+	email := strings.ToLower(strings.TrimSpace(user.Email))
+	if email == "" || isReservedEmail(email) {
+		return nil, false
+	}
+	if strings.TrimSpace(source) == "" {
+		source = "auth_service_dual_write"
+	}
+
+	client := s.entClient
+	if tx := dbent.TxFromContext(ctx); tx != nil {
+		client = tx.Client()
+	}
+
+	buildQuery := func() *dbent.AuthIdentityQuery {
+		return client.AuthIdentity.Query().Where(
+			authidentity.ProviderTypeEQ("email"),
+			authidentity.ProviderKeyEQ("email"),
+			authidentity.ProviderSubjectEQ(email),
+		)
+	}
+
+	existed, err := buildQuery().Exist(ctx)
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to inspect email auth identity: user_id=%d email=%s err=%v", user.ID, email, err)
+		return nil, false
+	}
+
+	if !existed {
+		if err := client.AuthIdentity.Create().
+			SetUserID(user.ID).
+			SetProviderType("email").
+			SetProviderKey("email").
+			SetProviderSubject(email).
+			SetVerifiedAt(time.Now().UTC()).
+			SetMetadata(map[string]any{
+				"source": strings.TrimSpace(source),
+			}).
+			OnConflictColumns(
+				authidentity.FieldProviderType,
+				authidentity.FieldProviderKey,
+				authidentity.FieldProviderSubject,
+			).
+			DoNothing().
+			Exec(ctx); err != nil {
+			if isSQLNoRowsError(err) {
+				return nil, false
+			}
+		}
+		if err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to ensure email auth identity: user_id=%d email=%s err=%v", user.ID, email, err)
+			return nil, false
+		}
+	}
+
+	identity, err := buildQuery().Only(ctx)
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to reload email auth identity: user_id=%d email=%s err=%v", user.ID, email, err)
+		return nil, false
+	}
+	if identity.UserID != user.ID {
+		logger.LegacyPrintf("service.auth", "[Auth] Email auth identity ownership mismatch: user_id=%d email=%s owner_id=%d", user.ID, email, identity.UserID)
+		return nil, false
+	}
+
+	return identity, !existed
+}
+
 func (s *AuthService) Login(ctx context.Context, email, password string) (string, *User, error) {
 	// 查找用户
 	user, err := s.userRepo.GetByEmail(ctx, email)
@@ -963,6 +1195,7 @@ func (s *AuthService) LoginOrRegisterOAuth(ctx context.Context, email, username 
 				Balance:      defaultBalance,
 				Concurrency:  defaultConcurrency,
 				Status:       StatusActive,
+				SignupSource: "email",
 			}
 
 			if err := s.userRepo.Create(ctx, newUser); err != nil {
@@ -1077,6 +1310,7 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 				Balance:      defaultBalance,
 				Concurrency:  defaultConcurrency,
 				Status:       StatusActive,
+				SignupSource: "email",
 			}
 
 			if s.entClient != nil && invitationRedeemCode != nil {
@@ -1748,6 +1982,24 @@ func (s *AuthService) RevokeAllUserSessions(ctx context.Context, userID int64) e
 		return nil // No-op if cache not configured
 	}
 	return s.refreshTokenCache.DeleteUserRefreshTokens(ctx, userID)
+}
+
+// RevokeAllUserTokens invalidates both stateless access tokens and refresh sessions.
+// Access/refresh token verification both depend on TokenVersion, so bumping it provides
+// immediate revocation even if refresh-token cache cleanup later fails.
+func (s *AuthService) RevokeAllUserTokens(ctx context.Context, userID int64) error {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("get user: %w", err)
+	}
+	user.TokenVersion++
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return fmt.Errorf("update user: %w", err)
+	}
+	if err := s.RevokeAllUserSessions(ctx, userID); err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to revoke refresh sessions after token invalidation for user %d: %v", userID, err)
+	}
+	return nil
 }
 
 // hashToken 计算Token的SHA256哈希

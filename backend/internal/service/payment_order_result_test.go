@@ -108,7 +108,7 @@ func TestMaybeBuildWeChatOAuthRequiredResponse(t *testing.T) {
 		Amount:          12.5,
 		PaymentType:     payment.TypeWxpay,
 		IsWeChatBrowser: true,
-		SrcURL:          "https://merchant.example/payment?from=wechat",
+		SrcURL:          "https://merchant.example/purchase?from=wechat",
 		OrderType:       payment.OrderTypeBalance,
 	}, 12.5, 12.88, 0.03)
 	if err != nil {

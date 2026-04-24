@@ -12,20 +12,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 )
 
-// GetWebhookProvider returns the provider instance that should verify a webhook.
-// It resolves the original provider instance from the order whenever possible and
-// only falls back to a registry provider for legacy/single-instance scenarios.
-func (s *PaymentService) GetWebhookProvider(ctx context.Context, providerKey, outTradeNo string) (payment.Provider, error) {
-	providers, err := s.GetWebhookProviders(ctx, providerKey, outTradeNo)
-	if err != nil {
-		return nil, err
-	}
-	if len(providers) == 0 {
-		return nil, payment.ErrProviderNotFound
-	}
-	return providers[0], nil
-}
-
 // GetWebhookProviders returns provider candidates that can verify the webhook.
 // Official WeChat Pay may require multiple candidates because the callback body
 // cannot be bound to a merchant before decryption.

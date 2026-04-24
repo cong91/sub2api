@@ -412,6 +412,25 @@ type PublicOrderResult struct {
 // VerifyOrderPublic verifies payment status without requiring authentication.
 // Returns limited order info (no user details) to prevent information leakage.
 // POST /api/v1/payment/public/orders/verify
+type resolveOrderPublicByResumeTokenRequest struct {
+	ResumeToken string `json:"resume_token" binding:"required"`
+}
+
+// ResolveOrderPublicByResumeToken resolves an order using a signed resume token.
+func (h *PaymentHandler) ResolveOrderPublicByResumeToken(c *gin.Context) {
+	var req resolveOrderPublicByResumeTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	order, err := h.paymentService.GetPublicOrderByResumeToken(c.Request.Context(), req.ResumeToken)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, order)
+}
+
 func (h *PaymentHandler) VerifyOrderPublic(c *gin.Context) {
 	var req VerifyOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -455,3 +474,4 @@ func isMobile(c *gin.Context) bool {
 	}
 	return false
 }
+

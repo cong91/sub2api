@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"entgo.io/ent/dialect"
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
 	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
@@ -172,13 +171,13 @@ func authPendingIdentityAdvisoryLockHash(key string) int64 {
 func lockAuthPendingIdentityKeys(ctx context.Context, client *dbent.Client, keys ...string) (func(), error) {
 	release := authPendingIdentityScopedKeyLocks.lock(keys...)
 	normalized := normalizeAuthPendingIdentityLockKeys(keys...)
-	if len(normalized) == 0 || client == nil || client.Driver().Dialect() != dialect.Postgres {
+	if len(normalized) == 0 || client == nil || client.Driver() == nil || client.Driver().Dialect() != "postgres" {
 		return release, nil
 	}
 
 	for _, key := range normalized {
-		var rows entsql.Rows
-		if err := client.Driver().Query(ctx, "SELECT pg_advisory_xact_lock($1)", []any{authPendingIdentityAdvisoryLockHash(key)}, &rows); err != nil {
+		rows, err := client.QueryContext(ctx, "SELECT pg_advisory_xact_lock($1)", authPendingIdentityAdvisoryLockHash(key))
+		if err != nil {
 			release()
 			return nil, err
 		}

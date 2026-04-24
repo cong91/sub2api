@@ -54,6 +54,8 @@ type Handlers struct {
 	Totp           *TotpHandler
 	Payment        *PaymentHandler
 	PaymentWebhook *PaymentWebhookHandler
+	AvailableChannel *AvailableChannelHandler
+	ChannelMonitor   *ChannelMonitorUserHandler
 }
 
 // BuildInfo contains build-time information
@@ -61,3 +63,5 @@ type BuildInfo struct {
 	Version   string
 	BuildType string // "source" for manual builds, "release" for CI builds
 }
+
+

@@ -99,6 +99,8 @@ func ProvideHandlers(
 	totpHandler *TotpHandler,
 	paymentHandler *PaymentHandler,
 	paymentWebhookHandler *PaymentWebhookHandler,
+	availableChannelHandler *AvailableChannelHandler,
+	channelMonitorUserHandler *ChannelMonitorUserHandler,
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
@@ -118,6 +120,8 @@ func ProvideHandlers(
 		Totp:           totpHandler,
 		Payment:        paymentHandler,
 		PaymentWebhook: paymentWebhookHandler,
+		AvailableChannel: availableChannelHandler,
+		ChannelMonitor:   channelMonitorUserHandler,
 	}
 }
 
@@ -138,6 +142,8 @@ var ProviderSet = wire.NewSet(
 	ProvideSettingHandler,
 	NewPaymentHandler,
 	NewPaymentWebhookHandler,
+	NewAvailableChannelHandler,
+	NewChannelMonitorUserHandler,
 
 	// Admin handlers
 	admin.NewDashboardHandler,
@@ -168,9 +174,16 @@ var ProviderSet = wire.NewSet(
 	admin.NewChannelMonitorHandler,
 	admin.NewChannelMonitorRequestTemplateHandler,
 	admin.NewPaymentHandler,
+<<<<<<< HEAD
 	admin.NewAffiliateHandler,
+=======
+	admin.NewChannelMonitorHandler,
+	admin.NewChannelMonitorRequestTemplateHandler,
+>>>>>>> 9890de97 (fix(backend): reconcile absorbed auth payment ent and wiring state)
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,
 	ProvideHandlers,
 )
+
+

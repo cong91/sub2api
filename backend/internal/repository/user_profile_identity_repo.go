@@ -216,7 +216,13 @@ func advisoryLockHash(key string) int64 {
 func lockRepositoryScopedKeys(ctx context.Context, client *dbent.Client, exec sqlQueryExecutor, keys ...string) (func(), error) {
 	release := repositoryScopedKeyLocks.lock(keys...)
 	normalized := normalizeLockKeys(keys...)
-	if len(normalized) == 0 || client == nil || exec == nil || client.Driver().Dialect() != dialect.Postgres {
+	if len(normalized) == 0 || client == nil || exec == nil {
+		return release, nil
+	}
+	if _, ok := exec.(*sql.Tx); !ok {
+		return release, nil
+	}
+	if client.Driver() == nil || client.Driver().Dialect() != dialect.Postgres {
 		return release, nil
 	}
 
