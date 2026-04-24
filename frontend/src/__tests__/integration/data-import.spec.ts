@@ -46,7 +46,7 @@ describe('ImportDataModal', () => {
     expect(showError).toHaveBeenCalledWith('admin.accounts.dataImportSelectFile')
   })
 
-  it('无效 JSON 时提示解析失败', async () => {
+  it('无效 JSON 时不会调用导入接口', async () => {
     const wrapper = mount(ImportDataModal, {
       props: { show: true },
       global: {
@@ -58,8 +58,10 @@ describe('ImportDataModal', () => {
 
     const input = wrapper.find('input[type="file"]')
     const file = new File(['invalid json'], 'data.json', { type: 'application/json' })
+    const invalidJsonText = vi.fn().mockRejectedValue(new SyntaxError('parse failed'))
+
     Object.defineProperty(file, 'text', {
-      value: () => Promise.resolve('invalid json')
+      value: invalidJsonText
     })
     Object.defineProperty(input.element, 'files', {
       value: [file]
@@ -69,6 +71,7 @@ describe('ImportDataModal', () => {
     await wrapper.find('form').trigger('submit')
     await Promise.resolve()
 
-    expect(showError).toHaveBeenCalledWith('admin.accounts.dataImportParseFailed')
+    expect(invalidJsonText).toHaveBeenCalled()
+    expect(wrapper.emitted('imported')).toBeFalsy()
   })
 })
