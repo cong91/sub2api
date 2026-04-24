@@ -104,13 +104,17 @@ func (s *vclawRedeemRepoStub) Create(_ context.Context, code *RedeemCode) error 
 }
 
 func newVClawClaimServiceForTest(userRepo UserRepository, redeemRepo RedeemCodeRepository, userDeviceRepo UserDeviceRepository) *VClawClaimService {
+	return newVClawClaimServiceForTestWithSettings(userRepo, redeemRepo, userDeviceRepo, nil)
+}
+
+func newVClawClaimServiceForTestWithSettings(userRepo UserRepository, redeemRepo RedeemCodeRepository, userDeviceRepo UserDeviceRepository, settingService *SettingService) *VClawClaimService {
 	return NewVClawClaimService(
 		nil,
 		userRepo,
 		redeemRepo,
 		userDeviceRepo,
 		&config.Config{Default: config.DefaultConfig{UserBalance: 1.5, UserConcurrency: 2}},
-		nil,
+		settingService,
 	)
 }
 
@@ -218,6 +222,34 @@ func TestVClawClaimService_Claim_FirstLaunchWithoutClaimCodeAutoCreatesBindingAn
 	require.Equal(t, int64(777), deviceRepo.created[0].UserID)
 	require.Nil(t, deviceRepo.created[0].ClaimRedeemCodeID)
 	require.Equal(t, redeemRepo.created[0].ID, deviceRepo.created[0].LoginRedeemCodeID)
+}
+
+func TestVClawClaimService_Claim_FirstLaunchAppliesConfiguredDeviceClaimBonus(t *testing.T) {
+	t.Parallel()
+
+	userRepo := &userRepoStub{nextID: 778}
+	deviceRepo := &vclawUserDeviceRepoStub{}
+	redeemRepo := &vclawRedeemRepoStub{}
+	settingService := NewSettingService(&settingRepoStub{values: map[string]string{SettingKeyDeviceClaimBonusBalance: "3.25"}}, &config.Config{})
+	svc := newVClawClaimServiceForTestWithSettings(userRepo, redeemRepo, deviceRepo, settingService)
+
+	result, err := svc.Claim(context.Background(), VClawClaimRequest{
+		Device: VClawDeviceInput{
+			DeviceHash:         "edededededededededededededededededededededededededededededededed",
+			FingerprintVersion: 1,
+			InstallID:          "install-bonus-1",
+			Platform:           "win32",
+			Arch:               "x64",
+			AppVersion:         "1.0.0",
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "first_claim", result.Mode)
+	require.Equal(t, []float64{3.25}, userRepo.balanceUpdates)
+	require.Len(t, redeemRepo.created, 2)
+	require.Equal(t, AdjustmentTypeAdminBalance, redeemRepo.created[0].Type)
+	require.Equal(t, 3.25, redeemRepo.created[0].Value)
+	require.Equal(t, RedeemTypeDeviceLogin, redeemRepo.created[1].Type)
 }
 
 func TestAuthService_InviteLogin_DeviceLoginUsesExistingBoundUser(t *testing.T) {

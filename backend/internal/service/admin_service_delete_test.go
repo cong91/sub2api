@@ -13,18 +13,19 @@ import (
 )
 
 type userRepoStub struct {
-	user          *User
-	getErr        error
-	createErr     error
-	deleteErr     error
-	exists        bool
-	existsErr     error
-	nextID        int64
-	created       []*User
-	updated       []*User
-	deletedIDs    []int64
-	usersByEmail  map[string]*User
-	getByEmailErr error
+	user           *User
+	getErr         error
+	createErr      error
+	deleteErr      error
+	exists         bool
+	existsErr      error
+	nextID         int64
+	created        []*User
+	updated        []*User
+	deletedIDs     []int64
+	usersByEmail   map[string]*User
+	getByEmailErr  error
+	balanceUpdates []float64
 }
 
 func (s *userRepoStub) Create(ctx context.Context, user *User) error {
@@ -120,7 +121,11 @@ func (s *userRepoStub) UpdateUserLastActiveAt(ctx context.Context, userID int64,
 }
 
 func (s *userRepoStub) UpdateBalance(ctx context.Context, id int64, amount float64) error {
-	panic("unexpected UpdateBalance call")
+	s.balanceUpdates = append(s.balanceUpdates, amount)
+	if s.user != nil && s.user.ID == id {
+		s.user.Balance += amount
+	}
+	return nil
 }
 
 func (s *userRepoStub) DeductBalance(ctx context.Context, id int64, amount float64) error {
