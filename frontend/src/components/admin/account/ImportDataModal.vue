@@ -23,7 +23,7 @@
         >
           <div class="min-w-0">
             <div class="truncate text-sm text-gray-700 dark:text-dark-200">
-              {{ fileName || t('admin.accounts.dataImportSelectFile') }}
+              {{ selectedFilesLabel || t('admin.accounts.dataImportSelectFile') }}
             </div>
             <div class="text-xs text-gray-500 dark:text-dark-400">JSON (.json)</div>
           </div>
@@ -36,6 +36,7 @@
           type="file"
           class="hidden"
           accept="application/json,.json"
+          multiple
           @change="handleFileChange"
         />
       </div>
@@ -90,7 +91,18 @@ import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import { adminAPI } from '@/api/admin'
 import { useAppStore } from '@/stores/app'
-import type { AdminDataImportResult } from '@/types'
+import type { AdminDataImportResult, AdminImportData, AdminDataPayload } from '@/types'
+
+const STRUCTURED_EXPORT_ONLY_ERROR = 'Structured export file must be imported alone'
+const IMPORT_FORMAT_TYPE = 'sub2api-account-data'
+
+interface ImportAggregateResult extends AdminDataImportResult {
+  errors: NonNullable<AdminDataImportResult['errors']>
+}
+
+interface ParsedImportFile {
+  data: AdminImportData
+}
 
 interface Props {
   show: boolean
@@ -101,6 +113,100 @@ interface Emits {
   (e: 'imported'): void
 }
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+const isStructuredDataPayload = (value: unknown): value is AdminDataPayload => {
+  return isPlainObject(value) && Array.isArray(value.proxies) && Array.isArray(value.accounts)
+}
+
+const isCPAAccountObject = (value: unknown): value is Record<string, unknown> => {
+  return isPlainObject(value) && (
+    typeof value.refresh_token === 'string'
+    || typeof value.access_token === 'string'
+    || typeof value.id_token === 'string'
+    || typeof value.account_id === 'string'
+  )
+}
+
+const mergeImportResults = (results: AdminDataImportResult[]): ImportAggregateResult => {
+  return results.reduce<ImportAggregateResult>((acc, item) => {
+    acc.proxy_created += item.proxy_created
+    acc.proxy_reused += item.proxy_reused
+    acc.proxy_failed += item.proxy_failed
+    acc.account_created += item.account_created
+    acc.account_failed += item.account_failed
+    if (item.errors?.length) {
+      acc.errors.push(...item.errors)
+    }
+    return acc
+  }, {
+    proxy_created: 0,
+    proxy_reused: 0,
+    proxy_failed: 0,
+    account_created: 0,
+    account_failed: 0,
+    errors: []
+  })
+}
+
+const parseImportPayload = (raw: unknown): AdminImportData => {
+  if (Array.isArray(raw)) {
+    if (raw.every(isCPAAccountObject)) {
+      return raw
+    }
+    throw new SyntaxError('Unsupported import array format')
+  }
+
+  if (isStructuredDataPayload(raw)) {
+    return raw as AdminImportData
+  }
+
+  if (isCPAAccountObject(raw)) {
+    return raw
+  }
+
+  throw new SyntaxError('Unsupported import object format')
+}
+
+const parseImportFiles = (entries: ParsedImportFile[]): AdminImportData[] => {
+  const structuredPayloads: AdminImportData[] = []
+  const cpaAccounts: Record<string, unknown>[] = []
+
+  for (const entry of entries) {
+    if (Array.isArray(entry.data)) {
+      cpaAccounts.push(...entry.data)
+      continue
+    }
+
+    if (isStructuredDataPayload(entry.data)) {
+      structuredPayloads.push(entry.data)
+      continue
+    }
+
+    cpaAccounts.push(entry.data)
+  }
+
+  if (structuredPayloads.length > 0 && cpaAccounts.length > 0) {
+    throw new Error(STRUCTURED_EXPORT_ONLY_ERROR)
+  }
+
+  if (structuredPayloads.length > 1) {
+    throw new Error(STRUCTURED_EXPORT_ONLY_ERROR)
+  }
+
+  if (structuredPayloads.length === 1) {
+    return structuredPayloads
+  }
+
+  if (cpaAccounts.length > 0) {
+    return [cpaAccounts]
+  }
+
+  return []
+}
+
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
@@ -108,19 +214,18 @@ const { t } = useI18n()
 const appStore = useAppStore()
 
 const importing = ref(false)
-const file = ref<File | null>(null)
+const files = ref<File[]>([])
 const result = ref<AdminDataImportResult | null>(null)
 
 const fileInput = ref<HTMLInputElement | null>(null)
-const fileName = computed(() => file.value?.name || '')
-
+const selectedFilesLabel = computed(() => buildSelectedFilesLabel(files.value))
 const errorItems = computed(() => result.value?.errors || [])
 
 watch(
   () => props.show,
   (open) => {
     if (open) {
-      file.value = null
+      files.value = []
       result.value = null
       if (fileInput.value) {
         fileInput.value.value = ''
@@ -135,7 +240,7 @@ const openFilePicker = () => {
 
 const handleFileChange = (event: Event) => {
   const target = event.target as HTMLInputElement
-  file.value = target.files?.[0] || null
+  files.value = Array.from(target.files || [])
 }
 
 const handleClose = () => {
@@ -161,22 +266,56 @@ const readFileAsText = async (sourceFile: File): Promise<string> => {
   })
 }
 
+const parseImportFilesFromText = async (selectedFiles: File[]): Promise<AdminImportData[]> => {
+  const parsedEntries = await Promise.all(selectedFiles.map(async (sourceFile) => {
+    const text = await readFileAsText(sourceFile)
+    const raw = JSON.parse(text) as unknown
+    return {
+      data: parseImportPayload(raw)
+    } satisfies ParsedImportFile
+  }))
+
+  return parseImportFiles(parsedEntries)
+}
+
+const buildSelectedFilesLabel = (selectedFiles: File[]): string => {
+  if (selectedFiles.length === 0) {
+    return ''
+  }
+  if (selectedFiles.length === 1) {
+    return selectedFiles[0].name
+  }
+  return `${selectedFiles.length} JSON files selected`
+}
+
+const importDataPayloads = async (payloads: AdminImportData[]): Promise<ImportAggregateResult> => {
+  const responses = await Promise.all(payloads.map((data) => adminAPI.accounts.importData({
+    data,
+    skip_default_group_bind: true
+  })))
+
+  return mergeImportResults(responses)
+}
+
 const handleImport = async () => {
-  if (!file.value) {
+  if (files.value.length === 0) {
     appStore.showError(t('admin.accounts.dataImportSelectFile'))
     return
   }
 
   importing.value = true
   try {
-    const text = await readFileAsText(file.value)
-    const dataPayload = JSON.parse(text)
+    const payloads = await parseImportFilesFromText(files.value)
+    if (payloads.length === 0) {
+      throw new SyntaxError('Unsupported import object format')
+    }
 
-    const res = await adminAPI.accounts.importData({
-      data: dataPayload,
-      skip_default_group_bind: true
-    })
+    const structuredPayload = payloads.find((payload) => !Array.isArray(payload) && payload.type === IMPORT_FORMAT_TYPE)
+    if (structuredPayload && payloads.length > 1) {
+      throw new Error(STRUCTURED_EXPORT_ONLY_ERROR)
+    }
 
+    const res = await importDataPayloads(payloads)
     result.value = res
 
     const msgParams: Record<string, unknown> = {
@@ -195,6 +334,8 @@ const handleImport = async () => {
   } catch (error: any) {
     if (error instanceof SyntaxError) {
       appStore.showError(t('admin.accounts.dataImportParseFailed'))
+    } else if (error?.message === STRUCTURED_EXPORT_ONLY_ERROR) {
+      appStore.showError(t('admin.accounts.dataImportFailed'))
     } else {
       appStore.showError(error?.message || t('admin.accounts.dataImportFailed'))
     }

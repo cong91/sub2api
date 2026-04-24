@@ -1022,6 +1022,11 @@ export interface AdminDataPayload {
   accounts: AdminDataAccount[]
 }
 
+export type AdminImportData =
+  | AdminDataPayload
+  | Record<string, unknown>
+  | Array<Record<string, unknown>>
+
 export interface AdminDataProxy {
   proxy_key: string
   name: string
