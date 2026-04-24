@@ -15,6 +15,7 @@ import type {
   AccountUsageStatsResponse,
   TempUnschedulableStatus,
   AdminDataPayload,
+  AdminImportData,
   AdminDataImportResult,
   CheckMixedChannelRequest,
   CheckMixedChannelResponse

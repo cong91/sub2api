@@ -126,7 +126,8 @@
             <div class="rounded-3xl border border-gray-100 bg-gray-50/80 p-5 dark:border-dark-700 dark:bg-dark-900/30">
               <ProfileEditForm
                 :initial-username="user?.username || ''"
-                embedded
+                :initial-email="user?.email || ''"
+                :can-edit-email="Boolean(user?.email)"
               />
             </div>
           </div>

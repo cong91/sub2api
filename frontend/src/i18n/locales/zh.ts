@@ -1096,7 +1096,6 @@ export default {
     status: '状态',
     role: '角色',
     enterUsername: '输入用户名',
-    email: '邮箱',
     enterEmail: '输入邮箱地址',
     emailBootstrapHint: '当前账户仍在使用临时系统邮箱，请在这里改成您自己的邮箱。',
     emailChangeAdminNote: '当您已切换为自己的邮箱后，之后再次修改邮箱需要管理员处理。',

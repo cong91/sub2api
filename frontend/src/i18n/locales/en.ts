@@ -1092,7 +1092,6 @@ export default {
     status: 'Status',
     role: 'Role',
     enterUsername: 'Enter username',
-    email: 'Email',
     enterEmail: 'Enter email address',
     emailBootstrapHint: 'This account is still using a temporary system email. Replace it with your own here.',
     emailChangeAdminNote: 'After you switch to your own email, future email changes must be handled by an admin.',
