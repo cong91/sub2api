@@ -5348,10 +5348,7 @@ async function loadSettings() {
   loading.value = true
   loadFailed.value = false
   try {
-    const [settings] = await Promise.all([
-      adminAPI.settings.getSettings(),
-      loadWebSearchConfig(),
-    ])
+    const settings = await adminAPI.settings.getSettings()
     settings.payment_load_balance_strategy = settings.payment_load_balance_strategy || 'round-robin'
     // Only assign non-null values from backend (null means unconfigured, keep defaults)
     for (const [key, value] of Object.entries(settings)) {
@@ -5389,6 +5386,12 @@ async function loadSettings() {
       authSourceDefaults[source] = loadedAuthSourceDefaults[source]
     }
     applyWeChatConnectMode(form.wechat_connect_mode)
+
+    try {
+      await loadWebSearchConfig()
+    } catch (error: unknown) {
+      console.warn('[settings] failed to load web search config without blocking settings page', error)
+    }
   } catch (error: unknown) {
     loadFailed.value = true
     appStore.showError(extractApiErrorMessage(error, t('admin.settings.failedToLoad')))
