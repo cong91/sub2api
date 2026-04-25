@@ -241,9 +241,10 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 	// 获取默认配置
 	defaultBalance := s.cfg.Default.UserBalance
 	defaultConcurrency := s.cfg.Default.UserConcurrency
+	grantPlan := s.resolveSignupGrantPlan(ctx, "email")
 	if s.settingService != nil {
-		defaultBalance = s.settingService.GetDefaultBalance(ctx)
-		defaultConcurrency = s.settingService.GetDefaultConcurrency(ctx)
+		defaultBalance = grantPlan.Balance
+		defaultConcurrency = grantPlan.Concurrency
 	}
 
 	// 创建用户
@@ -264,7 +265,6 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 		logger.LegacyPrintf("service.auth", "[Auth] Database error creating user: %v", err)
 		return "", nil, ErrServiceUnavailable
 	}
-	s.postAuthUserBootstrap(ctx, user, "email", true)
 	s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
 	if s.affiliateService != nil {
 		if _, err := s.affiliateService.EnsureUserAffiliate(ctx, user.ID); err != nil {

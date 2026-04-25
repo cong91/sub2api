@@ -20,11 +20,13 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -639,11 +641,39 @@ func (h *AccountHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	subject, _ := middleware.GetAuthSubjectFromContext(c)
+	role, _ := middleware.GetUserRoleFromContext(c)
+	requestID, _ := c.Request.Context().Value(ctxkey.ClientRequestID).(string)
+
+	slog.Info("admin account delete requested",
+		"audit", true,
+		"account_id", accountID,
+		"actor_user_id", subject.UserID,
+		"actor_role", role,
+		"client_request_id", requestID,
+	)
+
 	err = h.adminService.DeleteAccount(c.Request.Context(), accountID)
 	if err != nil {
+		slog.Error("admin account delete failed",
+			"audit", true,
+			"account_id", accountID,
+			"actor_user_id", subject.UserID,
+			"actor_role", role,
+			"client_request_id", requestID,
+			"error", err,
+		)
 		response.ErrorFrom(c, err)
 		return
 	}
+
+	slog.Info("admin account delete succeeded",
+		"audit", true,
+		"account_id", accountID,
+		"actor_user_id", subject.UserID,
+		"actor_role", role,
+		"client_request_id", requestID,
+	)
 
 	response.Success(c, gin.H{"message": "Account deleted successfully"})
 }

@@ -323,6 +323,7 @@ import { useIntervalFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
+import { extractApiErrorMessage } from '@/utils/apiError'
 import { adminAPI } from '@/api/admin'
 import { useTableLoader } from '@/composables/useTableLoader'
 import { useSwipeSelect, type SwipeSelectVirtualContext } from '@/composables/useSwipeSelect'
@@ -1415,7 +1416,26 @@ const handleSetPrivacy = async (a: Account) => {
   }
 }
 const handleDelete = (a: Account) => { deletingAcc.value = a; showDeleteDialog.value = true }
-const confirmDelete = async () => { if(!deletingAcc.value) return; try { await adminAPI.accounts.delete(deletingAcc.value.id); showDeleteDialog.value = false; deletingAcc.value = null; reload() } catch (error) { console.error('Failed to delete account:', error) } }
+const confirmDelete = async () => {
+  if (!deletingAcc.value) return
+
+  const accountToDelete = deletingAcc.value
+
+  try {
+    await adminAPI.accounts.delete(accountToDelete.id)
+    accounts.value = accounts.value.filter(account => account.id !== accountToDelete.id)
+    syncPaginationAfterLocalRemoval()
+    clearSelection()
+    enterAutoRefreshSilentWindow()
+    showDeleteDialog.value = false
+    deletingAcc.value = null
+    appStore.showSuccess(t('admin.accounts.deleteSuccess'))
+    await reload()
+  } catch (error: unknown) {
+    console.error('Failed to delete account:', error)
+    appStore.showError(extractApiErrorMessage(error, t('admin.accounts.deleteFailed')))
+  }
+}
 const handleToggleSchedulable = async (a: Account) => {
   const nextSchedulable = !a.schedulable
   togglingSchedulable.value = a.id

@@ -4823,6 +4823,7 @@ const form = reactive<SettingsForm>({
   totp_enabled: false,
   totp_encryption_key_configured: false,
   default_balance: 0,
+  affiliate_rebate_rate: 0,
   default_concurrency: 1,
   device_claim_bonus_balance: 0,
   default_user_rpm_limit: 0,

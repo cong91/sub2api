@@ -450,6 +450,18 @@ func ProvidePaymentService(
 	return NewPaymentService(entClient, registry, loadBalancer, redeemService, subscriptionSvc, configService, userRepo, groupRepo, affiliateService)
 }
 
+// ProvideVClawClaimService wires VClawClaimService.
+func ProvideVClawClaimService(
+	entClient *dbent.Client,
+	userRepo UserRepository,
+	redeemRepo RedeemCodeRepository,
+	userDeviceRepo UserDeviceRepository,
+	cfg *config.Config,
+	settingService *SettingService,
+) *VClawClaimService {
+	return NewVClawClaimService(entClient, userRepo, redeemRepo, userDeviceRepo, cfg, settingService)
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
