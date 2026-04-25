@@ -1038,7 +1038,7 @@
                         </p>
                       </div>
                       <Toggle
-                        :model-value="form.wechat_connect_open_enabled"
+                        :model-value="!!form.wechat_connect_open_enabled"
                         data-testid="wechat-connect-open-enabled"
                         @update:model-value="handleWeChatOpenEnabledChange"
                       />
@@ -1111,7 +1111,7 @@
                         </p>
                       </div>
                       <Toggle
-                        :model-value="form.wechat_connect_mp_enabled"
+                        :model-value="!!form.wechat_connect_mp_enabled"
                         data-testid="wechat-connect-mp-enabled"
                         @update:model-value="handleWeChatMPEnabledChange"
                       />
@@ -1189,7 +1189,7 @@
                         </p>
                       </div>
                       <Toggle
-                        :model-value="form.wechat_connect_mobile_enabled"
+                        :model-value="!!form.wechat_connect_mobile_enabled"
                         data-testid="wechat-connect-mobile-enabled"
                         @update:model-value="handleWeChatMobileEnabledChange"
                       />
@@ -1974,7 +1974,7 @@
                     {{ t("admin.settings.authSourceDefaults.requireEmailHint") }}
                   </p>
                 </div>
-                <Toggle v-model="form.force_email_on_third_party_signup" />
+                <Toggle :model-value="!!form.force_email_on_third_party_signup" @update:model-value="(value) => { form.force_email_on_third_party_signup = value }" />
               </div>
 
               <div class="space-y-4">
@@ -4683,6 +4683,8 @@ import type {
   WebSearchEmulationConfig,
   WebSearchProviderConfig,
   WebSearchTestResult,
+  AuthSourceDefaultsState,
+  AuthSourceType,
 } from "@/api/admin/settings";
 import type { AdminGroup, Proxy, NotifyEmailEntry } from "@/types";
 import type { ProviderInstance } from "@/types/payment";
@@ -4700,10 +4702,9 @@ import ImageUpload from "@/components/common/ImageUpload.vue";
 import BackupSettings from "@/views/admin/BackupView.vue";
 import { useClipboard } from "@/composables/useClipboard";
 import { affiliatesAPI, type AffiliateAdminEntry, type SimpleUser as AffiliateSimpleUser } from "@/api/admin/affiliates";
-import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiError";
+import { extractApiErrorMessage } from "@/utils/apiError";
 import { useAppStore } from "@/stores";
 import { useAdminSettingsStore } from "@/stores/adminSettings";
-import { normalizeVisibleMethod } from "@/components/payment/paymentFlow";
 import {
   isRegistrationEmailSuffixDomainValid,
   normalizeRegistrationEmailSuffixDomain,
@@ -4712,6 +4713,7 @@ import {
 } from '@/utils/registrationEmailPolicy'
 
 const { t, locale } = useI18n()
+const localText = (zh: string, en: string) => (locale.value?.startsWith('zh') ? zh : en)
 const appStore = useAppStore()
 const adminSettingsStore = useAdminSettingsStore()
 
@@ -4811,6 +4813,9 @@ type SettingsForm = SystemSettings & {
   turnstile_secret_key: string
   linuxdo_connect_client_secret: string
   oidc_connect_client_secret: string
+  wechat_connect_open_app_secret: string
+  wechat_connect_mp_app_secret: string
+  wechat_connect_mobile_app_secret: string
 }
 
 const form = reactive<SettingsForm>({
@@ -4867,10 +4872,13 @@ const form = reactive<SettingsForm>({
   wechat_connect_app_id: '',
   wechat_connect_app_secret_configured: false,
   wechat_connect_open_app_id: '',
+  wechat_connect_open_app_secret: '',
   wechat_connect_open_app_secret_configured: false,
   wechat_connect_mp_app_id: '',
+  wechat_connect_mp_app_secret: '',
   wechat_connect_mp_app_secret_configured: false,
   wechat_connect_mobile_app_id: '',
+  wechat_connect_mobile_app_secret: '',
   wechat_connect_mobile_app_secret_configured: false,
   wechat_connect_open_enabled: false,
   wechat_connect_mp_enabled: false,
@@ -5242,6 +5250,21 @@ const oidcRedirectUrlSuggestion = computed(() => {
   return `${origin}/api/v1/auth/oauth/oidc/callback`
 })
 
+const wechatRedirectUrlSuggestion = computed(() => {
+  if (typeof window === 'undefined') return ''
+  const origin =
+    window.location.origin || `${window.location.protocol}//${window.location.host}`
+  return `${origin}/api/v1/auth/oauth/wechat/callback`
+})
+
+async function setAndCopyWeChatRedirectUrl() {
+  const url = wechatRedirectUrlSuggestion.value
+  if (!url) return
+
+  form.wechat_connect_redirect_url = url
+  await copyToClipboard(url, t('admin.settings.wechatConnect.redirectUrlSetAndCopied'))
+}
+
 async function setAndCopyOIDCRedirectUrl() {
   const url = oidcRedirectUrlSuggestion.value
   if (!url) return
@@ -5354,6 +5377,15 @@ async function loadSettings() {
     form.turnstile_secret_key = ''
     form.linuxdo_connect_client_secret = ''
     form.oidc_connect_client_secret = ''
+    form.wechat_connect_open_app_secret = ''
+    form.wechat_connect_mp_app_secret = ''
+    form.wechat_connect_mobile_app_secret = ''
+    form.default_subscriptions = normalizeDefaultSubscriptionSettings(form.default_subscriptions)
+    const loadedAuthSourceDefaults = buildAuthSourceDefaultsState(settings)
+    for (const source of Object.keys(authSourceDefaults) as AuthSourceType[]) {
+      authSourceDefaults[source] = loadedAuthSourceDefaults[source]
+    }
+    applyWeChatConnectMode(form.wechat_connect_mode)
 
     // Load web search emulation config separately
     await loadWebSearchConfig()
@@ -5389,6 +5421,67 @@ function addDefaultSubscription() {
 
 function removeDefaultSubscription(index: number) {
   form.default_subscriptions.splice(index, 1)
+}
+
+function addAuthSourceDefaultSubscription(source: AuthSourceType) {
+  if (subscriptionGroups.value.length === 0) return
+  const existing = new Set(authSourceDefaults[source].subscriptions.map((item) => item.group_id))
+  const candidate = subscriptionGroups.value.find((group) => !existing.has(group.id))
+  if (!candidate) return
+  authSourceDefaults[source].subscriptions.push({
+    group_id: candidate.id,
+    validity_days: 30,
+  })
+}
+
+function removeAuthSourceDefaultSubscription(source: AuthSourceType, index: number) {
+  authSourceDefaults[source].subscriptions.splice(index, 1)
+}
+
+function applyWeChatConnectMode(mode: string) {
+  const capabilities = resolveWeChatConnectModeCapabilities(
+    undefined,
+    undefined,
+    undefined,
+    mode,
+  )
+  form.wechat_connect_open_enabled = capabilities.openEnabled
+  form.wechat_connect_mp_enabled = capabilities.mpEnabled
+  form.wechat_connect_mobile_enabled = capabilities.mobileEnabled
+  const scopes = defaultWeChatConnectScopesForMode(mode)
+  if (scopes) {
+    form.wechat_connect_scopes = scopes
+  }
+}
+
+function handleWeChatOpenEnabledChange(enabled: boolean) {
+  form.wechat_connect_open_enabled = enabled
+  form.wechat_connect_mode = deriveWeChatConnectStoredMode(
+    !!form.wechat_connect_open_enabled,
+    !!form.wechat_connect_mp_enabled,
+    !!form.wechat_connect_mobile_enabled,
+    form.wechat_connect_mode,
+  )
+}
+
+function handleWeChatMPEnabledChange(enabled: boolean) {
+  form.wechat_connect_mp_enabled = enabled
+  form.wechat_connect_mode = deriveWeChatConnectStoredMode(
+    !!form.wechat_connect_open_enabled,
+    !!form.wechat_connect_mp_enabled,
+    !!form.wechat_connect_mobile_enabled,
+    form.wechat_connect_mode,
+  )
+}
+
+function handleWeChatMobileEnabledChange(enabled: boolean) {
+  form.wechat_connect_mobile_enabled = enabled
+  form.wechat_connect_mode = deriveWeChatConnectStoredMode(
+    !!form.wechat_connect_open_enabled,
+    !!form.wechat_connect_mp_enabled,
+    !!form.wechat_connect_mobile_enabled,
+    form.wechat_connect_mode,
+  )
 }
 
 async function saveSettings() {
@@ -5474,6 +5567,7 @@ async function saveSettings() {
       password_reset_enabled: form.password_reset_enabled,
       totp_enabled: form.totp_enabled,
       default_balance: form.default_balance,
+      affiliate_rebate_rate: Number(form.affiliate_rebate_rate) || 0,
       default_concurrency: form.default_concurrency,
       device_claim_bonus_balance: Number(form.device_claim_bonus_balance) || 0,
       default_subscriptions: normalizedDefaultSubscriptions,
@@ -5505,6 +5599,26 @@ async function saveSettings() {
       linuxdo_connect_client_id: form.linuxdo_connect_client_id,
       linuxdo_connect_client_secret: form.linuxdo_connect_client_secret || undefined,
       linuxdo_connect_redirect_url: form.linuxdo_connect_redirect_url,
+      wechat_connect_enabled: form.wechat_connect_enabled,
+      wechat_connect_open_enabled: !!form.wechat_connect_open_enabled,
+      wechat_connect_mp_enabled: !!form.wechat_connect_mp_enabled,
+      wechat_connect_mobile_enabled: !!form.wechat_connect_mobile_enabled,
+      wechat_connect_mode: deriveWeChatConnectStoredMode(
+        !!form.wechat_connect_open_enabled,
+        !!form.wechat_connect_mp_enabled,
+        !!form.wechat_connect_mobile_enabled,
+        form.wechat_connect_mode,
+      ),
+      wechat_connect_app_id: form.wechat_connect_app_id,
+      wechat_connect_open_app_id: form.wechat_connect_open_app_id,
+      wechat_connect_open_app_secret: form.wechat_connect_open_app_secret || undefined,
+      wechat_connect_mp_app_id: form.wechat_connect_mp_app_id,
+      wechat_connect_mp_app_secret: form.wechat_connect_mp_app_secret || undefined,
+      wechat_connect_mobile_app_id: form.wechat_connect_mobile_app_id,
+      wechat_connect_mobile_app_secret: form.wechat_connect_mobile_app_secret || undefined,
+      wechat_connect_scopes: form.wechat_connect_scopes,
+      wechat_connect_redirect_url: form.wechat_connect_redirect_url,
+      wechat_connect_frontend_redirect_url: form.wechat_connect_frontend_redirect_url,
       oidc_connect_enabled: form.oidc_connect_enabled,
       oidc_connect_provider_name: form.oidc_connect_provider_name,
       oidc_connect_client_id: form.oidc_connect_client_id,
@@ -5577,7 +5691,8 @@ async function saveSettings() {
       available_channels_enabled: form.available_channels_enabled,
       // Affiliate (邀请返利) feature switch
       affiliate_enabled: form.affiliate_enabled,
-    };
+    }
+    appendAuthSourceDefaultsToUpdateRequest(payload, authSourceDefaults)
 
     const updated = await adminAPI.settings.updateSettings(payload)
     for (const [key, value] of Object.entries(updated)) {
@@ -5597,6 +5712,15 @@ async function saveSettings() {
     form.turnstile_secret_key = ''
     form.linuxdo_connect_client_secret = ''
     form.oidc_connect_client_secret = ''
+    form.wechat_connect_open_app_secret = ''
+    form.wechat_connect_mp_app_secret = ''
+    form.wechat_connect_mobile_app_secret = ''
+    form.default_subscriptions = normalizeDefaultSubscriptionSettings(form.default_subscriptions)
+    const updatedAuthSourceDefaults = buildAuthSourceDefaultsState(updated)
+    for (const source of Object.keys(authSourceDefaults) as AuthSourceType[]) {
+      authSourceDefaults[source] = updatedAuthSourceDefaults[source]
+    }
+    applyWeChatConnectMode(form.wechat_connect_mode)
     // Save web search emulation config separately (errors handled internally)
     const wsOk = await saveWebSearchConfig()
     // Refresh cached settings so sidebar/header update immediately

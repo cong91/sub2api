@@ -105,21 +105,21 @@ func ProvideHandlers(
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
 	return &Handlers{
-		Auth:           authHandler,
-		VClaw:          vclawHandler,
-		User:           userHandler,
-		APIKey:         apiKeyHandler,
-		Usage:          usageHandler,
-		Redeem:         redeemHandler,
-		Subscription:   subscriptionHandler,
-		Announcement:   announcementHandler,
-		Admin:          adminHandlers,
-		Gateway:        gatewayHandler,
-		OpenAIGateway:  openaiGatewayHandler,
-		Setting:        settingHandler,
-		Totp:           totpHandler,
-		Payment:        paymentHandler,
-		PaymentWebhook: paymentWebhookHandler,
+		Auth:             authHandler,
+		VClaw:            vclawHandler,
+		User:             userHandler,
+		APIKey:           apiKeyHandler,
+		Usage:            usageHandler,
+		Redeem:           redeemHandler,
+		Subscription:     subscriptionHandler,
+		Announcement:     announcementHandler,
+		Admin:            adminHandlers,
+		Gateway:          gatewayHandler,
+		OpenAIGateway:    openaiGatewayHandler,
+		Setting:          settingHandler,
+		Totp:             totpHandler,
+		Payment:          paymentHandler,
+		PaymentWebhook:   paymentWebhookHandler,
 		AvailableChannel: availableChannelHandler,
 		ChannelMonitor:   channelMonitorUserHandler,
 	}
@@ -130,7 +130,7 @@ var ProviderSet = wire.NewSet(
 	// Top-level handlers
 	NewAuthHandler,
 	NewVClawHandler,
-	ProvideUserHandler,
+	NewUserHandler,
 	NewAPIKeyHandler,
 	NewUsageHandler,
 	NewRedeemHandler,
@@ -174,16 +174,9 @@ var ProviderSet = wire.NewSet(
 	admin.NewChannelMonitorHandler,
 	admin.NewChannelMonitorRequestTemplateHandler,
 	admin.NewPaymentHandler,
-<<<<<<< HEAD
 	admin.NewAffiliateHandler,
-=======
-	admin.NewChannelMonitorHandler,
-	admin.NewChannelMonitorRequestTemplateHandler,
->>>>>>> 9890de97 (fix(backend): reconcile absorbed auth payment ent and wiring state)
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,
 	ProvideHandlers,
 )
-
-

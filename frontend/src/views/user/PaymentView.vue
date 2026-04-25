@@ -326,7 +326,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePaymentStore } from '@/stores/payment'
 import { useSubscriptionStore } from '@/stores/subscriptions'
@@ -340,6 +340,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import AmountInput from '@/components/payment/AmountInput.vue'
 import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector.vue'
 import { METHOD_ORDER, getPaymentPopupFeatures } from '@/components/payment/providerConfig'
+import { buildCreateOrderPayload, decidePaymentLaunch, normalizeVisibleMethod } from '@/components/payment/paymentFlow'
 import { platformAccentBarClass, platformBadgeLightClass, platformBadgeClass, platformTextClass, platformLabel } from '@/utils/platformColors'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
@@ -350,6 +351,7 @@ import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSele
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 const paymentStore = usePaymentStore()
 const subscriptionStore = useSubscriptionStore()
@@ -655,6 +657,7 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
         window.location.href = url
       }
     }
+    const requestType = selectedMethod.value
     const visibleMethod = normalizeVisibleMethod(requestType) || requestType
     // When user clicks the dedicated Stripe button, leave method blank so the
     // landing page renders Stripe's full Payment Element (card/link/alipay/wxpay).
@@ -682,13 +685,15 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
     })
 
     if (decision.kind === 'wechat_oauth' && decision.oauth?.authorize_url) {
-      window.location.href = buildWechatOAuthAuthorizeUrl(decision.oauth.authorize_url, {
+      window.location.href = buildCreateOrderPayload({
+        amount: orderAmount,
         paymentType: visibleMethod,
         orderType,
         planId: planId || undefined,
-        returnUrl: window.location.href,
-        resumeToken: result.resume_token || undefined,
-      })
+        origin: typeof window !== 'undefined' ? window.location.origin : '',
+        isMobile: isMobileDevice(),
+        isWechatBrowser: typeof window !== 'undefined' && /MicroMessenger/i.test(window.navigator.userAgent),
+      }).return_url || decision.oauth.authorize_url
       return
     }
 

@@ -39,21 +39,21 @@ type AdminHandlers struct {
 
 // Handlers contains all HTTP handlers
 type Handlers struct {
-	Auth           *AuthHandler
-	VClaw          *VClawHandler
-	User           *UserHandler
-	APIKey         *APIKeyHandler
-	Usage          *UsageHandler
-	Redeem         *RedeemHandler
-	Subscription   *SubscriptionHandler
-	Announcement   *AnnouncementHandler
-	Admin          *AdminHandlers
-	Gateway        *GatewayHandler
-	OpenAIGateway  *OpenAIGatewayHandler
-	Setting        *SettingHandler
-	Totp           *TotpHandler
-	Payment        *PaymentHandler
-	PaymentWebhook *PaymentWebhookHandler
+	Auth             *AuthHandler
+	VClaw            *VClawHandler
+	User             *UserHandler
+	APIKey           *APIKeyHandler
+	Usage            *UsageHandler
+	Redeem           *RedeemHandler
+	Subscription     *SubscriptionHandler
+	Announcement     *AnnouncementHandler
+	Admin            *AdminHandlers
+	Gateway          *GatewayHandler
+	OpenAIGateway    *OpenAIGatewayHandler
+	Setting          *SettingHandler
+	Totp             *TotpHandler
+	Payment          *PaymentHandler
+	PaymentWebhook   *PaymentWebhookHandler
 	AvailableChannel *AvailableChannelHandler
 	ChannelMonitor   *ChannelMonitorUserHandler
 }
@@ -63,5 +63,3 @@ type BuildInfo struct {
 	Version   string
 	BuildType string // "source" for manual builds, "release" for CI builds
 }
-
-

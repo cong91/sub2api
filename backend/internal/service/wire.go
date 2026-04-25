@@ -415,8 +415,7 @@ func ProvideAuthService(
 	groupRepo GroupRepository,
 	apiKeyService *APIKeyService,
 ) *AuthService {
-	svc := NewAuthService(entClient, userRepo, redeemRepo, refreshTokenCache, cfg, settingService, emailService, turnstileService, emailQueueService, promoService, defaultSubAssigner)
-	svc.SetAffiliateService(affiliateService)
+	svc := NewAuthService(entClient, userRepo, redeemRepo, refreshTokenCache, cfg, settingService, emailService, turnstileService, emailQueueService, promoService, defaultSubAssigner, affiliateService)
 	svc.SetUserDeviceRepository(userDeviceRepo)
 	svc.SetInviteBootstrapGroupRepository(groupRepo)
 	svc.SetInviteBootstrapAPIKeyService(apiKeyService)
@@ -547,7 +546,6 @@ var ProviderSet = wire.NewSet(
 	NewChannelService,
 	NewModelPricingResolver,
 	NewAffiliateService,
-	NewAffiliateUserRepository,
 	ProvidePaymentConfigService,
 	ProvidePaymentService,
 	ProvidePaymentOrderExpiryService,
@@ -556,6 +554,7 @@ var ProviderSet = wire.NewSet(
 	ProvideVClawClaimService,
 	wire.Bind(new(DefaultSubscriptionAssigner), new(*SubscriptionService)),
 )
+
 // ProvidePaymentConfigService wraps NewPaymentConfigService to accept the named
 // payment.EncryptionKey type instead of raw []byte, avoiding Wire ambiguity.
 func ProvidePaymentConfigService(entClient *dbent.Client, settingRepo SettingRepository, key payment.EncryptionKey) *PaymentConfigService {
