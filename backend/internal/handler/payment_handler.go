@@ -142,6 +142,8 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		HelpImageURL:              cfg.HelpImageURL,
 		StripePublishableKey:      cfg.StripePublishableKey,
 		AlipayForceQRCode:         cfg.AlipayForceQRCode,
+		PaddleClientToken:         cfg.PaddleClientToken,
+		PaddleEnvironment:         cfg.PaddleEnvironment,
 	})
 }
 
@@ -157,6 +159,8 @@ type checkoutInfoResponse struct {
 	HelpImageURL              string                          `json:"help_image_url"`
 	StripePublishableKey      string                          `json:"stripe_publishable_key"`
 	AlipayForceQRCode         bool                            `json:"alipay_force_qrcode"`
+	PaddleClientToken         string                          `json:"paddle_client_token,omitempty"`
+	PaddleEnvironment         string                          `json:"paddle_environment,omitempty"`
 }
 
 type checkoutPlan struct {
@@ -210,6 +214,7 @@ func (h *PaymentHandler) GetLimits(c *gin.Context) {
 // CreateOrderRequest is the request body for creating a payment order.
 type CreateOrderRequest struct {
 	Amount            float64 `json:"amount"`
+	PaymentCurrency   string  `json:"payment_currency"`
 	PaymentType       string  `json:"payment_type" binding:"required"`
 	OpenID            string  `json:"openid"`
 	WechatResumeToken string  `json:"wechat_resume_token"`
@@ -255,6 +260,7 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 	result, err := h.paymentService.CreateOrder(c.Request.Context(), service.CreateOrderRequest{
 		UserID:          subject.UserID,
 		Amount:          req.Amount,
+		PaymentCurrency: req.PaymentCurrency,
 		PaymentType:     req.PaymentType,
 		OpenID:          req.OpenID,
 		ClientIP:        c.ClientIP(),
