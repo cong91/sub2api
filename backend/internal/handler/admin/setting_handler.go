@@ -181,10 +181,10 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		PurchaseSubscriptionURL:                settings.PurchaseSubscriptionURL,
 		TableDefaultPageSize:                   settings.TableDefaultPageSize,
 		TablePageSizeOptions:                   settings.TablePageSizeOptions,
-		CustomMenuItems:                        dto.ParseCustomMenuItems(settings.CustomMenuItems),
 		CustomEndpoints:                        dto.ParseCustomEndpoints(settings.CustomEndpoints),
 		DefaultConcurrency:                     settings.DefaultConcurrency,
 		DefaultBalance:                         settings.DefaultBalance,
+		DeviceClaimBonusBalance:                settings.DeviceClaimBonusBalance,
 		AffiliateRebateRate:                    settings.AffiliateRebateRate,
 		AffiliateRebateFreezeHours:             settings.AffiliateRebateFreezeHours,
 		AffiliateRebateDurationDays:            settings.AffiliateRebateDurationDays,
@@ -384,6 +384,7 @@ type UpdateSettingsRequest struct {
 	CustomEndpoints             *[]dto.CustomEndpoint `json:"custom_endpoints"`
 
 	// 默认配置
+<<<<<<< HEAD
 	DefaultConcurrency                       int                               `json:"default_concurrency"`
 	DefaultBalance                           float64                           `json:"default_balance"`
 	AffiliateRebateRate                      *float64                          `json:"affiliate_rebate_rate"`
@@ -392,6 +393,14 @@ type UpdateSettingsRequest struct {
 	AffiliateRebatePerInviteeCap             *float64                          `json:"affiliate_rebate_per_invitee_cap"`
 	DefaultUserRPMLimit                      int                               `json:"default_user_rpm_limit"`
 	DefaultSubscriptions                     []dto.DefaultSubscriptionSetting  `json:"default_subscriptions"`
+=======
+	DefaultConcurrency      int                              `json:"default_concurrency"`
+	DefaultBalance          float64                          `json:"default_balance"`
+	DeviceClaimBonusBalance float64                          `json:"device_claim_bonus_balance"`
+	AffiliateRebateRate     *float64                         `json:"affiliate_rebate_rate"`
+	DefaultUserRPMLimit     int                              `json:"default_user_rpm_limit"`
+	DefaultSubscriptions    []dto.DefaultSubscriptionSetting `json:"default_subscriptions"`
+>>>>>>> dcf66dee (feat: replay safe auth payment and frontend support lanes)
 	AuthSourceDefaultEmailBalance            *float64                          `json:"auth_source_default_email_balance"`
 	AuthSourceDefaultEmailConcurrency        *int                              `json:"auth_source_default_email_concurrency"`
 	AuthSourceDefaultEmailSubscriptions      *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_email_subscriptions"`
@@ -525,6 +534,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 	if req.DefaultBalance < 0 {
 		req.DefaultBalance = 0
+	}
+	if req.DeviceClaimBonusBalance < 0 {
+		req.DeviceClaimBonusBalance = 0
 	}
 	affiliateRebateRate := previousSettings.AffiliateRebateRate
 	if req.AffiliateRebateRate != nil {
@@ -1211,6 +1223,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TableDefaultPageSize:             req.TableDefaultPageSize,
 		TablePageSizeOptions:             req.TablePageSizeOptions,
 		CustomMenuItems:                  customMenuJSON,
+<<<<<<< HEAD
 		CustomEndpoints:                  customEndpointsJSON,
 		DefaultConcurrency:               req.DefaultConcurrency,
 		DefaultBalance:                   req.DefaultBalance,
@@ -1220,6 +1233,15 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		AffiliateRebatePerInviteeCap:     affiliateRebatePerInviteeCap,
 		DefaultUserRPMLimit:              req.DefaultUserRPMLimit,
 		DefaultSubscriptions:             defaultSubscriptions,
+=======
+		CustomEndpoints:                      customEndpointsJSON,
+		DefaultConcurrency:                   req.DefaultConcurrency,
+		DefaultBalance:                       req.DefaultBalance,
+		DeviceClaimBonusBalance:              req.DeviceClaimBonusBalance,
+		AffiliateRebateRate:                  affiliateRebateRate,
+		DefaultUserRPMLimit:                  req.DefaultUserRPMLimit,
+		DefaultSubscriptions:                 defaultSubscriptions,
+>>>>>>> dcf66dee (feat: replay safe auth payment and frontend support lanes)
 		EnableModelFallback:              req.EnableModelFallback,
 		FallbackModelAnthropic:           req.FallbackModelAnthropic,
 		FallbackModelOpenAI:              req.FallbackModelOpenAI,
@@ -1543,6 +1565,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TableDefaultPageSize:                   updatedSettings.TableDefaultPageSize,
 		TablePageSizeOptions:                   updatedSettings.TablePageSizeOptions,
 		CustomMenuItems:                        dto.ParseCustomMenuItems(updatedSettings.CustomMenuItems),
+<<<<<<< HEAD
 		CustomEndpoints:                        dto.ParseCustomEndpoints(updatedSettings.CustomEndpoints),
 		DefaultConcurrency:                     updatedSettings.DefaultConcurrency,
 		DefaultBalance:                         updatedSettings.DefaultBalance,
@@ -1552,6 +1575,15 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		AffiliateRebatePerInviteeCap:           updatedSettings.AffiliateRebatePerInviteeCap,
 		DefaultUserRPMLimit:                    updatedSettings.DefaultUserRPMLimit,
 		DefaultSubscriptions:                   updatedDefaultSubscriptions,
+=======
+		CustomEndpoints:                      dto.ParseCustomEndpoints(updatedSettings.CustomEndpoints),
+		DefaultConcurrency:                   updatedSettings.DefaultConcurrency,
+		DefaultBalance:                       updatedSettings.DefaultBalance,
+		DeviceClaimBonusBalance:              updatedSettings.DeviceClaimBonusBalance,
+		AffiliateRebateRate:                  updatedSettings.AffiliateRebateRate,
+		DefaultUserRPMLimit:                  updatedSettings.DefaultUserRPMLimit,
+		DefaultSubscriptions:                 updatedDefaultSubscriptions,
+>>>>>>> dcf66dee (feat: replay safe auth payment and frontend support lanes)
 		EnableModelFallback:                    updatedSettings.EnableModelFallback,
 		FallbackModelAnthropic:                 updatedSettings.FallbackModelAnthropic,
 		FallbackModelOpenAI:                    updatedSettings.FallbackModelOpenAI,
@@ -1861,6 +1893,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.DefaultBalance != after.DefaultBalance {
 		changed = append(changed, "default_balance")
+	}
+	if before.DeviceClaimBonusBalance != after.DeviceClaimBonusBalance {
+		changed = append(changed, "device_claim_bonus_balance")
 	}
 	if before.AffiliateRebateRate != after.AffiliateRebateRate {
 		changed = append(changed, "affiliate_rebate_rate")
