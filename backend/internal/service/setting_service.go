@@ -1908,6 +1908,7 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	// 默认配置
 	updates[SettingKeyDefaultConcurrency] = strconv.Itoa(settings.DefaultConcurrency)
 	updates[SettingKeyDefaultBalance] = strconv.FormatFloat(settings.DefaultBalance, 'f', 8, 64)
+	updates[SettingKeyDeviceClaimBonusBalance] = strconv.FormatFloat(settings.DeviceClaimBonusBalance, 'f', 8, 64)
 	settings.AffiliateRebateRate = clampAffiliateRebateRate(settings.AffiliateRebateRate)
 	updates[SettingKeyAffiliateRebateRate] = strconv.FormatFloat(settings.AffiliateRebateRate, 'f', 8, 64)
 	if settings.AffiliateRebateFreezeHours < 0 {
@@ -1929,6 +1930,7 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	}
 	updates[SettingKeyAffiliateRebatePerInviteeCap] = strconv.FormatFloat(settings.AffiliateRebatePerInviteeCap, 'f', 8, 64)
 	updates[SettingKeyDefaultUserRPMLimit] = strconv.Itoa(settings.DefaultUserRPMLimit)
+	updates[SettingKeyAffiliateRebateRate] = strconv.FormatFloat(clampAffiliateRebateRate(settings.AffiliateRebateRate), 'f', 4, 64)
 	defaultSubsJSON, err := json.Marshal(settings.DefaultSubscriptions)
 	if err != nil {
 		return nil, fmt.Errorf("marshal default subscriptions: %w", err)
@@ -2866,6 +2868,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyOIDCConnectUserInfoUsernamePath:           "",
 		SettingKeyDefaultConcurrency:                        strconv.Itoa(s.cfg.Default.UserConcurrency),
 		SettingKeyDefaultBalance:                            strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
+		SettingKeyDeviceClaimBonusBalance:                   "0",
 		SettingKeyAffiliateRebateRate:                       strconv.FormatFloat(AffiliateRebateRateDefault, 'f', 8, 64),
 		SettingKeyAffiliateRebateFreezeHours:                strconv.Itoa(AffiliateRebateFreezeHoursDefault),
 		SettingKeyAffiliateRebateDurationDays:               strconv.Itoa(AffiliateRebateDurationDaysDefault),
@@ -3043,6 +3046,9 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		result.DefaultBalance = balance
 	} else {
 		result.DefaultBalance = s.cfg.Default.UserBalance
+	}
+	if bonus, err := strconv.ParseFloat(settings[SettingKeyDeviceClaimBonusBalance], 64); err == nil && bonus >= 0 {
+		result.DeviceClaimBonusBalance = bonus
 	}
 	if rebateRate, err := strconv.ParseFloat(settings[SettingKeyAffiliateRebateRate], 64); err == nil {
 		result.AffiliateRebateRate = clampAffiliateRebateRate(rebateRate)
@@ -3664,6 +3670,26 @@ func writeProviderDefaultGrantUpdates(updates map[string]string, keys authSource
 			blob = []byte("{}")
 		}
 		updates[keys.platformQuotas] = string(blob)
+	}
+}
+
+func authSourceSignupSettings(defaults *AuthSourceDefaultSettings, signupSource string) (ProviderDefaultGrantSettings, bool) {
+	if defaults == nil {
+		return ProviderDefaultGrantSettings{}, false
+	}
+
+	source := strings.TrimSpace(strings.ToLower(signupSource))
+	switch source {
+	case "email":
+		return defaults.Email, true
+	case "linuxdo", "linux_do":
+		return defaults.LinuxDo, true
+	case "oidc":
+		return defaults.OIDC, true
+	case "wechat", "we_chat":
+		return defaults.WeChat, true
+	default:
+		return ProviderDefaultGrantSettings{}, false
 	}
 }
 
