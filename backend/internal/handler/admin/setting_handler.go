@@ -222,11 +222,11 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		PurchaseSubscriptionURL:                settings.PurchaseSubscriptionURL,
 		TableDefaultPageSize:                   settings.TableDefaultPageSize,
 		TablePageSizeOptions:                   settings.TablePageSizeOptions,
-		CustomMenuItems:                        dto.ParseCustomMenuItems(settings.CustomMenuItems),
 		CustomEndpoints:                        dto.ParseCustomEndpoints(settings.CustomEndpoints),
 		DefaultConcurrency:                     settings.DefaultConcurrency,
 		DefaultBalance:                         settings.DefaultBalance,
 		RiskControlEnabled:                     settings.RiskControlEnabled,
+		DeviceClaimBonusBalance:                settings.DeviceClaimBonusBalance,
 		AffiliateRebateRate:                    settings.AffiliateRebateRate,
 		AffiliateRebateFreezeHours:             settings.AffiliateRebateFreezeHours,
 		AffiliateRebateDurationDays:            settings.AffiliateRebateDurationDays,
@@ -493,50 +493,46 @@ type UpdateSettingsRequest struct {
 	CustomEndpoints             *[]dto.CustomEndpoint `json:"custom_endpoints"`
 
 	// 默认配置
-	DefaultConcurrency                        int                               `json:"default_concurrency"`
-	DefaultBalance                            float64                           `json:"default_balance"`
-	AffiliateRebateRate                       *float64                          `json:"affiliate_rebate_rate"`
-	AffiliateRebateFreezeHours                *int                              `json:"affiliate_rebate_freeze_hours"`
-	AffiliateRebateDurationDays               *int                              `json:"affiliate_rebate_duration_days"`
-	AffiliateRebatePerInviteeCap              *float64                          `json:"affiliate_rebate_per_invitee_cap"`
-	DefaultUserRPMLimit                       int                               `json:"default_user_rpm_limit"`
-	DefaultSubscriptions                      []dto.DefaultSubscriptionSetting  `json:"default_subscriptions"`
-	AuthSourceDefaultEmailBalance             *float64                          `json:"auth_source_default_email_balance"`
-	AuthSourceDefaultEmailConcurrency         *int                              `json:"auth_source_default_email_concurrency"`
-	AuthSourceDefaultEmailSubscriptions       *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_email_subscriptions"`
-	AuthSourceDefaultEmailGrantOnSignup       *bool                             `json:"auth_source_default_email_grant_on_signup"`
-	AuthSourceDefaultEmailGrantOnFirstBind    *bool                             `json:"auth_source_default_email_grant_on_first_bind"`
-	AuthSourceDefaultLinuxDoBalance           *float64                          `json:"auth_source_default_linuxdo_balance"`
-	AuthSourceDefaultLinuxDoConcurrency       *int                              `json:"auth_source_default_linuxdo_concurrency"`
-	AuthSourceDefaultLinuxDoSubscriptions     *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_linuxdo_subscriptions"`
-	AuthSourceDefaultLinuxDoGrantOnSignup     *bool                             `json:"auth_source_default_linuxdo_grant_on_signup"`
-	AuthSourceDefaultLinuxDoGrantOnFirstBind  *bool                             `json:"auth_source_default_linuxdo_grant_on_first_bind"`
-	AuthSourceDefaultOIDCBalance              *float64                          `json:"auth_source_default_oidc_balance"`
-	AuthSourceDefaultOIDCConcurrency          *int                              `json:"auth_source_default_oidc_concurrency"`
-	AuthSourceDefaultOIDCSubscriptions        *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_oidc_subscriptions"`
-	AuthSourceDefaultOIDCGrantOnSignup        *bool                             `json:"auth_source_default_oidc_grant_on_signup"`
-	AuthSourceDefaultOIDCGrantOnFirstBind     *bool                             `json:"auth_source_default_oidc_grant_on_first_bind"`
-	AuthSourceDefaultWeChatBalance            *float64                          `json:"auth_source_default_wechat_balance"`
-	AuthSourceDefaultWeChatConcurrency        *int                              `json:"auth_source_default_wechat_concurrency"`
-	AuthSourceDefaultWeChatSubscriptions      *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_wechat_subscriptions"`
-	AuthSourceDefaultWeChatGrantOnSignup      *bool                             `json:"auth_source_default_wechat_grant_on_signup"`
-	AuthSourceDefaultWeChatGrantOnFirstBind   *bool                             `json:"auth_source_default_wechat_grant_on_first_bind"`
-	AuthSourceDefaultGitHubBalance            *float64                          `json:"auth_source_default_github_balance"`
-	AuthSourceDefaultGitHubConcurrency        *int                              `json:"auth_source_default_github_concurrency"`
-	AuthSourceDefaultGitHubSubscriptions      *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_github_subscriptions"`
-	AuthSourceDefaultGitHubGrantOnSignup      *bool                             `json:"auth_source_default_github_grant_on_signup"`
-	AuthSourceDefaultGitHubGrantOnFirstBind   *bool                             `json:"auth_source_default_github_grant_on_first_bind"`
-	AuthSourceDefaultGoogleBalance            *float64                          `json:"auth_source_default_google_balance"`
-	AuthSourceDefaultGoogleConcurrency        *int                              `json:"auth_source_default_google_concurrency"`
-	AuthSourceDefaultGoogleSubscriptions      *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_google_subscriptions"`
-	AuthSourceDefaultGoogleGrantOnSignup      *bool                             `json:"auth_source_default_google_grant_on_signup"`
-	AuthSourceDefaultGoogleGrantOnFirstBind   *bool                             `json:"auth_source_default_google_grant_on_first_bind"`
-	AuthSourceDefaultDingTalkBalance          *float64                          `json:"auth_source_default_dingtalk_balance"`
-	AuthSourceDefaultDingTalkConcurrency      *int                              `json:"auth_source_default_dingtalk_concurrency"`
-	AuthSourceDefaultDingTalkSubscriptions    *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_dingtalk_subscriptions"`
-	AuthSourceDefaultDingTalkGrantOnSignup    *bool                             `json:"auth_source_default_dingtalk_grant_on_signup"`
-	AuthSourceDefaultDingTalkGrantOnFirstBind *bool                             `json:"auth_source_default_dingtalk_grant_on_first_bind"`
-	ForceEmailOnThirdPartySignup              *bool                             `json:"force_email_on_third_party_signup"`
+	DefaultConcurrency                       int                               `json:"default_concurrency"`
+	DefaultBalance                           float64                           `json:"default_balance"`
+	DeviceClaimBonusBalance                  float64                           `json:"device_claim_bonus_balance"`
+	AffiliateRebateRate                      *float64                          `json:"affiliate_rebate_rate"`
+	AffiliateRebateFreezeHours               *int                              `json:"affiliate_rebate_freeze_hours"`
+	AffiliateRebateDurationDays              *int                              `json:"affiliate_rebate_duration_days"`
+	AffiliateRebatePerInviteeCap             *float64                          `json:"affiliate_rebate_per_invitee_cap"`
+	DefaultUserRPMLimit                      int                               `json:"default_user_rpm_limit"`
+	DefaultSubscriptions                     []dto.DefaultSubscriptionSetting  `json:"default_subscriptions"`
+	AuthSourceDefaultEmailBalance            *float64                          `json:"auth_source_default_email_balance"`
+	AuthSourceDefaultEmailConcurrency        *int                              `json:"auth_source_default_email_concurrency"`
+	AuthSourceDefaultEmailSubscriptions      *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_email_subscriptions"`
+	AuthSourceDefaultEmailGrantOnSignup      *bool                             `json:"auth_source_default_email_grant_on_signup"`
+	AuthSourceDefaultEmailGrantOnFirstBind   *bool                             `json:"auth_source_default_email_grant_on_first_bind"`
+	AuthSourceDefaultLinuxDoBalance          *float64                          `json:"auth_source_default_linuxdo_balance"`
+	AuthSourceDefaultLinuxDoConcurrency      *int                              `json:"auth_source_default_linuxdo_concurrency"`
+	AuthSourceDefaultLinuxDoSubscriptions    *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_linuxdo_subscriptions"`
+	AuthSourceDefaultLinuxDoGrantOnSignup    *bool                             `json:"auth_source_default_linuxdo_grant_on_signup"`
+	AuthSourceDefaultLinuxDoGrantOnFirstBind *bool                             `json:"auth_source_default_linuxdo_grant_on_first_bind"`
+	AuthSourceDefaultOIDCBalance             *float64                          `json:"auth_source_default_oidc_balance"`
+	AuthSourceDefaultOIDCConcurrency         *int                              `json:"auth_source_default_oidc_concurrency"`
+	AuthSourceDefaultOIDCSubscriptions       *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_oidc_subscriptions"`
+	AuthSourceDefaultOIDCGrantOnSignup       *bool                             `json:"auth_source_default_oidc_grant_on_signup"`
+	AuthSourceDefaultOIDCGrantOnFirstBind    *bool                             `json:"auth_source_default_oidc_grant_on_first_bind"`
+	AuthSourceDefaultWeChatBalance           *float64                          `json:"auth_source_default_wechat_balance"`
+	AuthSourceDefaultWeChatConcurrency       *int                              `json:"auth_source_default_wechat_concurrency"`
+	AuthSourceDefaultWeChatSubscriptions     *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_wechat_subscriptions"`
+	AuthSourceDefaultWeChatGrantOnSignup     *bool                             `json:"auth_source_default_wechat_grant_on_signup"`
+	AuthSourceDefaultWeChatGrantOnFirstBind  *bool                             `json:"auth_source_default_wechat_grant_on_first_bind"`
+	AuthSourceDefaultGitHubBalance           *float64                          `json:"auth_source_default_github_balance"`
+	AuthSourceDefaultGitHubConcurrency       *int                              `json:"auth_source_default_github_concurrency"`
+	AuthSourceDefaultGitHubSubscriptions     *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_github_subscriptions"`
+	AuthSourceDefaultGitHubGrantOnSignup     *bool                             `json:"auth_source_default_github_grant_on_signup"`
+	AuthSourceDefaultGitHubGrantOnFirstBind  *bool                             `json:"auth_source_default_github_grant_on_first_bind"`
+	AuthSourceDefaultGoogleBalance           *float64                          `json:"auth_source_default_google_balance"`
+	AuthSourceDefaultGoogleConcurrency       *int                              `json:"auth_source_default_google_concurrency"`
+	AuthSourceDefaultGoogleSubscriptions     *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_google_subscriptions"`
+	AuthSourceDefaultGoogleGrantOnSignup     *bool                             `json:"auth_source_default_google_grant_on_signup"`
+	AuthSourceDefaultGoogleGrantOnFirstBind  *bool                             `json:"auth_source_default_google_grant_on_first_bind"`
+	ForceEmailOnThirdPartySignup             *bool                             `json:"force_email_on_third_party_signup"`
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
@@ -659,6 +655,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 	if req.DefaultBalance < 0 {
 		req.DefaultBalance = 0
+	}
+	if req.DeviceClaimBonusBalance < 0 {
+		req.DeviceClaimBonusBalance = 0
 	}
 	affiliateRebateRate := previousSettings.AffiliateRebateRate
 	if req.AffiliateRebateRate != nil {
@@ -1432,129 +1431,114 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 
 	settings := &service.SystemSettings{
-		RegistrationEnabled:                    req.RegistrationEnabled,
-		EmailVerifyEnabled:                     req.EmailVerifyEnabled,
-		RegistrationEmailSuffixWhitelist:       req.RegistrationEmailSuffixWhitelist,
-		PromoCodeEnabled:                       req.PromoCodeEnabled,
-		PasswordResetEnabled:                   req.PasswordResetEnabled,
-		FrontendURL:                            req.FrontendURL,
-		InvitationCodeEnabled:                  req.InvitationCodeEnabled,
-		TotpEnabled:                            req.TotpEnabled,
-		LoginAgreementEnabled:                  req.LoginAgreementEnabled,
-		LoginAgreementMode:                     loginAgreementMode,
-		LoginAgreementUpdatedAt:                loginAgreementUpdatedAt,
-		LoginAgreementDocuments:                loginAgreementDocuments,
-		SMTPHost:                               req.SMTPHost,
-		SMTPPort:                               req.SMTPPort,
-		SMTPUsername:                           req.SMTPUsername,
-		SMTPPassword:                           req.SMTPPassword,
-		SMTPFrom:                               req.SMTPFrom,
-		SMTPFromName:                           req.SMTPFromName,
-		SMTPUseTLS:                             req.SMTPUseTLS,
-		TurnstileEnabled:                       req.TurnstileEnabled,
-		TurnstileSiteKey:                       req.TurnstileSiteKey,
-		TurnstileSecretKey:                     req.TurnstileSecretKey,
-		LinuxDoConnectEnabled:                  req.LinuxDoConnectEnabled,
-		LinuxDoConnectClientID:                 req.LinuxDoConnectClientID,
-		LinuxDoConnectClientSecret:             req.LinuxDoConnectClientSecret,
-		LinuxDoConnectRedirectURL:              req.LinuxDoConnectRedirectURL,
-		DingTalkConnectEnabled:                 req.DingTalkConnectEnabled,
-		DingTalkConnectClientID:                req.DingTalkConnectClientID,
-		DingTalkConnectClientSecret:            req.DingTalkConnectClientSecret,
-		DingTalkConnectRedirectURL:             req.DingTalkConnectRedirectURL,
-		DingTalkConnectCorpRestrictionPolicy:   req.DingTalkConnectCorpRestrictionPolicy,
-		DingTalkConnectInternalCorpID:          req.DingTalkConnectInternalCorpID,
-		DingTalkConnectBypassRegistration:      req.DingTalkConnectBypassRegistration,
-		DingTalkConnectSyncCorpEmail:           req.DingTalkConnectSyncCorpEmail,
-		DingTalkConnectSyncDisplayName:         req.DingTalkConnectSyncDisplayName,
-		DingTalkConnectSyncDept:                req.DingTalkConnectSyncDept,
-		DingTalkConnectSyncCorpEmailAttrKey:    req.DingTalkConnectSyncCorpEmailAttrKey,
-		DingTalkConnectSyncDisplayNameAttrKey:  req.DingTalkConnectSyncDisplayNameAttrKey,
-		DingTalkConnectSyncDeptAttrKey:         req.DingTalkConnectSyncDeptAttrKey,
-		DingTalkConnectSyncCorpEmailAttrName:   req.DingTalkConnectSyncCorpEmailAttrName,
-		DingTalkConnectSyncDisplayNameAttrName: req.DingTalkConnectSyncDisplayNameAttrName,
-		DingTalkConnectSyncDeptAttrName:        req.DingTalkConnectSyncDeptAttrName,
-		WeChatConnectEnabled:                   req.WeChatConnectEnabled,
-		WeChatConnectAppID:                     req.WeChatConnectAppID,
-		WeChatConnectAppSecret:                 req.WeChatConnectAppSecret,
-		WeChatConnectOpenAppID:                 req.WeChatConnectOpenAppID,
-		WeChatConnectOpenAppSecret:             req.WeChatConnectOpenAppSecret,
-		WeChatConnectMPAppID:                   req.WeChatConnectMPAppID,
-		WeChatConnectMPAppSecret:               req.WeChatConnectMPAppSecret,
-		WeChatConnectMobileAppID:               req.WeChatConnectMobileAppID,
-		WeChatConnectMobileAppSecret:           req.WeChatConnectMobileAppSecret,
-		WeChatConnectOpenEnabled:               req.WeChatConnectOpenEnabled,
-		WeChatConnectMPEnabled:                 req.WeChatConnectMPEnabled,
-		WeChatConnectMobileEnabled:             req.WeChatConnectMobileEnabled,
-		WeChatConnectMode:                      req.WeChatConnectMode,
-		WeChatConnectScopes:                    req.WeChatConnectScopes,
-		WeChatConnectRedirectURL:               req.WeChatConnectRedirectURL,
-		WeChatConnectFrontendRedirectURL:       req.WeChatConnectFrontendRedirectURL,
-		OIDCConnectEnabled:                     req.OIDCConnectEnabled,
-		OIDCConnectProviderName:                req.OIDCConnectProviderName,
-		OIDCConnectClientID:                    req.OIDCConnectClientID,
-		OIDCConnectClientSecret:                req.OIDCConnectClientSecret,
-		OIDCConnectIssuerURL:                   req.OIDCConnectIssuerURL,
-		OIDCConnectDiscoveryURL:                req.OIDCConnectDiscoveryURL,
-		OIDCConnectAuthorizeURL:                req.OIDCConnectAuthorizeURL,
-		OIDCConnectTokenURL:                    req.OIDCConnectTokenURL,
-		OIDCConnectUserInfoURL:                 req.OIDCConnectUserInfoURL,
-		OIDCConnectJWKSURL:                     req.OIDCConnectJWKSURL,
-		OIDCConnectScopes:                      req.OIDCConnectScopes,
-		OIDCConnectRedirectURL:                 req.OIDCConnectRedirectURL,
-		OIDCConnectFrontendRedirectURL:         req.OIDCConnectFrontendRedirectURL,
-		OIDCConnectTokenAuthMethod:             req.OIDCConnectTokenAuthMethod,
-		OIDCConnectUsePKCE:                     oidcUsePKCE,
-		OIDCConnectValidateIDToken:             oidcValidateIDToken,
-		OIDCConnectAllowedSigningAlgs:          req.OIDCConnectAllowedSigningAlgs,
-		OIDCConnectClockSkewSeconds:            req.OIDCConnectClockSkewSeconds,
-		OIDCConnectRequireEmailVerified:        req.OIDCConnectRequireEmailVerified,
-		OIDCConnectUserInfoEmailPath:           req.OIDCConnectUserInfoEmailPath,
-		OIDCConnectUserInfoIDPath:              req.OIDCConnectUserInfoIDPath,
-		OIDCConnectUserInfoUsernamePath:        req.OIDCConnectUserInfoUsernamePath,
-		GitHubOAuthEnabled:                     req.GitHubOAuthEnabled,
-		GitHubOAuthClientID:                    req.GitHubOAuthClientID,
-		GitHubOAuthClientSecret:                req.GitHubOAuthClientSecret,
-		GitHubOAuthRedirectURL:                 req.GitHubOAuthRedirectURL,
-		GitHubOAuthFrontendRedirectURL:         req.GitHubOAuthFrontendRedirectURL,
-		GoogleOAuthEnabled:                     req.GoogleOAuthEnabled,
-		GoogleOAuthClientID:                    req.GoogleOAuthClientID,
-		GoogleOAuthClientSecret:                req.GoogleOAuthClientSecret,
-		GoogleOAuthRedirectURL:                 req.GoogleOAuthRedirectURL,
-		GoogleOAuthFrontendRedirectURL:         req.GoogleOAuthFrontendRedirectURL,
-		SiteName:                               req.SiteName,
-		SiteLogo:                               req.SiteLogo,
-		SiteSubtitle:                           req.SiteSubtitle,
-		APIBaseURL:                             req.APIBaseURL,
-		ContactInfo:                            req.ContactInfo,
-		DocURL:                                 req.DocURL,
-		HomeContent:                            req.HomeContent,
-		HideCcsImportButton:                    req.HideCcsImportButton,
-		PurchaseSubscriptionEnabled:            purchaseEnabled,
-		PurchaseSubscriptionURL:                purchaseURL,
-		TableDefaultPageSize:                   req.TableDefaultPageSize,
-		TablePageSizeOptions:                   req.TablePageSizeOptions,
-		CustomMenuItems:                        customMenuJSON,
-		CustomEndpoints:                        customEndpointsJSON,
-		DefaultConcurrency:                     req.DefaultConcurrency,
-		DefaultBalance:                         req.DefaultBalance,
-		AffiliateRebateRate:                    affiliateRebateRate,
-		AffiliateRebateFreezeHours:             affiliateRebateFreezeHours,
-		AffiliateRebateDurationDays:            affiliateRebateDurationDays,
-		AffiliateRebatePerInviteeCap:           affiliateRebatePerInviteeCap,
-		DefaultUserRPMLimit:                    req.DefaultUserRPMLimit,
-		DefaultSubscriptions:                   defaultSubscriptions,
-		EnableModelFallback:                    req.EnableModelFallback,
-		FallbackModelAnthropic:                 req.FallbackModelAnthropic,
-		FallbackModelOpenAI:                    req.FallbackModelOpenAI,
-		FallbackModelGemini:                    req.FallbackModelGemini,
-		FallbackModelAntigravity:               req.FallbackModelAntigravity,
-		EnableIdentityPatch:                    req.EnableIdentityPatch,
-		IdentityPatchPrompt:                    req.IdentityPatchPrompt,
-		MinClaudeCodeVersion:                   req.MinClaudeCodeVersion,
-		MaxClaudeCodeVersion:                   req.MaxClaudeCodeVersion,
-		AllowUngroupedKeyScheduling:            req.AllowUngroupedKeyScheduling,
-		BackendModeEnabled:                     req.BackendModeEnabled,
+		RegistrationEnabled:              req.RegistrationEnabled,
+		EmailVerifyEnabled:               req.EmailVerifyEnabled,
+		RegistrationEmailSuffixWhitelist: req.RegistrationEmailSuffixWhitelist,
+		PromoCodeEnabled:                 req.PromoCodeEnabled,
+		PasswordResetEnabled:             req.PasswordResetEnabled,
+		FrontendURL:                      req.FrontendURL,
+		InvitationCodeEnabled:            req.InvitationCodeEnabled,
+		TotpEnabled:                      req.TotpEnabled,
+		LoginAgreementEnabled:            req.LoginAgreementEnabled,
+		LoginAgreementMode:               loginAgreementMode,
+		LoginAgreementUpdatedAt:          loginAgreementUpdatedAt,
+		LoginAgreementDocuments:          loginAgreementDocuments,
+		SMTPHost:                         req.SMTPHost,
+		SMTPPort:                         req.SMTPPort,
+		SMTPUsername:                     req.SMTPUsername,
+		SMTPPassword:                     req.SMTPPassword,
+		SMTPFrom:                         req.SMTPFrom,
+		SMTPFromName:                     req.SMTPFromName,
+		SMTPUseTLS:                       req.SMTPUseTLS,
+		TurnstileEnabled:                 req.TurnstileEnabled,
+		TurnstileSiteKey:                 req.TurnstileSiteKey,
+		TurnstileSecretKey:               req.TurnstileSecretKey,
+		LinuxDoConnectEnabled:            req.LinuxDoConnectEnabled,
+		LinuxDoConnectClientID:           req.LinuxDoConnectClientID,
+		LinuxDoConnectClientSecret:       req.LinuxDoConnectClientSecret,
+		LinuxDoConnectRedirectURL:        req.LinuxDoConnectRedirectURL,
+		WeChatConnectEnabled:             req.WeChatConnectEnabled,
+		WeChatConnectAppID:               req.WeChatConnectAppID,
+		WeChatConnectAppSecret:           req.WeChatConnectAppSecret,
+		WeChatConnectOpenAppID:           req.WeChatConnectOpenAppID,
+		WeChatConnectOpenAppSecret:       req.WeChatConnectOpenAppSecret,
+		WeChatConnectMPAppID:             req.WeChatConnectMPAppID,
+		WeChatConnectMPAppSecret:         req.WeChatConnectMPAppSecret,
+		WeChatConnectMobileAppID:         req.WeChatConnectMobileAppID,
+		WeChatConnectMobileAppSecret:     req.WeChatConnectMobileAppSecret,
+		WeChatConnectOpenEnabled:         req.WeChatConnectOpenEnabled,
+		WeChatConnectMPEnabled:           req.WeChatConnectMPEnabled,
+		WeChatConnectMobileEnabled:       req.WeChatConnectMobileEnabled,
+		WeChatConnectMode:                req.WeChatConnectMode,
+		WeChatConnectScopes:              req.WeChatConnectScopes,
+		WeChatConnectRedirectURL:         req.WeChatConnectRedirectURL,
+		WeChatConnectFrontendRedirectURL: req.WeChatConnectFrontendRedirectURL,
+		OIDCConnectEnabled:               req.OIDCConnectEnabled,
+		OIDCConnectProviderName:          req.OIDCConnectProviderName,
+		OIDCConnectClientID:              req.OIDCConnectClientID,
+		OIDCConnectClientSecret:          req.OIDCConnectClientSecret,
+		OIDCConnectIssuerURL:             req.OIDCConnectIssuerURL,
+		OIDCConnectDiscoveryURL:          req.OIDCConnectDiscoveryURL,
+		OIDCConnectAuthorizeURL:          req.OIDCConnectAuthorizeURL,
+		OIDCConnectTokenURL:              req.OIDCConnectTokenURL,
+		OIDCConnectUserInfoURL:           req.OIDCConnectUserInfoURL,
+		OIDCConnectJWKSURL:               req.OIDCConnectJWKSURL,
+		OIDCConnectScopes:                req.OIDCConnectScopes,
+		OIDCConnectRedirectURL:           req.OIDCConnectRedirectURL,
+		OIDCConnectFrontendRedirectURL:   req.OIDCConnectFrontendRedirectURL,
+		OIDCConnectTokenAuthMethod:       req.OIDCConnectTokenAuthMethod,
+		OIDCConnectUsePKCE:               oidcUsePKCE,
+		OIDCConnectValidateIDToken:       oidcValidateIDToken,
+		OIDCConnectAllowedSigningAlgs:    req.OIDCConnectAllowedSigningAlgs,
+		OIDCConnectClockSkewSeconds:      req.OIDCConnectClockSkewSeconds,
+		OIDCConnectRequireEmailVerified:  req.OIDCConnectRequireEmailVerified,
+		OIDCConnectUserInfoEmailPath:     req.OIDCConnectUserInfoEmailPath,
+		OIDCConnectUserInfoIDPath:        req.OIDCConnectUserInfoIDPath,
+		OIDCConnectUserInfoUsernamePath:  req.OIDCConnectUserInfoUsernamePath,
+		GitHubOAuthEnabled:               req.GitHubOAuthEnabled,
+		GitHubOAuthClientID:              req.GitHubOAuthClientID,
+		GitHubOAuthClientSecret:          req.GitHubOAuthClientSecret,
+		GitHubOAuthRedirectURL:           req.GitHubOAuthRedirectURL,
+		GitHubOAuthFrontendRedirectURL:   req.GitHubOAuthFrontendRedirectURL,
+		GoogleOAuthEnabled:               req.GoogleOAuthEnabled,
+		GoogleOAuthClientID:              req.GoogleOAuthClientID,
+		GoogleOAuthClientSecret:          req.GoogleOAuthClientSecret,
+		GoogleOAuthRedirectURL:           req.GoogleOAuthRedirectURL,
+		GoogleOAuthFrontendRedirectURL:   req.GoogleOAuthFrontendRedirectURL,
+		SiteName:                         req.SiteName,
+		SiteLogo:                         req.SiteLogo,
+		SiteSubtitle:                     req.SiteSubtitle,
+		APIBaseURL:                       req.APIBaseURL,
+		ContactInfo:                      req.ContactInfo,
+		DocURL:                           req.DocURL,
+		HomeContent:                      req.HomeContent,
+		HideCcsImportButton:              req.HideCcsImportButton,
+		PurchaseSubscriptionEnabled:      purchaseEnabled,
+		PurchaseSubscriptionURL:          purchaseURL,
+		TableDefaultPageSize:             req.TableDefaultPageSize,
+		TablePageSizeOptions:             req.TablePageSizeOptions,
+		CustomMenuItems:                  customMenuJSON,
+		CustomEndpoints:                  customEndpointsJSON,
+		DefaultConcurrency:               req.DefaultConcurrency,
+		DefaultBalance:                   req.DefaultBalance,
+		DeviceClaimBonusBalance:          req.DeviceClaimBonusBalance,
+		AffiliateRebateRate:              affiliateRebateRate,
+		AffiliateRebateFreezeHours:       affiliateRebateFreezeHours,
+		AffiliateRebateDurationDays:      affiliateRebateDurationDays,
+		AffiliateRebatePerInviteeCap:     affiliateRebatePerInviteeCap,
+		DefaultUserRPMLimit:              req.DefaultUserRPMLimit,
+		DefaultSubscriptions:             defaultSubscriptions,
+		EnableModelFallback:              req.EnableModelFallback,
+		FallbackModelAnthropic:           req.FallbackModelAnthropic,
+		FallbackModelOpenAI:              req.FallbackModelOpenAI,
+		FallbackModelGemini:              req.FallbackModelGemini,
+		FallbackModelAntigravity:         req.FallbackModelAntigravity,
+		EnableIdentityPatch:              req.EnableIdentityPatch,
+		IdentityPatchPrompt:              req.IdentityPatchPrompt,
+		MinClaudeCodeVersion:             req.MinClaudeCodeVersion,
+		MaxClaudeCodeVersion:             req.MaxClaudeCodeVersion,
+		AllowUngroupedKeyScheduling:      req.AllowUngroupedKeyScheduling,
+		BackendModeEnabled:               req.BackendModeEnabled,
 		OpsMonitoringEnabled: func() bool {
 			if req.OpsMonitoringEnabled != nil {
 				return *req.OpsMonitoringEnabled
@@ -1953,6 +1937,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		CustomEndpoints:                        dto.ParseCustomEndpoints(updatedSettings.CustomEndpoints),
 		DefaultConcurrency:                     updatedSettings.DefaultConcurrency,
 		DefaultBalance:                         updatedSettings.DefaultBalance,
+		DeviceClaimBonusBalance:                updatedSettings.DeviceClaimBonusBalance,
 		AffiliateRebateRate:                    updatedSettings.AffiliateRebateRate,
 		AffiliateRebateFreezeHours:             updatedSettings.AffiliateRebateFreezeHours,
 		AffiliateRebateDurationDays:            updatedSettings.AffiliateRebateDurationDays,
@@ -2339,6 +2324,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.DefaultBalance != after.DefaultBalance {
 		changed = append(changed, "default_balance")
+	}
+	if before.DeviceClaimBonusBalance != after.DeviceClaimBonusBalance {
+		changed = append(changed, "device_claim_bonus_balance")
 	}
 	if before.AffiliateRebateRate != after.AffiliateRebateRate {
 		changed = append(changed, "affiliate_rebate_rate")
