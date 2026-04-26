@@ -91,7 +91,9 @@ import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import { adminAPI } from '@/api/admin'
 import { useAppStore } from '@/stores/app'
-import type { AdminDataImportResult, AdminImportData, AdminDataPayload } from '@/types'
+import type { AdminDataImportResult, AdminDataPayload } from '@/types'
+
+type AdminImportData = AdminDataPayload
 
 const IMPORT_FORMAT_FILE_PREFIX = 'sub2api-account'
 const STRUCTURED_EXPORT_ONLY_ERROR = 'Structured export file must be imported alone'
@@ -144,10 +146,29 @@ const mergeImportResults = (results: AdminDataImportResult[]): ImportAggregateRe
   })
 }
 
+const normalizeCPAAccountsPayload = (accounts: Record<string, unknown>[]): AdminDataPayload => ({
+  exported_at: new Date(0).toISOString(),
+  proxies: [],
+  accounts: accounts.map((account) => ({
+    name: typeof account.name === 'string' ? account.name : (typeof account.account_id === 'string' ? account.account_id : 'Imported Account'),
+    notes: typeof account.notes === 'string' ? account.notes : null,
+    platform: typeof account.platform === 'string' ? account.platform as never : 'openai',
+    type: typeof account.type === 'string' ? account.type as never : 'apikey',
+    credentials: account,
+    extra: {},
+    proxy_key: typeof account.proxy_key === 'string' ? account.proxy_key : null,
+    concurrency: typeof account.concurrency === 'number' ? account.concurrency : 1,
+    priority: typeof account.priority === 'number' ? account.priority : 0,
+    rate_multiplier: typeof account.rate_multiplier === 'number' ? account.rate_multiplier : null,
+    expires_at: typeof account.expires_at === 'number' ? account.expires_at : null,
+    auto_pause_on_expired: typeof account.auto_pause_on_expired === 'boolean' ? account.auto_pause_on_expired : false,
+  })),
+})
+
 const parseImportPayload = (raw: unknown): AdminImportData => {
   if (Array.isArray(raw)) {
     if (raw.every(isCPAAccountObject)) {
-      return raw
+      return normalizeCPAAccountsPayload(raw)
     }
     throw new SyntaxError('Unsupported import array format')
   }
@@ -157,35 +178,14 @@ const parseImportPayload = (raw: unknown): AdminImportData => {
   }
 
   if (isCPAAccountObject(raw)) {
-    return raw
+    return normalizeCPAAccountsPayload([raw])
   }
 
   throw new SyntaxError('Unsupported import object format')
 }
 
 const parseImportFiles = (entries: ParsedImportFile[]): AdminImportData[] => {
-  const structuredPayloads: AdminImportData[] = []
-  const cpaAccounts: Record<string, unknown>[] = []
-
-  for (const entry of entries) {
-    if (Array.isArray(entry.data)) {
-      cpaAccounts.push(...entry.data)
-      continue
-    }
-
-    if (isStructuredDataPayload(entry.data)) {
-      structuredPayloads.push(entry.data)
-      continue
-    }
-
-    cpaAccounts.push(entry.data)
-  }
-
-  if (cpaAccounts.length > 0) {
-    structuredPayloads.push(cpaAccounts)
-  }
-
-  return structuredPayloads
+  return entries.map((entry) => entry.data)
 }
 
 const parseImportFilesFromText = async (files: File[]): Promise<AdminImportData[]> => {
