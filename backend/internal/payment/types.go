@@ -16,8 +16,10 @@ const (
 	TypeStripe       PaymentType = "stripe"
 	TypeCard         PaymentType = "card"
 	TypeLink         PaymentType = "link"
+	TypePaddle       PaymentType = "paddle"
 	TypeEasyPay      PaymentType = "easypay"
 	TypeAirwallex    PaymentType = "airwallex"
+	TypeSepay        PaymentType = "sepay"
 )
 
 // Order status constants shared across payment and service layers.
@@ -99,7 +101,10 @@ func GetBasePaymentType(t string) string {
 // CreatePaymentRequest holds the parameters for creating a new payment.
 type CreatePaymentRequest struct {
 	OrderID            string // Internal order ID
-	Amount             string // 支付金额，按服务商实例配置的币种解释
+	Amount             string // Pay amount in the payment currency (formatted string)
+	PaymentCurrency    string // Currency the user/provider pays in (e.g. CNY, VND)
+	LedgerCurrency     string // Canonical system currency for accounting (e.g. USD)
+	LedgerAmount       string // Credited ledger amount as a formatted string
 	PaymentType        string // e.g. "alipay", "wxpay", "stripe"
 	Subject            string // Product description
 	NotifyURL          string // Webhook callback URL
@@ -152,13 +157,15 @@ type CreatePaymentResponse struct {
 	ResultType   CreatePaymentResultType // Typed result contract for frontend flows
 	OAuth        *WechatOAuthInfo        // WeChat OAuth bootstrap payload when required
 	JSAPI        *WechatJSAPIPayload     // WeChat JSAPI invocation payload when ready
+	CheckoutID   string                  // Provider-specific hosted checkout/session/transaction ID
 }
 
 // QueryOrderResponse describes the payment status from the upstream provider.
 type QueryOrderResponse struct {
 	TradeNo  string
 	Status   string  // "pending", "paid", "failed", "refunded"
-	Amount   float64 // 按服务商返回币种解释的金额
+	Amount   float64 // Amount in the payment currency
+	Currency string  // ISO-like currency code (e.g. CNY, VND)
 	PaidAt   string  // RFC3339 timestamp or empty
 	Metadata map[string]string
 }
@@ -168,6 +175,7 @@ type PaymentNotification struct {
 	TradeNo  string
 	OrderID  string
 	Amount   float64
+	Currency string
 	Status   string // "success" or "failed"
 	RawData  string // Raw notification body for audit
 	Metadata map[string]string
