@@ -509,6 +509,7 @@ var ProviderSet = wire.NewSet(
 	ProvideBalanceNotifyService,
 	ProvideChannelMonitorService,
 	ProvideChannelMonitorRunner,
+	NewVClawClaimService,
 	NewChannelMonitorRequestTemplateService,
 )
 
