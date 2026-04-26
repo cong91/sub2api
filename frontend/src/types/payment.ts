@@ -19,7 +19,7 @@ export type OrderStatus =
   | 'REFUNDED'
   | 'REFUND_FAILED'
 
-export type PaymentType = 'alipay' | 'wxpay' | 'alipay_direct' | 'wxpay_direct' | 'stripe' | 'easypay' | 'airwallex'
+export type PaymentType = 'alipay' | 'wxpay' | 'alipay_direct' | 'wxpay_direct' | 'stripe' | 'paddle' | 'easypay' | 'airwallex' | 'sepay'
 
 export type OrderType = 'balance' | 'subscription'
 
@@ -38,6 +38,8 @@ export interface PaymentConfig {
   help_image_url: string
   help_text: string
   stripe_publishable_key: string
+  paddle_client_token: string
+  paddle_environment: string
 }
 
 export interface MethodLimit {
@@ -72,6 +74,8 @@ export interface CheckoutInfoResponse {
   stripe_publishable_key: string
   /** When true, Alipay payments on mobile always show the QR code instead of redirecting */
   alipay_force_qrcode?: boolean
+  paddle_client_token: string
+  paddle_environment: string
 }
 
 // ==================== Orders ====================
@@ -196,6 +200,7 @@ export interface CreateOrderResult {
   currency?: string
   country_code?: string
   payment_env?: string
+  checkout_id?: string
   pay_amount: number
   fee_rate: number
   expires_at: string
