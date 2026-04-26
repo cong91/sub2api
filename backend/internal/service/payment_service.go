@@ -72,6 +72,7 @@ func generateRandomString(n int) string {
 type CreateOrderRequest struct {
 	UserID          int64
 	Amount          float64
+	PaymentCurrency string
 	PaymentType     string
 	OpenID          string
 	ClientIP        string
@@ -86,23 +87,31 @@ type CreateOrderRequest struct {
 }
 
 type CreateOrderResponse struct {
-	OrderID      int64                           `json:"order_id"`
-	Amount       float64                         `json:"amount"`
-	PayAmount    float64                         `json:"pay_amount"`
-	FeeRate      float64                         `json:"fee_rate"`
-	Status       string                          `json:"status"`
-	ResultType   payment.CreatePaymentResultType `json:"result_type,omitempty"`
-	PaymentType  string                          `json:"payment_type"`
-	OutTradeNo   string                          `json:"out_trade_no,omitempty"`
-	PayURL       string                          `json:"pay_url,omitempty"`
-	QRCode       string                          `json:"qr_code,omitempty"`
-	ClientSecret string                          `json:"client_secret,omitempty"`
-	OAuth        *payment.WechatOAuthInfo        `json:"oauth,omitempty"`
-	JSAPI        *payment.WechatJSAPIPayload     `json:"jsapi,omitempty"`
-	JSAPIPayload *payment.WechatJSAPIPayload     `json:"jsapi_payload,omitempty"`
-	ExpiresAt    time.Time                       `json:"expires_at"`
-	PaymentMode  string                          `json:"payment_mode,omitempty"`
-	ResumeToken  string                          `json:"resume_token,omitempty"`
+	OrderID         int64                           `json:"order_id"`
+	Amount          float64                         `json:"amount"`
+	PaymentAmount   float64                         `json:"payment_amount"`
+	PaymentCurrency string                          `json:"payment_currency"`
+	LedgerAmount    float64                         `json:"ledger_amount"`
+	LedgerCurrency  string                          `json:"ledger_currency"`
+	FXRate          float64                         `json:"fx_rate"`
+	FXSource        string                          `json:"fx_source"`
+	FXTimestamp     time.Time                       `json:"fx_timestamp"`
+	PayAmount       float64                         `json:"pay_amount"`
+	FeeRate         float64                         `json:"fee_rate"`
+	Status          string                          `json:"status"`
+	ResultType      payment.CreatePaymentResultType `json:"result_type,omitempty"`
+	PaymentType     string                          `json:"payment_type"`
+	OutTradeNo      string                          `json:"out_trade_no,omitempty"`
+	PayURL          string                          `json:"pay_url,omitempty"`
+	QRCode          string                          `json:"qr_code,omitempty"`
+	ClientSecret    string                          `json:"client_secret,omitempty"`
+	CheckoutID      string                          `json:"checkout_id,omitempty"`
+	OAuth           *payment.WechatOAuthInfo        `json:"oauth,omitempty"`
+	JSAPI           *payment.WechatJSAPIPayload     `json:"jsapi,omitempty"`
+	JSAPIPayload    *payment.WechatJSAPIPayload     `json:"jsapi_payload,omitempty"`
+	ExpiresAt       time.Time                       `json:"expires_at"`
+	PaymentMode     string                          `json:"payment_mode,omitempty"`
+	ResumeToken     string                          `json:"resume_token,omitempty"`
 }
 
 type OrderListParams struct {

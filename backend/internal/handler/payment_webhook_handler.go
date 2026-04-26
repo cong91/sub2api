@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -58,6 +59,12 @@ func (h *PaymentWebhookHandler) WxpayNotify(c *gin.Context) {
 // POST /api/v1/payment/webhook/stripe
 func (h *PaymentWebhookHandler) StripeWebhook(c *gin.Context) {
 	h.handleNotify(c, payment.TypeStripe)
+}
+
+// PaddleWebhook handles Paddle webhook events.
+// POST /api/v1/payment/webhook/paddle
+func (h *PaymentWebhookHandler) PaddleWebhook(c *gin.Context) {
+	h.handleNotify(c, payment.TypePaddle)
 }
 
 // handleNotify is the shared logic for all provider webhook handlers.
@@ -145,6 +152,17 @@ func extractOutTradeNo(rawBody, providerKey string) string {
 		values, err := url.ParseQuery(rawBody)
 		if err == nil {
 			return values.Get("out_trade_no")
+		}
+	case payment.TypePaddle:
+		var payload struct {
+			Data struct {
+				CustomData struct {
+					OrderID string `json:"orderId"`
+				} `json:"custom_data"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(rawBody), &payload); err == nil {
+			return payload.Data.CustomData.OrderID
 		}
 	}
 	// For other providers (Stripe, Alipay direct, WxPay direct), the registry
