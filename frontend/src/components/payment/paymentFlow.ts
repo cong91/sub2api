@@ -15,9 +15,10 @@ const VISIBLE_METHOD_ALIASES = {
   wxpay: 'wxpay',
   wxpay_direct: 'wxpay',
   stripe: 'stripe',
+  paddle: 'paddle',
 } as const
 
-export type VisiblePaymentMethod = 'alipay' | 'wxpay' | 'stripe'
+export type VisiblePaymentMethod = 'alipay' | 'wxpay' | 'stripe' | 'paddle'
 export type StripeVisibleMethod = 'alipay' | 'wechat_pay'
 export type PaymentLaunchKind =
   | 'qr_waiting'
@@ -37,6 +38,7 @@ export interface PaymentRecoverySnapshot {
   payUrl: string
   outTradeNo: string
   clientSecret: string
+  checkoutId: string
   payAmount: number
   orderType: OrderType | ''
   paymentMode: string
@@ -138,11 +140,16 @@ export function decidePaymentLaunch(
     payUrl: result.pay_url || '',
     outTradeNo: result.out_trade_no || '',
     clientSecret: result.client_secret || '',
+    checkoutId: result.checkout_id || '',
     payAmount: result.pay_amount,
     orderType: context.orderType,
     paymentMode: (result.payment_mode || '').trim(),
     resumeToken: result.resume_token || '',
   }, context.now)
+
+  if (baseState.checkoutId) {
+    return { kind: 'unhandled', paymentState: baseState, recovery: baseState }
+  }
 
   if (baseState.clientSecret) {
     // visibleMethod === 'stripe' means the user clicked the dedicated Stripe button
@@ -239,6 +246,7 @@ export function readPaymentRecoverySnapshot(
       || typeof parsed.payUrl !== 'string'
       || (parsed.outTradeNo != null && typeof parsed.outTradeNo !== 'string')
       || typeof parsed.clientSecret !== 'string'
+      || (parsed.checkoutId != null && typeof parsed.checkoutId !== 'string')
       || typeof parsed.payAmount !== 'number'
       || typeof parsed.paymentMode !== 'string'
       || typeof parsed.resumeToken !== 'string'
@@ -265,6 +273,7 @@ export function readPaymentRecoverySnapshot(
       payUrl: parsed.payUrl,
       outTradeNo: parsed.outTradeNo || '',
       clientSecret: parsed.clientSecret,
+      checkoutId: parsed.checkoutId || '',
       payAmount: parsed.payAmount,
       orderType: parsed.orderType === 'subscription' ? 'subscription' : 'balance',
       paymentMode: parsed.paymentMode,
