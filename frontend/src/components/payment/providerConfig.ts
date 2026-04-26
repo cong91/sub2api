@@ -31,13 +31,15 @@ export const PROVIDER_SUPPORTED_TYPES: Record<string, string[]> = {
   alipay: ['alipay'],
   wxpay: ['wxpay'],
   stripe: ['card', 'alipay', 'wxpay', 'link'],
+  paddle: ['paddle'],
+  sepay: ['sepay'],
 }
 
 /** Available payment modes for EasyPay providers. */
 export const EASYPAY_PAYMENT_MODES = ['qrcode', 'popup'] as const
 
 /** Fixed display order for user-facing payment methods */
-export const METHOD_ORDER = ['alipay', 'alipay_direct', 'wxpay', 'wxpay_direct', 'stripe'] as const
+export const METHOD_ORDER = ['alipay', 'alipay_direct', 'wxpay', 'wxpay_direct', 'sepay', 'stripe', 'paddle'] as const
 
 /** Payment mode constants */
 export const PAYMENT_MODE_QRCODE = 'qrcode'
@@ -68,6 +70,8 @@ export const WEBHOOK_PATHS: Record<string, string> = {
   alipay: '/api/v1/payment/webhook/alipay',
   wxpay: '/api/v1/payment/webhook/wxpay',
   stripe: '/api/v1/payment/webhook/stripe',
+  paddle: '/api/v1/payment/webhook/paddle',
+  sepay: '/api/v1/payment/webhook/sepay',
 }
 
 export const RETURN_PATH = '/payment/result'
@@ -77,6 +81,8 @@ export const PROVIDER_CALLBACK_PATHS: Record<string, CallbackPaths> = {
   easypay: { notifyUrl: WEBHOOK_PATHS.easypay, returnUrl: RETURN_PATH },
   alipay: { notifyUrl: WEBHOOK_PATHS.alipay, returnUrl: RETURN_PATH },
   wxpay: { notifyUrl: WEBHOOK_PATHS.wxpay },
+  paddle: { notifyUrl: WEBHOOK_PATHS.paddle },
+  sepay: { notifyUrl: WEBHOOK_PATHS.sepay },
   // stripe: no callback URL config needed (webhook is separate)
 }
 
@@ -107,6 +113,16 @@ export const PROVIDER_CONFIG_FIELDS: Record<string, ConfigFieldDef[]> = {
     { key: 'secretKey', label: '', sensitive: true },
     { key: 'publishableKey', label: '', sensitive: false },
     { key: 'webhookSecret', label: '', sensitive: true },
+  ],
+  paddle: [
+    { key: 'apiKey', label: 'API Key', sensitive: true },
+    { key: 'clientToken', label: 'Client Token', sensitive: false },
+    { key: 'webhookSecret', label: 'Webhook Secret', sensitive: true },
+    { key: 'environment', label: 'Environment', sensitive: false, optional: true, defaultValue: 'sandbox' },
+  ],
+  sepay: [
+    { key: 'apiToken', label: 'API Token', sensitive: true },
+    { key: 'bankAccountId', label: 'Bank Account ID', sensitive: false },
   ],
 }
 

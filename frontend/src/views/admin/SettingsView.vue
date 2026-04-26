@@ -2188,6 +2188,24 @@
                     {{ t("admin.settings.defaults.defaultUserRpmLimitHint") }}
                   </p>
                 </div>
+                <div>
+                  <label
+                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    {{ t("admin.settings.defaults.deviceClaimBonusBalance") }}
+                  </label>
+                  <input
+                    v-model.number="form.device_claim_bonus_balance"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="input"
+                    placeholder="0.00"
+                  />
+                  <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.defaults.deviceClaimBonusBalanceHint") }}
+                  </p>
+                </div>
               </div>
 
               <div class="border-t border-gray-100 pt-4 dark:border-dark-700">
@@ -5334,6 +5352,7 @@ const form = reactive<SettingsForm>({
   default_balance: 0,
   affiliate_rebate_rate: 20,
   default_concurrency: 1,
+  device_claim_bonus_balance: 0,
   default_subscriptions: [],
   force_email_on_third_party_signup: false,
   default_user_rpm_limit: 0,
@@ -6262,6 +6281,7 @@ async function saveSettings() {
         Math.max(0, Number(form.affiliate_rebate_rate) || 0),
       ),
       default_concurrency: form.default_concurrency,
+      device_claim_bonus_balance: Number(form.device_claim_bonus_balance) || 0,
       default_subscriptions: normalizedDefaultSubscriptions,
       force_email_on_third_party_signup: form.force_email_on_third_party_signup,
       default_user_rpm_limit: form.default_user_rpm_limit,

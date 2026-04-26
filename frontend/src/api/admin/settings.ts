@@ -310,6 +310,7 @@ export interface SystemSettings {
   default_balance: number;
   affiliate_rebate_rate: number;
   default_concurrency: number;
+  device_claim_bonus_balance: number;
   default_user_rpm_limit: number;
   default_subscriptions: DefaultSubscriptionSetting[];
   auth_source_default_email_balance?: number;
@@ -493,8 +494,9 @@ export interface UpdateSettingsRequest {
   invitation_code_enabled?: boolean;
   totp_enabled?: boolean; // TOTP 双因素认证
   default_balance?: number;
-  affiliate_rebate_rate?: number;
   default_concurrency?: number;
+  device_claim_bonus_balance?: number;
+  affiliate_rebate_rate?: number;
   default_user_rpm_limit?: number;
   default_subscriptions?: DefaultSubscriptionSetting[];
   auth_source_default_email_balance?: number;
