@@ -381,6 +381,7 @@ export interface SystemSettings {
   affiliate_rebate_per_invitee_cap: number;
   affiliate_admin_recharge_enabled: boolean;
   default_concurrency: number;
+  device_claim_bonus_balance: number;
   default_user_rpm_limit: number;
   default_subscriptions: DefaultSubscriptionSetting[];
   auth_source_default_email_balance?: number;
@@ -687,6 +688,7 @@ export interface UpdateSettingsRequest {
   affiliate_rebate_per_invitee_cap?: number;
   affiliate_admin_recharge_enabled?: boolean;
   default_concurrency?: number;
+  device_claim_bonus_balance?: number;
   default_user_rpm_limit?: number;
   default_subscriptions?: DefaultSubscriptionSetting[];
   auth_source_default_email_balance?: number;
