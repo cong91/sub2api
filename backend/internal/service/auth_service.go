@@ -26,25 +26,25 @@ import (
 )
 
 var (
-	ErrInvalidCredentials      = infraerrors.Unauthorized("INVALID_CREDENTIALS", "invalid email or password")
-	ErrUserNotActive           = infraerrors.Forbidden("USER_NOT_ACTIVE", "user is not active")
-	ErrEmailExists             = infraerrors.Conflict("EMAIL_EXISTS", "email already exists")
-	ErrEmailReserved           = infraerrors.BadRequest("EMAIL_RESERVED", "email is reserved")
-	ErrInvalidToken            = infraerrors.Unauthorized("INVALID_TOKEN", "invalid token")
-	ErrTokenExpired            = infraerrors.Unauthorized("TOKEN_EXPIRED", "token has expired")
-	ErrAccessTokenExpired      = infraerrors.Unauthorized("ACCESS_TOKEN_EXPIRED", "access token has expired")
-	ErrTokenTooLarge           = infraerrors.BadRequest("TOKEN_TOO_LARGE", "token too large")
-	ErrTokenRevoked            = infraerrors.Unauthorized("TOKEN_REVOKED", "token has been revoked")
-	ErrRefreshTokenInvalid     = infraerrors.Unauthorized("REFRESH_TOKEN_INVALID", "invalid refresh token")
-	ErrRefreshTokenExpired     = infraerrors.Unauthorized("REFRESH_TOKEN_EXPIRED", "refresh token has expired")
-	ErrRefreshTokenReused      = infraerrors.Unauthorized("REFRESH_TOKEN_REUSED", "refresh token has been reused")
-	ErrEmailVerifyRequired     = infraerrors.BadRequest("EMAIL_VERIFY_REQUIRED", "email verification is required")
-	ErrEmailSuffixNotAllowed   = infraerrors.BadRequest("EMAIL_SUFFIX_NOT_ALLOWED", "email suffix is not allowed")
-	ErrRegDisabled             = infraerrors.Forbidden("REGISTRATION_DISABLED", "registration is currently disabled")
-	ErrServiceUnavailable      = infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "service temporarily unavailable")
-	ErrInvitationCodeRequired  = infraerrors.BadRequest("INVITATION_CODE_REQUIRED", "invitation code is required")
-	ErrInvitationCodeInvalid   = infraerrors.BadRequest("INVITATION_CODE_INVALID", "invalid or used invitation code")
-	ErrOAuthInvitationRequired = infraerrors.Forbidden("OAUTH_INVITATION_REQUIRED", "invitation code required to complete oauth registration")
+	ErrInvalidCredentials         = infraerrors.Unauthorized("INVALID_CREDENTIALS", "invalid email or password")
+	ErrUserNotActive              = infraerrors.Forbidden("USER_NOT_ACTIVE", "user is not active")
+	ErrEmailExists                = infraerrors.Conflict("EMAIL_EXISTS", "email already exists")
+	ErrEmailReserved              = infraerrors.BadRequest("EMAIL_RESERVED", "email is reserved")
+	ErrInvalidToken               = infraerrors.Unauthorized("INVALID_TOKEN", "invalid token")
+	ErrTokenExpired               = infraerrors.Unauthorized("TOKEN_EXPIRED", "token has expired")
+	ErrAccessTokenExpired         = infraerrors.Unauthorized("ACCESS_TOKEN_EXPIRED", "access token has expired")
+	ErrTokenTooLarge              = infraerrors.BadRequest("TOKEN_TOO_LARGE", "token too large")
+	ErrTokenRevoked               = infraerrors.Unauthorized("TOKEN_REVOKED", "token has been revoked")
+	ErrRefreshTokenInvalid        = infraerrors.Unauthorized("REFRESH_TOKEN_INVALID", "invalid refresh token")
+	ErrRefreshTokenExpired        = infraerrors.Unauthorized("REFRESH_TOKEN_EXPIRED", "refresh token has expired")
+	ErrRefreshTokenReused         = infraerrors.Unauthorized("REFRESH_TOKEN_REUSED", "refresh token has been reused")
+	ErrEmailVerifyRequired        = infraerrors.BadRequest("EMAIL_VERIFY_REQUIRED", "email verification is required")
+	ErrEmailSuffixNotAllowed      = infraerrors.BadRequest("EMAIL_SUFFIX_NOT_ALLOWED", "email suffix is not allowed")
+	ErrRegDisabled                = infraerrors.Forbidden("REGISTRATION_DISABLED", "registration is currently disabled")
+	ErrServiceUnavailable         = infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "service temporarily unavailable")
+	ErrInvitationCodeRequired     = infraerrors.BadRequest("INVITATION_CODE_REQUIRED", "invitation code is required")
+	ErrInvitationCodeInvalid      = infraerrors.BadRequest("INVITATION_CODE_INVALID", "invalid or used invitation code")
+	ErrOAuthInvitationRequired    = infraerrors.Forbidden("OAUTH_INVITATION_REQUIRED", "invitation code required to complete oauth registration")
 	ErrBootstrapAPIKeyUnavailable = infraerrors.ServiceUnavailable("BOOTSTRAP_API_KEY_UNAVAILABLE", "failed to provision bootstrap api keys")
 )
 
@@ -78,6 +78,7 @@ type AuthService struct {
 	affiliateService         *AffiliateService
 	defaultSubAssigner       DefaultSubscriptionAssigner
 	inviteBootstrapAPIKeySvc InviteBootstrapAPIKeyService
+	inviteLoginDeviceRepo    InviteLoginDeviceResolver
 	groupRepo                GroupRepository
 }
 
@@ -99,6 +100,11 @@ type InviteLoginInput struct {
 type InviteBootstrapAPIKeyService interface {
 	GetAvailableGroups(ctx context.Context, userID int64) ([]Group, error)
 	Create(ctx context.Context, userID int64, req CreateAPIKeyRequest) (*APIKey, error)
+}
+
+type InviteLoginDeviceResolver interface {
+	GetByLoginRedeemCodeID(ctx context.Context, codeID int64) (*UserDevice, error)
+	UpdateLastLoginAt(ctx context.Context, id int64, at time.Time) error
 }
 
 type InviteLoginResult struct {
@@ -146,12 +152,17 @@ func NewAuthService(
 		affiliateService:         affiliateService,
 		defaultSubAssigner:       defaultSubAssigner,
 		inviteBootstrapAPIKeySvc: nil,
+		inviteLoginDeviceRepo:    nil,
 		groupRepo:                nil,
 	}
 }
 
 func (s *AuthService) SetInviteBootstrapAPIKeyService(svc InviteBootstrapAPIKeyService) {
 	s.inviteBootstrapAPIKeySvc = svc
+}
+
+func (s *AuthService) SetInviteLoginDeviceResolver(repo InviteLoginDeviceResolver) {
+	s.inviteLoginDeviceRepo = repo
 }
 
 func (s *AuthService) SetInviteBootstrapGroupRepository(repo GroupRepository) {
@@ -506,9 +517,27 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 // InviteLogin handles device-bound invite login.
 // POST /api/v1/auth/invite-login
 func (s *AuthService) InviteLogin(ctx context.Context, input InviteLoginInput) (*InviteLoginResult, error) {
-	// Current backend-only split slice: device-bound invite-login keeps the new input boundary,
-	// but device-claim/device-hash enforcement is intentionally deferred until the V-Claw lane.
-	return s.completeInviteBootstrapLogin(ctx, NormalizeRedeemCode(input.InvitationCode))
+	invitationCode := NormalizeRedeemCode(input.InvitationCode)
+	if invitationCode == "" {
+		return nil, ErrInvitationCodeRequired
+	}
+
+	code, err := s.redeemRepo.GetByCode(ctx, invitationCode)
+	if err != nil {
+		if errors.Is(err, ErrRedeemCodeNotFound) {
+			return nil, ErrInvitationCodeInvalid
+		}
+		return nil, ErrServiceUnavailable
+	}
+	if code == nil {
+		return nil, ErrInvitationCodeInvalid
+	}
+
+	if code.Type == RedeemTypeDeviceLogin {
+		return s.completeDeviceInviteLogin(ctx, input, code)
+	}
+
+	return s.completeInviteBootstrapLogin(ctx, invitationCode)
 }
 
 // RedeemLogin handles the web redeem login.
