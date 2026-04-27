@@ -11,25 +11,25 @@
       <!-- Settings Form -->
       <form v-else @submit.prevent="saveSettings" class="space-y-6" novalidate>
         <!-- Tab Navigation -->
-        <div class="sticky top-0 z-10 -mx-1 sm:mx-0">
+        <div class="sticky top-0 z-10">
           <div class="settings-tabs-scroll">
             <nav class="settings-tabs" aria-label="Settings sections">
-            <button
-              v-for="tab in settingsTabs"
-              :key="tab.key"
-              type="button"
-              :class="[
-                'settings-tab',
-                activeTab === tab.key && 'settings-tab-active',
-              ]"
-              @click="activeTab = tab.key"
-            >
-              <span class="settings-tab-icon">
-                <Icon :name="tab.icon" size="sm" />
-              </span>
-              <span>{{ t(`admin.settings.tabs.${tab.key}`) }}</span>
-            </button>
-          </nav>
+              <button
+                v-for="tab in settingsTabs"
+                :key="tab.key"
+                type="button"
+                :class="[
+                  'settings-tab',
+                  activeTab === tab.key && 'settings-tab-active',
+                ]"
+                @click="activeTab = tab.key"
+              >
+                <span class="settings-tab-icon">
+                  <Icon :name="tab.icon" size="sm" />
+                </span>
+                <span class="settings-tab-label">{{ t(`admin.settings.tabs.${tab.key}`) }}</span>
+              </button>
+            </nav>
           </div>
         </div>
 
@@ -8060,7 +8060,7 @@ watch(
 
 /* Scroll container: thin scrollbar on PC, auto-hide on mobile */
 .settings-tabs-scroll {
-  @apply overflow-x-auto overflow-y-hidden pb-1;
+  @apply overflow-x-auto overflow-y-hidden px-1 pb-1;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
@@ -8088,7 +8088,7 @@ watch(
 }
 
 .settings-tabs {
-  @apply inline-flex w-max min-w-full flex-nowrap gap-1 rounded-2xl
+  @apply inline-flex min-w-full flex-nowrap items-stretch gap-1.5 rounded-2xl
          border border-gray-100 bg-white/80 p-1 backdrop-blur-sm
          dark:border-dark-700/50 dark:bg-dark-800/80;
   box-shadow:
@@ -8098,21 +8098,25 @@ watch(
 
 @media (min-width: 640px) {
   .settings-tabs {
-    @apply flex w-full flex-nowrap;
+    @apply flex w-max min-w-full;
   }
 }
 
 .settings-tab {
-  @apply relative flex min-w-max items-center justify-center gap-1.5
-         whitespace-nowrap rounded-xl px-3 py-2
-         text-sm font-medium
+  @apply relative inline-flex shrink-0 items-center justify-center gap-2
+         whitespace-nowrap rounded-xl px-3.5 py-2
+         text-sm font-medium leading-none
          text-gray-500 dark:text-dark-400
          transition-all duration-200 ease-out;
 }
 
+.settings-tab-label {
+  @apply block whitespace-nowrap;
+}
+
 @media (min-width: 640px) {
   .settings-tab {
-    @apply min-w-0 flex-1 px-2.5;
+    @apply px-3;
   }
 }
 
@@ -8145,7 +8149,7 @@ watch(
 }
 
 .settings-tab-icon {
-  @apply flex h-6 w-6 items-center justify-center rounded-lg
+  @apply flex h-5 w-5 shrink-0 items-center justify-center rounded-lg
          transition-all duration-200;
 }
 
