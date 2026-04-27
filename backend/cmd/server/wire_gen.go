@@ -83,6 +83,8 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	userDeviceRepository := repository.NewUserDeviceRepository(client)
 	authService := service.NewAuthService(client, userRepository, redeemCodeRepository, refreshTokenCache, configConfig, settingService, emailService, turnstileService, emailQueueService, promoService, subscriptionService, affiliateService, serviceUserPlatformQuotaRepository)
 	authService.SetInviteLoginDeviceResolver(userDeviceRepository)
+	authService.SetInviteBootstrapAPIKeyService(apiKeyService)
+	authService.SetInviteBootstrapGroupRepository(groupRepository)
 	passkeyService, err := service.NewPasskeyService(configConfig, passkeyRepository, passkeySessionStore, userRepository)
 	if err != nil {
 		return nil, err
