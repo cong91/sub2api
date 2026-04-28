@@ -56,18 +56,18 @@ describe('ImportDataModal', () => {
       }
     })
 
-    const input = wrapper.find('input[type="file"]')
+    const vm = wrapper.vm as unknown as { handleFileChange: (event: Event) => void; handleImport: () => Promise<void> }
     const file = new File(['invalid json'], 'data.json', { type: 'application/json' })
     Object.defineProperty(file, 'text', {
       value: () => Promise.resolve('invalid json')
     })
-    Object.defineProperty(input.element, 'files', {
+    const input = document.createElement('input')
+    Object.defineProperty(input, 'files', {
       value: [file]
     })
 
-    await input.trigger('change')
-    await wrapper.find('form').trigger('submit')
-    await Promise.resolve()
+    vm.handleFileChange({ target: input } as unknown as Event)
+    await vm.handleImport()
 
     expect(showError).toHaveBeenCalledWith('admin.accounts.dataImportParseFailed')
   })

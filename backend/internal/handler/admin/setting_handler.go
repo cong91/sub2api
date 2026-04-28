@@ -384,23 +384,15 @@ type UpdateSettingsRequest struct {
 	CustomEndpoints             *[]dto.CustomEndpoint `json:"custom_endpoints"`
 
 	// 默认配置
-<<<<<<< HEAD
 	DefaultConcurrency                       int                               `json:"default_concurrency"`
 	DefaultBalance                           float64                           `json:"default_balance"`
+	DeviceClaimBonusBalance                  float64                           `json:"device_claim_bonus_balance"`
 	AffiliateRebateRate                      *float64                          `json:"affiliate_rebate_rate"`
 	AffiliateRebateFreezeHours               *int                              `json:"affiliate_rebate_freeze_hours"`
 	AffiliateRebateDurationDays              *int                              `json:"affiliate_rebate_duration_days"`
 	AffiliateRebatePerInviteeCap             *float64                          `json:"affiliate_rebate_per_invitee_cap"`
 	DefaultUserRPMLimit                      int                               `json:"default_user_rpm_limit"`
 	DefaultSubscriptions                     []dto.DefaultSubscriptionSetting  `json:"default_subscriptions"`
-=======
-	DefaultConcurrency      int                              `json:"default_concurrency"`
-	DefaultBalance          float64                          `json:"default_balance"`
-	DeviceClaimBonusBalance float64                          `json:"device_claim_bonus_balance"`
-	AffiliateRebateRate     *float64                         `json:"affiliate_rebate_rate"`
-	DefaultUserRPMLimit     int                              `json:"default_user_rpm_limit"`
-	DefaultSubscriptions    []dto.DefaultSubscriptionSetting `json:"default_subscriptions"`
->>>>>>> dcf66dee (feat: replay safe auth payment and frontend support lanes)
 	AuthSourceDefaultEmailBalance            *float64                          `json:"auth_source_default_email_balance"`
 	AuthSourceDefaultEmailConcurrency        *int                              `json:"auth_source_default_email_concurrency"`
 	AuthSourceDefaultEmailSubscriptions      *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_email_subscriptions"`
@@ -1223,25 +1215,16 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TableDefaultPageSize:             req.TableDefaultPageSize,
 		TablePageSizeOptions:             req.TablePageSizeOptions,
 		CustomMenuItems:                  customMenuJSON,
-<<<<<<< HEAD
 		CustomEndpoints:                  customEndpointsJSON,
 		DefaultConcurrency:               req.DefaultConcurrency,
 		DefaultBalance:                   req.DefaultBalance,
+		DeviceClaimBonusBalance:          req.DeviceClaimBonusBalance,
 		AffiliateRebateRate:              affiliateRebateRate,
 		AffiliateRebateFreezeHours:       affiliateRebateFreezeHours,
 		AffiliateRebateDurationDays:      affiliateRebateDurationDays,
 		AffiliateRebatePerInviteeCap:     affiliateRebatePerInviteeCap,
 		DefaultUserRPMLimit:              req.DefaultUserRPMLimit,
 		DefaultSubscriptions:             defaultSubscriptions,
-=======
-		CustomEndpoints:                      customEndpointsJSON,
-		DefaultConcurrency:                   req.DefaultConcurrency,
-		DefaultBalance:                       req.DefaultBalance,
-		DeviceClaimBonusBalance:              req.DeviceClaimBonusBalance,
-		AffiliateRebateRate:                  affiliateRebateRate,
-		DefaultUserRPMLimit:                  req.DefaultUserRPMLimit,
-		DefaultSubscriptions:                 defaultSubscriptions,
->>>>>>> dcf66dee (feat: replay safe auth payment and frontend support lanes)
 		EnableModelFallback:              req.EnableModelFallback,
 		FallbackModelAnthropic:           req.FallbackModelAnthropic,
 		FallbackModelOpenAI:              req.FallbackModelOpenAI,
@@ -1565,25 +1548,16 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TableDefaultPageSize:                   updatedSettings.TableDefaultPageSize,
 		TablePageSizeOptions:                   updatedSettings.TablePageSizeOptions,
 		CustomMenuItems:                        dto.ParseCustomMenuItems(updatedSettings.CustomMenuItems),
-<<<<<<< HEAD
 		CustomEndpoints:                        dto.ParseCustomEndpoints(updatedSettings.CustomEndpoints),
 		DefaultConcurrency:                     updatedSettings.DefaultConcurrency,
 		DefaultBalance:                         updatedSettings.DefaultBalance,
+		DeviceClaimBonusBalance:                updatedSettings.DeviceClaimBonusBalance,
 		AffiliateRebateRate:                    updatedSettings.AffiliateRebateRate,
 		AffiliateRebateFreezeHours:             updatedSettings.AffiliateRebateFreezeHours,
 		AffiliateRebateDurationDays:            updatedSettings.AffiliateRebateDurationDays,
 		AffiliateRebatePerInviteeCap:           updatedSettings.AffiliateRebatePerInviteeCap,
 		DefaultUserRPMLimit:                    updatedSettings.DefaultUserRPMLimit,
 		DefaultSubscriptions:                   updatedDefaultSubscriptions,
-=======
-		CustomEndpoints:                      dto.ParseCustomEndpoints(updatedSettings.CustomEndpoints),
-		DefaultConcurrency:                   updatedSettings.DefaultConcurrency,
-		DefaultBalance:                       updatedSettings.DefaultBalance,
-		DeviceClaimBonusBalance:              updatedSettings.DeviceClaimBonusBalance,
-		AffiliateRebateRate:                  updatedSettings.AffiliateRebateRate,
-		DefaultUserRPMLimit:                  updatedSettings.DefaultUserRPMLimit,
-		DefaultSubscriptions:                 updatedDefaultSubscriptions,
->>>>>>> dcf66dee (feat: replay safe auth payment and frontend support lanes)
 		EnableModelFallback:                    updatedSettings.EnableModelFallback,
 		FallbackModelAnthropic:                 updatedSettings.FallbackModelAnthropic,
 		FallbackModelOpenAI:                    updatedSettings.FallbackModelOpenAI,
