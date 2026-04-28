@@ -1,6 +1,6 @@
 module github.com/Wei-Shaw/sub2api
 
-go 1.26.2
+go 1.25.7
 
 require (
 	entgo.io/ent v0.14.5
@@ -104,7 +104,6 @@ require (
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/google/subcommands v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/hcl/v2 v2.18.1 // indirect
