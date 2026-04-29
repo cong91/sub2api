@@ -462,6 +462,7 @@ export interface SystemSettings {
   payment_ledger_currency: string;
   payment_allowed_currencies: string[];
   payment_manual_fx_rates: Record<string, number>;
+  payment_currency_capabilities: string;
   payment_fx_status: PaymentFXStatus;
   payment_cancel_rate_limit_enabled: boolean;
   payment_cancel_rate_limit_max: number;
@@ -635,6 +636,7 @@ export interface UpdateSettingsRequest {
   payment_ledger_currency?: string;
   payment_allowed_currencies?: string[];
   payment_manual_fx_rates?: string;
+  payment_currency_capabilities?: string;
   payment_fx_rates_stale_after_seconds?: number;
   payment_cancel_rate_limit_enabled?: boolean;
   payment_cancel_rate_limit_max?: number;
