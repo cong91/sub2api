@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
@@ -37,15 +38,20 @@ const (
 	SettingLedgerCurrency           = "PAYMENT_LEDGER_CURRENCY"
 	SettingAllowedPaymentCurrencies = "PAYMENT_ALLOWED_CURRENCIES"
 	SettingManualFXRates            = "PAYMENT_MANUAL_FX_RATES_JSON"
+	SettingFXRatesSource            = "PAYMENT_FX_RATES_SOURCE"
+	SettingFXRatesUpdatedAt         = "PAYMENT_FX_RATES_UPDATED_AT"
+	SettingFXRatesStaleAfterSeconds = "PAYMENT_FX_RATES_STALE_AFTER_SECONDS"
 )
 
 // Default values for payment configuration settings.
 const (
-	defaultOrderTimeoutMin    = 30
-	defaultMaxPendingOrders   = 3
-	defaultLedgerCurrency     = "USD"
-	defaultPaymentCurrencyCSV = "CNY,USD"
-	defaultManualFXRatesJSON  = `{"USD":1,"CNY":1}`
+	defaultOrderTimeoutMin          = 30
+	defaultMaxPendingOrders         = 3
+	defaultLedgerCurrency           = "USD"
+	defaultPaymentCurrencyCSV       = "CNY,USD"
+	defaultManualFXRatesJSON        = `{"USD":1,"CNY":1}`
+	defaultFXRatesSource            = fxSourceManual
+	defaultFXRatesStaleAfterSeconds = 24 * 60 * 60
 )
 
 // PaymentConfig holds the payment system configuration.
@@ -71,6 +77,7 @@ type PaymentConfig struct {
 	LedgerCurrency            string             `json:"ledger_currency"`
 	AllowedPaymentCurrencies  []string           `json:"allowed_payment_currencies"`
 	ManualFXRates             map[string]float64 `json:"manual_fx_rates"`
+	FXStatus                  PaymentFXStatus    `json:"fx_status"`
 
 	// Cancel rate limit settings
 	CancelRateLimitEnabled bool   `json:"cancel_rate_limit_enabled"`
@@ -100,6 +107,7 @@ type UpdatePaymentConfigRequest struct {
 	LedgerCurrency            *string  `json:"ledger_currency"`
 	AllowedPaymentCurrencies  []string `json:"allowed_payment_currencies"`
 	ManualFXRates             *string  `json:"manual_fx_rates"`
+	FXRatesStaleAfterSeconds  *int     `json:"fx_rates_stale_after_seconds"`
 
 	// Cancel rate limit settings
 	CancelRateLimitEnabled *bool   `json:"cancel_rate_limit_enabled"`
@@ -214,6 +222,7 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 		SettingProductNamePrefix, SettingProductNameSuffix,
 		SettingHelpImageURL, SettingHelpText,
 		SettingLedgerCurrency, SettingAllowedPaymentCurrencies, SettingManualFXRates,
+		SettingFXRatesSource, SettingFXRatesUpdatedAt, SettingFXRatesStaleAfterSeconds,
 		SettingCancelRateLimitOn, SettingCancelRateLimitMax,
 		SettingCancelWindowSize, SettingCancelWindowUnit, SettingCancelWindowMode,
 		SettingPaymentVisibleMethodAlipayEnabled, SettingPaymentVisibleMethodAlipaySource,
@@ -278,6 +287,7 @@ func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *Payme
 	if cfg.ManualFXRates[cfg.LedgerCurrency] <= 0 {
 		cfg.ManualFXRates[cfg.LedgerCurrency] = 1
 	}
+	cfg.FXStatus = buildPaymentFXStatus(cfg, vals, time.Now())
 	return cfg
 }
 
@@ -350,6 +360,9 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 			return infraerrors.BadRequest("INVALID_MANUAL_FX_RATES", "manual fx rates must be a JSON object of currency=>rate")
 		}
 	}
+	if req.FXRatesStaleAfterSeconds != nil && *req.FXRatesStaleAfterSeconds <= 0 {
+		return infraerrors.BadRequest("INVALID_FX_STALE_AFTER", "fx stale threshold must be greater than 0")
+	}
 	m := map[string]string{
 		SettingPaymentEnabled:                    formatBoolOrEmpty(req.Enabled),
 		SettingMinRechargeAmount:                 formatPositiveFloat(req.MinAmount),
@@ -368,6 +381,7 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 		SettingLedgerCurrency:                    normalizeCurrencyCode(derefStr(req.LedgerCurrency), ""),
 		SettingAllowedPaymentCurrencies:          strings.Join(normalizeCurrencyList(req.AllowedPaymentCurrencies), ","),
 		SettingManualFXRates:                     normalizeManualFXRatesJSON(derefStr(req.ManualFXRates)),
+		SettingFXRatesStaleAfterSeconds:          formatPositiveInt(req.FXRatesStaleAfterSeconds),
 		SettingCancelRateLimitOn:                 formatBoolOrEmpty(req.CancelRateLimitEnabled),
 		SettingCancelRateLimitMax:                formatPositiveInt(req.CancelRateLimitMax),
 		SettingCancelWindowSize:                  formatPositiveInt(req.CancelRateLimitWindow),
@@ -382,6 +396,10 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 		m[SettingEnabledPaymentTypes] = strings.Join(req.EnabledTypes, ",")
 	} else {
 		m[SettingEnabledPaymentTypes] = ""
+	}
+	if req.ManualFXRates != nil {
+		m[SettingFXRatesSource] = fxSourceManual
+		m[SettingFXRatesUpdatedAt] = time.Now().UTC().Format(time.RFC3339)
 	}
 	return s.settingRepo.SetMultiple(ctx, m)
 }

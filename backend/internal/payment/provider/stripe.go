@@ -14,7 +14,7 @@ import (
 
 // Stripe constants.
 const (
-	stripeCurrency            = "cny"
+	stripeDefaultCurrency     = "CNY"
 	stripeEventPaymentSuccess = "payment_intent.succeeded"
 	stripeEventPaymentFailed  = "payment_intent.payment_failed"
 )
@@ -72,7 +72,8 @@ var stripePaymentMethodTypes = map[string][]string{
 func (s *Stripe) CreatePayment(ctx context.Context, req payment.CreatePaymentRequest) (*payment.CreatePaymentResponse, error) {
 	s.ensureInit()
 
-	amountInCents, err := payment.YuanToFen(req.Amount)
+	currency := normalizeStripeCurrency(req.PaymentCurrency)
+	amountInMinorUnits, err := payment.AmountToMinorUnits(req.Amount, currency)
 	if err != nil {
 		return nil, fmt.Errorf("stripe create payment: %w", err)
 	}
@@ -86,11 +87,16 @@ func (s *Stripe) CreatePayment(ctx context.Context, req payment.CreatePaymentReq
 	}
 
 	params := &stripe.PaymentIntentCreateParams{
-		Amount:             stripe.Int64(amountInCents),
-		Currency:           stripe.String(stripeCurrency),
+		Amount:             stripe.Int64(amountInMinorUnits),
+		Currency:           stripe.String(strings.ToLower(currency)),
 		PaymentMethodTypes: pmTypes,
 		Description:        stripe.String(req.Subject),
-		Metadata:           map[string]string{"orderId": req.OrderID},
+		Metadata: map[string]string{
+			"orderId":         req.OrderID,
+			"paymentCurrency": currency,
+			"ledgerCurrency":  req.LedgerCurrency,
+			"ledgerAmount":    req.LedgerAmount,
+		},
 	}
 
 	// WeChat Pay requires payment_method_options with client type
@@ -133,10 +139,12 @@ func (s *Stripe) QueryOrder(ctx context.Context, tradeNo string) (*payment.Query
 		status = payment.ProviderStatusFailed
 	}
 
+	currency := normalizeStripeCurrency(string(pi.Currency))
 	return &payment.QueryOrderResponse{
-		TradeNo: pi.ID,
-		Status:  status,
-		Amount:  payment.FenToYuan(pi.Amount),
+		TradeNo:  pi.ID,
+		Status:   status,
+		Amount:   payment.MinorUnitsToAmount(pi.Amount, currency),
+		Currency: currency,
 	}, nil
 }
 
@@ -174,12 +182,14 @@ func parseStripePaymentIntent(event *stripe.Event, status string, rawBody string
 	if err := json.Unmarshal(event.Data.Raw, &pi); err != nil {
 		return nil, fmt.Errorf("stripe parse payment_intent: %w", err)
 	}
+	currency := normalizeStripeCurrency(string(pi.Currency))
 	return &payment.PaymentNotification{
-		TradeNo: pi.ID,
-		OrderID: pi.Metadata["orderId"],
-		Amount:  payment.FenToYuan(pi.Amount),
-		Status:  status,
-		RawData: rawBody,
+		TradeNo:  pi.ID,
+		OrderID:  pi.Metadata["orderId"],
+		Amount:   payment.MinorUnitsToAmount(pi.Amount, currency),
+		Currency: currency,
+		Status:   status,
+		RawData:  rawBody,
 	}, nil
 }
 
@@ -187,14 +197,14 @@ func parseStripePaymentIntent(event *stripe.Event, status string, rawBody string
 func (s *Stripe) Refund(ctx context.Context, req payment.RefundRequest) (*payment.RefundResponse, error) {
 	s.ensureInit()
 
-	amountInCents, err := payment.YuanToFen(req.Amount)
+	amountInMinorUnits, err := payment.AmountToMinorUnits(req.Amount, stripeDefaultCurrency)
 	if err != nil {
 		return nil, fmt.Errorf("stripe refund: %w", err)
 	}
 
 	params := &stripe.RefundCreateParams{
 		PaymentIntent: stripe.String(req.TradeNo),
-		Amount:        stripe.Int64(amountInCents),
+		Amount:        stripe.Int64(amountInMinorUnits),
 		Reason:        stripe.String(string(stripe.RefundReasonRequestedByCustomer)),
 	}
 	params.Context = ctx
@@ -213,6 +223,14 @@ func (s *Stripe) Refund(ctx context.Context, req payment.RefundRequest) (*paymen
 		RefundID: r.ID,
 		Status:   refundStatus,
 	}, nil
+}
+
+func normalizeStripeCurrency(currency string) string {
+	currency = strings.ToUpper(strings.TrimSpace(currency))
+	if currency == "" {
+		return stripeDefaultCurrency
+	}
+	return currency
 }
 
 // resolveStripeMethodTypes converts instance supported_types (comma-separated)
