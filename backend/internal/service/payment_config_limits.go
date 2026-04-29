@@ -25,8 +25,9 @@ func (s *PaymentConfigService) GetAvailableMethodLimits(ctx context.Context) (*M
 	resp := &MethodLimitsResponse{
 		Methods: make(map[string]MethodLimits, len(typeInstances)),
 	}
+	currencyCapabilities := s.currencyCapabilities(ctx)
 	for pt, insts := range typeInstances {
-		ml := s.pcAggregateMethodLimits(pt, insts)
+		ml := s.pcAggregateMethodLimits(pt, insts, currencyCapabilities)
 		resp.Methods[ml.PaymentType] = ml
 	}
 	resp.GlobalMin, resp.GlobalMax = pcComputeGlobalRange(resp.Methods)
@@ -76,6 +77,7 @@ func (s *PaymentConfigService) GetMethodLimits(ctx context.Context, types []stri
 		return nil, fmt.Errorf("query provider instances: %w", err)
 	}
 	result := make([]MethodLimits, 0, len(types))
+	currencyCapabilities := s.currencyCapabilities(ctx)
 	for _, pt := range types {
 		var matching []*dbent.PaymentProviderInstance
 		for _, inst := range instances {
@@ -83,7 +85,7 @@ func (s *PaymentConfigService) GetMethodLimits(ctx context.Context, types []stri
 				matching = append(matching, inst)
 			}
 		}
-		result = append(result, s.pcAggregateMethodLimits(pt, matching))
+		result = append(result, s.pcAggregateMethodLimits(pt, matching, currencyCapabilities))
 	}
 	return result, nil
 }
@@ -166,11 +168,11 @@ func unionFloat(agg float64, limited bool, val float64, wantMin bool) (float64, 
 //   - SingleMax: highest ceiling across instances; 0 if any is unlimited
 //   - DailyLimit: highest cap across instances; 0 if any is unlimited
 func pcAggregateMethodLimits(pt string, instances []*dbent.PaymentProviderInstance) MethodLimits {
-	return (&PaymentConfigService{}).pcAggregateMethodLimits(pt, instances)
+	return (&PaymentConfigService{}).pcAggregateMethodLimits(pt, instances, payment.CurrencyCapabilityConfig{})
 }
 
-func (s *PaymentConfigService) pcAggregateMethodLimits(pt string, instances []*dbent.PaymentProviderInstance) MethodLimits {
-	ml := MethodLimits{PaymentType: pt, AllowedPaymentCurrencies: s.pcSupportedPaymentCurrencies(pt, instances)}
+func (s *PaymentConfigService) pcAggregateMethodLimits(pt string, instances []*dbent.PaymentProviderInstance, currencyCapabilities payment.CurrencyCapabilityConfig) MethodLimits {
+	ml := MethodLimits{PaymentType: pt, AllowedPaymentCurrencies: s.pcSupportedPaymentCurrencies(pt, instances, currencyCapabilities)}
 	minLimited, maxLimited, dailyLimited := true, true, true
 
 	for _, inst := range instances {
@@ -195,7 +197,7 @@ func (s *PaymentConfigService) pcAggregateMethodLimits(pt string, instances []*d
 	return ml
 }
 
-func (s *PaymentConfigService) pcSupportedPaymentCurrencies(pt string, instances []*dbent.PaymentProviderInstance) []string {
+func (s *PaymentConfigService) pcSupportedPaymentCurrencies(pt string, instances []*dbent.PaymentProviderInstance, currencyCapabilities payment.CurrencyCapabilityConfig) []string {
 	seen := make(map[string]struct{})
 	out := make([]string, 0, 4)
 	add := func(currency string) {
@@ -212,12 +214,12 @@ func (s *PaymentConfigService) pcSupportedPaymentCurrencies(pt string, instances
 
 	for _, inst := range instances {
 		config := s.pcProviderInstanceConfig(inst)
-		for _, currency := range payment.InstancePaymentCurrencies(inst, pt, config) {
+		for _, currency := range payment.InstancePaymentCurrencies(inst, pt, config, currencyCapabilities) {
 			add(currency)
 		}
 	}
 	if len(out) == 0 {
-		for _, currency := range payment.ProviderDefaultPaymentCurrencies("", pt) {
+		for _, currency := range payment.InstancePaymentCurrencies(nil, pt, nil, currencyCapabilities) {
 			add(currency)
 		}
 	}
@@ -233,6 +235,17 @@ func (s *PaymentConfigService) pcProviderInstanceConfig(inst *dbent.PaymentProvi
 		return nil
 	}
 	return cfg
+}
+
+func (s *PaymentConfigService) currencyCapabilities(ctx context.Context) payment.CurrencyCapabilityConfig {
+	if s == nil || s.settingRepo == nil {
+		return payment.CurrencyCapabilityConfig{}
+	}
+	raw, err := s.settingRepo.GetValue(ctx, SettingCurrencyCapabilities)
+	if err != nil {
+		return payment.CurrencyCapabilityConfig{}
+	}
+	return parseCurrencyCapabilities(raw)
 }
 
 func (s *PaymentConfigService) GetPaymentTypeCurrencies(ctx context.Context, paymentType string) ([]string, error) {

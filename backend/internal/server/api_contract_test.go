@@ -780,6 +780,7 @@ func TestAPIContracts(t *testing.T) {
 					"payment_ledger_currency": "",
 					"payment_allowed_currencies": null,
 					"payment_manual_fx_rates": null,
+					"payment_currency_capabilities": "{}",
 					"payment_fx_status": {
 						"source": "",
 						"missing_currencies": null,
@@ -973,6 +974,7 @@ func TestAPIContracts(t *testing.T) {
 					"payment_ledger_currency": "",
 					"payment_allowed_currencies": null,
 					"payment_manual_fx_rates": null,
+					"payment_currency_capabilities": "{}",
 					"payment_fx_status": {
 						"source": "",
 						"missing_currencies": null,
