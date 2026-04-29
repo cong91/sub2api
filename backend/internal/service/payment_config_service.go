@@ -48,8 +48,8 @@ const (
 	defaultOrderTimeoutMin          = 30
 	defaultMaxPendingOrders         = 3
 	defaultLedgerCurrency           = "USD"
-	defaultPaymentCurrencyCSV       = "CNY,USD"
-	defaultManualFXRatesJSON        = `{"USD":1,"CNY":1}`
+	defaultPaymentCurrencyCSV       = "VND,USD"
+	defaultManualFXRatesJSON        = `{"USD":1,"VND":0.0000392}`
 	defaultFXRatesSource            = fxSourceManual
 	defaultFXRatesStaleAfterSeconds = 24 * 60 * 60
 )
@@ -124,11 +124,12 @@ type UpdatePaymentConfigRequest struct {
 
 // MethodLimits holds per-payment-type limits.
 type MethodLimits struct {
-	PaymentType string  `json:"payment_type"`
-	FeeRate     float64 `json:"fee_rate"`
-	DailyLimit  float64 `json:"daily_limit"`
-	SingleMin   float64 `json:"single_min"`
-	SingleMax   float64 `json:"single_max"`
+	PaymentType              string   `json:"payment_type"`
+	AllowedPaymentCurrencies []string `json:"allowed_payment_currencies,omitempty"`
+	FeeRate                  float64  `json:"fee_rate"`
+	DailyLimit               float64  `json:"daily_limit"`
+	SingleMin                float64  `json:"single_min"`
+	SingleMax                float64  `json:"single_max"`
 }
 
 // MethodLimitsResponse is the full response for the user-facing /limits API.
