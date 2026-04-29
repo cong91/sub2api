@@ -27,6 +27,9 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if normalized := NormalizeVisibleMethod(req.PaymentType); normalized != "" {
 		req.PaymentType = normalized
 	}
+	if err := s.applyPaymentQuoteToCreateOrder(&req); err != nil {
+		return nil, err
+	}
 	cfg, err := s.configService.GetPaymentConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get payment config: %w", err)
@@ -36,6 +39,13 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	}
 	plan, err := s.validateOrderInput(ctx, req, cfg)
 	if err != nil {
+		return nil, err
+	}
+	amounts, err := computeCreateOrderAmounts(req, cfg, plan, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	if err := validateLedgerAmountLimits(req.OrderType, amounts.LimitLedgerAmount, cfg); err != nil {
 		return nil, err
 	}
 	if err := s.checkCancelRateLimit(ctx, req.UserID, cfg); err != nil {
@@ -48,22 +58,22 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if user.Status != payment.EntityStatusActive {
 		return nil, infraerrors.Forbidden("USER_INACTIVE", "user account is disabled")
 	}
-	ledgerAmount := req.Amount
-	paymentAmount := req.Amount
-	if plan != nil {
-		ledgerAmount = plan.Price
-		paymentAmount = plan.Price
-	} else if req.OrderType == payment.OrderTypeBalance {
-		ledgerAmount = calculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier)
-	}
+	ledgerAmount := amounts.LedgerAmount
+	paymentAmount := amounts.PaymentAmount
 	feeRate := cfg.RechargeFeeRate
+	paymentCurrency := amounts.FXSnapshot.PaymentCurrency
 	payAmountStr := payment.CalculatePayAmount(paymentAmount, feeRate)
 	payAmount, _ := strconv.ParseFloat(payAmountStr, 64)
+	payAmount = roundPaymentAmountForCollection(payAmount, paymentCurrency)
+	payAmountStr = formatCurrencyAmountForProvider(payAmount, paymentCurrency)
 	sel, err := s.selectCreateOrderInstance(ctx, req, cfg, payAmount)
 	if err != nil {
 		return nil, err
 	}
 	if err := s.validateSelectedCreateOrderInstance(ctx, req, sel); err != nil {
+		return nil, err
+	}
+	if err := validateProviderCurrency(sel.ProviderKey, req.PaymentType, amounts.FXSnapshot.PaymentCurrency); err != nil {
 		return nil, err
 	}
 	oauthResp, err := s.maybeBuildWeChatOAuthRequiredResponseForSelection(ctx, req, ledgerAmount, payAmount, feeRate, sel)
@@ -73,7 +83,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if oauthResp != nil {
 		return oauthResp, nil
 	}
-	order, err := s.createOrderInTx(ctx, req, user, plan, cfg, ledgerAmount, paymentAmount, feeRate, payAmount, sel)
+	order, err := s.createOrderInTx(ctx, req, user, plan, cfg, amounts.FXSnapshot, ledgerAmount, paymentAmount, feeRate, payAmount, sel)
 	if err != nil {
 		return nil, err
 	}
@@ -97,10 +107,6 @@ func (s *PaymentService) validateOrderInput(ctx context.Context, req CreateOrder
 	if math.IsNaN(req.Amount) || math.IsInf(req.Amount, 0) || req.Amount <= 0 {
 		return nil, infraerrors.BadRequest("INVALID_AMOUNT", "amount must be a positive number")
 	}
-	if (cfg.MinAmount > 0 && req.Amount < cfg.MinAmount) || (cfg.MaxAmount > 0 && req.Amount > cfg.MaxAmount) {
-		return nil, infraerrors.BadRequest("INVALID_AMOUNT", "amount out of range").
-			WithMetadata(map[string]string{"min": fmt.Sprintf("%.2f", cfg.MinAmount), "max": fmt.Sprintf("%.2f", cfg.MaxAmount)})
-	}
 	return nil, nil
 }
 
@@ -122,7 +128,7 @@ func (s *PaymentService) validateSubOrder(ctx context.Context, req CreateOrderRe
 	return plan, nil
 }
 
-func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, ledgerAmount, paymentAmount, feeRate, payAmount float64, sel *payment.InstanceSelection) (*dbent.PaymentOrder, error) {
+func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, snapshot fxSnapshot, ledgerAmount, paymentAmount, feeRate, payAmount float64, sel *payment.InstanceSelection) (*dbent.PaymentOrder, error) {
 	tx, err := s.entClient.Tx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
@@ -140,10 +146,6 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 	}
 	exp := time.Now().Add(time.Duration(tm) * time.Minute)
 	outTradeNo, err := s.allocateOutTradeNo(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	snapshot, err := resolveFXSnapshot(req.PaymentCurrency, cfg, exp)
 	if err != nil {
 		return nil, err
 	}
@@ -316,17 +318,23 @@ func (s *PaymentService) checkDailyLimit(ctx context.Context, tx *dbent.Tx, user
 	}
 	var used float64
 	for _, o := range orders {
-		if o.OrderType == payment.OrderTypeBalance {
-			used += o.PayAmount
-			continue
-		}
-		used += o.Amount
+		used += dailyLimitLedgerAmountForOrder(o)
 	}
 	if used+amount > limit {
 		return infraerrors.TooManyRequests("DAILY_LIMIT_EXCEEDED", "daily_limit_exceeded").
 			WithMetadata(map[string]string{"remaining": fmt.Sprintf("%.2f", math.Max(0, limit-used))})
 	}
 	return nil
+}
+
+func dailyLimitLedgerAmountForOrder(o *dbent.PaymentOrder) float64 {
+	if o == nil {
+		return 0
+	}
+	if o.LedgerAmount > 0 {
+		return o.LedgerAmount
+	}
+	return o.Amount
 }
 
 func (s *PaymentService) selectCreateOrderInstance(ctx context.Context, req CreateOrderRequest, cfg *PaymentConfig, payAmount float64) (*payment.InstanceSelection, error) {
@@ -469,10 +477,10 @@ func buildProviderCreatePaymentRequest(req CreateOrderRequest, sel *payment.Inst
 	ledgerCurrency := normalizeCurrencyCode(order.LedgerCurrency, defaultLedgerCurrency)
 	return payment.CreatePaymentRequest{
 		OrderID:            order.OutTradeNo,
-		Amount:             strconv.FormatFloat(order.PaymentAmount, 'f', 2, 64),
+		Amount:             formatCurrencyAmountForProvider(order.PayAmount, paymentCurrency),
 		PaymentCurrency:    paymentCurrency,
 		LedgerCurrency:     ledgerCurrency,
-		LedgerAmount:       strconv.FormatFloat(order.LedgerAmount, 'f', 2, 64),
+		LedgerAmount:       formatCurrencyAmountForProvider(order.LedgerAmount, ledgerCurrency),
 		PaymentType:        req.PaymentType,
 		Subject:            subject,
 		ReturnURL:          req.ReturnURL,
@@ -503,7 +511,7 @@ func (s *PaymentService) buildPaymentSubject(plan *dbent.SubscriptionPlan, limit
 	if pf != "" || sf != "" {
 		return strings.TrimSpace(pf + " " + amountStr + " " + sf)
 	}
-	return "Sub2API " + amountStr + " CNY"
+	return "Sub2API " + amountStr + " " + normalizeCurrencyCode(cfg.LedgerCurrency, defaultLedgerCurrency)
 }
 
 func (s *PaymentService) maybeBuildWeChatOAuthRequiredResponse(ctx context.Context, req CreateOrderRequest, amount, payAmount, feeRate float64) (*CreateOrderResponse, error) {
@@ -608,24 +616,41 @@ func classifyCreatePaymentError(req CreateOrderRequest, providerKey string, err 
 }
 
 func buildCreateOrderResponse(order *dbent.PaymentOrder, req CreateOrderRequest, payAmount float64, sel *payment.InstanceSelection, pr *payment.CreatePaymentResponse, resultType payment.CreatePaymentResultType) *CreateOrderResponse {
-	return &CreateOrderResponse{
-		OrderID:      order.ID,
-		Amount:       order.Amount,
-		PayAmount:    payAmount,
-		FeeRate:      order.FeeRate,
-		Status:       OrderStatusPending,
-		ResultType:   resultType,
-		PaymentType:  req.PaymentType,
-		OutTradeNo:   order.OutTradeNo,
-		PayURL:       pr.PayURL,
-		QRCode:       pr.QRCode,
-		ClientSecret: pr.ClientSecret,
-		CheckoutID:   pr.CheckoutID,
-		JSAPI:        pr.JSAPI,
-		JSAPIPayload: pr.JSAPI,
-		ExpiresAt:    order.ExpiresAt,
-		PaymentMode:  sel.PaymentMode,
+	resp := &CreateOrderResponse{
+		OrderID:         order.ID,
+		Amount:          order.Amount,
+		PaymentAmount:   order.PaymentAmount,
+		PaymentCurrency: normalizeCurrencyCode(order.PaymentCurrency, defaultLedgerCurrency),
+		LedgerAmount:    order.LedgerAmount,
+		LedgerCurrency:  normalizeCurrencyCode(order.LedgerCurrency, defaultLedgerCurrency),
+		FXRate:          order.FxRatePaymentToLedger,
+		FXSource:        paymentOrderStringValue(order.FxSource),
+		PayAmount:       payAmount,
+		FeeRate:         order.FeeRate,
+		Status:          OrderStatusPending,
+		ResultType:      resultType,
+		PaymentType:     req.PaymentType,
+		OutTradeNo:      order.OutTradeNo,
+		PayURL:          pr.PayURL,
+		QRCode:          pr.QRCode,
+		ClientSecret:    pr.ClientSecret,
+		CheckoutID:      pr.CheckoutID,
+		JSAPI:           pr.JSAPI,
+		JSAPIPayload:    pr.JSAPI,
+		ExpiresAt:       order.ExpiresAt,
+		PaymentMode:     sel.PaymentMode,
 	}
+	if order.FxTimestamp != nil {
+		resp.FXTimestamp = *order.FxTimestamp
+	}
+	return resp
+}
+
+func paymentOrderStringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func buildWeChatPaymentOAuthStartURL(req CreateOrderRequest, scope string) (string, error) {
@@ -637,6 +662,15 @@ func buildWeChatPaymentOAuthStartURL(req CreateOrderRequest, scope string) (stri
 	q.Set("payment_type", strings.TrimSpace(req.PaymentType))
 	if req.Amount > 0 {
 		q.Set("amount", strconv.FormatFloat(req.Amount, 'f', -1, 64))
+	}
+	if amountMode := strings.TrimSpace(req.AmountMode); amountMode != "" {
+		q.Set("amount_mode", amountMode)
+	}
+	if quoteID := strings.TrimSpace(req.QuoteID); quoteID != "" {
+		q.Set("quote_id", quoteID)
+	}
+	if paymentCurrency := normalizeCurrencyCode(req.PaymentCurrency, ""); paymentCurrency != "" {
+		q.Set("payment_currency", paymentCurrency)
 	}
 	if orderType := strings.TrimSpace(req.OrderType); orderType != "" {
 		q.Set("order_type", orderType)

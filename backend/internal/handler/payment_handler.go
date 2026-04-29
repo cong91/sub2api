@@ -138,6 +138,11 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		BalanceDisabled:           cfg.BalanceDisabled,
 		BalanceRechargeMultiplier: cfg.BalanceRechargeMultiplier,
 		RechargeFeeRate:           cfg.RechargeFeeRate,
+		LedgerCurrency:            cfg.LedgerCurrency,
+		AllowedPaymentCurrencies:  cfg.AllowedPaymentCurrencies,
+		ManualFXRates:             cfg.ManualFXRates,
+		FXStatus:                  cfg.FXStatus,
+		CurrencyMeta:              buildCurrencyMeta(cfg),
 		HelpText:                  cfg.HelpText,
 		HelpImageURL:              cfg.HelpImageURL,
 		StripePublishableKey:      cfg.StripePublishableKey,
@@ -154,11 +159,81 @@ type checkoutInfoResponse struct {
 	BalanceDisabled           bool                            `json:"balance_disabled"`
 	BalanceRechargeMultiplier float64                         `json:"balance_recharge_multiplier"`
 	RechargeFeeRate           float64                         `json:"recharge_fee_rate"`
+	LedgerCurrency            string                          `json:"ledger_currency"`
+	AllowedPaymentCurrencies  []string                        `json:"allowed_payment_currencies"`
+	ManualFXRates             map[string]float64              `json:"manual_fx_rates"`
+	FXStatus                  service.PaymentFXStatus         `json:"fx_status"`
+	CurrencyMeta              map[string]currencyMeta         `json:"currency_meta"`
 	HelpText                  string                          `json:"help_text"`
 	HelpImageURL              string                          `json:"help_image_url"`
 	StripePublishableKey      string                          `json:"stripe_publishable_key"`
 	PaddleClientToken         string                          `json:"paddle_client_token,omitempty"`
 	PaddleEnvironment         string                          `json:"paddle_environment,omitempty"`
+}
+
+type currencyMeta struct {
+	MinorUnits int    `json:"minor_units"`
+	Symbol     string `json:"symbol"`
+}
+
+func buildCurrencyMeta(cfg *service.PaymentConfig) map[string]currencyMeta {
+	seen := map[string]struct{}{}
+	ordered := make([]string, 0, 8)
+	add := func(currency string) {
+		currency = strings.ToUpper(strings.TrimSpace(currency))
+		if currency == "" {
+			return
+		}
+		if _, ok := seen[currency]; ok {
+			return
+		}
+		seen[currency] = struct{}{}
+		ordered = append(ordered, currency)
+	}
+	if cfg != nil {
+		add(cfg.LedgerCurrency)
+		for _, currency := range cfg.AllowedPaymentCurrencies {
+			add(currency)
+		}
+		for currency := range cfg.ManualFXRates {
+			add(currency)
+		}
+	}
+	if len(ordered) == 0 {
+		add("USD")
+	}
+
+	out := make(map[string]currencyMeta, len(ordered))
+	for _, currency := range ordered {
+		out[currency] = currencyMeta{MinorUnits: checkoutCurrencyMinorUnits(currency), Symbol: checkoutCurrencySymbol(currency)}
+	}
+	return out
+}
+
+func checkoutCurrencyMinorUnits(currency string) int {
+	switch strings.ToUpper(strings.TrimSpace(currency)) {
+	case "VND", "KRW", "JPY":
+		return 0
+	default:
+		return 2
+	}
+}
+
+func checkoutCurrencySymbol(currency string) string {
+	switch strings.ToUpper(strings.TrimSpace(currency)) {
+	case "USD":
+		return "$"
+	case "VND":
+		return "₫"
+	case "KRW":
+		return "₩"
+	case "CNY", "JPY":
+		return "¥"
+	case "EUR":
+		return "€"
+	default:
+		return strings.ToUpper(strings.TrimSpace(currency))
+	}
 }
 
 type checkoutPlan struct {
@@ -209,10 +284,49 @@ func (h *PaymentHandler) GetLimits(c *gin.Context) {
 	response.Success(c, resp)
 }
 
+type CreatePaymentQuoteRequest struct {
+	Amount          float64 `json:"amount"`
+	AmountMode      string  `json:"amount_mode"`
+	PaymentCurrency string  `json:"payment_currency"`
+	PaymentType     string  `json:"payment_type" binding:"required"`
+	OrderType       string  `json:"order_type"`
+	PlanID          int64   `json:"plan_id"`
+}
+
+// CreatePaymentQuote returns a short-lived signed payment quote that locks the FX snapshot.
+// POST /api/v1/payment/quote
+func (h *PaymentHandler) CreatePaymentQuote(c *gin.Context) {
+	subject, ok := requireAuth(c)
+	if !ok {
+		return
+	}
+	var req CreatePaymentQuoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	quote, err := h.paymentService.CreatePaymentQuote(c.Request.Context(), service.CreatePaymentQuoteRequest{
+		UserID:          subject.UserID,
+		Amount:          req.Amount,
+		AmountMode:      req.AmountMode,
+		PaymentCurrency: req.PaymentCurrency,
+		PaymentType:     req.PaymentType,
+		OrderType:       req.OrderType,
+		PlanID:          req.PlanID,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, quote)
+}
+
 // CreateOrderRequest is the request body for creating a payment order.
 type CreateOrderRequest struct {
 	Amount            float64 `json:"amount"`
+	AmountMode        string  `json:"amount_mode"`
 	PaymentCurrency   string  `json:"payment_currency"`
+	QuoteID           string  `json:"quote_id"`
 	PaymentType       string  `json:"payment_type" binding:"required"`
 	OpenID            string  `json:"openid"`
 	WechatResumeToken string  `json:"wechat_resume_token"`
@@ -258,7 +372,9 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 	result, err := h.paymentService.CreateOrder(c.Request.Context(), service.CreateOrderRequest{
 		UserID:          subject.UserID,
 		Amount:          req.Amount,
+		AmountMode:      req.AmountMode,
 		PaymentCurrency: req.PaymentCurrency,
+		QuoteID:         req.QuoteID,
 		PaymentType:     req.PaymentType,
 		OpenID:          req.OpenID,
 		ClientIP:        c.ClientIP(),
@@ -306,6 +422,15 @@ func applyWeChatPaymentResumeClaims(req *CreateOrderRequest, claims *service.WeC
 			return infraerrors.BadRequest("INVALID_WECHAT_PAYMENT_RESUME_TOKEN", fmt.Sprintf("invalid resume amount: %s", claims.Amount))
 		}
 		req.Amount = amount
+	}
+	if strings.TrimSpace(claims.AmountMode) != "" {
+		req.AmountMode = strings.TrimSpace(claims.AmountMode)
+	}
+	if strings.TrimSpace(claims.PaymentCurrency) != "" {
+		req.PaymentCurrency = strings.ToUpper(strings.TrimSpace(claims.PaymentCurrency))
+	}
+	if strings.TrimSpace(claims.QuoteID) != "" {
+		req.QuoteID = strings.TrimSpace(claims.QuoteID)
 	}
 	if claims.OrderType != "" {
 		req.OrderType = claims.OrderType
