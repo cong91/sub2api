@@ -404,6 +404,28 @@ func TestGetAvailableMethodLimitsUsesConfiguredVisibleMethodSource(t *testing.T)
 	}
 }
 
+func TestGetAvailableMethodLimitsExposesConfiguredProviderCurrencies(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+
+	_, err := client.PaymentProviderInstance.Create().
+		SetProviderKey(payment.TypePaddle).
+		SetName("Paddle KRW/USD").
+		SetConfig(`{"allowed_payment_currencies":"KRW,USD"}`).
+		SetSupportedTypes(payment.TypePaddle).
+		SetEnabled(true).
+		Save(ctx)
+	require.NoError(t, err)
+
+	svc := NewPaymentConfigService(client, &paymentConfigSettingRepoStub{values: map[string]string{}}, []byte("0123456789abcdef0123456789abcdef"))
+	resp, err := svc.GetAvailableMethodLimits(ctx)
+	require.NoError(t, err)
+
+	paddleLimits, ok := resp.Methods[payment.TypePaddle]
+	require.True(t, ok, "expected paddle method limits")
+	require.Equal(t, []string{"KRW", "USD"}, paddleLimits.AllowedPaymentCurrencies)
+}
+
 func TestGetAvailableMethodLimitsPreservesLegacyCrossProviderBehaviorWhenVisibleMethodSourceMissing(t *testing.T) {
 	ctx := context.Background()
 	client := newPaymentConfigServiceTestClient(t)
