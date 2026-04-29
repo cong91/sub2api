@@ -295,9 +295,6 @@ type UpdateSettingsRequest struct {
 	PaymentLedgerCurrency            *string  `json:"payment_ledger_currency"`
 	PaymentAllowedCurrencies         []string `json:"payment_allowed_currencies"`
 	PaymentManualFXRates             *string  `json:"payment_manual_fx_rates"`
-	PaymentFXAutoSyncEnabled         *bool    `json:"payment_fx_auto_sync_enabled"`
-	PaymentFXAutoSyncProvider        *string  `json:"payment_fx_auto_sync_provider"`
-	PaymentFXAutoSyncIntervalSeconds *int     `json:"payment_fx_auto_sync_interval_seconds"`
 	PaymentFXRatesStaleAfterSeconds  *int     `json:"payment_fx_rates_stale_after_seconds"`
 
 	// Cancel rate limit
@@ -1742,9 +1739,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			LedgerCurrency:            req.PaymentLedgerCurrency,
 			AllowedPaymentCurrencies:  req.PaymentAllowedCurrencies,
 			ManualFXRates:             req.PaymentManualFXRates,
-			FXAutoSyncEnabled:         req.PaymentFXAutoSyncEnabled,
-			FXAutoSyncProvider:        req.PaymentFXAutoSyncProvider,
-			FXAutoSyncIntervalSec:     req.PaymentFXAutoSyncIntervalSeconds,
 			FXRatesStaleAfterSeconds:  req.PaymentFXRatesStaleAfterSeconds,
 			CancelRateLimitEnabled:    req.PaymentCancelRateLimitEnabled,
 			CancelRateLimitMax:        req.PaymentCancelRateLimitMax,
@@ -2004,9 +1998,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		PaymentAllowedCurrencies:                               updatedPaymentCfg.AllowedPaymentCurrencies,
 		PaymentManualFXRates:                                   updatedPaymentCfg.ManualFXRates,
 		PaymentFXStatus:                                        paymentFXStatusDTO(updatedPaymentCfg.FXStatus),
-		PaymentFXAutoSyncEnabled:                               updatedPaymentCfg.FXAutoSyncEnabled,
-		PaymentFXAutoSyncProvider:                              updatedPaymentCfg.FXAutoSyncProvider,
-		PaymentFXAutoSyncIntervalSeconds:                       updatedPaymentCfg.FXAutoSyncIntervalSec,
 		PaymentCancelRateLimitEnabled:                          updatedPaymentCfg.CancelRateLimitEnabled,
 		PaymentCancelRateLimitMax:                              updatedPaymentCfg.CancelRateLimitMax,
 		PaymentCancelRateLimitWindow:                           updatedPaymentCfg.CancelRateLimitWindow,
@@ -2079,8 +2070,7 @@ func hasPaymentFields(req UpdateSettingsRequest) bool {
 		req.PaymentProductNameSuffix != nil || req.PaymentHelpImageURL != nil ||
 		req.PaymentHelpText != nil || req.PaymentLedgerCurrency != nil ||
 		req.PaymentAllowedCurrencies != nil || req.PaymentManualFXRates != nil ||
-		req.PaymentFXAutoSyncEnabled != nil || req.PaymentFXAutoSyncProvider != nil ||
-		req.PaymentFXAutoSyncIntervalSeconds != nil || req.PaymentFXRatesStaleAfterSeconds != nil ||
+		req.PaymentFXRatesStaleAfterSeconds != nil ||
 		req.PaymentCancelRateLimitEnabled != nil ||
 		req.PaymentCancelRateLimitMax != nil || req.PaymentCancelRateLimitWindow != nil ||
 		req.PaymentCancelRateLimitUnit != nil || req.PaymentCancelRateLimitMode != nil ||
