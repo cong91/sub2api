@@ -13,6 +13,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
+	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -257,6 +258,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		PaymentLedgerCurrency:                  paymentCfg.LedgerCurrency,
 		PaymentAllowedCurrencies:               paymentCfg.AllowedPaymentCurrencies,
 		PaymentManualFXRates:                   paymentCfg.ManualFXRates,
+		PaymentCurrencyCapabilities:            paymentCurrencyCapabilitiesJSON(paymentCfg.CurrencyCapabilities),
 		PaymentFXStatus:                        paymentFXStatusDTO(paymentCfg.FXStatus),
 		PaymentCancelRateLimitEnabled:          paymentCfg.CancelRateLimitEnabled,
 		PaymentCancelRateLimitMax:              paymentCfg.CancelRateLimitMax,
@@ -561,6 +563,7 @@ type UpdateSettingsRequest struct {
 	PaymentLedgerCurrency            *string  `json:"payment_ledger_currency"`
 	PaymentAllowedCurrencies         []string `json:"payment_allowed_currencies"`
 	PaymentManualFXRates             *string  `json:"payment_manual_fx_rates"`
+	PaymentCurrencyCapabilities      *string  `json:"payment_currency_capabilities"`
 	PaymentFXRatesStaleAfterSeconds  *int     `json:"payment_fx_rates_stale_after_seconds"`
 
 	// Cancel rate limit
@@ -1625,6 +1628,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			LedgerCurrency:            req.PaymentLedgerCurrency,
 			AllowedPaymentCurrencies:  req.PaymentAllowedCurrencies,
 			ManualFXRates:             req.PaymentManualFXRates,
+			CurrencyCapabilities:      req.PaymentCurrencyCapabilities,
 			FXRatesStaleAfterSeconds:  req.PaymentFXRatesStaleAfterSeconds,
 			CancelRateLimitEnabled:    req.PaymentCancelRateLimitEnabled,
 			CancelRateLimitMax:        req.PaymentCancelRateLimitMax,
@@ -1820,6 +1824,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		PaymentLedgerCurrency:                  updatedPaymentCfg.LedgerCurrency,
 		PaymentAllowedCurrencies:               updatedPaymentCfg.AllowedPaymentCurrencies,
 		PaymentManualFXRates:                   updatedPaymentCfg.ManualFXRates,
+		PaymentCurrencyCapabilities:            paymentCurrencyCapabilitiesJSON(updatedPaymentCfg.CurrencyCapabilities),
 		PaymentFXStatus:                        paymentFXStatusDTO(updatedPaymentCfg.FXStatus),
 		PaymentCancelRateLimitEnabled:          updatedPaymentCfg.CancelRateLimitEnabled,
 		PaymentCancelRateLimitMax:              updatedPaymentCfg.CancelRateLimitMax,
@@ -1842,6 +1847,14 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		payload.OpenAIFastPolicySettings = openaiFastPolicySettingsToDTO(fastPolicy)
 	}
 	response.Success(c, systemSettingsResponseData(payload, updatedAuthSourceDefaults))
+}
+
+func paymentCurrencyCapabilitiesJSON(cfg payment.CurrencyCapabilityConfig) string {
+	raw, err := payment.MarshalCurrencyCapabilityConfig(cfg)
+	if err != nil {
+		return "{}"
+	}
+	return raw
 }
 
 func paymentFXStatusDTO(status service.PaymentFXStatus) dto.PaymentFXStatus {
@@ -1869,7 +1882,7 @@ func hasPaymentFields(req UpdateSettingsRequest) bool {
 		req.PaymentProductNameSuffix != nil || req.PaymentHelpImageURL != nil ||
 		req.PaymentHelpText != nil || req.PaymentLedgerCurrency != nil ||
 		req.PaymentAllowedCurrencies != nil || req.PaymentManualFXRates != nil ||
-		req.PaymentFXRatesStaleAfterSeconds != nil ||
+		req.PaymentCurrencyCapabilities != nil || req.PaymentFXRatesStaleAfterSeconds != nil ||
 		req.PaymentCancelRateLimitEnabled != nil ||
 		req.PaymentCancelRateLimitMax != nil || req.PaymentCancelRateLimitWindow != nil ||
 		req.PaymentCancelRateLimitUnit != nil || req.PaymentCancelRateLimitMode != nil
