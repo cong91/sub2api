@@ -45,19 +45,19 @@
             </div>
             <div class="flex justify-between">
               <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.baseAmount') }}</span>
-              <span class="font-medium text-gray-900 dark:text-white">&#165;{{ baseAmount.toFixed(2) }}</span>
+              <span class="font-medium text-gray-900 dark:text-white">{{ formatOrderMoney(baseAmount, order.payment_currency) }}</span>
             </div>
             <div v-if="order.fee_rate > 0" class="flex justify-between">
               <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.fee') }} ({{ order.fee_rate }}%)</span>
-              <span class="font-medium text-gray-900 dark:text-white">&#165;{{ feeAmount.toFixed(2) }}</span>
+              <span class="font-medium text-gray-900 dark:text-white">{{ formatOrderMoney(feeAmount, order.payment_currency) }}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.payAmount') }}</span>
-              <span class="font-bold text-primary-600 dark:text-primary-400">&#165;{{ order.pay_amount.toFixed(2) }}</span>
+              <span class="font-bold text-primary-600 dark:text-primary-400">{{ formatOrderMoney(order.pay_amount, order.payment_currency) }}</span>
             </div>
             <div v-if="order.amount !== order.pay_amount" class="flex justify-between">
               <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.creditedAmount') }}</span>
-              <span class="font-medium text-gray-900 dark:text-white">{{ order.order_type === 'balance' ? '$' : '¥' }}{{ order.amount.toFixed(2) }}</span>
+              <span class="font-medium text-gray-900 dark:text-white">{{ formatOrderMoney(order.ledger_amount ?? order.amount, order.ledger_currency || 'USD') }}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.paymentMethod') }}</span>
@@ -110,6 +110,7 @@ import { usePaymentStore } from '@/stores/payment'
 import { paymentAPI } from '@/api/payment'
 import type { PaymentOrder } from '@/types/payment'
 import { normalizePaymentMethodForDisplay, paymentMethodI18nKey } from './paymentUx'
+import { formatMoney } from '@/utils/money'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -127,6 +128,10 @@ interface ReturnInfo {
 }
 const returnInfo = ref<ReturnInfo | null>(null)
 
+function formatOrderMoney(amount: number, currency?: string): string {
+  return formatMoney(amount, currency || 'CNY')
+}
+
 const SUCCESS_STATUSES = new Set(['COMPLETED', 'PAID', 'RECHARGING'])
 const PENDING_STATUSES = new Set(['PENDING', 'CREATED', 'WAITING', 'PROCESSING'])
 const STATUS_REFRESH_INTERVAL_MS = 2000
@@ -137,7 +142,9 @@ const refreshAttempts = ref(0)
 
 /** 充值金额 = pay_amount / (1 + fee_rate/100)，fee_rate=0 时等于 pay_amount */
 const baseAmount = computed(() => {
-  if (!order.value || order.value.fee_rate <= 0) return order.value?.pay_amount ?? 0
+  if (!order.value) return 0
+  if (order.value.payment_amount != null && order.value.payment_amount > 0) return order.value.payment_amount
+  if (order.value.fee_rate <= 0) return order.value.pay_amount ?? 0
   return Math.round((order.value.pay_amount / (1 + order.value.fee_rate / 100)) * 100) / 100
 })
 

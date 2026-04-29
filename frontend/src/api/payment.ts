@@ -10,6 +10,8 @@ import type {
   PaymentChannel,
   MethodLimitsResponse,
   CheckoutInfoResponse,
+  CreatePaymentQuoteRequest,
+  PaymentQuoteResult,
   CreateOrderRequest,
   CreateOrderResult,
   PaymentOrder
@@ -40,6 +42,11 @@ export const paymentAPI = {
   /** Get payment method limits and fee rates */
   getLimits() {
     return apiClient.get<MethodLimitsResponse>('/payment/limits')
+  },
+
+  /** Create a signed local-currency quote before creating an order */
+  createQuote(data: CreatePaymentQuoteRequest) {
+    return apiClient.post<PaymentQuoteResult>('/payment/quote', data)
   },
 
   /** Create a new payment order */
