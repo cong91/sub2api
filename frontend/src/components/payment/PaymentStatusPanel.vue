@@ -22,11 +22,11 @@
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.amount') }}</span>
-                <span class="font-medium text-gray-900 dark:text-white">{{ paidOrder.order_type === 'balance' ? '$' : '¥' }}{{ paidOrder.amount.toFixed(2) }}</span>
+                <span class="font-medium text-gray-900 dark:text-white">{{ formatMoney(paidOrder.ledger_amount ?? paidOrder.amount, paidOrder.ledger_currency || 'USD') }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.payAmount') }}</span>
-                <span class="font-medium text-gray-900 dark:text-white">¥{{ paidOrder.pay_amount.toFixed(2) }}</span>
+                <span class="font-medium text-gray-900 dark:text-white">{{ formatMoney(paidOrder.pay_amount, paidOrder.payment_currency || 'CNY') }}</span>
               </div>
             </div>
           </div>
@@ -129,6 +129,7 @@ import { useAppStore } from '@/stores'
 import { paymentAPI } from '@/api/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import { getPaymentPopupFeatures } from '@/components/payment/providerConfig'
+import { formatMoney } from '@/utils/money'
 import type { PaymentOrder } from '@/types/payment'
 import Icon from '@/components/icons/Icon.vue'
 import QRCode from 'qrcode'

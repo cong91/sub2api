@@ -50,11 +50,23 @@
             </div>
             <template v-else>
             <div class="card p-6">
+              <div v-if="availablePaymentCurrencies.length > 1" class="mb-4">
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('payment.paymentCurrency') }}
+                </label>
+                <select v-model="selectedPaymentCurrency" class="input w-full">
+                  <option v-for="currency in availablePaymentCurrencies" :key="currency" :value="currency">
+                    {{ currencyMeta(currency, checkout.currency_meta).symbol }} {{ currency }}
+                  </option>
+                </select>
+              </div>
               <AmountInput
                 v-model="amount"
-                :amounts="[10, 20, 50, 100, 200, 500, 1000, 2000, 5000]"
+                :amounts="localQuickAmounts"
                 :min="globalMinAmount"
                 :max="globalMaxAmount"
+                :currency-symbol="paymentCurrencyMeta.symbol"
+                :minor-units="paymentMinorUnits"
               />
               <p v-if="amountError" class="mt-2 text-xs text-amber-600 dark:text-amber-300">{{ amountError }}</p>
             </div>
@@ -69,22 +81,25 @@
               <div class="space-y-2 text-sm">
                 <div class="flex justify-between">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('payment.paymentAmount') }}</span>
-                  <span class="text-gray-900 dark:text-white">¥{{ validAmount.toFixed(2) }}</span>
+                  <span class="text-gray-900 dark:text-white">{{ formatPaymentMoney(validAmount) }}</span>
                 </div>
                 <div v-if="feeRate > 0" class="flex justify-between">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fee') }} ({{ feeRate }}%)</span>
-                  <span class="text-gray-900 dark:text-white">¥{{ feeAmount.toFixed(2) }}</span>
+                  <span class="text-gray-900 dark:text-white">{{ formatPaymentMoney(feeAmount) }}</span>
                 </div>
                 <div v-if="feeRate > 0" class="flex justify-between border-t border-gray-200 pt-2 dark:border-dark-600">
                   <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.actualPay') }}</span>
-                  <span class="text-lg font-bold text-primary-600 dark:text-primary-400">¥{{ totalAmount.toFixed(2) }}</span>
+                  <span class="text-lg font-bold text-primary-600 dark:text-primary-400">{{ formatPaymentMoney(totalAmount) }}</span>
                 </div>
-                <div v-if="balanceRechargeMultiplier !== 1" class="flex justify-between" :class="{ 'border-t border-gray-200 pt-2 dark:border-dark-600': feeRate <= 0 }">
+                <div class="flex justify-between" :class="{ 'border-t border-gray-200 pt-2 dark:border-dark-600': feeRate <= 0 }">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('payment.creditedBalance') }}</span>
-                  <span class="text-gray-900 dark:text-white">${{ creditedAmount.toFixed(2) }}</span>
+                  <span class="text-gray-900 dark:text-white">{{ formatLedgerMoney(creditedAmount) }}</span>
                 </div>
-                <p v-if="balanceRechargeMultiplier !== 1" class="border-t border-gray-200 pt-2 text-xs text-gray-500 dark:border-dark-600 dark:text-gray-400">
-                  {{ t('payment.rechargeRatePreview', { usd: balanceRechargeMultiplier.toFixed(2) }) }}
+                <p class="border-t border-gray-200 pt-2 text-xs text-gray-500 dark:border-dark-600 dark:text-gray-400">
+                  {{ t('payment.rechargeRatePreview', { local: formatPaymentMoney(1), usd: formatLedgerMoney(ledgerAmountFromPayment(1, paymentCurrency, ledgerCurrency, checkout.manual_fx_rates, checkout.currency_meta)) }) }}
+                </p>
+                <p v-if="fxStatusMessage" class="text-xs" :class="fxStatusClass">
+                  {{ fxStatusMessage }}
                 </p>
               </div>
             </div>
@@ -93,7 +108,7 @@
                 <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                 {{ t('common.processing') }}
               </span>
-              <span v-else>{{ t('payment.createOrder') }} ¥{{ totalAmount.toFixed(2) }}</span>
+              <span v-else>{{ t('payment.createOrder') }} {{ formatPaymentMoney(totalAmount) }}</span>
             </button>
             </template>
           </template>
@@ -268,6 +283,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import AmountInput from '@/components/payment/AmountInput.vue'
 import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector.vue'
 import { METHOD_ORDER, getPaymentPopupFeatures } from '@/components/payment/providerConfig'
+import { ceilMoney, currencyMeta, currencyMinorUnits, formatMoney, ledgerAmountFromPayment, paymentAmountFromLedger, roundMoney } from '@/utils/money'
 import {
   PAYMENT_RECOVERY_STORAGE_KEY,
   buildCreateOrderPayload,
@@ -322,6 +338,7 @@ interface CreateOrderOptions {
   paymentType?: string
   isResume?: boolean
   mobileQrFallbackAttempted?: boolean
+  quoteId?: string
 }
 
 interface WeixinJSBridgeLike {
@@ -344,6 +361,10 @@ function emptyPaymentState(): PaymentRecoverySnapshot {
     clientSecret: '',
     checkoutId: '',
     payAmount: 0,
+    paymentAmount: 0,
+    ledgerAmount: 0,
+    paymentCurrency: '',
+    ledgerCurrency: '',
     orderType: '',
     paymentMode: '',
     resumeToken: '',
@@ -429,7 +450,7 @@ async function redirectToPaymentResult(state: PaymentRecoverySnapshot): Promise<
 
 function buildWechatOAuthAuthorizeUrl(
   authorizeUrl: string,
-  context: { paymentType: string; orderType: OrderType; planId?: number; orderAmount: number },
+  context: { paymentType: string; orderType: OrderType; planId?: number; orderAmount: number; amountMode?: 'ledger' | 'payment'; paymentCurrency?: string; quoteId?: string },
 ): string {
   const normalizedUrl = authorizeUrl.trim()
   if (!normalizedUrl || typeof window === 'undefined') {
@@ -444,6 +465,21 @@ function buildWechatOAuthAuthorizeUrl(
 
     redirectUrl.searchParams.set('payment_type', paymentType)
     redirectUrl.searchParams.set('order_type', context.orderType)
+    if (context.amountMode) {
+      redirectUrl.searchParams.set('amount_mode', context.amountMode)
+    } else {
+      redirectUrl.searchParams.delete('amount_mode')
+    }
+    if (context.paymentCurrency) {
+      redirectUrl.searchParams.set('payment_currency', context.paymentCurrency)
+    } else {
+      redirectUrl.searchParams.delete('payment_currency')
+    }
+    if (context.quoteId) {
+      redirectUrl.searchParams.set('quote_id', context.quoteId)
+    } else {
+      redirectUrl.searchParams.delete('quote_id')
+    }
 
     if (context.planId) {
       redirectUrl.searchParams.set('plan_id', String(context.planId))
@@ -489,7 +525,10 @@ function onPaymentSettled() {
 const checkout = ref<CheckoutInfoResponse>({
   methods: {}, global_min: 0, global_max: 0,
   plans: [], balance_disabled: false, balance_recharge_multiplier: 1, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '', paddle_client_token: '', paddle_environment: '',
+  ledger_currency: 'USD', allowed_payment_currencies: ['USD'], manual_fx_rates: {}, currency_meta: {},
+  fx_status: { source: 'manual', stale_after_seconds: 86400, stale: true, missing_currencies: [] },
 })
+const selectedPaymentCurrency = ref('')
 
 const tabs = computed(() => {
   const result: { key: 'recharge' | 'subscription'; label: string }[] = []
@@ -499,13 +538,70 @@ const tabs = computed(() => {
 })
 
 const visibleMethods = computed(() => getVisibleMethods(checkout.value.methods))
-const enabledMethods = computed(() => Object.keys(visibleMethods.value))
+const ledgerCurrency = computed(() => checkout.value.ledger_currency || 'USD')
+const availablePaymentCurrencies = computed(() => {
+  const currencies = checkout.value.allowed_payment_currencies?.map(c => c.trim().toUpperCase()).filter(Boolean) ?? []
+  return currencies.length ? currencies : [ledgerCurrency.value]
+})
+const paymentCurrency = computed(() => {
+  const selected = selectedPaymentCurrency.value.trim().toUpperCase()
+  return availablePaymentCurrencies.value.includes(selected) ? selected : availablePaymentCurrencies.value[0]
+})
+const paymentCurrencyMeta = computed(() => currencyMeta(paymentCurrency.value, checkout.value.currency_meta))
+const paymentMinorUnits = computed(() => currencyMinorUnits(paymentCurrency.value, checkout.value.currency_meta))
+const enabledMethods = computed(() => Object.keys(visibleMethods.value).filter(methodSupportsSelectedCurrency))
 const validAmount = computed(() => amount.value ?? 0)
+const ledgerPreviewAmount = computed(() => ledgerAmountFromPayment(
+  validAmount.value,
+  paymentCurrency.value,
+  ledgerCurrency.value,
+  checkout.value.manual_fx_rates,
+  checkout.value.currency_meta,
+))
 const balanceRechargeMultiplier = computed(() => {
   const multiplier = checkout.value.balance_recharge_multiplier
   return multiplier > 0 ? multiplier : 1
 })
-const creditedAmount = computed(() => Math.round((validAmount.value * balanceRechargeMultiplier.value) * 100) / 100)
+const creditedAmount = computed(() => roundMoney(ledgerPreviewAmount.value * balanceRechargeMultiplier.value, ledgerCurrency.value, checkout.value.currency_meta))
+const localQuickAmounts = computed(() => {
+  const currency = paymentCurrency.value
+  if (currency === 'VND') return [50000, 100000, 200000, 500000, 1000000, 2000000, 5000000]
+  if (currency === 'KRW') return [5000, 10000, 20000, 50000, 100000, 200000, 500000]
+  if (currency === 'CNY') return [50, 100, 200, 500, 1000, 2000, 5000]
+  return [10, 20, 50, 100, 200, 500, 1000]
+})
+const localMinAmount = computed(() => checkout.value.global_min > 0
+  ? paymentAmountFromLedger(checkout.value.global_min, paymentCurrency.value, ledgerCurrency.value, checkout.value.manual_fx_rates, checkout.value.currency_meta)
+  : 0)
+const localMaxAmount = computed(() => checkout.value.global_max > 0
+  ? paymentAmountFromLedger(checkout.value.global_max, paymentCurrency.value, ledgerCurrency.value, checkout.value.manual_fx_rates, checkout.value.currency_meta)
+  : 0)
+function formatPaymentMoney(value: number): string {
+  return formatMoney(value, paymentCurrency.value, checkout.value.currency_meta)
+}
+function formatLedgerMoney(value: number): string {
+  return formatMoney(value, ledgerCurrency.value, checkout.value.currency_meta)
+}
+const fxStatusClass = computed(() => checkout.value.fx_status?.stale
+  ? 'text-amber-600 dark:text-amber-300'
+  : 'text-gray-500 dark:text-gray-400')
+const fxStatusMessage = computed(() => {
+  const status = checkout.value.fx_status
+  if (!status) return ''
+  const source = status.source || 'manual'
+  const missing = status.missing_currencies?.join(', ')
+  if (missing) return t('payment.fxRateMissing', { currencies: missing })
+  if (status.stale) return t('payment.fxRateStale', { source })
+  if (!status.updated_at) return ''
+  return t('payment.fxRateUpdated', { source, time: new Date(status.updated_at).toLocaleString() })
+})
+function methodSupportsSelectedCurrency(method: string): boolean {
+  const currency = paymentCurrency.value
+  if (method === 'sepay') return currency === 'VND'
+  if (['stripe', 'alipay', 'wxpay', 'easypay', 'card', 'link', 'alipay_direct', 'wxpay_direct'].includes(method)) return currency === 'CNY'
+  if (method === 'paddle') return true
+  return currency === ledgerCurrency.value
+}
 
 // Adaptive grid: center single card, 2-col for 2 plans, 3-col for 3+
 const planGridClass = computed(() => {
@@ -519,24 +615,18 @@ function amountFitsMethod(amt: number, methodType: string): boolean {
   if (amt <= 0) return true
   const ml = visibleMethods.value[methodType]
   if (!ml) return false
-  if (ml.single_min > 0 && amt < ml.single_min) return false
-  if (ml.single_max > 0 && amt > ml.single_max) return false
+  const ledgerAmount = paymentCurrency.value === ledgerCurrency.value
+    ? amt
+    : ledgerAmountFromPayment(amt, paymentCurrency.value, ledgerCurrency.value, checkout.value.manual_fx_rates, checkout.value.currency_meta)
+  if (ledgerAmount <= 0) return false
+  if (ml.single_min > 0 && ledgerAmount < ml.single_min) return false
+  if (ml.single_max > 0 && ledgerAmount > ml.single_max) return false
   return true
 }
 
 // Visible methods decide the amount range shown to users.
-const globalMinAmount = computed(() => {
-  const limits = Object.values(visibleMethods.value)
-  if (limits.length === 0) return 0
-  if (limits.some(limit => limit.single_min <= 0)) return 0
-  return Math.min(...limits.map(limit => limit.single_min))
-})
-const globalMaxAmount = computed(() => {
-  const limits = Object.values(visibleMethods.value)
-  if (limits.length === 0) return 0
-  if (limits.some(limit => limit.single_max <= 0)) return 0
-  return Math.max(...limits.map(limit => limit.single_max))
-})
+const globalMinAmount = computed(() => localMinAmount.value)
+const globalMaxAmount = computed(() => localMaxAmount.value)
 
 // Selected method's limits (for validation and error messages)
 const selectedLimit = computed(() => visibleMethods.value[selectedMethod.value])
@@ -555,12 +645,12 @@ const methodOptions = computed<PaymentMethodOption[]>(() =>
 const feeRate = computed(() => checkout.value?.recharge_fee_rate ?? 0)
 const feeAmount = computed(() =>
   feeRate.value > 0 && validAmount.value > 0
-    ? Math.ceil(((validAmount.value * feeRate.value) / 100) * 100) / 100
+    ? ceilMoney((validAmount.value * feeRate.value) / 100, paymentCurrency.value, checkout.value.currency_meta)
     : 0
 )
 const totalAmount = computed(() =>
   feeRate.value > 0 && validAmount.value > 0
-    ? Math.round((validAmount.value + feeAmount.value) * 100) / 100
+    ? roundMoney(validAmount.value + feeAmount.value, paymentCurrency.value, checkout.value.currency_meta)
     : validAmount.value
 )
 
@@ -573,8 +663,8 @@ const amountError = computed(() => {
   // Selected method can't handle this amount (but others can)
   const ml = selectedLimit.value
   if (ml) {
-    if (ml.single_min > 0 && validAmount.value < ml.single_min) return t('payment.amountTooLow', { min: ml.single_min })
-    if (ml.single_max > 0 && validAmount.value > ml.single_max) return t('payment.amountTooHigh', { max: ml.single_max })
+    if (ml.single_min > 0 && ledgerPreviewAmount.value < ml.single_min) return t('payment.amountTooLow', { min: formatPaymentMoney(localMinAmount.value) })
+    if (ml.single_max > 0 && ledgerPreviewAmount.value > ml.single_max) return t('payment.amountTooHigh', { max: formatPaymentMoney(localMaxAmount.value) })
   }
   return ''
 })
@@ -588,12 +678,12 @@ const canSubmit = computed(() =>
 // Subscription-specific: method options based on plan price
 const subMethodOptions = computed<PaymentMethodOption[]>(() => {
   const planPrice = selectedPlan.value?.price ?? 0
-  return enabledMethods.value.map((type) => {
+  return Object.keys(visibleMethods.value).map((type) => {
     const ml = visibleMethods.value[type]
     return {
       type,
       fee_rate: ml?.fee_rate ?? 0,
-      available: ml?.available !== false && amountFitsMethod(planPrice, type),
+      available: ml?.available !== false && (planPrice <= 0 || ((ml?.single_min ?? 0) <= 0 || planPrice >= (ml?.single_min ?? 0)) && ((ml?.single_max ?? 0) <= 0 || planPrice <= (ml?.single_max ?? 0))),
     }
   })
 })
@@ -610,17 +700,32 @@ const subTotalAmount = computed(() => {
   return Math.round((price + subFeeAmount.value) * 100) / 100
 })
 
-const canSubmitSubscription = computed(() =>
-  selectedPlan.value !== null
-    && amountFitsMethod(selectedPlan.value.price, selectedMethod.value)
-    && selectedLimit.value?.available !== false
-)
+const canSubmitSubscription = computed(() => {
+  if (selectedPlan.value === null) return false
+  const ml = selectedLimit.value
+  if (!ml || ml.available === false) return false
+  const price = selectedPlan.value.price
+  if (ml.single_min > 0 && price < ml.single_min) return false
+  if (ml.single_max > 0 && price > ml.single_max) return false
+  return true
+})
 
 // Auto-switch to first available method when current selection can't handle the amount
 watch(() => [validAmount.value, selectedMethod.value] as const, ([amt, method]) => {
   if (amt <= 0 || amountFitsMethod(amt, method)) return
   const available = enabledMethods.value.find((m) => amountFitsMethod(amt, m))
   if (available) selectedMethod.value = available
+})
+
+watch(paymentCurrency, () => {
+  amount.value = null
+  const order: readonly string[] = METHOD_ORDER
+  const nextMethod = [...enabledMethods.value].sort((a, b) => {
+    const ai = order.indexOf(a as typeof METHOD_ORDER[number])
+    const bi = order.indexOf(b as typeof METHOD_ORDER[number])
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+  })[0]
+  selectedMethod.value = nextMethod || ''
 })
 
 // Payment button class: follows selected payment method color
@@ -680,12 +785,30 @@ async function confirmSubscribe() {
   await createOrder(selectedPlan.value.price, 'subscription', selectedPlan.value.id)
 }
 
+async function createPaymentQuoteForOrder(orderAmount: number, orderType: OrderType, paymentType: string, planId?: number): Promise<string> {
+  if (orderType !== 'balance' || orderAmount <= 0) {
+    return ''
+  }
+  const res = await paymentAPI.createQuote({
+    amount: orderAmount,
+    amount_mode: 'payment',
+    payment_currency: paymentCurrency.value,
+    payment_type: paymentType,
+    order_type: orderType,
+    plan_id: planId,
+  })
+  return res.data.quote_id
+}
+
 async function createOrder(orderAmount: number, orderType: OrderType, planId?: number, options: CreateOrderOptions = {}) {
   submitting.value = true
   errorMessage.value = ''
   errorHintMessage.value = ''
   const requestType = normalizeVisibleMethod(options.paymentType || selectedMethod.value) || options.paymentType || selectedMethod.value
   try {
+    const quoteId = options.wechatResumeToken
+      ? ''
+      : options.quoteId || await createPaymentQuoteForOrder(orderAmount, orderType, requestType, planId)
     const payload = buildCreateOrderPayload({
       amount: orderAmount,
       paymentType: requestType,
@@ -694,6 +817,9 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
       origin: typeof window !== 'undefined' ? window.location.origin : '',
       isMobile: isMobileDevice(),
       isWechatBrowser: typeof window !== 'undefined' && /MicroMessenger/i.test(window.navigator.userAgent),
+      amountMode: orderType === 'balance' ? 'payment' : undefined,
+      paymentCurrency: orderType === 'balance' ? paymentCurrency.value : undefined,
+      quoteId: quoteId || undefined,
     })
     if (options.openid) {
       payload.openid = options.openid
@@ -741,6 +867,9 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
         orderType,
         planId,
         orderAmount,
+        amountMode: orderType === 'balance' ? 'payment' : undefined,
+        paymentCurrency: orderType === 'balance' ? paymentCurrency.value : undefined,
+        quoteId: quoteId || undefined,
       })
       return
     }
@@ -901,6 +1030,7 @@ async function attemptMobileQrFallback(err: unknown, context: MobileQrFallbackCo
 
   try {
     const visibleMethod = normalizeVisibleMethod(context.paymentType) || context.paymentType
+    const quoteId = await createPaymentQuoteForOrder(context.orderAmount, context.orderType, visibleMethod, context.planId)
     const payload = buildCreateOrderPayload({
       amount: context.orderAmount,
       paymentType: visibleMethod,
@@ -909,6 +1039,9 @@ async function attemptMobileQrFallback(err: unknown, context: MobileQrFallbackCo
       origin: typeof window !== 'undefined' ? window.location.origin : '',
       isMobile: false,
       isWechatBrowser: false,
+      amountMode: context.orderType === 'balance' ? 'payment' : undefined,
+      paymentCurrency: context.orderType === 'balance' ? paymentCurrency.value : undefined,
+      quoteId: quoteId || undefined,
     })
     const result = await paymentStore.createOrder(payload) as CreateOrderResult & { resume_token?: string }
     const stripeMethod = visibleMethod === 'wxpay' ? 'wechat_pay' : 'alipay'
@@ -986,6 +1119,7 @@ async function resumeWechatPaymentFromQuery() {
       wechatResumeToken: resume.wechatResumeToken,
       paymentType: resume.paymentType,
       isResume: true,
+      quoteId: resume.quoteId,
     })
     return
   }
@@ -995,6 +1129,7 @@ async function resumeWechatPaymentFromQuery() {
       openid: resume.openid,
       paymentType: resume.paymentType,
       isResume: true,
+      quoteId: resume.quoteId,
     })
   }
 }
@@ -1003,6 +1138,7 @@ onMounted(async () => {
   try {
     const res = await paymentAPI.getCheckoutInfo()
     checkout.value = res.data
+    selectedPaymentCurrency.value = availablePaymentCurrencies.value[0]
     if (enabledMethods.value.length) {
       const order: readonly string[] = METHOD_ORDER
       const sorted = [...enabledMethods.value].sort((a, b) => {

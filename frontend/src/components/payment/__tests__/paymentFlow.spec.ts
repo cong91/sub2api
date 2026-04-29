@@ -235,6 +235,27 @@ describe('buildCreateOrderPayload', () => {
       payment_source: 'wechat_in_app_resume',
     })
   })
+  it('includes quote_id for local-currency balance orders when provided', () => {
+    expect(buildCreateOrderPayload({
+      amount: 255000,
+      paymentType: 'sepay',
+      orderType: 'balance',
+      isMobile: false,
+      isWechatBrowser: false,
+      amountMode: 'payment',
+      paymentCurrency: 'VND',
+      quoteId: 'quote-vnd-123',
+    })).toEqual({
+      amount: 255000,
+      amount_mode: 'payment',
+      payment_currency: 'VND',
+      quote_id: 'quote-vnd-123',
+      payment_type: 'sepay',
+      order_type: 'balance',
+      is_mobile: false,
+      payment_source: 'hosted_redirect',
+    })
+  })
 })
 
 describe('readPaymentRecoverySnapshot', () => {
