@@ -25,7 +25,9 @@ function mountDialog() {
       allKeyOptions: [
         { value: 'alipay', label: 'Alipay' },
         { value: 'wxpay', label: 'WeChat Pay' },
+        { value: 'sepay', label: 'SePay' },
         { value: 'stripe', label: 'Stripe' },
+        { value: 'paddle', label: 'Paddle' },
       ],
       enabledKeyOptions: [
         { value: 'alipay', label: 'Alipay' },
@@ -34,6 +36,9 @@ function mountDialog() {
       allPaymentTypes: [
         { value: 'alipay', label: 'Alipay' },
         { value: 'wxpay', label: 'WeChat Pay' },
+        { value: 'sepay', label: 'SePay' },
+        { value: 'stripe', label: 'Stripe' },
+        { value: 'paddle', label: 'Paddle' },
       ],
       redirectLabel: 'Redirect',
     },
