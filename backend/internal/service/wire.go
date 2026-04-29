@@ -488,7 +488,6 @@ var ProviderSet = wire.NewSet(
 	NewModelPricingResolver,
 	NewAffiliateService,
 	ProvidePaymentConfigService,
-	ProvidePaymentFXSyncService,
 	NewPaymentService,
 	ProvidePaymentOrderExpiryService,
 	ProvideBalanceNotifyService,
@@ -502,29 +501,6 @@ var ProviderSet = wire.NewSet(
 // payment.EncryptionKey type instead of raw []byte, avoiding Wire ambiguity.
 func ProvidePaymentConfigService(entClient *dbent.Client, settingRepo SettingRepository, key payment.EncryptionKey) *PaymentConfigService {
 	return NewPaymentConfigService(entClient, settingRepo, []byte(key))
-}
-
-// ProvidePaymentFXSyncService creates and starts the production FX sync scheduler.
-func ProvidePaymentFXSyncService(configSvc *PaymentConfigService, settingRepo SettingRepository, cfg *config.Config) *PaymentFXSyncService {
-	svc := NewPaymentFXSyncService(configSvc, settingRepo, nil)
-	providers := map[string]PaymentFXRateProvider{}
-	if cfg != nil && cfg.PaymentFX.OpenExchangeRates.AppID != "" {
-		providers[PaymentFXProviderOpenExchangeRates] = NewOpenExchangeRatesProvider(OpenExchangeRatesProviderConfig{
-			AppID:          cfg.PaymentFX.OpenExchangeRates.AppID,
-			BaseURL:        cfg.PaymentFX.OpenExchangeRates.BaseURL,
-			TimeoutSeconds: cfg.PaymentFX.OpenExchangeRates.TimeoutSeconds,
-		})
-	}
-	svc.SetProviders(providers)
-	if cfg != nil {
-		svc.SetRetryPolicy(PaymentFXSyncRetryPolicy{
-			MaxAttempts:    cfg.PaymentFX.Sync.MaxAttempts,
-			InitialBackoff: time.Duration(cfg.PaymentFX.Sync.InitialBackoffSeconds) * time.Second,
-			MaxBackoff:     time.Duration(cfg.PaymentFX.Sync.MaxBackoffSeconds) * time.Second,
-		})
-	}
-	svc.Start()
-	return svc
 }
 
 // ProvideBalanceNotifyService creates BalanceNotifyService
