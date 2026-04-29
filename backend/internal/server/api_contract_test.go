@@ -872,9 +872,6 @@ func TestAPIContracts(t *testing.T) {
 					"payment_ledger_currency": "",
 					"payment_allowed_currencies": null,
 					"payment_manual_fx_rates": null,
-					"payment_fx_auto_sync_enabled": false,
-					"payment_fx_auto_sync_provider": "",
-					"payment_fx_auto_sync_interval_seconds": 0,
 					"payment_fx_status": {
 						"source": "",
 						"missing_currencies": null,
@@ -1113,9 +1110,6 @@ func TestAPIContracts(t *testing.T) {
 					"payment_ledger_currency": "",
 					"payment_allowed_currencies": null,
 					"payment_manual_fx_rates": null,
-					"payment_fx_auto_sync_enabled": false,
-					"payment_fx_auto_sync_provider": "",
-					"payment_fx_auto_sync_interval_seconds": 0,
 					"payment_fx_status": {
 						"source": "",
 						"missing_currencies": null,
