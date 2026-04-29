@@ -801,6 +801,62 @@ describe("admin SettingsView payment visible method controls", () => {
     );
   });
 
+  it("renders SePay, Airwallex and Paddle as selectable payment types and provider keys", async () => {
+    const wrapper = mountView();
+
+    await flushPromises();
+    await openPaymentTab(wrapper);
+
+    expect(wrapper.text()).toContain("payment.methods.sepay");
+    expect(wrapper.text()).toContain("payment.methods.airwallex");
+    expect(wrapper.text()).toContain("payment.methods.paddle");
+
+    const vm = wrapper.vm as unknown as {
+      allPaymentTypes: Array<{ value: string }>;
+      providerKeyOptions: Array<{ value: string }>;
+    };
+
+    expect(vm.allPaymentTypes.map((item) => item.value)).toEqual([
+      "easypay",
+      "alipay",
+      "wxpay",
+      "sepay",
+      "stripe",
+      "airwallex",
+      "paddle",
+    ]);
+    expect(vm.providerKeyOptions.map((item) => item.value)).toEqual([
+      "easypay",
+      "alipay",
+      "wxpay",
+      "sepay",
+      "stripe",
+      "airwallex",
+      "paddle",
+    ]);
+  });
+
+  it("filters provider creation choices using enabled SePay and Paddle payment types", async () => {
+    getSettings.mockResolvedValue({
+      ...baseSettingsResponse,
+      payment_enabled_types: ["sepay", "paddle"],
+    });
+
+    const wrapper = mountView();
+
+    await flushPromises();
+    await openPaymentTab(wrapper);
+
+    const vm = wrapper.vm as unknown as {
+      enabledProviderKeyOptions: Array<{ value: string }>;
+    };
+
+    expect(vm.enabledProviderKeyOptions.map((item) => item.value)).toEqual([
+      "sepay",
+      "paddle",
+    ]);
+  });
+
   it("updates provider enablement immediately and reloads providers", async () => {
     const provider = {
       id: 7,
