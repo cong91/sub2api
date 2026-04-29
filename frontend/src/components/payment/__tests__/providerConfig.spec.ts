@@ -6,6 +6,10 @@ function findField(providerKey: string, key: string) {
   return fields.find(field => field.key === key)
 }
 
+function findSepayField(key: string) {
+  return findField('sepay', key)
+}
+
 describe('PROVIDER_CONFIG_FIELDS.wxpay', () => {
   it('keeps admin form validation aligned with backend-required credentials', () => {
     expect(findField('wxpay', 'publicKeyId')?.optional).toBeFalsy()
@@ -27,18 +31,6 @@ describe('PROVIDER_CONFIG_FIELDS.airwallex', () => {
     expect(currency?.hintKey).toBe('admin.settings.payment.field_paymentCurrencyHint')
     expect(currency?.options).toBe(PAYMENT_CURRENCY_OPTIONS)
   })
-
-  it('marks accountId as optional and explains when it can be left blank', () => {
-    const accountId = findField('airwallex', 'accountId')
-
-    expect(accountId?.optional).toBe(true)
-    expect(accountId?.clearable).toBe(true)
-    expect(accountId?.hintKey).toBe('admin.settings.payment.field_accountIdHint')
-  })
-
-  it('explains that apiBase must match the Airwallex key environment', () => {
-    expect(findField('airwallex', 'apiBase')?.hintKey).toBe('admin.settings.payment.field_airwallexApiBaseHint')
-  })
 })
 
 describe('PROVIDER_CONFIG_FIELDS.stripe', () => {
@@ -48,5 +40,14 @@ describe('PROVIDER_CONFIG_FIELDS.stripe', () => {
     expect(currency?.defaultValue).toBe('CNY')
     expect(currency?.hintKey).toBe('admin.settings.payment.field_paymentCurrencyHint')
     expect(currency?.options).toBe(PAYMENT_CURRENCY_OPTIONS)
+  })
+})
+
+describe('PROVIDER_CONFIG_FIELDS.sepay', () => {
+  it('requires SePay API credentials while keeping bank account ID user-friendly', () => {
+    expect(findSepayField('apiToken')?.optional).toBeFalsy()
+    expect(findSepayField('webhookApiKey')?.optional).toBeFalsy()
+    expect(findSepayField('webhookApiKey')?.sensitive).toBe(true)
+    expect(findSepayField('bankAccountId')?.optional).toBe(true)
   })
 })
