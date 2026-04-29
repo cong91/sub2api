@@ -17,9 +17,10 @@ const VISIBLE_METHOD_ALIASES = {
   stripe: 'stripe',
   airwallex: 'airwallex',
   paddle: 'paddle',
+  sepay: 'sepay',
 } as const
 
-export type VisiblePaymentMethod = 'alipay' | 'wxpay' | 'stripe' | 'airwallex' | 'paddle'
+export type VisiblePaymentMethod = 'alipay' | 'wxpay' | 'stripe' | 'airwallex' | 'paddle' | 'sepay'
 export type StripeVisibleMethod = 'alipay' | 'wechat_pay'
 export type PaymentLaunchKind =
   | 'qr_waiting'
@@ -46,6 +47,10 @@ export interface PaymentRecoverySnapshot {
   paymentEnv: string
   checkoutId: string
   payAmount: number
+  paymentAmount: number
+  ledgerAmount: number
+  paymentCurrency: string
+  ledgerCurrency: string
   orderType: OrderType | ''
   paymentMode: string
   resumeToken: string
@@ -84,6 +89,9 @@ export interface BuildCreateOrderPayloadInput {
   isWechatBrowser: boolean
   /** When true, Alipay payments always use QR code (passes is_mobile: false to backend) */
   forceQRCode?: boolean
+  amountMode?: 'ledger' | 'payment'
+  paymentCurrency?: string
+  quoteId?: string
 }
 
 type CreateOrderFlowResult = CreateOrderResult & {
@@ -124,6 +132,8 @@ export function buildCreateOrderPayload(input: BuildCreateOrderPayloadInput): Cr
     : input.isMobile
   const payload: CreateOrderRequest = {
     amount: input.amount,
+    amount_mode: input.amountMode,
+    payment_currency: input.paymentCurrency,
     payment_type: visibleMethod,
     order_type: input.orderType,
     is_mobile: effectiveMobile,
@@ -132,6 +142,9 @@ export function buildCreateOrderPayload(input: BuildCreateOrderPayloadInput): Cr
       : 'hosted_redirect',
   }
 
+  if (input.quoteId) {
+    payload.quote_id = input.quoteId
+  }
   if (input.planId) {
     payload.plan_id = input.planId
   }
@@ -162,6 +175,10 @@ export function decidePaymentLaunch(
     paymentEnv: result.payment_env || '',
     checkoutId: result.checkout_id || '',
     payAmount: result.pay_amount,
+    paymentAmount: result.payment_amount ?? result.pay_amount,
+    ledgerAmount: result.ledger_amount ?? result.amount,
+    paymentCurrency: result.payment_currency || '',
+    ledgerCurrency: result.ledger_currency || '',
     orderType: context.orderType,
     paymentMode: (result.payment_mode || '').trim(),
     resumeToken: result.resume_token || '',
@@ -285,6 +302,10 @@ export function readPaymentRecoverySnapshot(
       || (parsed.paymentEnv != null && typeof parsed.paymentEnv !== 'string')
       || (parsed.checkoutId != null && typeof parsed.checkoutId !== 'string')
       || typeof parsed.payAmount !== 'number'
+      || (parsed.paymentAmount != null && typeof parsed.paymentAmount !== 'number')
+      || (parsed.ledgerAmount != null && typeof parsed.ledgerAmount !== 'number')
+      || (parsed.paymentCurrency != null && typeof parsed.paymentCurrency !== 'string')
+      || (parsed.ledgerCurrency != null && typeof parsed.ledgerCurrency !== 'string')
       || typeof parsed.paymentMode !== 'string'
       || typeof parsed.resumeToken !== 'string'
       || typeof parsed.createdAt !== 'number'
@@ -316,6 +337,10 @@ export function readPaymentRecoverySnapshot(
       paymentEnv: parsed.paymentEnv || '',
       checkoutId: parsed.checkoutId || '',
       payAmount: parsed.payAmount,
+      paymentAmount: parsed.paymentAmount ?? parsed.payAmount,
+      ledgerAmount: parsed.ledgerAmount ?? parsed.amount,
+      paymentCurrency: parsed.paymentCurrency || '',
+      ledgerCurrency: parsed.ledgerCurrency || '',
       orderType: parsed.orderType === 'subscription' ? 'subscription' : 'balance',
       paymentMode: parsed.paymentMode,
       resumeToken: parsed.resumeToken,
