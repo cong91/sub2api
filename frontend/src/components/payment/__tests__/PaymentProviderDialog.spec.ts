@@ -55,8 +55,10 @@ function mountDialog(options: { editing?: ProviderInstance | null } = {}) {
       allKeyOptions: [
         { value: 'alipay', label: 'Alipay' },
         { value: 'wxpay', label: 'WeChat Pay' },
+        { value: 'sepay', label: 'SePay' },
         { value: 'stripe', label: 'Stripe' },
         { value: 'airwallex', label: 'Airwallex' },
+        { value: 'paddle', label: 'Paddle' },
       ],
       enabledKeyOptions: [
         { value: 'alipay', label: 'Alipay' },
@@ -66,6 +68,9 @@ function mountDialog(options: { editing?: ProviderInstance | null } = {}) {
       allPaymentTypes: [
         { value: 'alipay', label: 'Alipay' },
         { value: 'wxpay', label: 'WeChat Pay' },
+        { value: 'sepay', label: 'SePay' },
+        { value: 'stripe', label: 'Stripe' },
+        { value: 'paddle', label: 'Paddle' },
       ],
       redirectLabel: 'Redirect',
     },
