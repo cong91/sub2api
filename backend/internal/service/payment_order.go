@@ -37,6 +37,9 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if !cfg.Enabled {
 		return nil, infraerrors.Forbidden("PAYMENT_DISABLED", "payment system is disabled")
 	}
+	if err := s.resolveRequestPaymentCurrency(ctx, &req, cfg); err != nil {
+		return nil, err
+	}
 	plan, err := s.validateOrderInput(ctx, req, cfg)
 	if err != nil {
 		return nil, err
@@ -76,7 +79,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if err := s.validateSelectedCreateOrderInstance(ctx, req, sel); err != nil {
 		return nil, err
 	}
-	if err := validateProviderCurrency(sel.ProviderKey, req.PaymentType, paymentCurrency); err != nil {
+	if err := validateProviderCurrency(sel.ProviderKey, req.PaymentType, paymentCurrency, sel.Config); err != nil {
 		return nil, err
 	}
 	if err := validateSelectedCreateOrderAmountCurrency(payAmountStr, sel); err != nil {
@@ -370,8 +373,9 @@ func (s *PaymentService) selectCreateOrderInstance(ctx context.Context, req Crea
 
 func (s *PaymentService) prepareCreateOrderSelectionContext(ctx context.Context, req CreateOrderRequest) (context.Context, error) {
 	if !requestNeedsWeChatJSAPICompatibility(req) {
-		return ctx, nil
+		return selectionContextWithPaymentCurrency(ctx, req.PaymentCurrency), nil
 	}
+	ctx = selectionContextWithPaymentCurrency(ctx, req.PaymentCurrency)
 	if !s.usesOfficialWxpayVisibleMethod(ctx) {
 		return ctx, nil
 	}
