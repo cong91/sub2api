@@ -7,8 +7,6 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-const centsPerYuan = 100
-
 var zeroDecimalCurrencies = map[string]struct{}{
 	"BIF": {},
 	"CLP": {},
