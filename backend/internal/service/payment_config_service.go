@@ -41,9 +41,6 @@ const (
 	SettingFXRatesSource            = "PAYMENT_FX_RATES_SOURCE"
 	SettingFXRatesUpdatedAt         = "PAYMENT_FX_RATES_UPDATED_AT"
 	SettingFXRatesStaleAfterSeconds = "PAYMENT_FX_RATES_STALE_AFTER_SECONDS"
-	SettingFXAutoSyncEnabled        = "PAYMENT_FX_AUTO_SYNC_ENABLED"
-	SettingFXAutoSyncProvider       = "PAYMENT_FX_AUTO_SYNC_PROVIDER"
-	SettingFXAutoSyncIntervalSec    = "PAYMENT_FX_AUTO_SYNC_INTERVAL_SECONDS"
 )
 
 // Default values for payment configuration settings.
@@ -55,8 +52,6 @@ const (
 	defaultManualFXRatesJSON        = `{"USD":1,"CNY":1}`
 	defaultFXRatesSource            = fxSourceManual
 	defaultFXRatesStaleAfterSeconds = 24 * 60 * 60
-	defaultFXAutoSyncProvider       = "manual"
-	defaultFXAutoSyncIntervalSec    = 60 * 60
 )
 
 // PaymentConfig holds the payment system configuration.
@@ -83,9 +78,6 @@ type PaymentConfig struct {
 	AllowedPaymentCurrencies  []string           `json:"allowed_payment_currencies"`
 	ManualFXRates             map[string]float64 `json:"manual_fx_rates"`
 	FXStatus                  PaymentFXStatus    `json:"fx_status"`
-	FXAutoSyncEnabled         bool               `json:"fx_auto_sync_enabled"`
-	FXAutoSyncProvider        string             `json:"fx_auto_sync_provider"`
-	FXAutoSyncIntervalSec     int                `json:"fx_auto_sync_interval_seconds"`
 
 	// Cancel rate limit settings
 	CancelRateLimitEnabled bool   `json:"cancel_rate_limit_enabled"`
@@ -115,9 +107,6 @@ type UpdatePaymentConfigRequest struct {
 	LedgerCurrency            *string  `json:"ledger_currency"`
 	AllowedPaymentCurrencies  []string `json:"allowed_payment_currencies"`
 	ManualFXRates             *string  `json:"manual_fx_rates"`
-	FXAutoSyncEnabled         *bool    `json:"fx_auto_sync_enabled"`
-	FXAutoSyncProvider        *string  `json:"fx_auto_sync_provider"`
-	FXAutoSyncIntervalSec     *int     `json:"fx_auto_sync_interval_seconds"`
 	FXRatesStaleAfterSeconds  *int     `json:"fx_rates_stale_after_seconds"`
 
 	// Cancel rate limit settings
@@ -234,7 +223,6 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 		SettingHelpImageURL, SettingHelpText,
 		SettingLedgerCurrency, SettingAllowedPaymentCurrencies, SettingManualFXRates,
 		SettingFXRatesSource, SettingFXRatesUpdatedAt, SettingFXRatesStaleAfterSeconds,
-		SettingFXAutoSyncEnabled, SettingFXAutoSyncProvider, SettingFXAutoSyncIntervalSec,
 		SettingCancelRateLimitOn, SettingCancelRateLimitMax,
 		SettingCancelWindowSize, SettingCancelWindowUnit, SettingCancelWindowMode,
 		SettingPaymentVisibleMethodAlipayEnabled, SettingPaymentVisibleMethodAlipaySource,
@@ -270,9 +258,6 @@ func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *Payme
 		LedgerCurrency:            normalizeCurrencyCode(vals[SettingLedgerCurrency], defaultLedgerCurrency),
 		AllowedPaymentCurrencies:  parseCurrencyList(vals[SettingAllowedPaymentCurrencies], defaultPaymentCurrencyCSV),
 		ManualFXRates:             parseManualFXRates(vals[SettingManualFXRates]),
-		FXAutoSyncEnabled:         vals[SettingFXAutoSyncEnabled] == "true",
-		FXAutoSyncProvider:        strings.TrimSpace(vals[SettingFXAutoSyncProvider]),
-		FXAutoSyncIntervalSec:     pcParseInt(vals[SettingFXAutoSyncIntervalSec], defaultFXAutoSyncIntervalSec),
 
 		CancelRateLimitEnabled: vals[SettingCancelRateLimitOn] == "true",
 		CancelRateLimitMax:     pcParseInt(vals[SettingCancelRateLimitMax], 10),
@@ -301,12 +286,6 @@ func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *Payme
 	}
 	if cfg.ManualFXRates[cfg.LedgerCurrency] <= 0 {
 		cfg.ManualFXRates[cfg.LedgerCurrency] = 1
-	}
-	if cfg.FXAutoSyncProvider == "" {
-		cfg.FXAutoSyncProvider = defaultFXAutoSyncProvider
-	}
-	if cfg.FXAutoSyncIntervalSec <= 0 {
-		cfg.FXAutoSyncIntervalSec = defaultFXAutoSyncIntervalSec
 	}
 	cfg.FXStatus = buildPaymentFXStatus(cfg, vals, time.Now())
 	return cfg
@@ -381,9 +360,6 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 			return infraerrors.BadRequest("INVALID_MANUAL_FX_RATES", "manual fx rates must be a JSON object of currency=>rate")
 		}
 	}
-	if req.FXAutoSyncIntervalSec != nil && *req.FXAutoSyncIntervalSec <= 0 {
-		return infraerrors.BadRequest("INVALID_FX_SYNC_INTERVAL", "fx auto sync interval must be greater than 0")
-	}
 	if req.FXRatesStaleAfterSeconds != nil && *req.FXRatesStaleAfterSeconds <= 0 {
 		return infraerrors.BadRequest("INVALID_FX_STALE_AFTER", "fx stale threshold must be greater than 0")
 	}
@@ -405,9 +381,6 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 		SettingLedgerCurrency:                    normalizeCurrencyCode(derefStr(req.LedgerCurrency), ""),
 		SettingAllowedPaymentCurrencies:          strings.Join(normalizeCurrencyList(req.AllowedPaymentCurrencies), ","),
 		SettingManualFXRates:                     normalizeManualFXRatesJSON(derefStr(req.ManualFXRates)),
-		SettingFXAutoSyncEnabled:                 formatBoolOrEmpty(req.FXAutoSyncEnabled),
-		SettingFXAutoSyncProvider:                derefStr(req.FXAutoSyncProvider),
-		SettingFXAutoSyncIntervalSec:             formatPositiveInt(req.FXAutoSyncIntervalSec),
 		SettingFXRatesStaleAfterSeconds:          formatPositiveInt(req.FXRatesStaleAfterSeconds),
 		SettingCancelRateLimitOn:                 formatBoolOrEmpty(req.CancelRateLimitEnabled),
 		SettingCancelRateLimitMax:                formatPositiveInt(req.CancelRateLimitMax),
