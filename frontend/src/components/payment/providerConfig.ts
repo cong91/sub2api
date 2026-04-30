@@ -45,8 +45,26 @@ export const METHOD_ORDER = ['alipay', 'alipay_direct', 'wxpay', 'wxpay_direct',
 export const PAYMENT_MODE_QRCODE = 'qrcode'
 export const PAYMENT_MODE_POPUP = 'popup'
 
-/** Common settlement currencies that admins can assign to provider instances. */
-export const PAYMENT_CURRENCY_OPTIONS = ['USD', 'CNY', 'VND', 'KRW'] as const
+/** Common settlement currencies admins can assign to provider instances; custom ISO-4217 codes can still be typed in the UI. */
+export const PAYMENT_CURRENCY_OPTIONS = [
+  'USD',
+  'CNY',
+  'VND',
+  'KRW',
+  'EUR',
+  'JPY',
+  'GBP',
+  'AUD',
+  'CAD',
+  'SGD',
+  'HKD',
+  'TWD',
+  'THB',
+  'MYR',
+  'PHP',
+  'IDR',
+  'INR',
+] as const
 
 /** Safe provider defaults used when creating a new provider instance. */
 export const PROVIDER_DEFAULT_PAYMENT_CURRENCIES: Record<string, string[]> = {
