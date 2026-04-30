@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
@@ -24,8 +25,9 @@ func (s *PaymentConfigService) GetAvailableMethodLimits(ctx context.Context) (*M
 	resp := &MethodLimitsResponse{
 		Methods: make(map[string]MethodLimits, len(typeInstances)),
 	}
+	currencyCapabilities := s.currencyCapabilities(ctx)
 	for pt, insts := range typeInstances {
-		ml := pcAggregateMethodLimits(pt, insts)
+		ml := s.pcAggregateMethodLimits(pt, insts, currencyCapabilities)
 		resp.Methods[ml.PaymentType] = ml
 	}
 	resp.GlobalMin, resp.GlobalMax = pcComputeGlobalRange(resp.Methods)
@@ -75,6 +77,7 @@ func (s *PaymentConfigService) GetMethodLimits(ctx context.Context, types []stri
 		return nil, fmt.Errorf("query provider instances: %w", err)
 	}
 	result := make([]MethodLimits, 0, len(types))
+	currencyCapabilities := s.currencyCapabilities(ctx)
 	for _, pt := range types {
 		var matching []*dbent.PaymentProviderInstance
 		for _, inst := range instances {
@@ -82,7 +85,7 @@ func (s *PaymentConfigService) GetMethodLimits(ctx context.Context, types []stri
 				matching = append(matching, inst)
 			}
 		}
-		result = append(result, pcAggregateMethodLimits(pt, matching))
+		result = append(result, s.pcAggregateMethodLimits(pt, matching, currencyCapabilities))
 	}
 	return result, nil
 }
@@ -165,13 +168,17 @@ func unionFloat(agg float64, limited bool, val float64, wantMin bool) (float64, 
 //   - SingleMax: highest ceiling across instances; 0 if any is unlimited
 //   - DailyLimit: highest cap across instances; 0 if any is unlimited
 func pcAggregateMethodLimits(pt string, instances []*dbent.PaymentProviderInstance) MethodLimits {
-	ml := MethodLimits{PaymentType: pt}
+	return (&PaymentConfigService{}).pcAggregateMethodLimits(pt, instances, payment.CurrencyCapabilityConfig{})
+}
+
+func (s *PaymentConfigService) pcAggregateMethodLimits(pt string, instances []*dbent.PaymentProviderInstance, currencyCapabilities payment.CurrencyCapabilityConfig) MethodLimits {
+	ml := MethodLimits{PaymentType: pt, AllowedPaymentCurrencies: s.pcSupportedPaymentCurrencies(pt, instances, currencyCapabilities)}
 	minLimited, maxLimited, dailyLimited := true, true, true
 
 	for _, inst := range instances {
 		cl, hasLimits := pcInstanceTypeLimits(inst, pt)
 		if !hasLimits {
-			return MethodLimits{PaymentType: pt} // any unlimited instance → all zeros
+			return MethodLimits{PaymentType: pt, AllowedPaymentCurrencies: ml.AllowedPaymentCurrencies} // any unlimited instance → all zeros
 		}
 		ml.SingleMin, minLimited = unionFloat(ml.SingleMin, minLimited, cl.SingleMin, true)
 		ml.SingleMax, maxLimited = unionFloat(ml.SingleMax, maxLimited, cl.SingleMax, false)
@@ -188,6 +195,74 @@ func pcAggregateMethodLimits(pt string, instances []*dbent.PaymentProviderInstan
 		ml.DailyLimit = 0
 	}
 	return ml
+}
+
+func (s *PaymentConfigService) pcSupportedPaymentCurrencies(pt string, instances []*dbent.PaymentProviderInstance, currencyCapabilities payment.CurrencyCapabilityConfig) []string {
+	seen := make(map[string]struct{})
+	out := make([]string, 0, 4)
+	add := func(currency string) {
+		currency = normalizeCurrencyCode(currency, "")
+		if currency == "" {
+			return
+		}
+		if _, ok := seen[currency]; ok {
+			return
+		}
+		seen[currency] = struct{}{}
+		out = append(out, currency)
+	}
+
+	for _, inst := range instances {
+		config := s.pcProviderInstanceConfig(inst)
+		for _, currency := range payment.InstancePaymentCurrencies(inst, pt, config, currencyCapabilities) {
+			add(currency)
+		}
+	}
+	if len(out) == 0 {
+		for _, currency := range payment.InstancePaymentCurrencies(nil, pt, nil, currencyCapabilities) {
+			add(currency)
+		}
+	}
+	return out
+}
+
+func (s *PaymentConfigService) pcProviderInstanceConfig(inst *dbent.PaymentProviderInstance) map[string]string {
+	if s == nil || inst == nil || strings.TrimSpace(inst.Config) == "" {
+		return nil
+	}
+	cfg, err := s.decryptConfig(inst.Config)
+	if err != nil {
+		return nil
+	}
+	return cfg
+}
+
+func (s *PaymentConfigService) currencyCapabilities(ctx context.Context) payment.CurrencyCapabilityConfig {
+	if s == nil || s.settingRepo == nil {
+		return payment.CurrencyCapabilityConfig{}
+	}
+	raw, err := s.settingRepo.GetValue(ctx, SettingCurrencyCapabilities)
+	if err != nil {
+		return payment.CurrencyCapabilityConfig{}
+	}
+	return parseCurrencyCapabilities(raw)
+}
+
+func (s *PaymentConfigService) GetPaymentTypeCurrencies(ctx context.Context, paymentType string) ([]string, error) {
+	if s == nil || s.entClient == nil {
+		return nil, nil
+	}
+	limits, err := s.GetAvailableMethodLimits(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if limits == nil || limits.Methods == nil {
+		return nil, nil
+	}
+	if ml, ok := limits.Methods[paymentType]; ok {
+		return ml.AllowedPaymentCurrencies, nil
+	}
+	return nil, nil
 }
 
 // pcComputeGlobalRange computes the widest [min, max] across all methods.

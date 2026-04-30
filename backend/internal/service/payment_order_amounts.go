@@ -22,7 +22,11 @@ func computeCreateOrderAmounts(req CreateOrderRequest, cfg *PaymentConfig, plan 
 	if req.paymentQuote != nil {
 		return createOrderAmountsFromPaymentQuote(req.paymentQuote), nil
 	}
-	snapshot, err := resolveFXSnapshot(req.PaymentCurrency, cfg, now)
+	paymentCurrency := req.PaymentCurrency
+	if normalizeCurrencyCode(paymentCurrency, "") == "" {
+		paymentCurrency = defaultConfiguredPaymentCurrency(cfg)
+	}
+	snapshot, err := resolveFXSnapshot(paymentCurrency, cfg, now)
 	if err != nil {
 		return createOrderAmounts{}, err
 	}
