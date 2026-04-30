@@ -65,9 +65,11 @@ export interface PaymentConfig {
 }
 
 export interface MethodLimit {
+  payment_type?: string
+  allowed_payment_currencies?: string[]
   daily_limit: number
-  daily_used: number
-  daily_remaining: number
+  daily_used?: number
+  daily_remaining?: number
   single_min: number
   single_max: number
   fee_rate: number
