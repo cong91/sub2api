@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"strings"
 	"testing"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
@@ -307,6 +308,16 @@ func TestValidateProviderNotificationMetadataAllowsLegacyOrdersWithoutSnapshotFi
 		"trade_state": "SUCCESS",
 	})
 	assert.NoError(t, err)
+}
+
+func TestPaymentOrderIDPrefixAndAliases(t *testing.T) {
+	t.Parallel()
+
+	outTradeNo := generateOutTradeNo()
+	assert.True(t, strings.HasPrefix(outTradeNo, "vclaw_"), "new payment order IDs should be branded for V-Claw")
+	assert.False(t, strings.HasPrefix(outTradeNo, "sub2_"), "new payment order IDs must not expose legacy sub2 prefix")
+	assert.Equal(t, []string{"sub2_20260429AbC123xY"}, alternatePaymentOrderIDs("vclaw_20260429AbC123xY"))
+	assert.Equal(t, []string{"vclaw_20260429AbC123xY"}, alternatePaymentOrderIDs("sub2_20260429AbC123xY"))
 }
 
 func TestParseLegacyPaymentOrderID(t *testing.T) {
