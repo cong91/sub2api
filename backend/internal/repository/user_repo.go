@@ -16,7 +16,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
 	dbgroup "github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
-	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/promocodeusage"
@@ -451,10 +450,6 @@ func (r *userRepository) Delete(ctx context.Context, id int64) error {
 		},
 		func(ctx context.Context) error {
 			_, err := txClient.PromoCodeUsage.Delete().Where(promocodeusage.UserIDEQ(id)).Exec(ctx)
-			return err
-		},
-		func(ctx context.Context) error {
-			_, err := txClient.PaymentOrder.Delete().Where(paymentorder.UserIDEQ(id)).Exec(ctx)
 			return err
 		},
 		func(ctx context.Context) error {
