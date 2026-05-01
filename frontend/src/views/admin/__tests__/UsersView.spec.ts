@@ -176,16 +176,25 @@ describe('admin UsersView', () => {
     )
   })
 
-  it('shows invite redeem code next to truncated user email and copies it', async () => {
+  it('shows identity code next to truncated user email and copies it', async () => {
     listUsers.mockResolvedValue({
-      items: [createAdminUser({
-        email: 'invalid-invite-user-email-that-is-too-long-to-render-cleanly@example.invalid.local',
-        signup_source: 'invite',
-        primary_redeem_code: 'INVITE-CODE-1234567890',
-        primary_redeem_type: 'invitation',
-        has_device_binding: true
-      })],
-      total: 1,
+      items: [
+        createAdminUser({
+          email: 'invalid-invite-user-email-that-is-too-long-to-render-cleanly@example.invalid.local',
+          signup_source: 'invite',
+          primary_redeem_code: 'DLG-FN7Y-NJQJ-XNV6',
+          primary_redeem_type: 'device_login',
+          has_device_binding: true
+        }),
+        createAdminUser({
+          id: 43,
+          email: 'balance-topup@example.invalid.local',
+          primary_redeem_code: 'PAY-SHOULD-NOT-RENDER',
+          primary_redeem_type: 'balance',
+          has_device_binding: false
+        })
+      ],
+      total: 2,
       page: 1,
       page_size: 20,
       pages: 1
@@ -221,14 +230,16 @@ describe('admin UsersView', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('admin.users.redeemCode')
-    expect(wrapper.text()).toContain('INVITE-CODE-1234567890')
+    expect(wrapper.text()).not.toContain('admin.users.redeemCode')
+    expect(wrapper.text()).not.toContain('redeem-code')
+    expect(wrapper.text()).toContain('DLG-FN7Y-NJQJ-XNV6')
+    expect(wrapper.text()).not.toContain('PAY-SHOULD-NOT-RENDER')
     expect(wrapper.get('[title="invalid-invite-user-email-that-is-too-long-to-render-cleanly@example.invalid.local"]').classes()).toContain('truncate')
 
-    await wrapper.get('button[aria-label="admin.users.copyRedeemCode"]').trigger('click')
+    await wrapper.get('button[aria-label="admin.users.copyIdentityCode"]').trigger('click')
     await flushPromises()
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('INVITE-CODE-1234567890')
-    expect(showSuccess).toHaveBeenCalledWith('admin.users.redeemCodeCopied')
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('DLG-FN7Y-NJQJ-XNV6')
+    expect(showSuccess).toHaveBeenCalledWith('admin.users.identityCodeCopied')
   })
 })
