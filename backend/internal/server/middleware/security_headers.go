@@ -47,6 +47,8 @@ const (
 	AirwallexDemoStaticDomain = "https://static-demo.airwallex.com"
 	// AirwallexDemoCheckoutDomain 是 Airwallex 沙箱环境收银台元素和 iframe 域名。
 	AirwallexDemoCheckoutDomain = "https://checkout-demo.airwallex.com"
+	// PaddleDomain is the domain for Paddle.js SDK and hosted checkout frames
+	PaddleDomain = "https://*.paddle.com"
 )
 
 var requiredCSPDirectiveValues = []struct {
@@ -70,6 +72,8 @@ var requiredCSPDirectiveValues = []struct {
 	{"worker-src", TencentCaptchaWorkerSource},
 	{"script-src", StripeDomain},
 	{"frame-src", StripeDomain},
+	{"script-src", PaddleDomain},
+	{"frame-src", PaddleDomain},
 	{"script-src", AirwallexStaticDomain},
 	{"script-src", AirwallexCheckoutDomain},
 	{"style-src", AirwallexStaticDomain},
