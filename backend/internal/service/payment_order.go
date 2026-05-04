@@ -521,6 +521,9 @@ func (s *PaymentService) buildPaymentSubject(plan *dbent.SubscriptionPlan, limit
 		}
 		return "Sub2API Subscription " + plan.Name
 	}
+	if sel != nil && strings.TrimSpace(sel.ProviderKey) == payment.TypePaddle {
+		return "VClaw Credit"
+	}
 	currency := payment.DefaultPaymentCurrency
 	if sel != nil {
 		currency = paymentProviderConfigCurrency(sel.ProviderKey, sel.Config)
