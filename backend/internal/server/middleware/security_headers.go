@@ -20,6 +20,8 @@ const (
 	CloudflareInsightsDomain = "https://static.cloudflareinsights.com"
 	// StripeDomain is the domain for Stripe.js SDK
 	StripeDomain = "https://*.stripe.com"
+	// PaddleDomain is the domain for Paddle.js SDK and hosted checkout frames
+	PaddleDomain = "https://*.paddle.com"
 )
 
 // GenerateNonce generates a cryptographically secure random nonce.
@@ -118,6 +120,12 @@ func enhanceCSPPolicy(policy string) string {
 	if !strings.Contains(policy, "stripe.com") {
 		policy = addToDirective(policy, "script-src", StripeDomain)
 		policy = addToDirective(policy, "frame-src", StripeDomain)
+	}
+
+	// Add Paddle.js domain to script-src and hosted checkout frames if not present
+	if !strings.Contains(policy, "paddle.com") {
+		policy = addToDirective(policy, "script-src", PaddleDomain)
+		policy = addToDirective(policy, "frame-src", PaddleDomain)
 	}
 
 	return policy
