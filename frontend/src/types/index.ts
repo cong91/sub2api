@@ -136,6 +136,7 @@ export interface ActionCaptchaRequestProof extends Partial<TencentCaptchaRequest
 
 export interface InviteLoginRequest extends ActionCaptchaRequestProof {
   invitation_code: string
+  client_kind?: 'web'
   device_hash?: string
   install_id?: string
 }
