@@ -60,16 +60,20 @@ type RegisterRequest struct {
 }
 
 type InviteLoginRequest struct {
-	InvitationCode string `json:"invitation_code" binding:"required"`
-	DeviceHash     string `json:"device_hash"`
-	InstallID      string `json:"install_id"`
-	ClientKind     string `json:"client_kind"`
-	TurnstileToken string `json:"turnstile_token"`
+	InvitationCode        string `json:"invitation_code" binding:"required"`
+	DeviceHash            string `json:"device_hash"`
+	InstallID             string `json:"install_id"`
+	ClientKind            string `json:"client_kind"`
+	TurnstileToken        string `json:"turnstile_token"`
+	TencentCaptchaTicket  string `json:"tencent_captcha_ticket"`
+	TencentCaptchaRandstr string `json:"tencent_captcha_randstr"`
 }
 
 type RedeemLoginRequest struct {
-	InvitationCode string `json:"invitation_code" binding:"required"`
-	TurnstileToken string `json:"turnstile_token"`
+	InvitationCode        string `json:"invitation_code" binding:"required"`
+	TurnstileToken        string `json:"turnstile_token"`
+	TencentCaptchaTicket  string `json:"tencent_captcha_ticket"`
+	TencentCaptchaRandstr string `json:"tencent_captcha_randstr"`
 }
 
 type InviteBootstrapAPIKeyResponse struct {
@@ -256,7 +260,8 @@ func (h *AuthHandler) InviteLogin(c *gin.Context) {
 		return
 	}
 
-	if err := h.authService.VerifyTurnstile(c.Request.Context(), req.TurnstileToken, ip.GetClientIP(c)); err != nil {
+	proof := captchaProof(req.TurnstileToken, req.TencentCaptchaTicket, req.TencentCaptchaRandstr)
+	if err := h.authService.VerifyCaptcha(c.Request.Context(), proof, ip.GetClientIP(c)); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -302,7 +307,8 @@ func (h *AuthHandler) RedeemLogin(c *gin.Context) {
 		return
 	}
 
-	if err := h.authService.VerifyTurnstile(c.Request.Context(), req.TurnstileToken, ip.GetClientIP(c)); err != nil {
+	proof := captchaProof(req.TurnstileToken, req.TencentCaptchaTicket, req.TencentCaptchaRandstr)
+	if err := h.authService.VerifyCaptcha(c.Request.Context(), proof, ip.GetClientIP(c)); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
