@@ -84,6 +84,12 @@
               </span>
             </div>
           </div>
+          <div v-if="orderSummaryRows.length" class="w-full rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm dark:border-dark-600 dark:bg-dark-800/80">
+            <div v-for="row in orderSummaryRows" :key="row.key" class="flex items-center justify-between gap-4 py-1">
+              <span class="text-gray-500 dark:text-gray-400">{{ row.label }}</span>
+              <span :class="['text-right font-medium text-gray-900 dark:text-white', row.emphasis ? 'text-lg font-bold text-primary-600 dark:text-primary-400' : '']">{{ row.value }}</span>
+            </div>
+          </div>
           <p v-if="scanHint" class="text-center text-sm text-gray-500 dark:text-gray-400">{{ scanHint }}</p>
           <button v-if="payUrl" class="btn btn-secondary text-sm" @click="reopenPopup">
             {{ t('payment.qr.openPayWindow') }}
@@ -145,6 +151,12 @@ const props = defineProps<{
   paymentType: string
   payUrl?: string
   orderType?: string
+  payAmount?: number
+  paymentAmount?: number
+  ledgerAmount?: number
+  paymentCurrency?: string
+  ledgerCurrency?: string
+  outTradeNo?: string
 }>()
 
 type PaymentOutcome = 'success' | 'cancelled' | 'expired'
@@ -199,6 +211,62 @@ const countdownDisplay = computed(() => {
   const m = Math.floor(remainingSeconds.value / 60)
   const s = remainingSeconds.value % 60
   return m.toString().padStart(2, '0') + ':' + s.toString().padStart(2, '0')
+})
+
+interface OrderSummaryRow {
+  key: string
+  label: string
+  value: string
+  emphasis?: boolean
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+const orderSummaryRows = computed<OrderSummaryRow[]>(() => {
+  const rows: OrderSummaryRow[] = []
+  const paymentCurrency = props.paymentCurrency || 'VND'
+  const ledgerCurrency = props.ledgerCurrency || 'USD'
+
+  if (props.outTradeNo) {
+    rows.push({ key: 'orderNo', label: t('payment.orders.orderNo'), value: props.outTradeNo })
+  }
+
+  rows.push({
+    key: 'orderType',
+    label: t('payment.orders.orderType'),
+    value: props.orderType === 'subscription'
+      ? t('payment.admin.subscriptionOrder')
+      : t('payment.admin.balanceOrder'),
+  })
+
+  if (isFiniteNumber(props.payAmount)) {
+    rows.push({
+      key: 'payAmount',
+      label: t('payment.orders.payAmount'),
+      value: formatMoney(props.payAmount, paymentCurrency),
+      emphasis: true,
+    })
+  }
+
+  if (isFiniteNumber(props.paymentAmount) && props.paymentAmount !== props.payAmount) {
+    rows.push({
+      key: 'baseAmount',
+      label: t('payment.orders.baseAmount'),
+      value: formatMoney(props.paymentAmount, paymentCurrency),
+    })
+  }
+
+  if (props.orderType === 'balance' && isFiniteNumber(props.ledgerAmount)) {
+    rows.push({
+      key: 'creditedBalance',
+      label: t('payment.creditedBalance'),
+      value: formatMoney(props.ledgerAmount, ledgerCurrency),
+    })
+  }
+
+  return rows
 })
 
 function isSuccessStatus(status: string | null | undefined): boolean {
