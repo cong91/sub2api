@@ -330,6 +330,24 @@ func TestEnhanceCSPPolicy(t *testing.T) {
 		assert.NotContains(t, enhanced, NonceTemplate)
 		assert.Contains(t, enhanced, "'nonce-existing'")
 	})
+
+	t.Run("adds_paddle_domain_for_checkout", func(t *testing.T) {
+		policy := "default-src 'self'; script-src 'self' __CSP_NONCE__; frame-src https://challenges.cloudflare.com"
+		enhanced := enhanceCSPPolicy(policy)
+
+		assert.Contains(t, enhanced, "script-src 'self' __CSP_NONCE__")
+		assert.Contains(t, enhanced, PaddleDomain)
+		assert.Contains(t, enhanced, "frame-src https://challenges.cloudflare.com")
+		assert.Contains(t, enhanced, StripeDomain)
+		assert.Equal(t, 2, strings.Count(enhanced, PaddleDomain))
+	})
+
+	t.Run("preserves_existing_paddle_domain", func(t *testing.T) {
+		policy := "script-src 'self' https://*.paddle.com; frame-src https://*.paddle.com"
+		enhanced := enhanceCSPPolicy(policy)
+
+		assert.Equal(t, 2, strings.Count(enhanced, PaddleDomain))
+	})
 }
 
 func TestAddToDirective(t *testing.T) {
