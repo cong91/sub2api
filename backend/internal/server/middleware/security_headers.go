@@ -29,7 +29,7 @@ const (
 	// AirwallexDemoCheckoutDomain 是 Airwallex 沙箱环境收银台元素和 iframe 域名。
 	AirwallexDemoCheckoutDomain = "https://checkout-demo.airwallex.com"
 	// PaddleDomain is the domain for Paddle.js SDK and hosted checkout frames
-	PaddleDomain = "https://*.paddle.com
+	PaddleDomain = "https://*.paddle.com"
 )
 
 var requiredCSPDirectiveValues = []struct {
