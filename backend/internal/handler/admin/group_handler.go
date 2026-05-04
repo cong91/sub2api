@@ -27,6 +27,12 @@ type optionalLimitField struct {
 	value *float64
 }
 
+type optionalIntField struct {
+	set   bool
+	clear bool
+	value *int
+}
+
 func (f *optionalLimitField) UnmarshalJSON(data []byte) error {
 	f.set = true
 
@@ -68,6 +74,59 @@ func (f optionalLimitField) ToServiceInput() *float64 {
 		return f.value
 	}
 	zero := 0.0
+	return &zero
+}
+
+func (f *optionalIntField) UnmarshalJSON(data []byte) error {
+	f.set = true
+	f.clear = false
+	f.value = nil
+
+	trimmed := bytes.TrimSpace(data)
+	if bytes.Equal(trimmed, []byte("null")) {
+		f.clear = true
+		return nil
+	}
+
+	var number int
+	if err := json.Unmarshal(trimmed, &number); err == nil {
+		f.value = &number
+		return nil
+	}
+
+	var text string
+	if err := json.Unmarshal(trimmed, &text); err == nil {
+		text = strings.TrimSpace(text)
+		if text == "" {
+			f.clear = true
+			return nil
+		}
+		number, err = strconv.Atoi(text)
+		if err != nil {
+			return fmt.Errorf("invalid integer value %q: %w", text, err)
+		}
+		f.value = &number
+		return nil
+	}
+
+	return fmt.Errorf("invalid integer value: %s", string(trimmed))
+}
+
+func (f optionalIntField) ToCreateInput() int {
+	if !f.set || f.clear || f.value == nil {
+		return 0
+	}
+	return *f.value
+}
+
+func (f optionalIntField) ToUpdateInput() *int {
+	if !f.set {
+		return nil
+	}
+	if f.value != nil {
+		return f.value
+	}
+	zero := 0
 	return &zero
 }
 
@@ -114,7 +173,7 @@ type CreateGroupRequest struct {
 	DefaultMappedModel          string                                    `json:"default_mapped_model"`
 	MessagesDispatchModelConfig service.OpenAIMessagesDispatchModelConfig `json:"messages_dispatch_model_config"`
 	// 分组 RPM 上限（0 = 不限制）
-	RPMLimit int `json:"rpm_limit"`
+	RPMLimit optionalIntField `json:"rpm_limit"`
 	// 从指定分组复制账号（创建后自动绑定）
 	CopyAccountsFromGroupIDs []int64 `json:"copy_accounts_from_group_ids"`
 }
@@ -154,7 +213,7 @@ type UpdateGroupRequest struct {
 	DefaultMappedModel          *string                                    `json:"default_mapped_model"`
 	MessagesDispatchModelConfig *service.OpenAIMessagesDispatchModelConfig `json:"messages_dispatch_model_config"`
 	// 分组 RPM 上限（0 = 不限制）；nil 表示未提供不改动
-	RPMLimit *int `json:"rpm_limit"`
+	RPMLimit optionalIntField `json:"rpm_limit"`
 	// 从指定分组复制账号（同步操作：先清空当前分组的账号绑定，再绑定源分组的账号）
 	CopyAccountsFromGroupIDs []int64 `json:"copy_accounts_from_group_ids"`
 }
@@ -275,7 +334,7 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		RequirePrivacySet:               req.RequirePrivacySet,
 		DefaultMappedModel:              req.DefaultMappedModel,
 		MessagesDispatchModelConfig:     req.MessagesDispatchModelConfig,
-		RPMLimit:                        req.RPMLimit,
+		RPMLimit:                        req.RPMLimit.ToCreateInput(),
 		CopyAccountsFromGroupIDs:        req.CopyAccountsFromGroupIDs,
 	})
 	if err != nil {
@@ -330,7 +389,7 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		RequirePrivacySet:               req.RequirePrivacySet,
 		DefaultMappedModel:              req.DefaultMappedModel,
 		MessagesDispatchModelConfig:     req.MessagesDispatchModelConfig,
-		RPMLimit:                        req.RPMLimit,
+		RPMLimit:                        req.RPMLimit.ToUpdateInput(),
 		CopyAccountsFromGroupIDs:        req.CopyAccountsFromGroupIDs,
 	})
 	if err != nil {
