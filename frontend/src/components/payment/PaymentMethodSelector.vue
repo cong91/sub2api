@@ -44,6 +44,8 @@ import alipayIcon from '@/assets/icons/alipay.svg'
 import wxpayIcon from '@/assets/icons/wxpay.svg'
 import stripeIcon from '@/assets/icons/stripe.svg'
 import airwallexIcon from '@/assets/icons/airwallex.svg'
+import paddleIcon from '@/assets/icons/paddle.png'
+import sepayIcon from '@/assets/icons/sepay.svg'
 
 export interface PaymentMethodOption {
   type: string
@@ -67,6 +69,8 @@ const METHOD_ICONS: Record<string, string> = {
   wxpay: wxpayIcon,
   stripe: stripeIcon,
   airwallex: airwallexIcon,
+  paddle: paddleIcon,
+  sepay: sepayIcon,
 }
 
 const sortedMethods = computed(() => {
@@ -90,6 +94,8 @@ function methodSelectedClass(type: string): string {
   if (type.includes('wxpay')) return 'border-[#09BB07] bg-green-50 text-gray-900 shadow-sm dark:bg-green-950 dark:text-gray-100'
   if (type === 'stripe') return 'border-[#676BE5] bg-indigo-50 text-gray-900 shadow-sm dark:bg-indigo-950 dark:text-gray-100'
   if (type === 'airwallex') return 'border-[#FF6B3D] bg-orange-50 text-gray-900 shadow-sm dark:border-[#FF8E3C] dark:bg-orange-950 dark:text-gray-100'
+  if (type === 'paddle') return 'border-[#FFDD35] bg-yellow-50 text-gray-900 shadow-sm dark:bg-yellow-950 dark:text-gray-100'
+  if (type === 'sepay') return 'border-[#0F766E] bg-teal-50 text-gray-900 shadow-sm dark:bg-teal-950 dark:text-gray-100'
   return 'border-primary-500 bg-primary-50 text-gray-900 shadow-sm dark:bg-primary-950 dark:text-gray-100'
 }
 </script>
