@@ -134,6 +134,16 @@ export interface ActionCaptchaRequestProof extends Partial<TencentCaptchaRequest
   turnstile_token?: string
 }
 
+export interface InviteLoginRequest extends ActionCaptchaRequestProof {
+  invitation_code: string
+  device_hash?: string
+  install_id?: string
+}
+
+export interface RedeemLoginRequest extends ActionCaptchaRequestProof {
+  invitation_code: string
+}
+
 export interface RegisterRequest {
   email: string
   password: string
