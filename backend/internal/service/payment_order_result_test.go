@@ -176,6 +176,38 @@ func TestBuildCreateOrderResponseCopiesJSAPIPayload(t *testing.T) {
 	}
 }
 
+func TestBuildCreateOrderResponseUsesSingleCanonicalCheckoutURL(t *testing.T) {
+	t.Parallel()
+
+	resp := buildCreateOrderResponse(
+		&dbent.PaymentOrder{
+			ID:         123,
+			Amount:     50,
+			ExpiresAt:  time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC),
+			OutTradeNo: "vclaw_123",
+		},
+		CreateOrderRequest{PaymentType: payment.TypePaddle},
+		50,
+		&payment.InstanceSelection{ProviderKey: payment.TypePaddle, PaymentMode: "redirect"},
+		&payment.CreatePaymentResponse{
+			TradeNo:     "txn_123",
+			CheckoutID:  "txn_123",
+			CheckoutURL: "https://buy.paddle.com/checkout/txn_123",
+		},
+		payment.CreatePaymentResultOrderCreated,
+	)
+
+	if resp.CheckoutURL != "https://buy.paddle.com/checkout/txn_123" {
+		t.Fatalf("checkout_url = %q, want Paddle hosted URL", resp.CheckoutURL)
+	}
+	if resp.PayURL != "" {
+		t.Fatalf("pay_url = %q, want empty because checkout_url is canonical", resp.PayURL)
+	}
+	if resp.CheckoutID != "txn_123" {
+		t.Fatalf("checkout_id = %q, want txn_123", resp.CheckoutID)
+	}
+}
+
 func TestMaybeBuildWeChatOAuthRequiredResponse(t *testing.T) {
 	t.Setenv("PAYMENT_RESUME_SIGNING_KEY", "0123456789abcdef0123456789abcdef")
 
