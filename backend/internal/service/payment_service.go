@@ -112,6 +112,7 @@ type CreateOrderResponse struct {
 	PaymentType     string                          `json:"payment_type"`
 	OutTradeNo      string                          `json:"out_trade_no,omitempty"`
 	PayURL          string                          `json:"pay_url,omitempty"`
+	CheckoutURL     string                          `json:"checkout_url,omitempty"`
 	QRCode          string                          `json:"qr_code,omitempty"`
 	ClientSecret    string                          `json:"client_secret,omitempty"`
 	IntentID        string                          `json:"intent_id,omitempty"`
@@ -126,7 +127,6 @@ type CreateOrderResponse struct {
 	PaymentMode     string                          `json:"payment_mode,omitempty"`
 	ResumeToken     string                          `json:"resume_token,omitempty"`
 }
-
 type OrderListParams struct {
 	Page        int
 	PageSize    int
