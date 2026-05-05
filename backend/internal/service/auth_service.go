@@ -764,8 +764,10 @@ func isGroupEligibleForInviteBootstrap(redeemCode *RedeemCode, group Group) bool
 	switch redeemCode.Type {
 	case RedeemTypeSubscription, RedeemTypeInvitation:
 		return group.IsSubscriptionType()
-	case RedeemTypeBalance, RedeemTypeDeviceLogin:
+	case RedeemTypeBalance:
 		return !group.IsSubscriptionType()
+	case RedeemTypeDeviceLogin:
+		return true
 	default:
 		return false
 	}
@@ -773,8 +775,19 @@ func isGroupEligibleForInviteBootstrap(redeemCode *RedeemCode, group Group) bool
 
 func isInviteBootstrapGroupBetter(redeemCode *RedeemCode, a, b Group) bool {
 	switch redeemCode.Type {
-	case RedeemTypeBalance, RedeemTypeDeviceLogin:
+	case RedeemTypeBalance:
 		if a.RateMultiplier != b.RateMultiplier {
+			return a.RateMultiplier < b.RateMultiplier
+		}
+	case RedeemTypeDeviceLogin:
+		if a.IsSubscriptionType() != b.IsSubscriptionType() {
+			return a.IsSubscriptionType()
+		}
+		if a.IsSubscriptionType() {
+			if a.DefaultValidityDays != b.DefaultValidityDays {
+				return a.DefaultValidityDays > b.DefaultValidityDays
+			}
+		} else if a.RateMultiplier != b.RateMultiplier {
 			return a.RateMultiplier < b.RateMultiplier
 		}
 	case RedeemTypeSubscription, RedeemTypeInvitation:
