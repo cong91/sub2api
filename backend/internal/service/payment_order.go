@@ -425,7 +425,19 @@ func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.Paymen
 	}
 	subject := s.buildPaymentSubject(plan, limitAmount, cfg, sel)
 	outTradeNo := order.OutTradeNo
-	canonicalReturnURL, err := CanonicalizeReturnURL(req.ReturnURL, req.SrcHost, req.SrcURL)
+	returnURL := req.ReturnURL
+	firstPartyFrontendURL := ""
+	if sel.ProviderKey == payment.TypePaddle {
+		firstPartyFrontendURL, err = s.resolveFirstPartyFrontendURL(ctx, req.ReturnURL)
+		if err != nil {
+			return nil, err
+		}
+		returnURL, err = buildFirstPartyPaymentResultURL(firstPartyFrontendURL)
+		if err != nil {
+			return nil, err
+		}
+	}
+	canonicalReturnURL, err := CanonicalizeReturnURL(returnURL, req.SrcHost, req.SrcURL)
 	if err != nil {
 		return nil, err
 	}
@@ -486,9 +498,111 @@ func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.Paymen
 	if resultType == "" {
 		resultType = payment.CreatePaymentResultOrderCreated
 	}
+	if sel.ProviderKey == payment.TypePaddle {
+		checkoutURL, err := buildFirstPartyCheckoutURL(firstPartyFrontendURL, order, firstNonEmptyPaymentString(pr.CheckoutID, pr.TradeNo), resumeToken)
+		if err != nil {
+			return nil, err
+		}
+		pr.CheckoutURL = checkoutURL
+		pr.PayURL = ""
+	}
 	resp := buildCreateOrderResponse(order, req, payAmount, sel, pr, resultType)
 	resp.ResumeToken = resumeToken
 	return resp, nil
+}
+
+func (s *PaymentService) resolveFirstPartyFrontendURL(ctx context.Context, fallbackReturnURL string) (string, error) {
+	frontendURL := ""
+	if s != nil && s.configService != nil {
+		frontendURL = s.configService.GetFrontendURL(ctx)
+	}
+	if frontendURL == "" {
+		frontendURL = originFromHTTPSURL(fallbackReturnURL)
+	}
+	if frontendURL == "" {
+		return "", infraerrors.ServiceUnavailable("PAYMENT_FRONTEND_URL_REQUIRED", "paddle first-party checkout requires a configured https frontend_url")
+	}
+	return frontendURL, nil
+}
+
+func buildFirstPartyPaymentResultURL(frontendURL string) (string, error) {
+	base, err := parseFirstPartyFrontendURL(frontendURL)
+	if err != nil {
+		return "", err
+	}
+	base.Path = joinURLPath(base.Path, "/payment/result")
+	base.RawQuery = ""
+	base.Fragment = ""
+	return base.String(), nil
+}
+
+func buildFirstPartyCheckoutURL(frontendURL string, order *dbent.PaymentOrder, checkoutID string, resumeToken string) (string, error) {
+	if order == nil {
+		return "", fmt.Errorf("build first-party checkout url: order is nil")
+	}
+	checkoutID = strings.TrimSpace(checkoutID)
+	if checkoutID == "" {
+		return "", infraerrors.ServiceUnavailable("PADDLE_CHECKOUT_ID_REQUIRED", "paddle first-party checkout requires a transaction checkout id")
+	}
+	base, err := parseFirstPartyFrontendURL(frontendURL)
+	if err != nil {
+		return "", err
+	}
+	base.Path = joinURLPath(base.Path, "/checkout")
+	query := base.Query()
+	query.Set("provider", payment.TypePaddle)
+	query.Set("checkout_id", checkoutID)
+	query.Set("order_id", strconv.FormatInt(order.ID, 10))
+	query.Set("out_trade_no", order.OutTradeNo)
+	if strings.TrimSpace(resumeToken) != "" {
+		query.Set("resume_token", strings.TrimSpace(resumeToken))
+	}
+	if !order.ExpiresAt.IsZero() {
+		query.Set("expires_at", order.ExpiresAt.UTC().Format(time.RFC3339))
+	}
+	base.RawQuery = query.Encode()
+	base.Fragment = ""
+	return base.String(), nil
+}
+
+func parseFirstPartyFrontendURL(rawURL string) (*url.URL, error) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !parsed.IsAbs() || parsed.Host == "" {
+		return nil, infraerrors.ServiceUnavailable("PAYMENT_FRONTEND_URL_INVALID", "payment frontend_url must be an absolute https URL")
+	}
+	if parsed.Scheme != "https" {
+		return nil, infraerrors.ServiceUnavailable("PAYMENT_FRONTEND_URL_INVALID", "payment frontend_url must use https")
+	}
+	return parsed, nil
+}
+
+func originFromHTTPSURL(rawURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !parsed.IsAbs() || parsed.Scheme != "https" || parsed.Host == "" {
+		return ""
+	}
+	parsed.Path = ""
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String()
+}
+
+func joinURLPath(basePath string, leaf string) string {
+	basePath = strings.TrimRight(strings.TrimSpace(basePath), "/")
+	leaf = "/" + strings.TrimLeft(strings.TrimSpace(leaf), "/")
+	if basePath == "" || basePath == "/" {
+		return leaf
+	}
+	return basePath + leaf
+}
+
+func firstNonEmptyPaymentString(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func buildProviderCreatePaymentRequest(req CreateOrderRequest, sel *payment.InstanceSelection, order *dbent.PaymentOrder, subject string) payment.CreatePaymentRequest {
@@ -713,6 +827,7 @@ func buildCreateOrderResponse(order *dbent.PaymentOrder, req CreateOrderRequest,
 		PaymentType:     req.PaymentType,
 		OutTradeNo:      order.OutTradeNo,
 		PayURL:          pr.PayURL,
+		CheckoutURL:     pr.CheckoutURL,
 		QRCode:          pr.QRCode,
 		ClientSecret:    pr.ClientSecret,
 		IntentID:        pr.IntentID,
