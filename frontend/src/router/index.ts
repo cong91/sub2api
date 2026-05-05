@@ -3,7 +3,7 @@
  * Defines all application routes with lazy loading and navigation guards
  */
 
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory, type LocationQuery, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { useAdminSettingsStore } from '@/stores/adminSettings'
@@ -681,7 +681,15 @@ let authInitialized = false
 const navigationLoading = useNavigationLoadingState()
 // 延迟初始化预加载，传入 router 实例
 let routePrefetch: ReturnType<typeof useRoutePrefetch> | null = null
-const BACKEND_MODE_ALLOWED_PATHS = ['/login', '/key-usage', '/setup', '/payment/result', '/payment/airwallex', '/legal']
+const BACKEND_MODE_ALLOWED_PATHS = [
+  '/login',
+  '/key-usage',
+  '/setup',
+  '/payment/result',
+  '/payment/airwallex',
+  '/legal',
+  '/checkout'
+]
 const BACKEND_MODE_CALLBACK_PATHS = [
   '/auth/callback',
   '/auth/linuxdo/callback',
@@ -725,7 +733,28 @@ function isBackendModePublicRouteAllowed(path: string, hasPendingAuthSession: bo
   return false
 }
 
-router.beforeEach((to, _from, next) => {
+function queryStringValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return value.trim()
+  }
+  if (Array.isArray(value) && typeof value[0] === 'string') {
+    return value[0].trim()
+  }
+  return ''
+}
+
+function getCheckoutAccessToken(query: LocationQuery): string {
+  return queryStringValue(query.accessToken) || queryStringValue(query.access_token)
+}
+
+function stripCheckoutAuthQuery(query: LocationQuery): LocationQuery {
+  const sanitized: LocationQuery = { ...query }
+  delete sanitized.accessToken
+  delete sanitized.access_token
+  return sanitized
+}
+
+router.beforeEach(async (to, _from, next) => {
   // 开始导航加载状态
   navigationLoading.startNavigation()
 
@@ -740,6 +769,31 @@ router.beforeEach((to, _from, next) => {
   // Set page title
   const appStore = useAppStore()
   updateDocumentTitle(to)
+
+  if (to.path === '/checkout') {
+    const checkoutAccessToken = getCheckoutAccessToken(to.query)
+    if (checkoutAccessToken) {
+      try {
+        await authStore.setToken(checkoutAccessToken)
+        next({
+          path: to.path,
+          query: stripCheckoutAuthQuery(to.query),
+          hash: to.hash,
+          replace: true,
+        })
+        return
+      } catch (error) {
+        console.error('Failed to authenticate checkout from access token:', error)
+        next({
+          path: to.path,
+          query: stripCheckoutAuthQuery(to.query),
+          hash: to.hash,
+          replace: true,
+        })
+        return
+      }
+    }
+  }
 
   // Check if route requires authentication
   const requiresAuth = to.meta.requiresAuth !== false // Default to true
