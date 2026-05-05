@@ -184,7 +184,7 @@ func TestPaddleCreatePaymentReturnsUpstreamStatusBody(t *testing.T) {
 	}
 }
 
-func TestPaddleCreatePaymentReturnsErrorWhenHostedCheckoutURLMissing(t *testing.T) {
+func TestPaddleCreatePaymentAllowsMissingHostedCheckoutURL(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":{"id":"txn_123"}}`))
@@ -195,14 +195,20 @@ func TestPaddleCreatePaymentReturnsErrorWhenHostedCheckoutURLMissing(t *testing.
 	if err != nil {
 		t.Fatalf("NewPaddle() error = %v", err)
 	}
-	_, err = p.CreatePayment(context.Background(), payment.CreatePaymentRequest{
+	resp, err := p.CreatePayment(context.Background(), payment.CreatePaymentRequest{
 		OrderID:         "vclaw_123",
 		Amount:          "5000",
 		PaymentCurrency: "KRW",
 		PaymentType:     "paddle",
 	})
-	if err == nil || !strings.Contains(err.Error(), "missing hosted checkout url") {
-		t.Fatalf("CreatePayment() error = %v, want missing hosted checkout url", err)
+	if err != nil {
+		t.Fatalf("CreatePayment() error = %v", err)
+	}
+	if resp.TradeNo != "txn_123" || resp.CheckoutID != "txn_123" {
+		t.Fatalf("response = %+v, want txn_123 trade and checkout IDs", resp)
+	}
+	if resp.CheckoutURL != "" {
+		t.Fatalf("checkout_url = %q, want service-layer first-party checkout URL", resp.CheckoutURL)
 	}
 }
 

@@ -189,11 +189,10 @@ func (p *Paddle) CreatePayment(ctx context.Context, req payment.CreatePaymentReq
 	if resp.Data.Checkout != nil {
 		checkoutURL = strings.TrimSpace(resp.Data.Checkout.URL)
 	}
-	if checkoutURL == "" {
-		return nil, fmt.Errorf("paddle create payment: missing hosted checkout url")
-	}
-	if err := validateHostedCheckoutURL(checkoutURL); err != nil {
-		return nil, fmt.Errorf("paddle create payment: invalid hosted checkout url: %w", err)
+	if checkoutURL != "" {
+		if err := validateHostedCheckoutURL(checkoutURL); err != nil {
+			return nil, fmt.Errorf("paddle create payment: invalid hosted checkout url: %w", err)
+		}
 	}
 	return &payment.CreatePaymentResponse{
 		TradeNo:     resp.Data.ID,
