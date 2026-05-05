@@ -256,6 +256,14 @@ func TestAuthServiceInviteLoginAcceptsDeviceLoginCode(t *testing.T) {
 	bootstrapSvc := &inviteBootstrapAPIKeyServiceStub{
 		groups: []Group{
 			{
+				ID:                  201,
+				Platform:            "openai",
+				Status:              StatusActive,
+				SubscriptionType:    SubscriptionTypeSubscription,
+				DefaultValidityDays: 30,
+				ActiveAccountCount:  1,
+			},
+			{
 				ID:                 101,
 				Platform:           "openai",
 				Status:             StatusActive,
@@ -287,11 +295,12 @@ func TestAuthServiceInviteLoginAcceptsDeviceLoginCode(t *testing.T) {
 		userDeviceRepo,
 		map[string]string{
 			SettingKeyRegistrationEnabled:  "false",
-			SettingKeyDefaultSubscriptions: `[{"group_id":101,"validity_days":30}]`,
+			SettingKeyDefaultSubscriptions: `[{"group_id":201,"validity_days":30}]`,
 		},
 		bootstrapSvc,
 	)
-	authService.defaultSubAssigner = &defaultSubscriptionAssignerStub{}
+	assigner := &defaultSubscriptionAssignerStub{}
+	authService.defaultSubAssigner = assigner
 
 	result, err := authService.InviteLogin(context.Background(), InviteLoginInput{
 		InvitationCode: loginCode,
@@ -315,7 +324,9 @@ func TestAuthServiceInviteLoginAcceptsDeviceLoginCode(t *testing.T) {
 	require.NotNil(t, bootstrapSvc.createdKeys[0].GroupID)
 	require.NotNil(t, bootstrapSvc.createdKeys[1].GroupID)
 	require.Equal(t, int64(103), *bootstrapSvc.createdKeys[0].GroupID)
-	require.Equal(t, int64(101), *bootstrapSvc.createdKeys[1].GroupID)
+	require.Equal(t, int64(201), *bootstrapSvc.createdKeys[1].GroupID)
+	require.Len(t, assigner.calls, 1)
+	require.Equal(t, int64(201), assigner.calls[0].GroupID)
 }
 
 func TestAuthServiceInviteLoginAllowsWebLoginWithoutDeviceHash(t *testing.T) {
