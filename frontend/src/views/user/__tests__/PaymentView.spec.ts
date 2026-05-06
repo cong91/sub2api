@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import PaymentView from '../PaymentView.vue'
+import PaddleCheckoutInline from '@/components/payment/PaddleCheckoutInline.vue'
 import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/components/payment/paymentFlow'
 import { formatPaymentAmount } from '@/components/payment/currency'
 import type { CheckoutInfoResponse, MethodLimit, SubscriptionPlan } from '@/types/payment'
@@ -20,6 +21,8 @@ const showError = vi.hoisted(() => vi.fn())
 const showInfo = vi.hoisted(() => vi.fn())
 const showWarning = vi.hoisted(() => vi.fn())
 const getCheckoutInfo = vi.hoisted(() => vi.fn())
+const resolveOrderPublicByResumeToken = vi.hoisted(() => vi.fn())
+const verifyOrderPublic = vi.hoisted(() => vi.fn())
 const bridgeInvoke = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', async () => {
@@ -79,6 +82,8 @@ vi.mock('@/stores', () => ({
 vi.mock('@/api/payment', () => ({
   paymentAPI: {
     getCheckoutInfo,
+    resolveOrderPublicByResumeToken,
+    verifyOrderPublic,
   },
 }))
 
@@ -333,6 +338,8 @@ describe('PaymentView payment methods', () => {
     showError.mockReset()
     showInfo.mockReset()
     showWarning.mockReset()
+    resolveOrderPublicByResumeToken.mockReset()
+    verifyOrderPublic.mockReset()
     window.localStorage.clear()
     delete (window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge
   })
@@ -425,6 +432,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     shallowMount(PaymentView, {
       global: {
         stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
           Teleport: true,
           Transition: false,
         },
@@ -454,6 +462,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     shallowMount(PaymentView, {
       global: {
         stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
           Teleport: true,
           Transition: false,
         },
@@ -475,6 +484,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     const wrapper = shallowMount(PaymentView, {
       global: {
         stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
           Teleport: true,
           Transition: false,
         },
@@ -519,6 +529,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     shallowMount(PaymentView, {
       global: {
         stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
           Teleport: true,
           Transition: false,
         },
@@ -557,6 +568,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     shallowMount(PaymentView, {
       global: {
         stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
           Teleport: true,
           Transition: false,
         },
@@ -605,6 +617,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     shallowMount(PaymentView, {
       global: {
         stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
           Teleport: true,
           Transition: false,
         },
@@ -626,5 +639,76 @@ describe('PaymentView WeChat JSAPI flow', () => {
     expect(showWarning).toHaveBeenCalledWith('payment.errors.mobilePaymentFallbackToQr')
     expect(showError).not.toHaveBeenCalled()
     expect(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)).toContain('weixin://wxpay/bizpayurl?pr=fallback-native')
+  })
+
+  it('resolves first-party Paddle checkout order details from the resume token', async () => {
+    routeState.path = '/checkout'
+    routeState.query = {
+      provider: 'paddle',
+      checkout_id: 'txn_123',
+      order_id: '901',
+      out_trade_no: 'vclaw_901',
+      resume_token: 'resume-901',
+      expires_at: '2099-01-01T00:10:00Z',
+    }
+    getCheckoutInfo.mockResolvedValueOnce({
+      data: {
+        ...checkoutInfoFixture().data,
+        paddle_client_token: 'test-client-token',
+        paddle_environment: 'sandbox',
+        ledger_currency: 'USD',
+        allowed_payment_currencies: ['USD'],
+        manual_fx_rates: {},
+        currency_meta: { USD: { minor_units: 2, symbol: '$' } },
+        fx_status: { source: 'manual', stale_after_seconds: 86400, stale: false, missing_currencies: [] },
+      },
+    })
+    resolveOrderPublicByResumeToken.mockResolvedValueOnce({
+      data: {
+        id: 901,
+        user_id: 0,
+        amount: 12.5,
+        pay_amount: 12.5,
+        payment_amount: 12.5,
+        ledger_amount: 12.5,
+        payment_currency: 'USD',
+        ledger_currency: 'USD',
+        fee_rate: 0,
+        payment_type: 'paddle',
+        out_trade_no: 'vclaw_901',
+        status: 'PENDING',
+        order_type: 'balance',
+        created_at: '2026-05-05T00:00:00Z',
+        expires_at: '2099-01-01T00:10:00Z',
+        refund_amount: 0,
+      },
+    })
+
+    const wrapper = shallowMount(PaymentView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Teleport: true,
+          Transition: false,
+        },
+      },
+    })
+    await flushPromises()
+    await flushPromises()
+
+    const paddle = wrapper.findComponent(PaddleCheckoutInline)
+    expect(resolveOrderPublicByResumeToken).toHaveBeenCalledWith('resume-901')
+    expect(paddle.exists()).toBe(true)
+    expect(paddle.props('checkoutId')).toBe('txn_123')
+    expect(paddle.props('order')).toMatchObject({
+      id: 901,
+      out_trade_no: 'vclaw_901',
+      pay_amount: 12.5,
+      order_type: 'balance',
+    })
+    expect(routerReplace).toHaveBeenCalledWith({
+      path: '/checkout',
+      query: expect.objectContaining({ source: 'first_party_checkout' }),
+    })
   })
 })
