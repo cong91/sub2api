@@ -150,7 +150,7 @@ export function decidePaymentLaunch(
     qrCode: result.qr_code || '',
     expiresAt: result.expires_at || '',
     paymentType: visibleMethod,
-    payUrl: result.pay_url || '',
+    payUrl: result.pay_url || result.checkout_url || '',
     outTradeNo: result.out_trade_no || '',
     clientSecret: result.client_secret || '',
     checkoutId: result.checkout_id || '',
@@ -164,7 +164,7 @@ export function decidePaymentLaunch(
     resumeToken: result.resume_token || '',
   }, context.now)
 
-  if (baseState.checkoutId) {
+  if (baseState.checkoutId && !baseState.payUrl) {
     return { kind: 'unhandled', paymentState: baseState, recovery: baseState }
   }
 
