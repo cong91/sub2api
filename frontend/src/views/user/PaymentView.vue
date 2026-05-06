@@ -178,6 +178,16 @@
                   </div>
                 </div>
               </div>
+              <div v-if="availablePaymentCurrencies.length > 1" class="card p-6">
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('payment.paymentCurrency') }}
+                </label>
+                <select v-model="selectedPaymentCurrency" class="input w-full">
+                  <option v-for="currency in availablePaymentCurrencies" :key="currency" :value="currency">
+                    {{ currencyMeta(currency, checkout.currency_meta).symbol }} {{ currency }}
+                  </option>
+                </select>
+              </div>
               <div v-if="visibleMethodTypes.length >= 1" class="card p-6">
                 <PaymentMethodSelector
                   :methods="subMethodOptions"
@@ -365,6 +375,7 @@ interface CreateOrderOptions {
   openid?: string
   wechatResumeToken?: string
   paymentType?: string
+  paymentCurrency?: string
   isResume?: boolean
   mobileQrFallbackAttempted?: boolean
   quoteId?: string
@@ -801,11 +812,15 @@ const subMethodOptions = computed<PaymentMethodOption[]>(() => {
   return visibleMethodTypes.value.map((type) => {
     const ml = visibleMethods.value[type]
     const supportsCurrency = methodSupportsSelectedCurrency(type)
+    const withinLimits = planPrice <= 0
+      || (((ml?.single_min ?? 0) <= 0 || planPrice >= (ml?.single_min ?? 0))
+        && ((ml?.single_max ?? 0) <= 0 || planPrice <= (ml?.single_max ?? 0)))
+    const payAmountForMethod = subscriptionTotalAmountForCurrency(planPrice, normalizePaymentCurrency(ml?.currency))
     return {
       type,
       display_name: ml?.display_name,
       fee_rate: ml?.fee_rate ?? 0,
-      available: supportsCurrency && ml?.available !== false && amountFitsMethod(subscriptionTotalAmountForCurrency(planPrice, normalizePaymentCurrency(ml?.currency)), type),
+      available: supportsCurrency && ml?.available !== false && withinLimits && amountFitsMethod(payAmountForMethod, type),
     }
   })
 })
@@ -898,12 +913,13 @@ async function confirmSubscribe() {
 }
 
 async function createPaymentQuoteForOrder(orderAmount: number, orderType: OrderType, paymentType: string, planId?: number): Promise<string> {
-  if (orderType !== 'balance' || orderAmount <= 0) {
+  if (orderAmount <= 0) {
     return ''
   }
+  const amountMode = orderType === 'subscription' ? 'ledger' : 'payment'
   const res = await paymentAPI.createQuote({
     amount: orderAmount,
-    amount_mode: 'payment',
+    amount_mode: amountMode,
     payment_currency: paymentCurrency.value,
     payment_type: paymentType,
     order_type: orderType,
@@ -917,6 +933,7 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
   errorMessage.value = ''
   errorHintMessage.value = ''
   const requestType = normalizeVisibleMethod(options.paymentType || selectedMethod.value) || options.paymentType || selectedMethod.value
+  const requestPaymentCurrency = (options.paymentCurrency || paymentCurrency.value).trim().toUpperCase()
   try {
     const quoteId = options.wechatResumeToken
       ? ''
@@ -930,8 +947,8 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
       isMobile: isMobileDevice(),
       isWechatBrowser: typeof window !== 'undefined' && /MicroMessenger/i.test(window.navigator.userAgent),
       forceQRCode: !!(checkout.value.alipay_force_qrcode && normalizeVisibleMethod(requestType) === 'alipay'),
-      amountMode: orderType === 'balance' ? 'payment' : undefined,
-      paymentCurrency: orderType === 'balance' ? paymentCurrency.value : undefined,
+      amountMode: orderType === 'subscription' ? 'ledger' : 'payment',
+      paymentCurrency: requestPaymentCurrency,
       quoteId: quoteId || undefined,
     })
     if (options.openid) {
@@ -992,8 +1009,8 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
         orderType,
         planId,
         orderAmount,
-        amountMode: orderType === 'balance' ? 'payment' : undefined,
-        paymentCurrency: orderType === 'balance' ? paymentCurrency.value : undefined,
+        amountMode: orderType === 'subscription' ? 'ledger' : 'payment',
+        paymentCurrency: requestPaymentCurrency,
         quoteId: quoteId || undefined,
       })
       return
@@ -1169,8 +1186,8 @@ async function attemptMobileQrFallback(err: unknown, context: MobileQrFallbackCo
       origin: typeof window !== 'undefined' ? window.location.origin : '',
       isMobile: false,
       isWechatBrowser: false,
-      amountMode: context.orderType === 'balance' ? 'payment' : undefined,
-      paymentCurrency: context.orderType === 'balance' ? paymentCurrency.value : undefined,
+      amountMode: context.orderType === 'subscription' ? 'ledger' : 'payment',
+      paymentCurrency: paymentCurrency.value,
       quoteId: quoteId || undefined,
     })
     const result = await paymentStore.createOrder(payload) as CreateOrderResult & { resume_token?: string }
@@ -1345,6 +1362,9 @@ async function resumeWechatPaymentFromQuery() {
   if (resume.orderType === 'subscription' && resume.planId) {
     selectedPlan.value = checkout.value.plans.find(plan => plan.id === resume.planId) ?? null
   }
+  if (resume.paymentCurrency && availablePaymentCurrencies.value.includes(resume.paymentCurrency)) {
+    selectedPaymentCurrency.value = resume.paymentCurrency
+  }
 
   await router.replace({ path: route.path, query: stripWechatResumeQuery(route.query) })
 
@@ -1352,6 +1372,7 @@ async function resumeWechatPaymentFromQuery() {
     await createOrder(0, resume.orderType, resume.planId, {
       wechatResumeToken: resume.wechatResumeToken,
       paymentType: resume.paymentType,
+      paymentCurrency: resume.paymentCurrency,
       isResume: true,
       quoteId: resume.quoteId,
     })
@@ -1362,6 +1383,7 @@ async function resumeWechatPaymentFromQuery() {
     await createOrder(resume.orderAmount, resume.orderType, resume.planId, {
       openid: resume.openid,
       paymentType: resume.paymentType,
+      paymentCurrency: resume.paymentCurrency,
       isResume: true,
       quoteId: resume.quoteId,
     })
