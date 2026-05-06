@@ -278,9 +278,6 @@ func TestBuildFirstPartyCheckoutURLUsesFrontendCheckoutRoute(t *testing.T) {
 	}
 }
 
-	}
-}
-
 func TestMaybeBuildWeChatOAuthRequiredResponse(t *testing.T) {
 	t.Setenv("PAYMENT_RESUME_SIGNING_KEY", "0123456789abcdef0123456789abcdef")
 
