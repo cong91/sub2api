@@ -518,7 +518,7 @@ type UserSubscription struct {
 
 	DeviceIdentityCode *string `json:"device_identity_code,omitempty"`
 	DeviceIdentityType *string `json:"device_identity_type,omitempty"`
-	HasDeviceBinding   bool    `json:"has_device_binding"`
+	HasDeviceBinding   bool    `json:"has_device_binding,omitempty"`
 
 	User  *User  `json:"user,omitempty"`
 	Group *Group `json:"group,omitempty"`
