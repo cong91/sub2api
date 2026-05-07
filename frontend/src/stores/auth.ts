@@ -98,6 +98,14 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value?.role === 'admin'
   })
 
+  const isMarketing = computed(() => {
+    return user.value?.role === 'marketing'
+  })
+
+  const hasAdminConsoleAccess = computed(() => {
+    return isAdmin.value || isMarketing.value
+  })
+
   const isSimpleMode = computed(() => runMode.value === 'simple')
   const hasPendingAuthSession = computed(() => pendingAuthSession.value !== null)
 
@@ -522,6 +530,8 @@ export const useAuthStore = defineStore('auth', () => {
     // Computed
     isAuthenticated,
     isAdmin,
+    isMarketing,
+    hasAdminConsoleAccess,
     isSimpleMode,
     hasPendingAuthSession,
 
