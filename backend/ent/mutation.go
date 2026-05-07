@@ -8754,7 +8754,6 @@ type ChannelMonitorMutation struct {
 	updated_at              *time.Time
 	name                    *string
 	provider                *channelmonitor.Provider
-	api_mode                *string
 	endpoint                *string
 	api_key_encrypted       *string
 	primary_model           *string
@@ -9024,42 +9023,6 @@ func (m *ChannelMonitorMutation) OldProvider(ctx context.Context) (v channelmoni
 // ResetProvider resets all changes to the "provider" field.
 func (m *ChannelMonitorMutation) ResetProvider() {
 	m.provider = nil
-}
-
-// SetAPIMode sets the "api_mode" field.
-func (m *ChannelMonitorMutation) SetAPIMode(s string) {
-	m.api_mode = &s
-}
-
-// APIMode returns the value of the "api_mode" field in the mutation.
-func (m *ChannelMonitorMutation) APIMode() (r string, exists bool) {
-	v := m.api_mode
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldAPIMode returns the old "api_mode" field's value of the ChannelMonitor entity.
-// If the ChannelMonitor object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMonitorMutation) OldAPIMode(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldAPIMode is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldAPIMode requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldAPIMode: %w", err)
-	}
-	return oldValue.APIMode, nil
-}
-
-// ResetAPIMode resets all changes to the "api_mode" field.
-func (m *ChannelMonitorMutation) ResetAPIMode() {
-	m.api_mode = nil
 }
 
 // SetEndpoint sets the "endpoint" field.
@@ -9819,7 +9782,7 @@ func (m *ChannelMonitorMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ChannelMonitorMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 17)
 	if m.created_at != nil {
 		fields = append(fields, channelmonitor.FieldCreatedAt)
 	}
@@ -9831,9 +9794,6 @@ func (m *ChannelMonitorMutation) Fields() []string {
 	}
 	if m.provider != nil {
 		fields = append(fields, channelmonitor.FieldProvider)
-	}
-	if m.api_mode != nil {
-		fields = append(fields, channelmonitor.FieldAPIMode)
 	}
 	if m.endpoint != nil {
 		fields = append(fields, channelmonitor.FieldEndpoint)
@@ -9890,8 +9850,6 @@ func (m *ChannelMonitorMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case channelmonitor.FieldProvider:
 		return m.Provider()
-	case channelmonitor.FieldAPIMode:
-		return m.APIMode()
 	case channelmonitor.FieldEndpoint:
 		return m.Endpoint()
 	case channelmonitor.FieldAPIKeyEncrypted:
@@ -9935,8 +9893,6 @@ func (m *ChannelMonitorMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldName(ctx)
 	case channelmonitor.FieldProvider:
 		return m.OldProvider(ctx)
-	case channelmonitor.FieldAPIMode:
-		return m.OldAPIMode(ctx)
 	case channelmonitor.FieldEndpoint:
 		return m.OldEndpoint(ctx)
 	case channelmonitor.FieldAPIKeyEncrypted:
@@ -9999,13 +9955,6 @@ func (m *ChannelMonitorMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetProvider(v)
-		return nil
-	case channelmonitor.FieldAPIMode:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetAPIMode(v)
 		return nil
 	case channelmonitor.FieldEndpoint:
 		v, ok := value.(string)
@@ -10212,9 +10161,6 @@ func (m *ChannelMonitorMutation) ResetField(name string) error {
 		return nil
 	case channelmonitor.FieldProvider:
 		m.ResetProvider()
-		return nil
-	case channelmonitor.FieldAPIMode:
-		m.ResetAPIMode()
 		return nil
 	case channelmonitor.FieldEndpoint:
 		m.ResetEndpoint()
@@ -12647,7 +12593,6 @@ type ChannelMonitorRequestTemplateMutation struct {
 	updated_at         *time.Time
 	name               *string
 	provider           *channelmonitorrequesttemplate.Provider
-	api_mode           *string
 	description        *string
 	extra_headers      *map[string]string
 	body_override_mode *string
@@ -12901,42 +12846,6 @@ func (m *ChannelMonitorRequestTemplateMutation) OldProvider(ctx context.Context)
 // ResetProvider resets all changes to the "provider" field.
 func (m *ChannelMonitorRequestTemplateMutation) ResetProvider() {
 	m.provider = nil
-}
-
-// SetAPIMode sets the "api_mode" field.
-func (m *ChannelMonitorRequestTemplateMutation) SetAPIMode(s string) {
-	m.api_mode = &s
-}
-
-// APIMode returns the value of the "api_mode" field in the mutation.
-func (m *ChannelMonitorRequestTemplateMutation) APIMode() (r string, exists bool) {
-	v := m.api_mode
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldAPIMode returns the old "api_mode" field's value of the ChannelMonitorRequestTemplate entity.
-// If the ChannelMonitorRequestTemplate object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMonitorRequestTemplateMutation) OldAPIMode(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldAPIMode is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldAPIMode requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldAPIMode: %w", err)
-	}
-	return oldValue.APIMode, nil
-}
-
-// ResetAPIMode resets all changes to the "api_mode" field.
-func (m *ChannelMonitorRequestTemplateMutation) ResetAPIMode() {
-	m.api_mode = nil
 }
 
 // SetDescription sets the "description" field.
@@ -13197,7 +13106,7 @@ func (m *ChannelMonitorRequestTemplateMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ChannelMonitorRequestTemplateMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 8)
 	if m.created_at != nil {
 		fields = append(fields, channelmonitorrequesttemplate.FieldCreatedAt)
 	}
@@ -13209,9 +13118,6 @@ func (m *ChannelMonitorRequestTemplateMutation) Fields() []string {
 	}
 	if m.provider != nil {
 		fields = append(fields, channelmonitorrequesttemplate.FieldProvider)
-	}
-	if m.api_mode != nil {
-		fields = append(fields, channelmonitorrequesttemplate.FieldAPIMode)
 	}
 	if m.description != nil {
 		fields = append(fields, channelmonitorrequesttemplate.FieldDescription)
@@ -13241,8 +13147,6 @@ func (m *ChannelMonitorRequestTemplateMutation) Field(name string) (ent.Value, b
 		return m.Name()
 	case channelmonitorrequesttemplate.FieldProvider:
 		return m.Provider()
-	case channelmonitorrequesttemplate.FieldAPIMode:
-		return m.APIMode()
 	case channelmonitorrequesttemplate.FieldDescription:
 		return m.Description()
 	case channelmonitorrequesttemplate.FieldExtraHeaders:
@@ -13268,8 +13172,6 @@ func (m *ChannelMonitorRequestTemplateMutation) OldField(ctx context.Context, na
 		return m.OldName(ctx)
 	case channelmonitorrequesttemplate.FieldProvider:
 		return m.OldProvider(ctx)
-	case channelmonitorrequesttemplate.FieldAPIMode:
-		return m.OldAPIMode(ctx)
 	case channelmonitorrequesttemplate.FieldDescription:
 		return m.OldDescription(ctx)
 	case channelmonitorrequesttemplate.FieldExtraHeaders:
@@ -13314,13 +13216,6 @@ func (m *ChannelMonitorRequestTemplateMutation) SetField(name string, value ent.
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetProvider(v)
-		return nil
-	case channelmonitorrequesttemplate.FieldAPIMode:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetAPIMode(v)
 		return nil
 	case channelmonitorrequesttemplate.FieldDescription:
 		v, ok := value.(string)
@@ -13425,9 +13320,6 @@ func (m *ChannelMonitorRequestTemplateMutation) ResetField(name string) error {
 		return nil
 	case channelmonitorrequesttemplate.FieldProvider:
 		m.ResetProvider()
-		return nil
-	case channelmonitorrequesttemplate.FieldAPIMode:
-		m.ResetAPIMode()
 		return nil
 	case channelmonitorrequesttemplate.FieldDescription:
 		m.ResetDescription()
@@ -26616,6 +26508,8 @@ type PromoCodeMutation struct {
 	usage_records        map[int64]struct{}
 	removedusage_records map[int64]struct{}
 	clearedusage_records bool
+	creator              *int64
+	clearedcreator       bool
 	done                 bool
 	oldValue             func(context.Context) (*PromoCode, error)
 	predicates           []predicate.PromoCode
@@ -27057,6 +26951,55 @@ func (m *PromoCodeMutation) ResetNotes() {
 	delete(m.clearedFields, promocode.FieldNotes)
 }
 
+// SetCreatedBy sets the "created_by" field.
+func (m *PromoCodeMutation) SetCreatedBy(i int64) {
+	m.creator = &i
+}
+
+// CreatedBy returns the value of the "created_by" field in the mutation.
+func (m *PromoCodeMutation) CreatedBy() (r int64, exists bool) {
+	v := m.creator
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedBy returns the old "created_by" field's value of the PromoCode entity.
+// If the PromoCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PromoCodeMutation) OldCreatedBy(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedBy: %w", err)
+	}
+	return oldValue.CreatedBy, nil
+}
+
+// ClearCreatedBy clears the value of the "created_by" field.
+func (m *PromoCodeMutation) ClearCreatedBy() {
+	m.creator = nil
+	m.clearedFields[promocode.FieldCreatedBy] = struct{}{}
+}
+
+// CreatedByCleared returns if the "created_by" field was cleared in this mutation.
+func (m *PromoCodeMutation) CreatedByCleared() bool {
+	_, ok := m.clearedFields[promocode.FieldCreatedBy]
+	return ok
+}
+
+// ResetCreatedBy resets all changes to the "created_by" field.
+func (m *PromoCodeMutation) ResetCreatedBy() {
+	m.creator = nil
+	delete(m.clearedFields, promocode.FieldCreatedBy)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *PromoCodeMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -27183,6 +27126,46 @@ func (m *PromoCodeMutation) ResetUsageRecords() {
 	m.removedusage_records = nil
 }
 
+// SetCreatorID sets the "creator" edge to the User entity by id.
+func (m *PromoCodeMutation) SetCreatorID(id int64) {
+	m.creator = &id
+}
+
+// ClearCreator clears the "creator" edge to the User entity.
+func (m *PromoCodeMutation) ClearCreator() {
+	m.clearedcreator = true
+	m.clearedFields[promocode.FieldCreatedBy] = struct{}{}
+}
+
+// CreatorCleared reports if the "creator" edge to the User entity was cleared.
+func (m *PromoCodeMutation) CreatorCleared() bool {
+	return m.CreatedByCleared() || m.clearedcreator
+}
+
+// CreatorID returns the "creator" edge ID in the mutation.
+func (m *PromoCodeMutation) CreatorID() (id int64, exists bool) {
+	if m.creator != nil {
+		return *m.creator, true
+	}
+	return
+}
+
+// CreatorIDs returns the "creator" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// CreatorID instead. It exists only for internal usage by the builders.
+func (m *PromoCodeMutation) CreatorIDs() (ids []int64) {
+	if id := m.creator; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetCreator resets all changes to the "creator" edge.
+func (m *PromoCodeMutation) ResetCreator() {
+	m.creator = nil
+	m.clearedcreator = false
+}
+
 // Where appends a list predicates to the PromoCodeMutation builder.
 func (m *PromoCodeMutation) Where(ps ...predicate.PromoCode) {
 	m.predicates = append(m.predicates, ps...)
@@ -27217,7 +27200,7 @@ func (m *PromoCodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PromoCodeMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 10)
 	if m.code != nil {
 		fields = append(fields, promocode.FieldCode)
 	}
@@ -27238,6 +27221,9 @@ func (m *PromoCodeMutation) Fields() []string {
 	}
 	if m.notes != nil {
 		fields = append(fields, promocode.FieldNotes)
+	}
+	if m.creator != nil {
+		fields = append(fields, promocode.FieldCreatedBy)
 	}
 	if m.created_at != nil {
 		fields = append(fields, promocode.FieldCreatedAt)
@@ -27267,6 +27253,8 @@ func (m *PromoCodeMutation) Field(name string) (ent.Value, bool) {
 		return m.ExpiresAt()
 	case promocode.FieldNotes:
 		return m.Notes()
+	case promocode.FieldCreatedBy:
+		return m.CreatedBy()
 	case promocode.FieldCreatedAt:
 		return m.CreatedAt()
 	case promocode.FieldUpdatedAt:
@@ -27294,6 +27282,8 @@ func (m *PromoCodeMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldExpiresAt(ctx)
 	case promocode.FieldNotes:
 		return m.OldNotes(ctx)
+	case promocode.FieldCreatedBy:
+		return m.OldCreatedBy(ctx)
 	case promocode.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case promocode.FieldUpdatedAt:
@@ -27355,6 +27345,13 @@ func (m *PromoCodeMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetNotes(v)
+		return nil
+	case promocode.FieldCreatedBy:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedBy(v)
 		return nil
 	case promocode.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -27445,6 +27442,9 @@ func (m *PromoCodeMutation) ClearedFields() []string {
 	if m.FieldCleared(promocode.FieldNotes) {
 		fields = append(fields, promocode.FieldNotes)
 	}
+	if m.FieldCleared(promocode.FieldCreatedBy) {
+		fields = append(fields, promocode.FieldCreatedBy)
+	}
 	return fields
 }
 
@@ -27464,6 +27464,9 @@ func (m *PromoCodeMutation) ClearField(name string) error {
 		return nil
 	case promocode.FieldNotes:
 		m.ClearNotes()
+		return nil
+	case promocode.FieldCreatedBy:
+		m.ClearCreatedBy()
 		return nil
 	}
 	return fmt.Errorf("unknown PromoCode nullable field %s", name)
@@ -27494,6 +27497,9 @@ func (m *PromoCodeMutation) ResetField(name string) error {
 	case promocode.FieldNotes:
 		m.ResetNotes()
 		return nil
+	case promocode.FieldCreatedBy:
+		m.ResetCreatedBy()
+		return nil
 	case promocode.FieldCreatedAt:
 		m.ResetCreatedAt()
 		return nil
@@ -27506,9 +27512,12 @@ func (m *PromoCodeMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *PromoCodeMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.usage_records != nil {
 		edges = append(edges, promocode.EdgeUsageRecords)
+	}
+	if m.creator != nil {
+		edges = append(edges, promocode.EdgeCreator)
 	}
 	return edges
 }
@@ -27523,13 +27532,17 @@ func (m *PromoCodeMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case promocode.EdgeCreator:
+		if id := m.creator; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *PromoCodeMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.removedusage_records != nil {
 		edges = append(edges, promocode.EdgeUsageRecords)
 	}
@@ -27552,9 +27565,12 @@ func (m *PromoCodeMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *PromoCodeMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.clearedusage_records {
 		edges = append(edges, promocode.EdgeUsageRecords)
+	}
+	if m.clearedcreator {
+		edges = append(edges, promocode.EdgeCreator)
 	}
 	return edges
 }
@@ -27565,6 +27581,8 @@ func (m *PromoCodeMutation) EdgeCleared(name string) bool {
 	switch name {
 	case promocode.EdgeUsageRecords:
 		return m.clearedusage_records
+	case promocode.EdgeCreator:
+		return m.clearedcreator
 	}
 	return false
 }
@@ -27573,6 +27591,9 @@ func (m *PromoCodeMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *PromoCodeMutation) ClearEdge(name string) error {
 	switch name {
+	case promocode.EdgeCreator:
+		m.ClearCreator()
+		return nil
 	}
 	return fmt.Errorf("unknown PromoCode unique edge %s", name)
 }
@@ -27583,6 +27604,9 @@ func (m *PromoCodeMutation) ResetEdge(name string) error {
 	switch name {
 	case promocode.EdgeUsageRecords:
 		m.ResetUsageRecords()
+		return nil
+	case promocode.EdgeCreator:
+		m.ResetCreator()
 		return nil
 	}
 	return fmt.Errorf("unknown PromoCode edge %s", name)
@@ -29234,6 +29258,8 @@ type RedeemCodeMutation struct {
 	cleareduser            bool
 	group                  *int64
 	clearedgroup           bool
+	creator                *int64
+	clearedcreator         bool
 	claimed_devices        map[int64]struct{}
 	removedclaimed_devices map[int64]struct{}
 	clearedclaimed_devices bool
@@ -29654,6 +29680,55 @@ func (m *RedeemCodeMutation) ResetNotes() {
 	delete(m.clearedFields, redeemcode.FieldNotes)
 }
 
+// SetCreatedBy sets the "created_by" field.
+func (m *RedeemCodeMutation) SetCreatedBy(i int64) {
+	m.creator = &i
+}
+
+// CreatedBy returns the value of the "created_by" field in the mutation.
+func (m *RedeemCodeMutation) CreatedBy() (r int64, exists bool) {
+	v := m.creator
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedBy returns the old "created_by" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldCreatedBy(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedBy: %w", err)
+	}
+	return oldValue.CreatedBy, nil
+}
+
+// ClearCreatedBy clears the value of the "created_by" field.
+func (m *RedeemCodeMutation) ClearCreatedBy() {
+	m.creator = nil
+	m.clearedFields[redeemcode.FieldCreatedBy] = struct{}{}
+}
+
+// CreatedByCleared returns if the "created_by" field was cleared in this mutation.
+func (m *RedeemCodeMutation) CreatedByCleared() bool {
+	_, ok := m.clearedFields[redeemcode.FieldCreatedBy]
+	return ok
+}
+
+// ResetCreatedBy resets all changes to the "created_by" field.
+func (m *RedeemCodeMutation) ResetCreatedBy() {
+	m.creator = nil
+	delete(m.clearedFields, redeemcode.FieldCreatedBy)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *RedeemCodeMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -29688,55 +29763,6 @@ func (m *RedeemCodeMutation) OldCreatedAt(ctx context.Context) (v time.Time, err
 // ResetCreatedAt resets all changes to the "created_at" field.
 func (m *RedeemCodeMutation) ResetCreatedAt() {
 	m.created_at = nil
-}
-
-// SetExpiresAt sets the "expires_at" field.
-func (m *RedeemCodeMutation) SetExpiresAt(t time.Time) {
-	m.expires_at = &t
-}
-
-// ExpiresAt returns the value of the "expires_at" field in the mutation.
-func (m *RedeemCodeMutation) ExpiresAt() (r time.Time, exists bool) {
-	v := m.expires_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldExpiresAt returns the old "expires_at" field's value of the RedeemCode entity.
-// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *RedeemCodeMutation) OldExpiresAt(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
-	}
-	return oldValue.ExpiresAt, nil
-}
-
-// ClearExpiresAt clears the value of the "expires_at" field.
-func (m *RedeemCodeMutation) ClearExpiresAt() {
-	m.expires_at = nil
-	m.clearedFields[redeemcode.FieldExpiresAt] = struct{}{}
-}
-
-// ExpiresAtCleared returns if the "expires_at" field was cleared in this mutation.
-func (m *RedeemCodeMutation) ExpiresAtCleared() bool {
-	_, ok := m.clearedFields[redeemcode.FieldExpiresAt]
-	return ok
-}
-
-// ResetExpiresAt resets all changes to the "expires_at" field.
-func (m *RedeemCodeMutation) ResetExpiresAt() {
-	m.expires_at = nil
-	delete(m.clearedFields, redeemcode.FieldExpiresAt)
 }
 
 // SetGroupID sets the "group_id" field.
@@ -29911,6 +29937,46 @@ func (m *RedeemCodeMutation) ResetGroup() {
 	m.clearedgroup = false
 }
 
+// SetCreatorID sets the "creator" edge to the User entity by id.
+func (m *RedeemCodeMutation) SetCreatorID(id int64) {
+	m.creator = &id
+}
+
+// ClearCreator clears the "creator" edge to the User entity.
+func (m *RedeemCodeMutation) ClearCreator() {
+	m.clearedcreator = true
+	m.clearedFields[redeemcode.FieldCreatedBy] = struct{}{}
+}
+
+// CreatorCleared reports if the "creator" edge to the User entity was cleared.
+func (m *RedeemCodeMutation) CreatorCleared() bool {
+	return m.CreatedByCleared() || m.clearedcreator
+}
+
+// CreatorID returns the "creator" edge ID in the mutation.
+func (m *RedeemCodeMutation) CreatorID() (id int64, exists bool) {
+	if m.creator != nil {
+		return *m.creator, true
+	}
+	return
+}
+
+// CreatorIDs returns the "creator" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// CreatorID instead. It exists only for internal usage by the builders.
+func (m *RedeemCodeMutation) CreatorIDs() (ids []int64) {
+	if id := m.creator; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetCreator resets all changes to the "creator" edge.
+func (m *RedeemCodeMutation) ResetCreator() {
+	m.creator = nil
+	m.clearedcreator = false
+}
+
 // AddClaimedDeviceIDs adds the "claimed_devices" edge to the UserDevice entity by ids.
 func (m *RedeemCodeMutation) AddClaimedDeviceIDs(ids ...int64) {
 	if m.claimed_devices == nil {
@@ -30075,11 +30141,11 @@ func (m *RedeemCodeMutation) Fields() []string {
 	if m.notes != nil {
 		fields = append(fields, redeemcode.FieldNotes)
 	}
+	if m.creator != nil {
+		fields = append(fields, redeemcode.FieldCreatedBy)
+	}
 	if m.created_at != nil {
 		fields = append(fields, redeemcode.FieldCreatedAt)
-	}
-	if m.expires_at != nil {
-		fields = append(fields, redeemcode.FieldExpiresAt)
 	}
 	if m.group != nil {
 		fields = append(fields, redeemcode.FieldGroupID)
@@ -30109,10 +30175,10 @@ func (m *RedeemCodeMutation) Field(name string) (ent.Value, bool) {
 		return m.UsedAt()
 	case redeemcode.FieldNotes:
 		return m.Notes()
+	case redeemcode.FieldCreatedBy:
+		return m.CreatedBy()
 	case redeemcode.FieldCreatedAt:
 		return m.CreatedAt()
-	case redeemcode.FieldExpiresAt:
-		return m.ExpiresAt()
 	case redeemcode.FieldGroupID:
 		return m.GroupID()
 	case redeemcode.FieldValidityDays:
@@ -30140,10 +30206,10 @@ func (m *RedeemCodeMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldUsedAt(ctx)
 	case redeemcode.FieldNotes:
 		return m.OldNotes(ctx)
+	case redeemcode.FieldCreatedBy:
+		return m.OldCreatedBy(ctx)
 	case redeemcode.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
-	case redeemcode.FieldExpiresAt:
-		return m.OldExpiresAt(ctx)
 	case redeemcode.FieldGroupID:
 		return m.OldGroupID(ctx)
 	case redeemcode.FieldValidityDays:
@@ -30206,19 +30272,19 @@ func (m *RedeemCodeMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetNotes(v)
 		return nil
+	case redeemcode.FieldCreatedBy:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedBy(v)
+		return nil
 	case redeemcode.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCreatedAt(v)
-		return nil
-	case redeemcode.FieldExpiresAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetExpiresAt(v)
 		return nil
 	case redeemcode.FieldGroupID:
 		v, ok := value.(int64)
@@ -30300,8 +30366,8 @@ func (m *RedeemCodeMutation) ClearedFields() []string {
 	if m.FieldCleared(redeemcode.FieldNotes) {
 		fields = append(fields, redeemcode.FieldNotes)
 	}
-	if m.FieldCleared(redeemcode.FieldExpiresAt) {
-		fields = append(fields, redeemcode.FieldExpiresAt)
+	if m.FieldCleared(redeemcode.FieldCreatedBy) {
+		fields = append(fields, redeemcode.FieldCreatedBy)
 	}
 	if m.FieldCleared(redeemcode.FieldGroupID) {
 		fields = append(fields, redeemcode.FieldGroupID)
@@ -30329,8 +30395,8 @@ func (m *RedeemCodeMutation) ClearField(name string) error {
 	case redeemcode.FieldNotes:
 		m.ClearNotes()
 		return nil
-	case redeemcode.FieldExpiresAt:
-		m.ClearExpiresAt()
+	case redeemcode.FieldCreatedBy:
+		m.ClearCreatedBy()
 		return nil
 	case redeemcode.FieldGroupID:
 		m.ClearGroupID()
@@ -30364,11 +30430,11 @@ func (m *RedeemCodeMutation) ResetField(name string) error {
 	case redeemcode.FieldNotes:
 		m.ResetNotes()
 		return nil
+	case redeemcode.FieldCreatedBy:
+		m.ResetCreatedBy()
+		return nil
 	case redeemcode.FieldCreatedAt:
 		m.ResetCreatedAt()
-		return nil
-	case redeemcode.FieldExpiresAt:
-		m.ResetExpiresAt()
 		return nil
 	case redeemcode.FieldGroupID:
 		m.ResetGroupID()
@@ -30382,12 +30448,15 @@ func (m *RedeemCodeMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *RedeemCodeMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.user != nil {
 		edges = append(edges, redeemcode.EdgeUser)
 	}
 	if m.group != nil {
 		edges = append(edges, redeemcode.EdgeGroup)
+	}
+	if m.creator != nil {
+		edges = append(edges, redeemcode.EdgeCreator)
 	}
 	if m.claimed_devices != nil {
 		edges = append(edges, redeemcode.EdgeClaimedDevices)
@@ -30410,6 +30479,10 @@ func (m *RedeemCodeMutation) AddedIDs(name string) []ent.Value {
 		if id := m.group; id != nil {
 			return []ent.Value{*id}
 		}
+	case redeemcode.EdgeCreator:
+		if id := m.creator; id != nil {
+			return []ent.Value{*id}
+		}
 	case redeemcode.EdgeClaimedDevices:
 		ids := make([]ent.Value, 0, len(m.claimed_devices))
 		for id := range m.claimed_devices {
@@ -30428,7 +30501,7 @@ func (m *RedeemCodeMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *RedeemCodeMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.removedclaimed_devices != nil {
 		edges = append(edges, redeemcode.EdgeClaimedDevices)
 	}
@@ -30460,12 +30533,15 @@ func (m *RedeemCodeMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *RedeemCodeMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.cleareduser {
 		edges = append(edges, redeemcode.EdgeUser)
 	}
 	if m.clearedgroup {
 		edges = append(edges, redeemcode.EdgeGroup)
+	}
+	if m.clearedcreator {
+		edges = append(edges, redeemcode.EdgeCreator)
 	}
 	if m.clearedclaimed_devices {
 		edges = append(edges, redeemcode.EdgeClaimedDevices)
@@ -30484,6 +30560,8 @@ func (m *RedeemCodeMutation) EdgeCleared(name string) bool {
 		return m.cleareduser
 	case redeemcode.EdgeGroup:
 		return m.clearedgroup
+	case redeemcode.EdgeCreator:
+		return m.clearedcreator
 	case redeemcode.EdgeClaimedDevices:
 		return m.clearedclaimed_devices
 	case redeemcode.EdgeLoginDevices:
@@ -30502,6 +30580,9 @@ func (m *RedeemCodeMutation) ClearEdge(name string) error {
 	case redeemcode.EdgeGroup:
 		m.ClearGroup()
 		return nil
+	case redeemcode.EdgeCreator:
+		m.ClearCreator()
+		return nil
 	}
 	return fmt.Errorf("unknown RedeemCode unique edge %s", name)
 }
@@ -30515,6 +30596,9 @@ func (m *RedeemCodeMutation) ResetEdge(name string) error {
 		return nil
 	case redeemcode.EdgeGroup:
 		m.ResetGroup()
+		return nil
+	case redeemcode.EdgeCreator:
+		m.ResetCreator()
 		return nil
 	case redeemcode.EdgeClaimedDevices:
 		m.ResetClaimedDevices()
@@ -35125,10 +35209,6 @@ type UsageLogMutation struct {
 	image_count                 *int
 	addimage_count              *int
 	image_size                  *string
-	image_input_size            *string
-	image_output_size           *string
-	image_size_source           *string
-	image_size_breakdown        *map[string]int
 	cache_ttl_overridden        *bool
 	created_at                  *time.Time
 	clearedFields               map[string]struct{}
@@ -37071,202 +37151,6 @@ func (m *UsageLogMutation) ResetImageSize() {
 	delete(m.clearedFields, usagelog.FieldImageSize)
 }
 
-// SetImageInputSize sets the "image_input_size" field.
-func (m *UsageLogMutation) SetImageInputSize(s string) {
-	m.image_input_size = &s
-}
-
-// ImageInputSize returns the value of the "image_input_size" field in the mutation.
-func (m *UsageLogMutation) ImageInputSize() (r string, exists bool) {
-	v := m.image_input_size
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldImageInputSize returns the old "image_input_size" field's value of the UsageLog entity.
-// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UsageLogMutation) OldImageInputSize(ctx context.Context) (v *string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldImageInputSize is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldImageInputSize requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldImageInputSize: %w", err)
-	}
-	return oldValue.ImageInputSize, nil
-}
-
-// ClearImageInputSize clears the value of the "image_input_size" field.
-func (m *UsageLogMutation) ClearImageInputSize() {
-	m.image_input_size = nil
-	m.clearedFields[usagelog.FieldImageInputSize] = struct{}{}
-}
-
-// ImageInputSizeCleared returns if the "image_input_size" field was cleared in this mutation.
-func (m *UsageLogMutation) ImageInputSizeCleared() bool {
-	_, ok := m.clearedFields[usagelog.FieldImageInputSize]
-	return ok
-}
-
-// ResetImageInputSize resets all changes to the "image_input_size" field.
-func (m *UsageLogMutation) ResetImageInputSize() {
-	m.image_input_size = nil
-	delete(m.clearedFields, usagelog.FieldImageInputSize)
-}
-
-// SetImageOutputSize sets the "image_output_size" field.
-func (m *UsageLogMutation) SetImageOutputSize(s string) {
-	m.image_output_size = &s
-}
-
-// ImageOutputSize returns the value of the "image_output_size" field in the mutation.
-func (m *UsageLogMutation) ImageOutputSize() (r string, exists bool) {
-	v := m.image_output_size
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldImageOutputSize returns the old "image_output_size" field's value of the UsageLog entity.
-// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UsageLogMutation) OldImageOutputSize(ctx context.Context) (v *string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldImageOutputSize is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldImageOutputSize requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldImageOutputSize: %w", err)
-	}
-	return oldValue.ImageOutputSize, nil
-}
-
-// ClearImageOutputSize clears the value of the "image_output_size" field.
-func (m *UsageLogMutation) ClearImageOutputSize() {
-	m.image_output_size = nil
-	m.clearedFields[usagelog.FieldImageOutputSize] = struct{}{}
-}
-
-// ImageOutputSizeCleared returns if the "image_output_size" field was cleared in this mutation.
-func (m *UsageLogMutation) ImageOutputSizeCleared() bool {
-	_, ok := m.clearedFields[usagelog.FieldImageOutputSize]
-	return ok
-}
-
-// ResetImageOutputSize resets all changes to the "image_output_size" field.
-func (m *UsageLogMutation) ResetImageOutputSize() {
-	m.image_output_size = nil
-	delete(m.clearedFields, usagelog.FieldImageOutputSize)
-}
-
-// SetImageSizeSource sets the "image_size_source" field.
-func (m *UsageLogMutation) SetImageSizeSource(s string) {
-	m.image_size_source = &s
-}
-
-// ImageSizeSource returns the value of the "image_size_source" field in the mutation.
-func (m *UsageLogMutation) ImageSizeSource() (r string, exists bool) {
-	v := m.image_size_source
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldImageSizeSource returns the old "image_size_source" field's value of the UsageLog entity.
-// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UsageLogMutation) OldImageSizeSource(ctx context.Context) (v *string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldImageSizeSource is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldImageSizeSource requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldImageSizeSource: %w", err)
-	}
-	return oldValue.ImageSizeSource, nil
-}
-
-// ClearImageSizeSource clears the value of the "image_size_source" field.
-func (m *UsageLogMutation) ClearImageSizeSource() {
-	m.image_size_source = nil
-	m.clearedFields[usagelog.FieldImageSizeSource] = struct{}{}
-}
-
-// ImageSizeSourceCleared returns if the "image_size_source" field was cleared in this mutation.
-func (m *UsageLogMutation) ImageSizeSourceCleared() bool {
-	_, ok := m.clearedFields[usagelog.FieldImageSizeSource]
-	return ok
-}
-
-// ResetImageSizeSource resets all changes to the "image_size_source" field.
-func (m *UsageLogMutation) ResetImageSizeSource() {
-	m.image_size_source = nil
-	delete(m.clearedFields, usagelog.FieldImageSizeSource)
-}
-
-// SetImageSizeBreakdown sets the "image_size_breakdown" field.
-func (m *UsageLogMutation) SetImageSizeBreakdown(value map[string]int) {
-	m.image_size_breakdown = &value
-}
-
-// ImageSizeBreakdown returns the value of the "image_size_breakdown" field in the mutation.
-func (m *UsageLogMutation) ImageSizeBreakdown() (r map[string]int, exists bool) {
-	v := m.image_size_breakdown
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldImageSizeBreakdown returns the old "image_size_breakdown" field's value of the UsageLog entity.
-// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UsageLogMutation) OldImageSizeBreakdown(ctx context.Context) (v map[string]int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldImageSizeBreakdown is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldImageSizeBreakdown requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldImageSizeBreakdown: %w", err)
-	}
-	return oldValue.ImageSizeBreakdown, nil
-}
-
-// ClearImageSizeBreakdown clears the value of the "image_size_breakdown" field.
-func (m *UsageLogMutation) ClearImageSizeBreakdown() {
-	m.image_size_breakdown = nil
-	m.clearedFields[usagelog.FieldImageSizeBreakdown] = struct{}{}
-}
-
-// ImageSizeBreakdownCleared returns if the "image_size_breakdown" field was cleared in this mutation.
-func (m *UsageLogMutation) ImageSizeBreakdownCleared() bool {
-	_, ok := m.clearedFields[usagelog.FieldImageSizeBreakdown]
-	return ok
-}
-
-// ResetImageSizeBreakdown resets all changes to the "image_size_breakdown" field.
-func (m *UsageLogMutation) ResetImageSizeBreakdown() {
-	m.image_size_breakdown = nil
-	delete(m.clearedFields, usagelog.FieldImageSizeBreakdown)
-}
-
 // SetCacheTTLOverridden sets the "cache_ttl_overridden" field.
 func (m *UsageLogMutation) SetCacheTTLOverridden(b bool) {
 	m.cache_ttl_overridden = &b
@@ -37508,7 +37392,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 41)
+	fields := make([]string, 0, 37)
 	if m.user != nil {
 		fields = append(fields, usagelog.FieldUserID)
 	}
@@ -37614,18 +37498,6 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.image_size != nil {
 		fields = append(fields, usagelog.FieldImageSize)
 	}
-	if m.image_input_size != nil {
-		fields = append(fields, usagelog.FieldImageInputSize)
-	}
-	if m.image_output_size != nil {
-		fields = append(fields, usagelog.FieldImageOutputSize)
-	}
-	if m.image_size_source != nil {
-		fields = append(fields, usagelog.FieldImageSizeSource)
-	}
-	if m.image_size_breakdown != nil {
-		fields = append(fields, usagelog.FieldImageSizeBreakdown)
-	}
 	if m.cache_ttl_overridden != nil {
 		fields = append(fields, usagelog.FieldCacheTTLOverridden)
 	}
@@ -37710,14 +37582,6 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.ImageCount()
 	case usagelog.FieldImageSize:
 		return m.ImageSize()
-	case usagelog.FieldImageInputSize:
-		return m.ImageInputSize()
-	case usagelog.FieldImageOutputSize:
-		return m.ImageOutputSize()
-	case usagelog.FieldImageSizeSource:
-		return m.ImageSizeSource()
-	case usagelog.FieldImageSizeBreakdown:
-		return m.ImageSizeBreakdown()
 	case usagelog.FieldCacheTTLOverridden:
 		return m.CacheTTLOverridden()
 	case usagelog.FieldCreatedAt:
@@ -37801,14 +37665,6 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldImageCount(ctx)
 	case usagelog.FieldImageSize:
 		return m.OldImageSize(ctx)
-	case usagelog.FieldImageInputSize:
-		return m.OldImageInputSize(ctx)
-	case usagelog.FieldImageOutputSize:
-		return m.OldImageOutputSize(ctx)
-	case usagelog.FieldImageSizeSource:
-		return m.OldImageSizeSource(ctx)
-	case usagelog.FieldImageSizeBreakdown:
-		return m.OldImageSizeBreakdown(ctx)
 	case usagelog.FieldCacheTTLOverridden:
 		return m.OldCacheTTLOverridden(ctx)
 	case usagelog.FieldCreatedAt:
@@ -38066,34 +37922,6 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetImageSize(v)
-		return nil
-	case usagelog.FieldImageInputSize:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetImageInputSize(v)
-		return nil
-	case usagelog.FieldImageOutputSize:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetImageOutputSize(v)
-		return nil
-	case usagelog.FieldImageSizeSource:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetImageSizeSource(v)
-		return nil
-	case usagelog.FieldImageSizeBreakdown:
-		v, ok := value.(map[string]int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetImageSizeBreakdown(v)
 		return nil
 	case usagelog.FieldCacheTTLOverridden:
 		v, ok := value.(bool)
@@ -38412,18 +38240,6 @@ func (m *UsageLogMutation) ClearedFields() []string {
 	if m.FieldCleared(usagelog.FieldImageSize) {
 		fields = append(fields, usagelog.FieldImageSize)
 	}
-	if m.FieldCleared(usagelog.FieldImageInputSize) {
-		fields = append(fields, usagelog.FieldImageInputSize)
-	}
-	if m.FieldCleared(usagelog.FieldImageOutputSize) {
-		fields = append(fields, usagelog.FieldImageOutputSize)
-	}
-	if m.FieldCleared(usagelog.FieldImageSizeSource) {
-		fields = append(fields, usagelog.FieldImageSizeSource)
-	}
-	if m.FieldCleared(usagelog.FieldImageSizeBreakdown) {
-		fields = append(fields, usagelog.FieldImageSizeBreakdown)
-	}
 	return fields
 }
 
@@ -38479,18 +38295,6 @@ func (m *UsageLogMutation) ClearField(name string) error {
 		return nil
 	case usagelog.FieldImageSize:
 		m.ClearImageSize()
-		return nil
-	case usagelog.FieldImageInputSize:
-		m.ClearImageInputSize()
-		return nil
-	case usagelog.FieldImageOutputSize:
-		m.ClearImageOutputSize()
-		return nil
-	case usagelog.FieldImageSizeSource:
-		m.ClearImageSizeSource()
-		return nil
-	case usagelog.FieldImageSizeBreakdown:
-		m.ClearImageSizeBreakdown()
 		return nil
 	}
 	return fmt.Errorf("unknown UsageLog nullable field %s", name)
@@ -38604,18 +38408,6 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldImageSize:
 		m.ResetImageSize()
-		return nil
-	case usagelog.FieldImageInputSize:
-		m.ResetImageInputSize()
-		return nil
-	case usagelog.FieldImageOutputSize:
-		m.ResetImageOutputSize()
-		return nil
-	case usagelog.FieldImageSizeSource:
-		m.ResetImageSizeSource()
-		return nil
-	case usagelog.FieldImageSizeBreakdown:
-		m.ResetImageSizeBreakdown()
 		return nil
 	case usagelog.FieldCacheTTLOverridden:
 		m.ResetCacheTTLOverridden()
@@ -38814,6 +38606,12 @@ type UserMutation struct {
 	redeem_codes                  map[int64]struct{}
 	removedredeem_codes           map[int64]struct{}
 	clearedredeem_codes           bool
+	created_redeem_codes          map[int64]struct{}
+	removedcreated_redeem_codes   map[int64]struct{}
+	clearedcreated_redeem_codes   bool
+	created_promo_codes           map[int64]struct{}
+	removedcreated_promo_codes    map[int64]struct{}
+	clearedcreated_promo_codes    bool
 	subscriptions                 map[int64]struct{}
 	removedsubscriptions          map[int64]struct{}
 	clearedsubscriptions          bool
@@ -40065,6 +39863,114 @@ func (m *UserMutation) ResetRedeemCodes() {
 	m.removedredeem_codes = nil
 }
 
+// AddCreatedRedeemCodeIDs adds the "created_redeem_codes" edge to the RedeemCode entity by ids.
+func (m *UserMutation) AddCreatedRedeemCodeIDs(ids ...int64) {
+	if m.created_redeem_codes == nil {
+		m.created_redeem_codes = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.created_redeem_codes[ids[i]] = struct{}{}
+	}
+}
+
+// ClearCreatedRedeemCodes clears the "created_redeem_codes" edge to the RedeemCode entity.
+func (m *UserMutation) ClearCreatedRedeemCodes() {
+	m.clearedcreated_redeem_codes = true
+}
+
+// CreatedRedeemCodesCleared reports if the "created_redeem_codes" edge to the RedeemCode entity was cleared.
+func (m *UserMutation) CreatedRedeemCodesCleared() bool {
+	return m.clearedcreated_redeem_codes
+}
+
+// RemoveCreatedRedeemCodeIDs removes the "created_redeem_codes" edge to the RedeemCode entity by IDs.
+func (m *UserMutation) RemoveCreatedRedeemCodeIDs(ids ...int64) {
+	if m.removedcreated_redeem_codes == nil {
+		m.removedcreated_redeem_codes = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.created_redeem_codes, ids[i])
+		m.removedcreated_redeem_codes[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedCreatedRedeemCodes returns the removed IDs of the "created_redeem_codes" edge to the RedeemCode entity.
+func (m *UserMutation) RemovedCreatedRedeemCodesIDs() (ids []int64) {
+	for id := range m.removedcreated_redeem_codes {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// CreatedRedeemCodesIDs returns the "created_redeem_codes" edge IDs in the mutation.
+func (m *UserMutation) CreatedRedeemCodesIDs() (ids []int64) {
+	for id := range m.created_redeem_codes {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetCreatedRedeemCodes resets all changes to the "created_redeem_codes" edge.
+func (m *UserMutation) ResetCreatedRedeemCodes() {
+	m.created_redeem_codes = nil
+	m.clearedcreated_redeem_codes = false
+	m.removedcreated_redeem_codes = nil
+}
+
+// AddCreatedPromoCodeIDs adds the "created_promo_codes" edge to the PromoCode entity by ids.
+func (m *UserMutation) AddCreatedPromoCodeIDs(ids ...int64) {
+	if m.created_promo_codes == nil {
+		m.created_promo_codes = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.created_promo_codes[ids[i]] = struct{}{}
+	}
+}
+
+// ClearCreatedPromoCodes clears the "created_promo_codes" edge to the PromoCode entity.
+func (m *UserMutation) ClearCreatedPromoCodes() {
+	m.clearedcreated_promo_codes = true
+}
+
+// CreatedPromoCodesCleared reports if the "created_promo_codes" edge to the PromoCode entity was cleared.
+func (m *UserMutation) CreatedPromoCodesCleared() bool {
+	return m.clearedcreated_promo_codes
+}
+
+// RemoveCreatedPromoCodeIDs removes the "created_promo_codes" edge to the PromoCode entity by IDs.
+func (m *UserMutation) RemoveCreatedPromoCodeIDs(ids ...int64) {
+	if m.removedcreated_promo_codes == nil {
+		m.removedcreated_promo_codes = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.created_promo_codes, ids[i])
+		m.removedcreated_promo_codes[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedCreatedPromoCodes returns the removed IDs of the "created_promo_codes" edge to the PromoCode entity.
+func (m *UserMutation) RemovedCreatedPromoCodesIDs() (ids []int64) {
+	for id := range m.removedcreated_promo_codes {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// CreatedPromoCodesIDs returns the "created_promo_codes" edge IDs in the mutation.
+func (m *UserMutation) CreatedPromoCodesIDs() (ids []int64) {
+	for id := range m.created_promo_codes {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetCreatedPromoCodes resets all changes to the "created_promo_codes" edge.
+func (m *UserMutation) ResetCreatedPromoCodes() {
+	m.created_promo_codes = nil
+	m.clearedcreated_promo_codes = false
+	m.removedcreated_promo_codes = nil
+}
+
 // AddSubscriptionIDs adds the "subscriptions" edge to the UserSubscription entity by ids.
 func (m *UserMutation) AddSubscriptionIDs(ids ...int64) {
 	if m.subscriptions == nil {
@@ -41268,12 +41174,18 @@ func (m *UserMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *UserMutation) AddedEdges() []string {
-	edges := make([]string, 0, 13)
+	edges := make([]string, 0, 15)
 	if m.api_keys != nil {
 		edges = append(edges, user.EdgeAPIKeys)
 	}
 	if m.redeem_codes != nil {
 		edges = append(edges, user.EdgeRedeemCodes)
+	}
+	if m.created_redeem_codes != nil {
+		edges = append(edges, user.EdgeCreatedRedeemCodes)
+	}
+	if m.created_promo_codes != nil {
+		edges = append(edges, user.EdgeCreatedPromoCodes)
 	}
 	if m.subscriptions != nil {
 		edges = append(edges, user.EdgeSubscriptions)
@@ -41324,6 +41236,18 @@ func (m *UserMutation) AddedIDs(name string) []ent.Value {
 	case user.EdgeRedeemCodes:
 		ids := make([]ent.Value, 0, len(m.redeem_codes))
 		for id := range m.redeem_codes {
+			ids = append(ids, id)
+		}
+		return ids
+	case user.EdgeCreatedRedeemCodes:
+		ids := make([]ent.Value, 0, len(m.created_redeem_codes))
+		for id := range m.created_redeem_codes {
+			ids = append(ids, id)
+		}
+		return ids
+	case user.EdgeCreatedPromoCodes:
+		ids := make([]ent.Value, 0, len(m.created_promo_codes))
+		for id := range m.created_promo_codes {
 			ids = append(ids, id)
 		}
 		return ids
@@ -41399,12 +41323,18 @@ func (m *UserMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *UserMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 13)
+	edges := make([]string, 0, 15)
 	if m.removedapi_keys != nil {
 		edges = append(edges, user.EdgeAPIKeys)
 	}
 	if m.removedredeem_codes != nil {
 		edges = append(edges, user.EdgeRedeemCodes)
+	}
+	if m.removedcreated_redeem_codes != nil {
+		edges = append(edges, user.EdgeCreatedRedeemCodes)
+	}
+	if m.removedcreated_promo_codes != nil {
+		edges = append(edges, user.EdgeCreatedPromoCodes)
 	}
 	if m.removedsubscriptions != nil {
 		edges = append(edges, user.EdgeSubscriptions)
@@ -41455,6 +41385,18 @@ func (m *UserMutation) RemovedIDs(name string) []ent.Value {
 	case user.EdgeRedeemCodes:
 		ids := make([]ent.Value, 0, len(m.removedredeem_codes))
 		for id := range m.removedredeem_codes {
+			ids = append(ids, id)
+		}
+		return ids
+	case user.EdgeCreatedRedeemCodes:
+		ids := make([]ent.Value, 0, len(m.removedcreated_redeem_codes))
+		for id := range m.removedcreated_redeem_codes {
+			ids = append(ids, id)
+		}
+		return ids
+	case user.EdgeCreatedPromoCodes:
+		ids := make([]ent.Value, 0, len(m.removedcreated_promo_codes))
+		for id := range m.removedcreated_promo_codes {
 			ids = append(ids, id)
 		}
 		return ids
@@ -41530,12 +41472,18 @@ func (m *UserMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *UserMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 13)
+	edges := make([]string, 0, 15)
 	if m.clearedapi_keys {
 		edges = append(edges, user.EdgeAPIKeys)
 	}
 	if m.clearedredeem_codes {
 		edges = append(edges, user.EdgeRedeemCodes)
+	}
+	if m.clearedcreated_redeem_codes {
+		edges = append(edges, user.EdgeCreatedRedeemCodes)
+	}
+	if m.clearedcreated_promo_codes {
+		edges = append(edges, user.EdgeCreatedPromoCodes)
 	}
 	if m.clearedsubscriptions {
 		edges = append(edges, user.EdgeSubscriptions)
@@ -41581,6 +41529,10 @@ func (m *UserMutation) EdgeCleared(name string) bool {
 		return m.clearedapi_keys
 	case user.EdgeRedeemCodes:
 		return m.clearedredeem_codes
+	case user.EdgeCreatedRedeemCodes:
+		return m.clearedcreated_redeem_codes
+	case user.EdgeCreatedPromoCodes:
+		return m.clearedcreated_promo_codes
 	case user.EdgeSubscriptions:
 		return m.clearedsubscriptions
 	case user.EdgeAssignedSubscriptions:
@@ -41624,6 +41576,12 @@ func (m *UserMutation) ResetEdge(name string) error {
 		return nil
 	case user.EdgeRedeemCodes:
 		m.ResetRedeemCodes()
+		return nil
+	case user.EdgeCreatedRedeemCodes:
+		m.ResetCreatedRedeemCodes()
+		return nil
+	case user.EdgeCreatedPromoCodes:
+		m.ResetCreatedPromoCodes()
 		return nil
 	case user.EdgeSubscriptions:
 		m.ResetSubscriptions()
