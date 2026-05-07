@@ -177,6 +177,11 @@ export default {
     enterApiKey: 'Please enter an API Key',
     querySuccess: 'Query successful',
     queryFailed: 'Query failed',
+    windowUnits: {
+      day: 'D',
+      week: 'W',
+      month: 'M'
+    },
     queryFailedRetry: 'Query failed, please try again later',
   },
 
@@ -223,6 +228,7 @@ export default {
       passwordMismatch: 'Passwords do not match'
     },
     ready: {
+      autoRefreshRemaining: 'Next refresh in {seconds}s',
       title: 'Ready to Install',
       description: 'Review your configuration and complete setup',
       database: 'Database',
@@ -568,6 +574,9 @@ export default {
     wechatProviderName: 'WeChat',
     wechatCallbackPageTitle: 'WeChat Sign-In Callback',
     wechatPaymentCallbackPageTitle: 'WeChat Payment Callback',
+    wechatConnect: {
+      mobileOnlyHint: 'This site only has WeChat mobile app login configured. Continue from the native app through the WeChat SDK.'
+    },
     wechatPayment: {
       callbackTitle: 'Resuming WeChat payment',
       callbackProcessing: 'Resuming WeChat payment...',
@@ -1798,7 +1807,7 @@ export default {
       createUser: 'Create User',
       editUser: 'Edit User',
       deleteUser: 'Delete User',
-      searchUsers: 'Search by email, username, notes, API key, or redeem code...',
+      searchUsers: 'Search by email, username, notes, API key, redeem code, or device code...',
       allRoles: 'All Roles',
       allStatus: 'All Status',
       allGroups: 'All Groups',
@@ -1815,6 +1824,7 @@ export default {
       allApiKeyGroups: 'All API Key Groups',
       searchApiKeyGroups: 'Search API Key groups...',
       admin: 'Admin',
+      marketing: 'Marketing',
       user: 'User',
       disabled: 'Disabled',
       email: 'Email',
@@ -1968,6 +1978,7 @@ export default {
       totalRecharged: 'Total Recharged',
       roles: {
         admin: 'Admin',
+        marketing: 'Marketing',
         user: 'User'
       },
       // Settings Dropdowns
@@ -2264,7 +2275,16 @@ export default {
         tooltipEdit: 'Select one or more groups of the same platform. After saving, current group accounts will be replaced with accounts from these groups (deduplicated).',
         selectPlaceholder: 'Select groups to copy accounts from...',
         hint: 'Multiple groups can be selected, accounts will be deduplicated',
+        optionLabel: '{name} ({count} accounts)',
         hintEdit: '⚠️ Warning: This will replace all existing account bindings'
+      },
+      accountFilter: {
+        title: 'Account Filter Controls',
+        requireOAuthOnly: 'OAuth accounts only',
+        oauthOnlyEnabled: 'Enabled — excludes API Key accounts',
+        requirePrivacySet: 'Require privacy-protected accounts',
+        privacySetEnabled: 'Enabled — accounts without Privacy configured are excluded',
+        disabled: 'Disabled'
       },
       modelRouting: {
         title: 'Model Routing',
@@ -2354,6 +2374,21 @@ export default {
     channels: {
       title: 'Channel Management',
       description: 'Manage channels and custom model pricing',
+      intervalValidation: {
+        minTokensNonNegative: 'Interval #{index}: minimum token count ({value}) cannot be negative',
+        maxTokensPositive: 'Interval #{index}: maximum token count ({value}) must be greater than 0',
+        maxTokensGreaterThanMin: 'Interval #{index}: maximum token count ({max}) must be greater than minimum token count ({min})',
+        priceNonNegative: 'Interval #{index}: {name} cannot be negative',
+        unboundedLast: 'Interval #{index}: unbounded interval (empty max tokens) can only be the last interval',
+        overlap: 'Intervals #{prevIndex} and #{index} overlap: previous upper bound ({prevMax}) is greater than current lower bound ({min})',
+        priceNames: {
+          input: 'Input price',
+          output: 'Output price',
+          cacheWrite: 'Cache write price',
+          cacheRead: 'Cache read price',
+          perRequest: 'Per-request price'
+        }
+      },
       searchChannels: 'Search channels...',
       createChannel: 'Create Channel',
       editChannel: 'Edit Channel',
@@ -3877,7 +3912,17 @@ export default {
           customTitle: 'Custom OAuth (AI Studio OAuth)',
           customDesc: 'Uses admin-configured OAuth client for org management.',
           customRequirement: 'Admin must configure Client ID and add you as a test user.',
+          googleOneDesc: 'Personal account with Google One subscription quota',
+          codeAssistDesc: 'Enterprise tier, requires a GCP project',
+          codeAssistRequirement: 'Activate a GCP project and link a billing card',
+          googleOneAccount: 'Personal account',
+          gcpCodeAssistAccount: 'GCP Code Assist account',
+          showAdvanced: 'Show advanced options (custom OAuth client)',
+          hideAdvanced: 'Hide advanced options (custom OAuth client)',
           badges: {
+            recommendedPersonal: 'Recommended for individuals',
+            noGcp: 'No GCP needed',
+            enterpriseUser: 'Enterprise users',
             recommended: 'Recommended',
             highConcurrency: 'High concurrency',
             noAdmin: 'No admin setup',
@@ -3895,6 +3940,7 @@ export default {
           activationTitle: 'One-click Activation',
           activationItems: {
             geminiWeb: 'Activate Gemini Web to avoid User not initialized.',
+            changeCountryAssociation: 'Change country association',
             gcpProject: 'Activate a GCP project and get the Project ID for Code Assist.'
           },
           links: {
@@ -4508,7 +4554,7 @@ export default {
       title: 'Usage Records',
       description: 'View and manage all user usage records',
       userFilter: 'User',
-      searchUserPlaceholder: 'Search user by email...',
+      searchUserPlaceholder: 'Search user by email or device code...',
       searchApiKeyPlaceholder: 'Search API key by name...',
       searchAccountPlaceholder: 'Search account by name...',
       selectedUser: 'Selected',
@@ -4583,6 +4629,47 @@ export default {
     ops: {
       title: 'Ops Monitoring',
       description: 'Operational monitoring and troubleshooting',
+      systemLogs: {
+        title: 'System Logs',
+        description: 'Latest logs first. Filter, search, and cleanup with the current criteria.',
+        allLevels: 'All levels',
+        loadFailed: 'Failed to load system logs',
+        runtimeSaved: 'Log runtime configuration applied',
+        runtimeSaveFailed: 'Failed to save log configuration',
+        resetConfirm: 'Reset to startup configuration (env/yaml) and apply immediately?',
+        resetSuccess: 'Reset to startup log configuration',
+        resetFailed: 'Failed to reset log configuration',
+        cleanupConfirm: 'Cleanup system logs using the current filters? This cannot be undone.',
+        cleanupSuccess: 'Cleanup completed, deleted {count} logs',
+        cleanupFailed: 'Failed to cleanup system logs',
+        queue: 'Queue',
+        written: 'Written',
+        dropped: 'Dropped',
+        failed: 'Failed',
+        runtimeConfig: 'Runtime log configuration (applies immediately)',
+        level: 'Level',
+        stacktraceLevel: 'Stacktrace level',
+        samplingInitial: 'Sampling initial',
+        samplingThereafter: 'Sampling thereafter',
+        retentionDays: 'Retention days',
+        saveAndApply: 'Save and apply',
+        resetDefaults: 'Reset defaults',
+        lastWriteError: 'Latest write error: ',
+        timeRange: 'Time range',
+        startTime: 'Start time (optional)',
+        endTime: 'End time (optional)',
+        component: 'Component',
+        componentPlaceholder: 'e.g. http.access',
+        platform: 'Platform',
+        model: 'Model',
+        keyword: 'Keyword',
+        keywordPlaceholder: 'Message/request_id',
+        cleanupCurrentFilter: 'Cleanup current filters',
+        refreshHealth: 'Refresh health metrics',
+        noLogs: 'No system logs',
+        time: 'Time',
+        details: 'Log details'
+      },
       // Dashboard
       systemHealth: 'System Health',
       overview: 'Overview',
@@ -5576,6 +5663,36 @@ export default {
         redirectUrlSetAndCopied: 'Redirect URL generated and copied to clipboard',
         frontendRedirectUrl: 'Frontend Callback Path',
         frontendRedirectUrlPlaceholder: '/auth/oidc/callback',
+        modes: {
+          open: {
+            title: 'PC App',
+            description: 'Desktop browsers sign in through WeChat Open Platform QR login. This can coexist with Official Account or Mobile App.',
+            appIdLabel: 'PC App ID',
+            appIdPlaceholder: 'WeChat Open Platform PC App ID',
+            appSecretLabel: 'PC App Secret',
+            appSecretPlaceholder: 'WeChat Open Platform PC App Secret'
+          },
+          mp: {
+            title: 'Official Account',
+            description: 'Only available inside the WeChat browser. It is shown as unavailable outside WeChat.',
+            appIdLabel: 'Official Account App ID',
+            appIdPlaceholder: 'Official Account App ID',
+            appSecretLabel: 'Official Account App Secret',
+            appSecretPlaceholder: 'Official Account App Secret'
+          },
+          mobile: {
+            title: 'Mobile App',
+            description: 'Native mobile clients start authorization through the WeChat SDK. The web UI does not launch this flow directly.',
+            appIdLabel: 'Mobile App ID',
+            appIdPlaceholder: 'Mobile App ID',
+            appSecretLabel: 'Mobile App Secret',
+            appSecretPlaceholder: 'Mobile App Secret'
+          }
+        },
+        unionIdWarning: 'When PC App is enabled together with Official Account or Mobile App, they should belong to the same WeChat Open Platform account so UnionID can merge identities reliably.',
+        browserRedirectUrlLabel: 'Browser Redirect URL',
+        browserRedirectUrlHint: 'Used by PC App and Official Account browser callbacks. Native mobile SDK flows do not start from this browser callback directly.',
+        mpMobileConflict: 'Official Account and Mobile App cannot be enabled at the same time.',
         frontendRedirectUrlHint: 'Frontend route used after backend callback',
         tokenAuthMethod: 'Token Auth Method',
         clockSkewSeconds: 'Clock Skew (seconds)',
@@ -6431,6 +6548,13 @@ export default {
         methodHint: 'Controls whether checkout shows this method and which source key it exposes.',
         sourceLabel: 'Payment source',
         sourceHint: 'Choose an explicit source before enabling the method. Not configured methods are not exposed.',
+        sources: {
+          notConfigured: 'Not configured',
+          officialAlipay: 'Official Alipay',
+          easypayAlipay: 'EasyPay Alipay',
+          officialWxpay: 'Official WeChat Pay',
+          easypayWxpay: 'EasyPay WeChat Pay'
+        },
         sourceRequiredError: 'Select a payment source before enabling {title}.'
       },
       openaiExperimentalScheduler: {
