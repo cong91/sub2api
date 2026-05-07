@@ -479,6 +479,7 @@ export default {
       statusFilter: '状态筛选',
       allStatuses: '全部状态',
       admin: '管理员',
+      marketing: '营销',
       user: '用户',
       disabled: '禁用',
       email: '邮箱',
@@ -563,6 +564,7 @@ export default {
       deleteConfirm: "确定要删除用户 '{email}' 吗？此操作无法撤销。",
       roles: {
         admin: '管理员',
+        marketing: '营销',
         user: '用户'
       },
       form: {
