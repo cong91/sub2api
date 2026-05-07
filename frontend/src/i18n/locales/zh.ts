@@ -704,7 +704,7 @@ export default {
     createKey: '创建密钥',
     editKey: '编辑密钥',
     deleteKey: '删除密钥',
-    deleteConfirmMessage: "确定要删除 '{name}' 吗？此操作无法撤销。",
+    deleteConfirmMessage: '确定要删除 \'{name}\' 吗？此操作无法撤销。',
     apiKey: 'API 密钥',
     group: '分组',
     noGroup: '无分组',
@@ -1481,7 +1481,13 @@ export default {
       configureAiAccounts: '配置 AI 平台账号',
       systemSettings: '系统设置',
       configureSystem: '配置系统设置',
-      failedToLoad: '加载仪表盘数据失败'
+      failedToLoad: '加载仪表盘数据失败',
+      active: '活跃',
+      create: '创建',
+      err: '错误',
+      newUsersToday: '今日新增用户',
+      ok: '正常',
+      userUsageTrend: '用户使用趋势（前 12）',
     },
 
     backup: {
@@ -1839,7 +1845,7 @@ export default {
       createUser: '创建用户',
       editUser: '编辑用户',
       deleteUser: '删除用户',
-      deleteConfirmMessage: "确定要删除用户 '{email}' 吗？此操作无法撤销。",
+      deleteConfirmMessage: '确定要删除用户 \'{email}\' 吗？此操作无法撤销。',
       searchPlaceholder: '邮箱/用户名/备注/API Key/redeem code 模糊搜索...',
       searchUsers: '邮箱/用户名/备注/API Key/redeem code/设备码 模糊搜索',
       roleFilter: '角色筛选',
@@ -1937,7 +1943,7 @@ export default {
       failedToDelete: '删除用户失败',
       failedToToggle: '更新用户状态失败',
       failedToLoadApiKeys: '加载用户 API 密钥失败',
-      deleteConfirm: "确定要删除用户 '{email}' 吗？此操作无法撤销。",
+      deleteConfirm: '确定要删除用户 \'{email}\' 吗？此操作无法撤销。',
       roles: {
         admin: '管理员',
         marketing: '营销',
@@ -2059,7 +2065,7 @@ export default {
         addAttribute: '添加属性',
         editAttribute: '编辑属性',
         deleteAttribute: '删除属性',
-        deleteConfirm: "确定要删除属性 '{name}' 吗？所有用户的该属性值将被删除。",
+        deleteConfirm: '确定要删除属性 \'{name}\' 吗？所有用户的该属性值将被删除。',
         noAttributes: '暂无自定义属性',
         noAttributesHint: '点击上方按钮添加自定义属性',
         key: '属性键',
@@ -2159,7 +2165,7 @@ export default {
       sortOrderHint: '拖拽分组调整显示顺序，排在前面的分组会优先显示',
       sortOrderUpdated: '排序已更新',
       failedToUpdateSortOrder: '更新排序失败',
-      deleteConfirm: "确定要删除分组 '{name}' 吗？所有关联的 API 密钥将不再属于任何分组。",
+      deleteConfirm: '确定要删除分组 \'{name}\' 吗？所有关联的 API 密钥将不再属于任何分组。',
       deleteConfirmSubscription:
         "确定要删除订阅分组 '{name}' 吗？此操作会让所有绑定此订阅的用户的 API Key 失效，并删除所有相关的订阅记录。此操作无法撤销。",
       columns: {
@@ -2417,8 +2423,15 @@ export default {
         geminiText: 'Gemini Text',
         geminiImage: 'Gemini Image',
         hint: '至少选择一个模型系列'
-      }
-    },
+      },
+      claudeMaxSimulation: {
+        disabled: '已禁用',
+        enabled: '已启用（模拟 1h 缓存）',
+        hint: '仅调整用量计费日志中的 token 类别，不持久化每次请求的映射状态。',
+        title: 'Claude Max 用量模拟',
+        tooltip: '启用后，对于没有上游 cache-write 用量的 Claude 模型，系统会在保持总 token 不变的情况下，确定性地将 token 映射为少量输入加 1h 缓存创建。',
+      },
+      },
 
     // Available Channels (aggregated read-only view)
     availableChannels: {
@@ -2499,8 +2512,8 @@ export default {
       deleteError: '删除渠道失败',
       nameRequired: '请输入渠道名称',
       duplicateModels: '模型「{0}」在多个定价条目中重复',
-      modelConflict: "模型模式 '{model1}' 和 '{model2}' 冲突：匹配范围重叠",
-      mappingConflict: "模型映射源 '{model1}' 和 '{model2}' 冲突：匹配范围重叠",
+      modelConflict: '模型模式 \'{model1}\' 和 \'{model2}\' 冲突：匹配范围重叠',
+      mappingConflict: '模型映射源 \'{model1}\' 和 \'{model2}\' 冲突：匹配范围重叠',
       deleteConfirm: '确定要删除渠道「{name}」吗？此操作不可撤销。',
       columns: {
         name: '名称',
@@ -3038,7 +3051,7 @@ export default {
       revoke: '撤销',
       resetQuota: '重置配额',
       resetQuotaTitle: '重置用量配额',
-      resetQuotaConfirm: "确定要重置 '{user}' 的每日、每周和每月用量配额吗？用量将归零并从今天开始重新计算。",
+      resetQuotaConfirm: '确定要重置 \'{user}\' 的每日、每周和每月用量配额吗？用量将归零并从今天开始重新计算。',
       quotaResetSuccess: '配额重置成功',
       failedToResetQuota: '重置配额失败',
       noSubscriptionsYet: '暂无订阅',
@@ -3055,7 +3068,7 @@ export default {
       pleaseSelectUser: '请选择用户',
       pleaseSelectGroup: '请选择分组',
       validityDaysRequired: '请输入有效的天数（至少1天）',
-      revokeConfirm: "确定要撤销 '{user}' 的订阅吗？此操作无法撤销。",
+      revokeConfirm: '确定要撤销 \'{user}\' 的订阅吗？此操作无法撤销。',
       guide: {
         title: '订阅管理教程',
         subtitle: '订阅模式允许你按时间周期为用户分配使用额度，支持日/周/月配额限制。按照以下步骤即可完成配置。',
@@ -3163,7 +3176,7 @@ export default {
       crsBack: '返回',
       editAccount: '编辑账号',
       deleteAccount: '删除账号',
-      deleteConfirmMessage: "确定要删除账号 '{name}' 吗？",
+      deleteConfirmMessage: '确定要删除账号 \'{name}\' 吗？',
       refreshCookie: '刷新 Cookie',
       testAccount: '测试账号',
       searchAccounts: '搜索账号...',
@@ -3293,7 +3306,7 @@ export default {
       rateLimitCleared: '速率限制已清除',
       setupToken: 'Setup Token',
       apiKey: 'API Key',
-      deleteConfirm: "确定要删除账号 '{name}' 吗？此操作无法撤销。",
+      deleteConfirm: '确定要删除账号 \'{name}\' 吗？此操作无法撤销。',
       failedToClearRateLimit: '清除速率限制失败',
       platforms: {
         claude: 'Claude',
@@ -4397,7 +4410,7 @@ export default {
       batchInput: '代理列表',
       batchInputPlaceholder:
         "每行输入一个代理，支持以下格式：\nsocks5://user:pass{'@'}192.168.1.1:1080\nhttp://192.168.1.1:8080\nhttps://user:pass{'@'}proxy.example.com:443",
-      batchInputHint: "支持 http、https、socks5 协议，格式：协议://[用户名:密码{'@'}]主机:端口",
+      batchInputHint: '支持 http、https、socks5 协议，格式：协议://[用户名:密码{\'@\'}]主机:端口',
       parsedCount: '有效 {count} 个',
       invalidCount: '无效 {count} 个',
       duplicateCount: '重复 {count} 个',
@@ -4484,8 +4497,9 @@ export default {
         usedBy: '使用者',
         usedAt: '使用时间',
         createdAt: '创建时间',
-        actions: '操作'
-      },
+        actions: '操作',
+        createdBy: '创建者',
+    },
       types: {
         balance: '余额',
         concurrency: '并发数',
@@ -4672,8 +4686,9 @@ export default {
         status: '状态',
         expiresAt: '过期时间',
         createdAt: '创建时间',
-        actions: '操作'
-      },
+        actions: '操作',
+        createdBy: '创建者',
+    },
       // 表单标签（扁平结构便于模板使用）
       code: '优惠码',
       autoGenerate: '留空自动生成',
@@ -6377,14 +6392,14 @@ export default {
         port: 'SMTP 端口',
         portPlaceholder: '587',
         username: 'SMTP 用户名',
-        usernamePlaceholder: "your-email{'@'}gmail.com",
+        usernamePlaceholder: 'your-email{\'@\'}gmail.com',
         password: 'SMTP 密码',
         passwordPlaceholder: '********',
         passwordHint: '留空以保留现有密码',
         passwordConfiguredPlaceholder: '********',
         passwordConfiguredHint: '密码已配置，留空以保留当前值。',
         fromEmail: '发件人邮箱',
-        fromEmailPlaceholder: "noreply{'@'}example.com",
+        fromEmailPlaceholder: 'noreply{\'@\'}example.com',
         fromName: '发件人名称',
         fromNamePlaceholder: 'Sub2API',
         useTls: '使用 TLS',
@@ -6394,7 +6409,7 @@ export default {
         title: '发送测试邮件',
         description: '发送测试邮件以验证 SMTP 配置',
         recipientEmail: '收件人邮箱',
-        recipientEmailPlaceholder: "test{'@'}example.com",
+        recipientEmailPlaceholder: 'test{\'@\'}example.com',
         sendTestEmail: '发送测试邮件',
         sending: '发送中...',
         enterRecipientHint: '请输入收件人邮箱地址'
@@ -7515,6 +7530,8 @@ export default {
         expired: '已过期',
         revoked: '已撤销',
       },
+
+      allowUserRefund: '允许用户退款',
     },
   },
 
