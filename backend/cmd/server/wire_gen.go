@@ -99,7 +99,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	announcementReadRepository := repository.NewAnnouncementReadRepository(client)
 	announcementService := service.NewAnnouncementService(announcementRepository, announcementReadRepository, userRepository, userSubscriptionRepository)
 	announcementHandler := handler.NewAnnouncementHandler(announcementService)
-	vClawClaimService := service.NewVClawClaimService(client, userRepository, redeemCodeRepository, userDeviceRepository, configConfig, settingService, subscriptionService)
+	vClawClaimService := service.NewVClawClaimService(client, userRepository, redeemCodeRepository, userDeviceRepository, configConfig, settingService, subscriptionService, affiliateService)
 	vClawHandler := handler.NewVClawHandler(vClawClaimService)
 	channelMonitorRepository := repository.NewChannelMonitorRepository(client, db)
 	channelMonitorService := service.ProvideChannelMonitorService(channelMonitorRepository, secretEncryptor)
