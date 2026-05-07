@@ -85,7 +85,7 @@ const timeRangeOptions = [
 ]
 
 const filterLevelOptions = computed(() => [
-  { value: '', label: t('admin.ops.systemLogs.all') },
+  { value: '', label: t('admin.ops.systemLogs.allLevels') },
   { value: 'debug', label: 'debug' },
   { value: 'info', label: 'info' },
   { value: 'warn', label: 'warn' },
@@ -153,7 +153,7 @@ const formatSystemLogDetail = (row: OpsSystemLog) => {
   const err = getExtraString(extra, 'err') || getExtraString(extra, 'error')
   if (err) parts.push(`error=${err}`)
 
-  // 用空格拼接，交给 CSS 自动换行，尽量“填满再换行”。
+  // Join with spaces so CSS can wrap detail text naturally.
   return parts.join('  ')
 }
 
@@ -217,7 +217,7 @@ const fetchHealth = async () => {
   try {
     health.value = await opsAPI.getSystemLogSinkHealth()
   } catch {
-    // 忽略健康数据读取失败，不影响主流程。
+    // Ignore health loading failures; the log table remains usable.
   }
 }
 
@@ -250,17 +250,17 @@ const saveRuntimeConfig = async () => {
     runtimeConfig.caller = saved.caller
     runtimeConfig.stacktrace_level = saved.stacktrace_level
     runtimeConfig.retention_days = saved.retention_days
-    appStore.showSuccess(t('admin.ops.systemLogs.runtimeConfigActive'))
+    appStore.showSuccess(t('admin.ops.systemLogs.runtimeSaved'))
   } catch (err: any) {
     console.error('[OpsSystemLogTable] Failed to save runtime log config', err)
-    appStore.showError(err?.response?.data?.detail || t('admin.ops.systemLogs.runtimeConfigSaveFailed'))
+    appStore.showError(err?.response?.data?.detail || t('admin.ops.systemLogs.runtimeSaveFailed'))
   } finally {
     runtimeSaving.value = false
   }
 }
 
 const resetRuntimeConfig = async () => {
-  const ok = window.confirm(t('admin.ops.systemLogs.resetRuntimeConfigConfirm'))
+  const ok = window.confirm(t('admin.ops.systemLogs.resetConfirm'))
   if (!ok) return
 
   runtimeSaving.value = true
@@ -273,11 +273,11 @@ const resetRuntimeConfig = async () => {
     runtimeConfig.caller = saved.caller
     runtimeConfig.stacktrace_level = saved.stacktrace_level
     runtimeConfig.retention_days = saved.retention_days
-    appStore.showSuccess(t('admin.ops.systemLogs.runtimeConfigReset'))
+    appStore.showSuccess(t('admin.ops.systemLogs.resetSuccess'))
     await fetchHealth()
   } catch (err: any) {
     console.error('[OpsSystemLogTable] Failed to reset runtime log config', err)
-    appStore.showError(err?.response?.data?.detail || t('admin.ops.systemLogs.runtimeConfigResetFailed'))
+    appStore.showError(err?.response?.data?.detail || t('admin.ops.systemLogs.resetFailed'))
   } finally {
     runtimeSaving.value = false
   }
@@ -396,7 +396,7 @@ onMounted(async () => {
           <Select v-model="runtimeConfig.level" class="mt-1" :options="runtimeLevelOptions" />
         </label>
         <label class="text-xs text-gray-600 dark:text-gray-300">
-          {{ t('admin.ops.systemLogs.stacktraceThreshold') }}
+          {{ t('admin.ops.systemLogs.stacktraceLevel') }}
           <Select v-model="runtimeConfig.stacktrace_level" class="mt-1" :options="stacktraceLevelOptions" />
         </label>
         <label class="text-xs text-gray-600 dark:text-gray-300">
@@ -434,7 +434,7 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-      <p v-if="health.last_error" class="mt-2 text-xs text-red-600 dark:text-red-400">{{ t('admin.ops.systemLogs.latestWriteError') }} {{ health.last_error }}</p>
+      <p v-if="health.last_error" class="mt-2 text-xs text-red-600 dark:text-red-400">{{ t('admin.ops.systemLogs.lastWriteError') }}{{ health.last_error }}</p>
     </div>
 
     <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-5">
@@ -497,15 +497,15 @@ onMounted(async () => {
     </div>
 
     <div class="mb-3 flex flex-wrap gap-2">
-      <button type="button" class="btn btn-primary btn-sm" @click="applyFilters">{{ t('admin.ops.systemLogs.search') }}</button>
+      <button type="button" class="btn btn-primary btn-sm" @click="applyFilters">{{ t('common.search') }}</button>
       <button type="button" class="btn btn-secondary btn-sm" @click="resetFilters">{{ t('common.reset') }}</button>
-      <button type="button" class="btn btn-danger btn-sm" @click="cleanupCurrentFilter">{{ t('admin.ops.systemLogs.cleanCurrentFilters') }}</button>
+      <button type="button" class="btn btn-danger btn-sm" @click="cleanupCurrentFilter">{{ t('admin.ops.systemLogs.cleanupCurrentFilter') }}</button>
       <button type="button" class="btn btn-secondary btn-sm" @click="fetchHealth">{{ t('admin.ops.systemLogs.refreshHealth') }}</button>
     </div>
 
     <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-dark-700">
       <div v-if="loading" class="px-4 py-8 text-center text-sm text-gray-500">{{ t('common.loading') }}</div>
-      <div v-else-if="!hasData" class="px-4 py-8 text-center text-sm text-gray-500">{{ t('admin.ops.systemLogs.empty') }}</div>
+      <div v-else-if="!hasData" class="px-4 py-8 text-center text-sm text-gray-500">{{ t('admin.ops.systemLogs.noLogs') }}</div>
       <div v-else class="overflow-auto">
         <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-dark-700">
           <thead class="bg-gray-50 dark:bg-dark-900">
@@ -513,7 +513,7 @@ onMounted(async () => {
               <th class="w-[170px] px-3 py-2 text-left text-[11px] font-semibold text-gray-500">{{ t('admin.ops.systemLogs.time') }}</th>
               <th class="w-[160px] px-3 py-2 text-left text-[11px] font-semibold text-gray-500">{{ t('admin.ops.systemLogs.host') }}</th>
               <th class="w-[80px] px-3 py-2 text-left text-[11px] font-semibold text-gray-500">{{ t('admin.ops.systemLogs.level') }}</th>
-              <th class="px-3 py-2 text-left text-[11px] font-semibold text-gray-500">{{ t('admin.ops.systemLogs.logDetails') }}</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold text-gray-500">{{ t('admin.ops.systemLogs.details') }}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-dark-800">

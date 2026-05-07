@@ -1603,7 +1603,7 @@
           </div>
         </div>
 
-        <!-- 账号过滤控制 (OpenAI/Antigravity/Anthropic/Gemini) -->
+        <!-- {{ t('admin.groups.accountFilter.title') }} (OpenAI/Antigravity/Anthropic/Gemini) -->
         <div
           v-if="
             ['openai', 'antigravity', 'anthropic', 'gemini'].includes(
@@ -1613,20 +1613,20 @@
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4 space-y-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            {{ t("admin.groups.accountFilters.title") }}
+            {{ t('admin.groups.accountFilter.title') }}
           </h4>
 
           <!-- require_oauth_only toggle -->
           <div class="flex items-center justify-between">
             <div>
               <label class="text-sm text-gray-600 dark:text-gray-400"
-                >{{ t("admin.groups.accountFilters.oauthOnly") }}</label
+                >{{ t('admin.groups.accountFilter.requireOAuthOnly') }}</label
               >
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                 {{
                   createForm.require_oauth_only
-                    ? t("admin.groups.accountFilters.oauthOnlyEnabled")
-                    : t("admin.groups.accountFilters.disabled")
+                    ? t('admin.groups.accountFilter.oauthOnlyEnabled')
+                    : t('admin.groups.accountFilter.disabled')
                 }}
               </p>
             </div>
@@ -1657,13 +1657,13 @@
           <div class="flex items-center justify-between">
             <div>
               <label class="text-sm text-gray-600 dark:text-gray-400"
-                >{{ t("admin.groups.accountFilters.privacySetOnly") }}</label
+                >{{ t('admin.groups.accountFilter.requirePrivacySet') }}</label
               >
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                 {{
                   createForm.require_privacy_set
-                    ? t("admin.groups.accountFilters.privacySetOnlyEnabled")
-                    : t("admin.groups.accountFilters.disabled")
+                    ? t('admin.groups.accountFilter.privacySetEnabled')
+                    : t('admin.groups.accountFilter.disabled')
                 }}
               </p>
             </div>
@@ -3113,7 +3113,7 @@
           </div>
         </div>
 
-        <!-- 账号过滤控制 (OpenAI/Antigravity/Anthropic/Gemini) -->
+        <!-- {{ t('admin.groups.accountFilter.title') }} (OpenAI/Antigravity/Anthropic/Gemini) -->
         <div
           v-if="
             ['openai', 'antigravity', 'anthropic', 'gemini'].includes(
@@ -3123,20 +3123,20 @@
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4 space-y-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            {{ t("admin.groups.accountFilters.title") }}
+            {{ t('admin.groups.accountFilter.title') }}
           </h4>
 
           <!-- require_oauth_only toggle -->
           <div class="flex items-center justify-between">
             <div>
               <label class="text-sm text-gray-600 dark:text-gray-400"
-                >{{ t("admin.groups.accountFilters.oauthOnly") }}</label
+                >{{ t('admin.groups.accountFilter.requireOAuthOnly') }}</label
               >
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                 {{
                   editForm.require_oauth_only
-                    ? t("admin.groups.accountFilters.oauthOnlyEnabled")
-                    : t("admin.groups.accountFilters.disabled")
+                    ? t('admin.groups.accountFilter.oauthOnlyEnabled')
+                    : t('admin.groups.accountFilter.disabled')
                 }}
               </p>
             </div>
@@ -3167,13 +3167,13 @@
           <div class="flex items-center justify-between">
             <div>
               <label class="text-sm text-gray-600 dark:text-gray-400"
-                >{{ t("admin.groups.accountFilters.privacySetOnly") }}</label
+                >{{ t('admin.groups.accountFilter.requirePrivacySet') }}</label
               >
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                 {{
                   editForm.require_privacy_set
-                    ? t("admin.groups.accountFilters.privacySetOnlyEnabled")
-                    : t("admin.groups.accountFilters.disabled")
+                    ? t('admin.groups.accountFilter.privacySetEnabled')
+                    : t('admin.groups.accountFilter.disabled')
                 }}
               </p>
             </div>
@@ -3920,7 +3920,7 @@ const copyAccountsGroupOptions = computed(() => {
   );
   return eligibleGroups.map((g) => ({
     value: g.id,
-    label: `${g.name} (${t("admin.groups.accountsCount", { count: g.account_count || 0 })})`,
+    label: t('admin.groups.copyAccounts.optionLabel', { name: g.name, count: g.account_count || 0 }),
   }));
 });
 
@@ -3935,7 +3935,7 @@ const copyAccountsGroupOptionsForEdit = computed(() => {
   );
   return eligibleGroups.map((g) => ({
     value: g.id,
-    label: `${g.name} (${t("admin.groups.accountsCount", { count: g.account_count || 0 })})`,
+    label: t('admin.groups.copyAccounts.optionLabel', { name: g.name, count: g.account_count || 0 }),
   }));
 });
 
@@ -4051,7 +4051,7 @@ const createForm = reactive({
   sonnet_mapped_model: createMessagesDispatchDefaults.sonnet_mapped_model,
   haiku_mapped_model: createMessagesDispatchDefaults.haiku_mapped_model,
   exact_model_mappings: [] as MessagesDispatchMappingRow[],
-  // 账号过滤控制（OpenAI/Antigravity 平台）
+  // {{ t('admin.groups.accountFilter.title') }}（OpenAI/Antigravity 平台）
   require_oauth_only: false,
   require_privacy_set: false,
   // 模型路由开关
@@ -4399,7 +4399,7 @@ const editForm = reactive({
   sonnet_mapped_model: editMessagesDispatchDefaults.sonnet_mapped_model,
   haiku_mapped_model: editMessagesDispatchDefaults.haiku_mapped_model,
   exact_model_mappings: [] as MessagesDispatchMappingRow[],
-  // 账号过滤控制（OpenAI/Antigravity 平台）
+  // {{ t('admin.groups.accountFilter.title') }}（OpenAI/Antigravity 平台）
   require_oauth_only: false,
   require_privacy_set: false,
   // 模型路由开关
