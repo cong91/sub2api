@@ -19,6 +19,7 @@ func RegisterAdminRoutes(
 	admin := v1.Group("/admin")
 	admin.Use(gin.HandlerFunc(adminAuth))
 	admin.Use(middleware.AdminComplianceGuard(settingService))
+	admin.Use(middleware.AdminRoleAccessMiddleware())
 	{
 		// 部署与运营合规确认
 		registerAdminComplianceRoutes(admin, h)

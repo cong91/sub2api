@@ -21,7 +21,7 @@ interface Props {
   queryMode: string
   loading: boolean
   lastUpdated: Date | null
-  thresholds?: OpsMetricThresholds | null // 阈值配置
+  thresholds?: OpsMetricThresholds | null // threshold configuration
   autoRefreshEnabled?: boolean
   autoRefreshCountdown?: number
   fullscreen?: boolean
@@ -889,7 +889,7 @@ function handleToolbarRefresh() {
 
           <template v-if="props.autoRefreshEnabled && props.autoRefreshCountdown !== undefined">
             <span>·</span>
-            <span>剩余 {{ props.autoRefreshCountdown }}s</span>
+            <span>{{ t('admin.ops.autoRefreshRemaining', { seconds: props.autoRefreshCountdown }) }}</span>
           </template>
         </div>
       </div>
