@@ -1248,6 +1248,8 @@ export interface RedeemCode {
   status: 'active' | 'used' | 'expired' | 'unused'
   used_by: number | null
   used_at: string | null
+  created_by?: number | null
+  created_by_user?: User
   created_at: string
   updated_at?: string
   group_id?: number | null // 订阅类型专用
@@ -1466,6 +1468,9 @@ export interface UserSubscription {
   expires_at: string | null
   user?: User
   group?: Group
+  device_identity_code?: string | null
+  device_identity_type?: string | null
+  has_device_binding?: boolean
 }
 
 export interface SubscriptionProgress {
@@ -1668,6 +1673,8 @@ export interface PromoCode {
   status: 'active' | 'disabled'
   expires_at: string | null
   notes: string | null
+  created_by?: number | null
+  created_by_user?: User
   created_at: string
   updated_at: string
 }
