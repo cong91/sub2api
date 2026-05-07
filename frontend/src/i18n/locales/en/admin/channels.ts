@@ -619,6 +619,8 @@ export default {
       quotaEndsInDaysHours: 'Quota ends in {days}d {hours}h',
       daysRemaining: 'days remaining',
       remainingDays: 'Remaining days',
+      deviceCode: 'Device code',
+      deviceBound: 'Device bound',
       noExpiration: 'No expiration',
       status: {
         active: 'Active',
