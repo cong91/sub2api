@@ -415,6 +415,7 @@ export default {
       allApiKeyGroups: 'All API Key Groups',
       searchApiKeyGroups: 'Search API Key groups...',
       admin: 'Admin',
+      marketing: 'Marketing',
       user: 'User',
       disabled: 'Disabled',
       email: 'Email',
@@ -581,6 +582,7 @@ export default {
       totalRecharged: 'Total Recharged',
       roles: {
         admin: 'Admin',
+        marketing: 'Marketing',
         user: 'User'
       },
       // Settings Dropdowns
