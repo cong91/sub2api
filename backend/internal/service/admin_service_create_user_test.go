@@ -42,6 +42,34 @@ func TestAdminService_CreateUser_Success(t *testing.T) {
 	require.Equal(t, user, repo.created[0])
 }
 
+func TestAdminService_CreateUser_WithExplicitRole(t *testing.T) {
+	repo := &userRepoStub{nextID: 11}
+	svc := &adminServiceImpl{userRepo: repo}
+
+	user, err := svc.CreateUser(context.Background(), &CreateUserInput{
+		Email:    "marketer@test.com",
+		Password: "strong-pass",
+		Role:     RoleMarketing,
+	})
+	require.NoError(t, err)
+	require.Equal(t, RoleMarketing, user.Role)
+	require.Len(t, repo.created, 1)
+	require.Equal(t, RoleMarketing, repo.created[0].Role)
+}
+
+func TestAdminService_CreateUser_InvalidRole(t *testing.T) {
+	repo := &userRepoStub{nextID: 12}
+	svc := &adminServiceImpl{userRepo: repo}
+
+	_, err := svc.CreateUser(context.Background(), &CreateUserInput{
+		Email:    "invalid-role@test.com",
+		Password: "strong-pass",
+		Role:     "sales",
+	})
+	require.Error(t, err)
+	require.Empty(t, repo.created)
+}
+
 func TestAdminService_CreateUser_EmailExists(t *testing.T) {
 	repo := &userRepoStub{createErr: ErrEmailExists}
 	svc := &adminServiceImpl{userRepo: repo}
