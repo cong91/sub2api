@@ -136,6 +136,7 @@ type CreateUserInput struct {
 	Password      string
 	Username      string
 	Notes         string
+	Role          string
 	Balance       *float64
 	Concurrency   int
 	RPMLimit      int
@@ -150,6 +151,7 @@ type UpdateUserInput struct {
 	Balance       *float64 // 使用指针区分"未提供"和"设置为0"
 	Concurrency   *int     // 使用指针区分"未提供"和"设置为0"
 	RPMLimit      *int     // 使用指针区分"未提供"和"设置为0"
+	Role          string
 	Status        string
 	AllowedGroups *[]int64 // 使用指针区分"未提供"和"设置为空数组"
 	// GroupRates 用户专属分组倍率配置
@@ -701,12 +703,16 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 	} else if s.settingService != nil {
 		balance = s.settingService.GetDefaultBalance(ctx)
 	}
+	role, err := normalizeUserRole(input.Role)
+	if err != nil {
+		return nil, err
+	}
 
 	user := &User{
 		Email:         input.Email,
 		Username:      input.Username,
 		Notes:         input.Notes,
-		Role:          RoleUser, // Always create as regular user, never admin
+		Role:          role,
 		Balance:       balance,
 		Concurrency:   input.Concurrency,
 		RPMLimit:      input.RPMLimit,
@@ -721,6 +727,17 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 	}
 	s.assignDefaultSubscriptions(ctx, user.ID)
 	return user, nil
+}
+
+func normalizeUserRole(role string) (string, error) {
+	switch role {
+	case "":
+		return RoleUser, nil
+	case RoleAdmin, RoleMarketing, RoleUser:
+		return role, nil
+	default:
+		return "", fmt.Errorf("invalid user role: %s", role)
+	}
 }
 
 func (s *adminServiceImpl) assignDefaultSubscriptions(ctx context.Context, userID int64) {
@@ -741,6 +758,12 @@ func (s *adminServiceImpl) assignDefaultSubscriptions(ctx context.Context, userI
 }
 
 func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error) {
+	if input.Role != "" {
+		if _, err := normalizeUserRole(input.Role); err != nil {
+			return nil, err
+		}
+	}
+
 	// 校验用户专属分组倍率：必须 > 0（nil 合法，表示清除专属倍率）
 	if input.GroupRates != nil {
 		for groupID, rate := range input.GroupRates {
@@ -784,6 +807,9 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 
 	if input.Status != "" {
 		user.Status = input.Status
+	}
+	if input.Role != "" {
+		user.Role = input.Role
 	}
 
 	if input.Concurrency != nil {
