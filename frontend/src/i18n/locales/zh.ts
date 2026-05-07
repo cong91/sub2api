@@ -177,6 +177,11 @@ export default {
     enterApiKey: '请输入 API Key',
     querySuccess: '查询成功',
     queryFailed: '查询失败',
+    windowUnits: {
+      day: '日',
+      week: '周',
+      month: '月'
+    },
     queryFailedRetry: '查询失败，请稍后重试',
   },
 
@@ -531,6 +536,9 @@ export default {
     wechatProviderName: '微信',
     wechatCallbackPageTitle: '微信登录回调',
     wechatPaymentCallbackPageTitle: '微信支付回调',
+    wechatConnect: {
+      mobileOnlyHint: '当前仅配置微信移动应用登录，需要在原生 App 中通过微信 SDK 发起授权。'
+    },
     wechatPayment: {
       callbackTitle: '正在恢复微信支付',
       callbackProcessing: '正在恢复微信支付...',
@@ -1463,7 +1471,22 @@ export default {
         restoreConfirm: '确定要从此备份恢复吗？这将覆盖当前数据库！',
         restorePasswordPrompt: '请输入管理员密码以确认恢复操作',
         restoreSuccess: '数据库恢复成功',
-        deleteConfirm: '确定要删除此备份吗？',
+        intervalValidation: {
+        minTokensNonNegative: '区间 #{index}: 最小 token 数 ({value}) 不能为负数',
+        maxTokensPositive: '区间 #{index}: 最大 token 数 ({value}) 必须大于 0',
+        maxTokensGreaterThanMin: '区间 #{index}: 最大 token 数 ({max}) 必须大于最小 token 数 ({min})',
+        priceNonNegative: '区间 #{index}: {name}不能为负数',
+        unboundedLast: '区间 #{index}: 无上限区间（最大 token 数为空）只能是最后一个',
+        overlap: '区间 #{prevIndex} 和 #{index} 重叠：前一个区间上界 ({prevMax}) 大于当前区间下界 ({min})',
+        priceNames: {
+          input: '输入价格',
+          output: '输出价格',
+          cacheWrite: '缓存写入价格',
+          cacheRead: '缓存读取价格',
+          perRequest: '单次价格'
+        }
+      },
+      deleteConfirm: '确定要删除此备份吗？',
         deleted: '备份已删除'
       },
       r2Guide: {
@@ -2203,7 +2226,16 @@ export default {
         tooltipEdit: '选择一个或多个相同平台的分组，保存后当前分组的账号会被替换为这些分组的账号（去重）。',
         selectPlaceholder: '选择分组以复制其账号...',
         hint: '可选多个分组，账号会自动去重',
+        optionLabel: '{name} ({count} 个账号)',
         hintEdit: '⚠️ 注意：这会替换当前分组的所有账号绑定'
+      },
+      accountFilter: {
+        title: '账号过滤控制',
+        requireOAuthOnly: '仅允许 OAuth 账号',
+        oauthOnlyEnabled: '已启用 — 排除 API Key 类型账号',
+        requirePrivacySet: '仅允许隐私保护已设置的账号',
+        privacySetEnabled: '已启用 — Privacy 未设置的账号将被排除',
+        disabled: '未启用'
       },
       modelRouting: {
         title: '模型路由配置',
@@ -2286,6 +2318,21 @@ export default {
     channels: {
       title: '渠道管理',
       description: '管理渠道和自定义模型定价',
+      intervalValidation: {
+        minTokensNonNegative: '区间 #{index}: 最小 token 数 ({value}) 不能为负数',
+        maxTokensPositive: '区间 #{index}: 最大 token 数 ({value}) 必须大于 0',
+        maxTokensGreaterThanMin: '区间 #{index}: 最大 token 数 ({max}) 必须大于最小 token 数 ({min})',
+        priceNonNegative: '区间 #{index}: {name} 不能为负数',
+        unboundedLast: '区间 #{index}: 无上限区间（最大 token 数为空）只能放在最后',
+        overlap: '区间 #{prevIndex} 与 #{index} 重叠: 上一个上限 ({prevMax}) 大于当前下限 ({min})',
+        priceNames: {
+          input: '输入价格',
+          output: '输出价格',
+          cacheWrite: '缓存写入价格',
+          cacheRead: '缓存读取价格',
+          perRequest: '每请求价格'
+        }
+      },
       searchChannels: '搜索渠道...',
       createChannel: '创建渠道',
       editChannel: '编辑渠道',
@@ -3527,7 +3574,17 @@ export default {
           customTitle: '自定义授权（AI Studio OAuth）',
           customDesc: '使用管理员预设的 OAuth 客户端，适合组织管理。',
           customRequirement: '需管理员配置 Client ID 并加入测试用户白名单。',
+          googleOneDesc: '个人账号，享受 Google One 订阅配额',
+          codeAssistDesc: '企业级，需要 GCP 项目',
+          codeAssistRequirement: '需要激活 GCP 项目并绑定信用卡',
+          googleOneAccount: '个人账号',
+          gcpCodeAssistAccount: 'GCP Code Assist 账号',
+          showAdvanced: '显示高级选项（自建 OAuth Client）',
+          hideAdvanced: '隐藏高级选项（自建 OAuth Client）',
           badges: {
+            recommendedPersonal: '推荐个人用户',
+            noGcp: '无需 GCP',
+            enterpriseUser: '企业用户',
             recommended: '推荐',
             highConcurrency: '高并发',
             noAdmin: '无需管理员配置',
@@ -3545,6 +3602,7 @@ export default {
           activationTitle: '服务激活',
           activationItems: {
             geminiWeb: '激活 Gemini Web，避免 User not initialized。',
+            changeCountryAssociation: '修改归属地',
             gcpProject: '激活 GCP 项目，获取 Code Assist 所需 Project ID。'
           },
           links: {
@@ -5234,6 +5292,36 @@ export default {
         redirectUrlSetAndCopied: '已使用当前站点生成回调地址并复制到剪贴板',
         frontendRedirectUrl: '前端回调路径',
         frontendRedirectUrlPlaceholder: '/auth/oidc/callback',
+        modes: {
+          open: {
+            title: 'PC 应用',
+            description: '桌面浏览器通过微信开放平台扫码登录。可与公众号或移动应用同时存在。',
+            appIdLabel: 'PC 应用 AppID',
+            appIdPlaceholder: '微信开放平台 PC 应用 AppID',
+            appSecretLabel: 'PC 应用 AppSecret',
+            appSecretPlaceholder: '微信开放平台 PC 应用 AppSecret'
+          },
+          mp: {
+            title: '公众号',
+            description: '仅在微信内浏览器可用；非微信环境下会显示不可用。',
+            appIdLabel: '公众号 AppID',
+            appIdPlaceholder: '公众号 AppID',
+            appSecretLabel: '公众号 AppSecret',
+            appSecretPlaceholder: '公众号 AppSecret'
+          },
+          mobile: {
+            title: '移动应用',
+            description: '原生移动端通过微信 SDK 唤起授权，网页端不会直接发起该流程。',
+            appIdLabel: '移动应用 AppID',
+            appIdPlaceholder: '移动应用 AppID',
+            appSecretLabel: '移动应用 AppSecret',
+            appSecretPlaceholder: '移动应用 AppSecret'
+          }
+        },
+        unionIdWarning: '如果同时启用 PC 应用和公众号/移动应用，这些应用需要挂在同一个微信开放平台主体下，否则 UnionID 无法稳定归并账号。',
+        browserRedirectUrlLabel: '浏览器回调地址',
+        browserRedirectUrlHint: '用于 PC 应用和公众号的网页回调。移动应用走原生 SDK 时不直接使用这个浏览器回调。',
+        mpMobileConflict: '公众号和移动应用不能同时启用。',
         frontendRedirectUrlHint: '后端回调完成后重定向到此前端路径',
         tokenAuthMethod: 'Token 鉴权方式',
         clockSkewSeconds: '时钟偏移（秒）',
@@ -6019,6 +6107,13 @@ export default {
         methodHint: '控制前台结算页是否展示该方式，以及展示时使用的来源键。',
         sourceLabel: '支付来源',
         sourceHint: '启用后必须明确选择一个来源；未配置状态不会对外展示该支付方式。',
+        sources: {
+          notConfigured: '未配置',
+          officialAlipay: '支付宝官方',
+          easypayAlipay: '易支付支付宝',
+          officialWxpay: '微信官方',
+          easypayWxpay: '易支付微信'
+        },
         sourceRequiredError: '{title} 已启用，请先选择支付来源。'
       },
       openaiExperimentalScheduler: {
