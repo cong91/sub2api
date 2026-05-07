@@ -115,6 +115,20 @@ func (_c *RedeemCodeCreate) SetNillableNotes(v *string) *RedeemCodeCreate {
 	return _c
 }
 
+// SetCreatedBy sets the "created_by" field.
+func (_c *RedeemCodeCreate) SetCreatedBy(v int64) *RedeemCodeCreate {
+	_c.mutation.SetCreatedBy(v)
+	return _c
+}
+
+// SetNillableCreatedBy sets the "created_by" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableCreatedBy(v *int64) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetCreatedBy(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *RedeemCodeCreate) SetCreatedAt(v time.Time) *RedeemCodeCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -125,20 +139,6 @@ func (_c *RedeemCodeCreate) SetCreatedAt(v time.Time) *RedeemCodeCreate {
 func (_c *RedeemCodeCreate) SetNillableCreatedAt(v *time.Time) *RedeemCodeCreate {
 	if v != nil {
 		_c.SetCreatedAt(*v)
-	}
-	return _c
-}
-
-// SetExpiresAt sets the "expires_at" field.
-func (_c *RedeemCodeCreate) SetExpiresAt(v time.Time) *RedeemCodeCreate {
-	_c.mutation.SetExpiresAt(v)
-	return _c
-}
-
-// SetNillableExpiresAt sets the "expires_at" field if the given value is not nil.
-func (_c *RedeemCodeCreate) SetNillableExpiresAt(v *time.Time) *RedeemCodeCreate {
-	if v != nil {
-		_c.SetExpiresAt(*v)
 	}
 	return _c
 }
@@ -193,6 +193,25 @@ func (_c *RedeemCodeCreate) SetUser(v *User) *RedeemCodeCreate {
 // SetGroup sets the "group" edge to the Group entity.
 func (_c *RedeemCodeCreate) SetGroup(v *Group) *RedeemCodeCreate {
 	return _c.SetGroupID(v.ID)
+}
+
+// SetCreatorID sets the "creator" edge to the User entity by ID.
+func (_c *RedeemCodeCreate) SetCreatorID(id int64) *RedeemCodeCreate {
+	_c.mutation.SetCreatorID(id)
+	return _c
+}
+
+// SetNillableCreatorID sets the "creator" edge to the User entity by ID if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableCreatorID(id *int64) *RedeemCodeCreate {
+	if id != nil {
+		_c = _c.SetCreatorID(*id)
+	}
+	return _c
+}
+
+// SetCreator sets the "creator" edge to the User entity.
+func (_c *RedeemCodeCreate) SetCreator(v *User) *RedeemCodeCreate {
+	return _c.SetCreatorID(v.ID)
 }
 
 // AddClaimedDeviceIDs adds the "claimed_devices" edge to the UserDevice entity by IDs.
@@ -372,10 +391,6 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 		_spec.SetField(redeemcode.FieldCreatedAt, field.TypeTime, value)
 		_node.CreatedAt = value
 	}
-	if value, ok := _c.mutation.ExpiresAt(); ok {
-		_spec.SetField(redeemcode.FieldExpiresAt, field.TypeTime, value)
-		_node.ExpiresAt = &value
-	}
 	if value, ok := _c.mutation.ValidityDays(); ok {
 		_spec.SetField(redeemcode.FieldValidityDays, field.TypeInt, value)
 		_node.ValidityDays = value
@@ -412,6 +427,23 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.GroupID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.CreatorIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   redeemcode.CreatorTable,
+			Columns: []string{redeemcode.CreatorColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.CreatedBy = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.ClaimedDevicesIDs(); len(nodes) > 0 {
@@ -606,21 +638,21 @@ func (u *RedeemCodeUpsert) ClearNotes() *RedeemCodeUpsert {
 	return u
 }
 
-// SetExpiresAt sets the "expires_at" field.
-func (u *RedeemCodeUpsert) SetExpiresAt(v time.Time) *RedeemCodeUpsert {
-	u.Set(redeemcode.FieldExpiresAt, v)
+// SetCreatedBy sets the "created_by" field.
+func (u *RedeemCodeUpsert) SetCreatedBy(v int64) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldCreatedBy, v)
 	return u
 }
 
-// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
-func (u *RedeemCodeUpsert) UpdateExpiresAt() *RedeemCodeUpsert {
-	u.SetExcluded(redeemcode.FieldExpiresAt)
+// UpdateCreatedBy sets the "created_by" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateCreatedBy() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldCreatedBy)
 	return u
 }
 
-// ClearExpiresAt clears the value of the "expires_at" field.
-func (u *RedeemCodeUpsert) ClearExpiresAt() *RedeemCodeUpsert {
-	u.SetNull(redeemcode.FieldExpiresAt)
+// ClearCreatedBy clears the value of the "created_by" field.
+func (u *RedeemCodeUpsert) ClearCreatedBy() *RedeemCodeUpsert {
+	u.SetNull(redeemcode.FieldCreatedBy)
 	return u
 }
 
@@ -831,24 +863,24 @@ func (u *RedeemCodeUpsertOne) ClearNotes() *RedeemCodeUpsertOne {
 	})
 }
 
-// SetExpiresAt sets the "expires_at" field.
-func (u *RedeemCodeUpsertOne) SetExpiresAt(v time.Time) *RedeemCodeUpsertOne {
+// SetCreatedBy sets the "created_by" field.
+func (u *RedeemCodeUpsertOne) SetCreatedBy(v int64) *RedeemCodeUpsertOne {
 	return u.Update(func(s *RedeemCodeUpsert) {
-		s.SetExpiresAt(v)
+		s.SetCreatedBy(v)
 	})
 }
 
-// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
-func (u *RedeemCodeUpsertOne) UpdateExpiresAt() *RedeemCodeUpsertOne {
+// UpdateCreatedBy sets the "created_by" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateCreatedBy() *RedeemCodeUpsertOne {
 	return u.Update(func(s *RedeemCodeUpsert) {
-		s.UpdateExpiresAt()
+		s.UpdateCreatedBy()
 	})
 }
 
-// ClearExpiresAt clears the value of the "expires_at" field.
-func (u *RedeemCodeUpsertOne) ClearExpiresAt() *RedeemCodeUpsertOne {
+// ClearCreatedBy clears the value of the "created_by" field.
+func (u *RedeemCodeUpsertOne) ClearCreatedBy() *RedeemCodeUpsertOne {
 	return u.Update(func(s *RedeemCodeUpsert) {
-		s.ClearExpiresAt()
+		s.ClearCreatedBy()
 	})
 }
 
@@ -1231,24 +1263,24 @@ func (u *RedeemCodeUpsertBulk) ClearNotes() *RedeemCodeUpsertBulk {
 	})
 }
 
-// SetExpiresAt sets the "expires_at" field.
-func (u *RedeemCodeUpsertBulk) SetExpiresAt(v time.Time) *RedeemCodeUpsertBulk {
+// SetCreatedBy sets the "created_by" field.
+func (u *RedeemCodeUpsertBulk) SetCreatedBy(v int64) *RedeemCodeUpsertBulk {
 	return u.Update(func(s *RedeemCodeUpsert) {
-		s.SetExpiresAt(v)
+		s.SetCreatedBy(v)
 	})
 }
 
-// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
-func (u *RedeemCodeUpsertBulk) UpdateExpiresAt() *RedeemCodeUpsertBulk {
+// UpdateCreatedBy sets the "created_by" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateCreatedBy() *RedeemCodeUpsertBulk {
 	return u.Update(func(s *RedeemCodeUpsert) {
-		s.UpdateExpiresAt()
+		s.UpdateCreatedBy()
 	})
 }
 
-// ClearExpiresAt clears the value of the "expires_at" field.
-func (u *RedeemCodeUpsertBulk) ClearExpiresAt() *RedeemCodeUpsertBulk {
+// ClearCreatedBy clears the value of the "created_by" field.
+func (u *RedeemCodeUpsertBulk) ClearCreatedBy() *RedeemCodeUpsertBulk {
 	return u.Update(func(s *RedeemCodeUpsert) {
-		s.ClearExpiresAt()
+		s.ClearCreatedBy()
 	})
 }
 
