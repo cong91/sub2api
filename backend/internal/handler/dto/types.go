@@ -346,6 +346,9 @@ type RedeemCode struct {
 	// so users can see why they were charged or credited
 	Notes *string `json:"notes,omitempty"`
 
+	CreatedBy     *int64 `json:"created_by,omitempty"`
+	CreatedByUser *User  `json:"created_by_user,omitempty"`
+
 	User  *User  `json:"user,omitempty"`
 	Group *Group `json:"group,omitempty"`
 }
@@ -513,6 +516,10 @@ type UserSubscription struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
+	DeviceIdentityCode *string `json:"device_identity_code,omitempty"`
+	DeviceIdentityType *string `json:"device_identity_type,omitempty"`
+	HasDeviceBinding   bool    `json:"has_device_binding"`
+
 	User  *User  `json:"user,omitempty"`
 	Group *Group `json:"group,omitempty"`
 }
@@ -541,16 +548,18 @@ type BulkAssignResult struct {
 
 // PromoCode 注册优惠码
 type PromoCode struct {
-	ID          int64      `json:"id"`
-	Code        string     `json:"code"`
-	BonusAmount float64    `json:"bonus_amount"`
-	MaxUses     int        `json:"max_uses"`
-	UsedCount   int        `json:"used_count"`
-	Status      string     `json:"status"`
-	ExpiresAt   *time.Time `json:"expires_at"`
-	Notes       string     `json:"notes"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID            int64      `json:"id"`
+	Code          string     `json:"code"`
+	BonusAmount   float64    `json:"bonus_amount"`
+	MaxUses       int        `json:"max_uses"`
+	UsedCount     int        `json:"used_count"`
+	Status        string     `json:"status"`
+	ExpiresAt     *time.Time `json:"expires_at"`
+	Notes         string     `json:"notes"`
+	CreatedBy     *int64     `json:"created_by,omitempty"`
+	CreatedByUser *User      `json:"created_by_user,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
 // PromoCodeUsage 优惠码使用记录
