@@ -20,11 +20,11 @@ FROM ${NODE_IMAGE} AS frontend-builder
 
 WORKDIR /app/frontend
 
-# Install pnpm (pinned to v9 to match CI and keep builds reproducible)
-RUN corepack enable && corepack prepare pnpm@9 --activate
+# Install pnpm (pinned for reproducible CI builds)
+RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
 
 # Install dependencies first (better caching)
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/.npmrc ./
 RUN pnpm install --frozen-lockfile
 
 # Copy frontend source and build
