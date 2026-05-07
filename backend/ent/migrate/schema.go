@@ -1021,12 +1021,21 @@ var (
 		{Name: "notes", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
 		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "created_by", Type: field.TypeInt64, Nullable: true},
 	}
 	// PromoCodesTable holds the schema information for the "promo_codes" table.
 	PromoCodesTable = &schema.Table{
 		Name:       "promo_codes",
 		Columns:    PromoCodesColumns,
 		PrimaryKey: []*schema.Column{PromoCodesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "promo_codes_users_created_promo_codes",
+				Columns:    []*schema.Column{PromoCodesColumns[10]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "promocode_status",
@@ -1037,6 +1046,11 @@ var (
 				Name:    "promocode_expires_at",
 				Unique:  false,
 				Columns: []*schema.Column{PromoCodesColumns[6]},
+			},
+			{
+				Name:    "promocode_created_by",
+				Unique:  false,
+				Columns: []*schema.Column{PromoCodesColumns[10]},
 			},
 		},
 	}
@@ -1130,6 +1144,7 @@ var (
 		{Name: "validity_days", Type: field.TypeInt, Default: 30},
 		{Name: "group_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "used_by", Type: field.TypeInt64, Nullable: true},
+		{Name: "created_by", Type: field.TypeInt64, Nullable: true},
 	}
 	// RedeemCodesTable holds the schema information for the "redeem_codes" table.
 	RedeemCodesTable = &schema.Table{
@@ -1149,6 +1164,12 @@ var (
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
+			{
+				Symbol:     "redeem_codes_users_created_redeem_codes",
+				Columns:    []*schema.Column{RedeemCodesColumns[11]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
 		},
 		Indexes: []*schema.Index{
 			{
@@ -1165,6 +1186,11 @@ var (
 				Name:    "redeemcode_group_id",
 				Unique:  false,
 				Columns: []*schema.Column{RedeemCodesColumns[9]},
+			},
+			{
+				Name:    "redeemcode_created_by",
+				Unique:  false,
+				Columns: []*schema.Column{RedeemCodesColumns[11]},
 			},
 		},
 	}
@@ -1872,6 +1898,7 @@ func init() {
 	PendingAuthSessionsTable.Annotation = &entsql.Annotation{
 		Table: "pending_auth_sessions",
 	}
+	PromoCodesTable.ForeignKeys[0].RefTable = UsersTable
 	PromoCodesTable.Annotation = &entsql.Annotation{
 		Table: "promo_codes",
 	}
@@ -1885,6 +1912,7 @@ func init() {
 	}
 	RedeemCodesTable.ForeignKeys[0].RefTable = GroupsTable
 	RedeemCodesTable.ForeignKeys[1].RefTable = UsersTable
+	RedeemCodesTable.ForeignKeys[2].RefTable = UsersTable
 	RedeemCodesTable.Annotation = &entsql.Annotation{
 		Table: "redeem_codes",
 	}
