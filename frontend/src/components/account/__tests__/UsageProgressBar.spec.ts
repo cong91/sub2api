@@ -7,7 +7,7 @@ vi.mock('vue-i18n', async () => {
   return {
     ...actual,
     useI18n: () => ({
-      t: (key: string) => key
+      t: (key: string) => (key === 'common.now' ? 'Now' : key)
     })
   }
 })
@@ -22,7 +22,7 @@ describe('UsageProgressBar', () => {
     vi.useRealTimers()
   })
 
-  it('showNowWhenIdle=true 且利用率为 0 时显示“现在”', () => {
+  it('showNowWhenIdle=true and utilization is 0 shows now label', () => {
     const wrapper = mount(UsageProgressBar, {
       props: {
         label: '5h',
@@ -33,11 +33,11 @@ describe('UsageProgressBar', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('现在')
+    expect(wrapper.text()).toContain('Now')
     expect(wrapper.text()).not.toContain('2h 30m')
   })
 
-  it('showNowWhenIdle=true 但利用率大于 0 时显示倒计时', () => {
+  it('showNowWhenIdle=true but utilization above 0 shows countdown', () => {
     const wrapper = mount(UsageProgressBar, {
       props: {
         label: '7d',
@@ -49,10 +49,10 @@ describe('UsageProgressBar', () => {
     })
 
     expect(wrapper.text()).toContain('2h 30m')
-    expect(wrapper.text()).not.toContain('现在')
+    expect(wrapper.text()).not.toContain('Now')
   })
 
-  it('showNowWhenIdle=false 时保持原有倒计时行为', () => {
+  it('showNowWhenIdle=false keeps countdown behavior', () => {
     const wrapper = mount(UsageProgressBar, {
       props: {
         label: '1d',
@@ -64,6 +64,6 @@ describe('UsageProgressBar', () => {
     })
 
     expect(wrapper.text()).toContain('2h 30m')
-    expect(wrapper.text()).not.toContain('现在')
+    expect(wrapper.text()).not.toContain('Now')
   })
 })

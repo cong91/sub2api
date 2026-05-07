@@ -50,6 +50,8 @@ vi.mock('@/api/auth', () => ({
 interface MockAuthState {
   isAuthenticated: boolean
   isAdmin: boolean
+  isMarketing?: boolean
+  hasAdminConsoleAccess?: boolean
   isSimpleMode: boolean
   backendModeEnabled: boolean
   hasPendingAuthSession: boolean
@@ -65,6 +67,9 @@ function simulateGuard(
 ): string | null {
   const requiresAuth = toMeta.requiresAuth !== false
   const requiresAdmin = toMeta.requiresAdmin === true
+  const allowMarketing = toMeta.allowMarketing === true
+  const isMarketing = authState.isMarketing === true
+  const hasAdminConsoleAccess = authState.hasAdminConsoleAccess ?? (authState.isAdmin || isMarketing)
 
   // 不需要认证的路由
   if (!requiresAuth) {
@@ -72,13 +77,13 @@ function simulateGuard(
       authState.isAuthenticated &&
       (toPath === '/login' || toPath === '/register')
     ) {
-      if (authState.backendModeEnabled && !authState.isAdmin) {
+      if (authState.backendModeEnabled && !hasAdminConsoleAccess) {
         return null
       }
-      return authState.isAdmin ? '/admin/dashboard' : '/dashboard'
+      return hasAdminConsoleAccess ? '/admin/dashboard' : '/dashboard'
     }
     if (authState.backendModeEnabled && !authState.isAuthenticated) {
-      const allowed = ['/login', '/key-usage', '/setup', '/payment/result']
+      const allowed = ['/login', '/key-usage', '/setup', '/payment/result', '/checkout']
       const callbackPaths = [
         '/auth/callback',
         '/auth/linuxdo/callback',
@@ -103,9 +108,12 @@ function simulateGuard(
     return '/login'
   }
 
-  // 需要管理员但不是管理员
-  if (requiresAdmin && !authState.isAdmin) {
-    return '/dashboard'
+  // 需要后台权限：管理员可访问全部，营销只能访问允许的后台路由。
+  if (requiresAdmin) {
+    const hasRequiredAdminAccess = authState.isAdmin || (allowMarketing && isMarketing)
+    if (!hasRequiredAdminAccess) {
+      return hasAdminConsoleAccess ? '/admin/dashboard' : '/dashboard'
+    }
   }
 
   // 简易模式限制
@@ -118,16 +126,16 @@ function simulateGuard(
       '/redeem',
     ]
     if (restrictedPaths.some((path) => toPath.startsWith(path))) {
-      return authState.isAdmin ? '/admin/dashboard' : '/dashboard'
+      return hasAdminConsoleAccess ? '/admin/dashboard' : '/dashboard'
     }
   }
 
-  // Backend mode: admin gets full access, non-admin blocked
+  // Backend mode: admin-console roles get protected console access, non-console users are blocked
   if (authState.backendModeEnabled) {
-    if (authState.isAuthenticated && authState.isAdmin) {
+    if (authState.isAuthenticated && hasAdminConsoleAccess) {
       return null
     }
-    const allowed = ['/login', '/key-usage', '/setup', '/payment/result']
+    const allowed = ['/login', '/key-usage', '/setup', '/payment/result', '/checkout']
     const callbackPaths = [
       '/auth/callback',
       '/auth/linuxdo/callback',
@@ -159,6 +167,8 @@ describe('路由守卫逻辑', () => {
     const authState: MockAuthState = {
       isAuthenticated: false,
       isAdmin: false,
+      isMarketing: false,
+      hasAdminConsoleAccess: false,
       isSimpleMode: false,
       backendModeEnabled: false,
       hasPendingAuthSession: false,
@@ -191,6 +201,8 @@ describe('路由守卫逻辑', () => {
     const authState: MockAuthState = {
       isAuthenticated: true,
       isAdmin: false,
+      isMarketing: false,
+      hasAdminConsoleAccess: false,
       isSimpleMode: false,
       backendModeEnabled: false,
       hasPendingAuthSession: false,
@@ -228,6 +240,8 @@ describe('路由守卫逻辑', () => {
     const authState: MockAuthState = {
       isAuthenticated: true,
       isAdmin: true,
+      isMarketing: false,
+      hasAdminConsoleAccess: true,
       isSimpleMode: false,
       backendModeEnabled: false,
       hasPendingAuthSession: false,
@@ -245,6 +259,40 @@ describe('路由守卫逻辑', () => {
 
     it('访问用户页面允许通过', () => {
       const redirect = simulateGuard('/dashboard', {}, authState)
+      expect(redirect).toBeNull()
+    })
+  })
+
+
+
+  // --- Đã xác thực vai trò marketing ---
+
+  describe('đã xác thực marketing', () => {
+    const authState: MockAuthState = {
+      isAuthenticated: true,
+      isAdmin: false,
+      isMarketing: true,
+      hasAdminConsoleAccess: true,
+      isSimpleMode: false,
+      backendModeEnabled: false,
+      hasPendingAuthSession: false,
+    }
+
+    it('được vào route admin-console đã allowMarketing', () => {
+      const redirect = simulateGuard('/admin/subscriptions', { requiresAdmin: true, allowMarketing: true }, authState)
+      expect(redirect).toBeNull()
+    })
+
+    it('bị chặn khỏi route chỉ dành cho admin đầy đủ', () => {
+      const redirect = simulateGuard('/admin/settings', { requiresAdmin: true }, authState)
+      expect(redirect).toBe('/admin/dashboard')
+    })
+
+    it('backend mode vẫn cho marketing vào admin dashboard', () => {
+      const redirect = simulateGuard('/admin/dashboard', { requiresAdmin: true, allowMarketing: true }, {
+        ...authState,
+        backendModeEnabled: true,
+      })
       expect(redirect).toBeNull()
     })
   })
