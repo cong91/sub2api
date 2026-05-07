@@ -60,6 +60,12 @@
                 >
                   <span class="font-medium text-gray-900 dark:text-white">{{ user.email }}</span>
                   <span class="ml-2 text-gray-500 dark:text-gray-400">#{{ user.id }}</span>
+                  <span
+                    v-if="user.primary_redeem_code"
+                    class="ml-2 rounded bg-blue-50 px-1.5 py-0.5 font-mono text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                  >
+                    {{ user.primary_redeem_code }}
+                  </span>
                 </button>
               </div>
             </div>
@@ -488,6 +494,12 @@
               >
                 <span class="font-medium text-gray-900 dark:text-white">{{ user.email }}</span>
                 <span class="ml-2 text-gray-500 dark:text-gray-400">#{{ user.id }}</span>
+                <span
+                  v-if="user.primary_redeem_code"
+                  class="ml-2 rounded bg-blue-50 px-1.5 py-0.5 font-mono text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                >
+                  {{ user.primary_redeem_code }}
+                </span>
               </button>
             </div>
           </div>
@@ -917,6 +929,11 @@ const showUserDropdown = ref(false)
 const selectedUser = ref<SimpleUser | null>(null)
 let userSearchTimeout: ReturnType<typeof setTimeout> | null = null
 
+const getUserSearchDisplay = (user: SimpleUser) => {
+  const identityCode = user.primary_redeem_code?.trim()
+  return identityCode ? `${user.email} · ${identityCode}` : user.email
+}
+
 const filters = reactive({
   status: 'active',
   group_id: '',
@@ -1077,7 +1094,7 @@ const searchFilterUsers = async () => {
 
 const selectFilterUser = (user: SimpleUser) => {
   selectedFilterUser.value = user
-  filterUserKeyword.value = user.email
+  filterUserKeyword.value = getUserSearchDisplay(user)
   showFilterUserDropdown.value = false
   filters.user_id = user.id
   applyFilters()
@@ -1127,7 +1144,7 @@ const searchUsers = async () => {
 
 const selectUser = (user: SimpleUser) => {
   selectedUser.value = user
-  userSearchKeyword.value = user.email
+  userSearchKeyword.value = getUserSearchDisplay(user)
   showUserDropdown.value = false
   assignForm.user_id = user.id
 }
