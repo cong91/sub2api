@@ -379,6 +379,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Admin Dashboard',
       titleKey: 'admin.dashboard.title',
+      allowMarketing: true,
       descriptionKey: 'admin.dashboard.description'
     }
   },
@@ -391,6 +392,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Ops Monitoring',
       titleKey: 'admin.ops.title',
+      allowMarketing: true,
       descriptionKey: 'admin.ops.description'
     }
   },
@@ -403,6 +405,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'User Management',
       titleKey: 'admin.users.title',
+      allowMarketing: true,
       descriptionKey: 'admin.users.description'
     }
   },
@@ -466,6 +469,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Subscription Management',
       titleKey: 'admin.subscriptions.title',
+      allowMarketing: true,
       descriptionKey: 'admin.subscriptions.description'
     }
   },
@@ -514,6 +518,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Redeem Code Management',
       titleKey: 'admin.redeem.title',
+      allowMarketing: true,
       descriptionKey: 'admin.redeem.description'
     }
   },
@@ -526,6 +531,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Promo Code Management',
       titleKey: 'admin.promo.title',
+      allowMarketing: true,
       descriptionKey: 'admin.promo.description'
     }
   },
@@ -563,6 +569,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Usage Records',
       titleKey: 'admin.usage.title',
+      allowMarketing: true,
       descriptionKey: 'admin.usage.description'
     }
   },
@@ -579,6 +586,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Affiliate Invite Records',
       titleKey: 'nav.affiliateInviteRecords',
+      allowMarketing: true,
       descriptionKey: 'admin.affiliates.invitesDescription'
     }
   },
@@ -591,6 +599,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Affiliate Rebate Records',
       titleKey: 'nav.affiliateRebateRecords',
+      allowMarketing: true,
       descriptionKey: 'admin.affiliates.rebatesDescription'
     }
   },
@@ -603,6 +612,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Affiliate Transfer Records',
       titleKey: 'nav.affiliateTransferRecords',
+      allowMarketing: true,
       descriptionKey: 'admin.affiliates.transfersDescription'
     }
   },
@@ -618,6 +628,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Payment Dashboard',
       titleKey: 'nav.paymentDashboard',
+      allowMarketing: true,
       requiresPayment: true
     }
   },
@@ -630,6 +641,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Order Management',
       titleKey: 'nav.orderManagement',
+      allowMarketing: true,
       requiresPayment: true
     }
   },
@@ -642,6 +654,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Subscription Plans',
       titleKey: 'nav.paymentPlans',
+      allowMarketing: true,
       requiresPayment: true
     }
   },
@@ -708,7 +721,7 @@ function updateDocumentTitle(to = router.currentRoute.value): void {
     const publicItems = appStore.cachedPublicSettings?.custom_menu_items ?? []
     const adminSettingsStore = useAdminSettingsStore()
     const menuItem = publicItems.find((item) => item.id === id)
-      ?? (authStore.isAdmin ? adminSettingsStore.customMenuItems.find((item) => item.id === id) : undefined)
+      ?? (authStore.hasAdminConsoleAccess ? adminSettingsStore.customMenuItems.find((item) => item.id === id) : undefined)
     if (menuItem?.label) {
       const siteName = appStore.siteName || 'Sub2API'
       document.title = `${menuItem.label} - ${siteName}`
@@ -799,6 +812,7 @@ router.beforeEach(async (to, _from, next) => {
   // Check if route requires authentication
   const requiresAuth = to.meta.requiresAuth !== false // Default to true
   const requiresAdmin = to.meta.requiresAdmin === true
+  const allowMarketing = to.meta.allowMarketing === true
 
   // If route doesn't require auth, allow access
   if (!requiresAuth) {
@@ -806,12 +820,12 @@ router.beforeEach(async (to, _from, next) => {
     if (authStore.isAuthenticated && (to.path === '/login' || to.path === '/register')) {
       // In backend mode, non-admin users should NOT be redirected away from login
       // (they are blocked from all protected routes, so redirecting would cause a loop)
-      if (appStore.backendModeEnabled && !authStore.isAdmin) {
+      if (appStore.backendModeEnabled && !authStore.hasAdminConsoleAccess) {
         next()
         return
       }
-      // Admin users go to admin dashboard, regular users go to user dashboard
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      // Admin-console users go to admin dashboard, regular users go to user dashboard
+      next(authStore.hasAdminConsoleAccess ? '/admin/dashboard' : '/dashboard')
       return
     }
     // Backend mode: block public pages for unauthenticated users (except login, key-usage, setup)
@@ -837,10 +851,13 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   // Check admin requirement
-  if (requiresAdmin && !authStore.isAdmin) {
-    // User is authenticated but not admin, redirect to user dashboard
-    next('/dashboard')
-    return
+  if (requiresAdmin) {
+    const hasRequiredAdminAccess = authStore.isAdmin || (allowMarketing && authStore.isMarketing)
+    if (!hasRequiredAdminAccess) {
+      // User is authenticated but lacks access to this admin-console route.
+      next(authStore.hasAdminConsoleAccess ? '/admin/dashboard' : '/dashboard')
+      return
+    }
   }
 
   if (requiresAdmin && authStore.isAdmin) {
@@ -862,7 +879,7 @@ router.beforeEach(async (to, _from, next) => {
   if (to.meta.requiresPayment) {
     const paymentEnabled = appStore.cachedPublicSettings?.payment_enabled
     if (!paymentEnabled) {
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      next(authStore.hasAdminConsoleAccess ? '/admin/dashboard' : '/dashboard')
       return
     }
   }
@@ -887,14 +904,14 @@ router.beforeEach(async (to, _from, next) => {
 
     if (restrictedPaths.some((path) => to.path.startsWith(path))) {
       // 简易模式下访问受限页面,重定向到仪表板
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      next(authStore.hasAdminConsoleAccess ? '/admin/dashboard' : '/dashboard')
       return
     }
   }
 
-  // Backend mode: admin gets full access, non-admin blocked
+  // Backend mode: admin-console roles get protected console access, non-console users are blocked.
   if (appStore.backendModeEnabled) {
-    if (authStore.isAuthenticated && authStore.isAdmin) {
+    if (authStore.isAuthenticated && authStore.hasAdminConsoleAccess) {
       next()
       return
     }

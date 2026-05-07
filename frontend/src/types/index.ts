@@ -63,6 +63,8 @@ export interface UserProfileSourceContext {
   provider_label?: string | null
 }
 
+export type UserRole = 'admin' | 'marketing' | 'user'
+
 export interface User {
   id: number
   username: string
@@ -84,7 +86,7 @@ export interface User {
   linuxdo_bound?: boolean
   oidc_bound?: boolean
   wechat_bound?: boolean
-  role: 'admin' | 'user' // User role for authorization
+  role: UserRole // User role for authorization
   balance: number // User balance for API usage
   concurrency: number // Allowed concurrent requests
   rpm_limit?: number // User-level RPM cap (0 = unlimited); effective as fallback when group has no rpm_limit

@@ -1415,6 +1415,64 @@
         </div>
       </div>
 
+      <div
+        v-if="account?.platform === 'openai' && (account?.type === 'oauth' || account?.type === 'apikey')"
+        class="border-t border-gray-200 pt-4 dark:border-dark-600 space-y-4"
+      >
+        <div class="flex items-center justify-between">
+          <div>
+            <label class="input-label mb-0">{{ t('admin.accounts.openai.compactMode') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.openai.compactModeDesc') }}
+            </p>
+          </div>
+          <div class="w-44">
+            <Select v-model="openAICompactMode" :options="openAICompactModeOptions" />
+          </div>
+        </div>
+        <div class="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-dark-700 dark:text-gray-300">
+          <span class="font-medium">{{ t(openAICompactStatusKey) }}</span>
+          <span
+            v-if="account?.extra?.openai_compact_checked_at"
+            class="ml-2 text-gray-500 dark:text-gray-400"
+          >
+            {{ t('admin.accounts.openai.compactLastChecked') }}:
+            {{ formatDateTime(new Date(String(account.extra.openai_compact_checked_at))) }}
+          </span>
+        </div>
+        <div>
+          <label class="input-label">{{ t('admin.accounts.openai.compactModelMapping') }}</label>
+          <p class="input-hint">{{ t('admin.accounts.openai.compactModelMappingDesc') }}</p>
+          <div v-if="openAICompactModelMappings.length > 0" class="mb-3 space-y-2">
+            <div
+              v-for="(mapping, index) in openAICompactModelMappings"
+              :key="getOpenAICompactModelMappingKey(mapping)"
+              class="flex items-center gap-2"
+            >
+              <input
+                v-model="mapping.from"
+                type="text"
+                class="input flex-1"
+                :placeholder="t('admin.accounts.fromModel')"
+              />
+              <span class="text-gray-400">→</span>
+              <input
+                v-model="mapping.to"
+                type="text"
+                class="input flex-1"
+                :placeholder="t('admin.accounts.toModel')"
+              />
+              <button type="button" @click="removeOpenAICompactModelMapping(index)" class="text-red-500 hover:text-red-700">
+                <Icon name="trash" size="sm" />
+              </button>
+            </div>
+          </div>
+          <button type="button" @click="addOpenAICompactModelMapping" class="btn btn-secondary text-sm">
+            + {{ t('admin.accounts.addMapping') }}
+          </button>
+        </div>
+      </div>
+
       <!-- OpenAI WS Mode 三态（off/ctx_pool/passthrough） -->
       <div
         v-if="account?.platform === 'openai' && (account?.type === 'oauth' || account?.type === 'apikey')"
@@ -2341,7 +2399,7 @@ import GroupSelector from '@/components/common/GroupSelector.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import QuotaLimitCard from '@/components/account/QuotaLimitCard.vue'
 import { applyInterceptWarmup } from '@/components/account/credentialsBuilder'
-import { formatDateTimeLocalInput, parseDateTimeLocalInput } from '@/utils/format'
+import { formatDateTime, formatDateTimeLocalInput, parseDateTimeLocalInput } from '@/utils/format'
 import { createStableObjectKeyResolver } from '@/utils/stableObjectKey'
 import { VERTEX_LOCATION_OPTIONS } from '@/constants/account'
 import {
@@ -2421,6 +2479,7 @@ const isBedrockAPIKeyMode = computed(() =>
   (props.account?.credentials as Record<string, unknown>)?.auth_mode === 'apikey'
 )
 const modelMappings = ref<ModelMapping[]>([])
+const openAICompactModelMappings = ref<ModelMapping[]>([])
 const modelRestrictionMode = ref<'whitelist' | 'mapping'>('whitelist')
 const allowedModels = ref<string[]>([])
 const DEFAULT_POOL_MODE_RETRY_COUNT = 3
@@ -2479,6 +2538,7 @@ const isSyncingAntigravityUpstream = ref(false)
 const tempUnschedEnabled = ref(false)
 const tempUnschedRules = ref<TempUnschedRuleForm[]>([])
 const getModelMappingKey = createStableObjectKeyResolver<ModelMapping>('edit-model-mapping')
+const getOpenAICompactModelMappingKey = createStableObjectKeyResolver<ModelMapping>('edit-openai-compact-model-mapping')
 const getAntigravityModelMappingKey = createStableObjectKeyResolver<ModelMapping>('edit-antigravity-model-mapping')
 const getTempUnschedRuleKey = createStableObjectKeyResolver<TempUnschedRuleForm>('edit-temp-unsched-rule')
 
@@ -2943,6 +3003,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
         Array.isArray(extra?.codex_cli_only_allowed_clients) &&
         (extra.codex_cli_only_allowed_clients as unknown[]).includes('claude_code')
     }
+    const compactMappings = credentials?.compact_model_mapping as Record<string, string> | undefined
+    if (compactMappings && typeof compactMappings === 'object') {
+      openAICompactModelMappings.value = Object.entries(compactMappings).map(([from, to]) => ({ from, to }))
+    }
   }
   if (newAccount.platform === 'anthropic' && newAccount.type === 'apikey') {
     anthropicPassthroughEnabled.value = extra?.anthropic_passthrough === true
@@ -3164,6 +3228,14 @@ const addPresetMapping = (from: string, to: string) => {
 
 const addAntigravityModelMapping = () => {
   antigravityModelMappings.value.push({ from: '', to: '' })
+}
+
+const addOpenAICompactModelMapping = () => {
+  openAICompactModelMappings.value.push({ from: '', to: '' })
+}
+
+const removeOpenAICompactModelMapping = (index: number) => {
+  openAICompactModelMappings.value.splice(index, 1)
 }
 
 const removeAntigravityModelMapping = (index: number) => {
@@ -3647,6 +3719,12 @@ const handleSubmit = async () => {
       }
       if (props.account.platform === 'openai') {
         applyOpenAIEndpointCapabilities(newCredentials)
+        const compactModelMapping = buildModelMappingObject('mapping', [], openAICompactModelMappings.value)
+        if (compactModelMapping) {
+          newCredentials.compact_model_mapping = compactModelMapping
+        } else {
+          delete newCredentials.compact_model_mapping
+        }
       }
 
       // Add pool mode if enabled
@@ -3834,6 +3912,13 @@ const handleSubmit = async () => {
       } else if (currentCredentials.model_mapping) {
         // 透传模式保留现有映射
         newCredentials.model_mapping = currentCredentials.model_mapping
+      }
+
+      const compactModelMapping = buildModelMappingObject('mapping', [], openAICompactModelMappings.value)
+      if (compactModelMapping) {
+        newCredentials.compact_model_mapping = compactModelMapping
+      } else {
+        delete newCredentials.compact_model_mapping
       }
 
       updatePayload.credentials = newCredentials
