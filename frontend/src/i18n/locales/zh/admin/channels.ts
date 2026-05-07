@@ -625,6 +625,8 @@ export default {
       quotaEndsInDaysHours: '额度将在 {days} 天 {hours} 小时后结束',
       daysRemaining: '天剩余',
       remainingDays: '剩余天数',
+      deviceCode: '设备码',
+      deviceBound: '已绑定设备',
       noExpiration: '无过期时间',
       status: {
         active: '生效中',
