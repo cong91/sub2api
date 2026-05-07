@@ -4250,6 +4250,13 @@ const handleSubmit = async () => {
         }
       }
 
+      const compactModelMapping = buildModelMappingObject('mapping', [], openAICompactModelMappings.value)
+      if (compactModelMapping) {
+        newCredentials.compact_model_mapping = compactModelMapping
+      } else {
+        delete newCredentials.compact_model_mapping
+      }
+
       updatePayload.credentials = newCredentials
     }
 
