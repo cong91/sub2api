@@ -32,8 +32,6 @@
           </button>
         </div>
       </div>
-        </div>
-      </div>
 
       <!-- Login Form -->
       <form @submit.prevent="handleSubmit" class="space-y-5">
@@ -278,7 +276,6 @@ import TurnstileWidget from '@/components/TurnstileWidget.vue'
 import { useAuthStore, useAppStore } from '@/stores'
 import { getPublicSettings, isTotp2FARequired, isWeChatWebOAuthEnabled } from '@/api/auth'
 import type { TotpLoginResponse } from '@/types'
-import { extractI18nErrorMessage } from '@/utils/apiError'
 import { clearAllAffiliateReferralCodes } from '@/utils/oauthAffiliate'
 
 const { t } = useI18n()
