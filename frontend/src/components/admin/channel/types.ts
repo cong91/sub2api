@@ -115,75 +115,123 @@ export function findModelConflict(models: string[]): [string, string] | null {
 
 // ── 区间校验 ──────────────────────────────────────────────
 
-/** 校验区间列表的合法性，返回错误消息；通过则返回 null
+type Translate = (key: string, params?: Record<string, unknown>) => string
+
+const defaultTranslate: Translate = (key, params = {}) => {
+  const messages: Record<string, string> = {
+    'admin.channels.intervalValidation.minTokensNonNegative':
+      'Interval #{index}: minimum token count ({value}) cannot be negative',
+    'admin.channels.intervalValidation.maxTokensPositive':
+      'Interval #{index}: maximum token count ({value}) must be greater than 0',
+    'admin.channels.intervalValidation.maxTokensGreaterThanMin':
+      'Interval #{index}: maximum token count ({max}) must be greater than minimum token count ({min})',
+    'admin.channels.intervalValidation.priceNonNegative':
+      'Interval #{index}: {name} cannot be negative',
+    'admin.channels.intervalValidation.unboundedLast':
+      'Interval #{index}: unbounded interval (empty max tokens) can only be the last interval',
+    'admin.channels.intervalValidation.overlap':
+      'Intervals #{prevIndex} and #{index} overlap: previous upper bound ({prevMax}) is greater than current lower bound ({min})',
+  }
+  const template = messages[key] ?? key
+  return template.replace(/\{(\w+)\}/g, (_, param: string) => String(params[param] ?? ''))
+}
+
+/** Validate interval rules and return a localized error message; returns null when valid.
  *
- * mode 决定区间语义：
- * - token：区间是上下文 token 数分段 (min, max]，不能重叠，无上限段必须放最后
- * - per_request / image：区间是按 tier_label 分层（1K/2K/4K 等），后端按 label
- *   匹配，不依赖 min/max，因此跳过重叠 / last-unlimited 校验
+ * mode determines interval semantics:
+ * - token: intervals are context token count segments (min, max], cannot overlap, unbounded must be last
+ * - per_request / image: intervals are tier_label based (1K/2K/4K etc), backend matches by label,
+ *   so overlap / last-unlimited checks are skipped
  */
 export function validateIntervals(
   intervals: IntervalFormEntry[],
+  translate: Translate = defaultTranslate,
   mode: BillingMode = 'token',
 ): string | null {
   if (!intervals || intervals.length === 0) return null
 
-  // 按 min_tokens 排序（不修改原数组）
   const sorted = [...intervals].sort((a, b) => a.min_tokens - b.min_tokens)
 
   for (let i = 0; i < sorted.length; i++) {
-    const err = validateSingleInterval(sorted[i], i)
+    const err = validateSingleInterval(sorted[i], i, translate)
     if (err) return err
   }
 
   // per_request / image 模式按 tier_label 匹配，不做 token 区间重叠校验
   if (mode !== 'token') return null
-  return checkIntervalOverlap(sorted)
+  return checkIntervalOverlap(sorted, translate)
 }
 
-function validateSingleInterval(iv: IntervalFormEntry, idx: number): string | null {
+function validateSingleInterval(
+  iv: IntervalFormEntry,
+  idx: number,
+  translate: Translate,
+): string | null {
   if (iv.min_tokens < 0) {
-    return `区间 #${idx + 1}: 最小 token 数 (${iv.min_tokens}) 不能为负数`
+    return translate('admin.channels.intervalValidation.minTokensNonNegative', {
+      index: idx + 1,
+      value: iv.min_tokens,
+    })
   }
   if (iv.max_tokens != null) {
     if (iv.max_tokens <= 0) {
-      return `区间 #${idx + 1}: 最大 token 数 (${iv.max_tokens}) 必须大于 0`
+      return translate('admin.channels.intervalValidation.maxTokensPositive', {
+        index: idx + 1,
+        value: iv.max_tokens,
+      })
     }
     if (iv.max_tokens <= iv.min_tokens) {
-      return `区间 #${idx + 1}: 最大 token 数 (${iv.max_tokens}) 必须大于最小 token 数 (${iv.min_tokens})`
+      return translate('admin.channels.intervalValidation.maxTokensGreaterThanMin', {
+        index: idx + 1,
+        max: iv.max_tokens,
+        min: iv.min_tokens,
+      })
     }
   }
-  return validateIntervalPrices(iv, idx)
+  return validateIntervalPrices(iv, idx, translate)
 }
 
-function validateIntervalPrices(iv: IntervalFormEntry, idx: number): string | null {
+function validateIntervalPrices(
+  iv: IntervalFormEntry,
+  idx: number,
+  translate: Translate,
+): string | null {
   const prices: [string, number | string | null][] = [
-    ['输入价格', iv.input_price],
-    ['输出价格', iv.output_price],
-    ['缓存写入价格', iv.cache_write_price],
-    ['缓存读取价格', iv.cache_read_price],
-    ['单次价格', iv.per_request_price],
+    [translate('admin.channels.intervalValidation.priceNames.input'), iv.input_price],
+    [translate('admin.channels.intervalValidation.priceNames.output'), iv.output_price],
+    [translate('admin.channels.intervalValidation.priceNames.cacheWrite'), iv.cache_write_price],
+    [translate('admin.channels.intervalValidation.priceNames.cacheRead'), iv.cache_read_price],
+    [translate('admin.channels.intervalValidation.priceNames.perRequest'), iv.per_request_price],
   ]
   for (const [name, val] of prices) {
     if (val != null && val !== '' && Number(val) < 0) {
-      return `区间 #${idx + 1}: ${name}不能为负数`
+      return translate('admin.channels.intervalValidation.priceNonNegative', {
+        index: idx + 1,
+        name,
+      })
     }
   }
   return null
 }
 
-function checkIntervalOverlap(sorted: IntervalFormEntry[]): string | null {
+function checkIntervalOverlap(
+  sorted: IntervalFormEntry[],
+  translate: Translate,
+): string | null {
   for (let i = 0; i < sorted.length; i++) {
-    // 无上限区间必须是最后一个
     if (sorted[i].max_tokens == null && i < sorted.length - 1) {
-      return `区间 #${i + 1}: 无上限区间（最大 token 数为空）只能是最后一个`
+      return translate('admin.channels.intervalValidation.unboundedLast', { index: i + 1 })
     }
     if (i === 0) continue
     const prev = sorted[i - 1]
-    // (min, max] 语义：前一个区间上界 > 当前区间下界则重叠
     if (prev.max_tokens == null || prev.max_tokens > sorted[i].min_tokens) {
       const prevMax = prev.max_tokens == null ? '∞' : String(prev.max_tokens)
-      return `区间 #${i} 和 #${i + 1} 重叠：前一个区间上界 (${prevMax}) 大于当前区间下界 (${sorted[i].min_tokens})`
+      return translate('admin.channels.intervalValidation.overlap', {
+        prevIndex: i,
+        index: i + 1,
+        prevMax,
+        min: sorted[i].min_tokens,
+      })
     }
   }
   return null
