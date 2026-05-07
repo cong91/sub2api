@@ -670,6 +670,8 @@ export default {
       hoursMinutesRemaining: '{hours}h {minutes}m remaining',
       minutesRemaining: '{minutes}m remaining',
       remainingDays: 'Remaining days',
+      deviceCode: 'Device code',
+      deviceBound: 'Device bound',
       noExpiration: 'No expiration',
       status: {
         active: 'Active',
