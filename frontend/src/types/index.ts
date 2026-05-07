@@ -1332,6 +1332,8 @@ export interface RedeemCode {
   status: 'active' | 'used' | 'expired' | 'unused' | 'disabled'
   used_by: number | null
   used_at: string | null
+  created_by?: number | null
+  created_by_user?: User
   created_at: string
   expires_at?: string | null
   updated_at?: string
@@ -1567,6 +1569,9 @@ export interface UserSubscription {
   expires_at: string | null
   user?: User
   group?: Group
+  device_identity_code?: string | null
+  device_identity_type?: string | null
+  has_device_binding?: boolean
 }
 
 export interface SubscriptionProgress {
@@ -1769,6 +1774,8 @@ export interface PromoCode {
   status: 'active' | 'disabled'
   expires_at: string | null
   notes: string | null
+  created_by?: number | null
+  created_by_user?: User
   created_at: string
   updated_at: string
 }
