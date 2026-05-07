@@ -4515,7 +4515,7 @@ export default {
       title: 'Redeem Code Management',
       description: 'Generate and manage redeem codes',
       generateCodes: 'Generate Codes',
-      searchCodes: 'Search codes or email...',
+      searchCodes: 'Search codes, user email, or creator email...',
       allTypes: 'All Types',
       allStatus: 'All Status',
       balance: 'Balance',
@@ -4532,7 +4532,8 @@ export default {
         status: 'Status',
         usedBy: 'Used By',
         usedAt: 'Used At',
-        actions: 'Actions'
+        createdBy: 'Created By',
+        actions: 'Actions' 
       },
       userPrefix: 'User #{id}',
       exportCsv: 'Export CSV',
@@ -4668,7 +4669,7 @@ export default {
       createCode: 'Create Promo Code',
       editCode: 'Edit Promo Code',
       deleteCode: 'Delete Promo Code',
-      searchCodes: 'Search codes...',
+      searchCodes: 'Search codes or creator email...',
       allStatus: 'All Status',
       columns: {
         code: 'Code',
@@ -4678,8 +4679,9 @@ export default {
         usage: 'Usage',
         status: 'Status',
         expiresAt: 'Expires At',
+        createdBy: 'Created By',
         createdAt: 'Created At',
-        actions: 'Actions'
+        actions: 'Actions' 
       },
       // Form labels (flat structure for template usage)
       code: 'Promo Code',
