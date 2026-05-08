@@ -251,6 +251,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		OpsMetricsIntervalSeconds:              settings.OpsMetricsIntervalSeconds,
 		MinClaudeCodeVersion:                   settings.MinClaudeCodeVersion,
 		MaxClaudeCodeVersion:                   settings.MaxClaudeCodeVersion,
+		AntigravityUserAgentVersion:            settings.AntigravityUserAgentVersion,
 		AllowUngroupedKeyScheduling:            settings.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:                     settings.BackendModeEnabled,
 		EnableFingerprintUnification:           settings.EnableFingerprintUnification,
@@ -585,6 +586,8 @@ type UpdateSettingsRequest struct {
 
 	MinClaudeCodeVersion string `json:"min_claude_code_version"`
 	MaxClaudeCodeVersion string `json:"max_claude_code_version"`
+
+	AntigravityUserAgentVersion string `json:"antigravity_user_agent_version"`
 
 	// 分组隔离
 	AllowUngroupedKeyScheduling bool `json:"allow_ungrouped_key_scheduling"`
@@ -1663,6 +1666,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		IdentityPatchPrompt:                    req.IdentityPatchPrompt,
 		MinClaudeCodeVersion:                   req.MinClaudeCodeVersion,
 		MaxClaudeCodeVersion:                   req.MaxClaudeCodeVersion,
+		AntigravityUserAgentVersion:            strings.TrimSpace(req.AntigravityUserAgentVersion),
 		AllowUngroupedKeyScheduling:            req.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:                     req.BackendModeEnabled,
 		AllowUserViewErrorRequests: func() bool {
@@ -2151,6 +2155,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		OpsMetricsIntervalSeconds:              updatedSettings.OpsMetricsIntervalSeconds,
 		MinClaudeCodeVersion:                   updatedSettings.MinClaudeCodeVersion,
 		MaxClaudeCodeVersion:                   updatedSettings.MaxClaudeCodeVersion,
+		AntigravityUserAgentVersion:            updatedSettings.AntigravityUserAgentVersion,
 		AllowUngroupedKeyScheduling:            updatedSettings.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:                     updatedSettings.BackendModeEnabled,
 		EnableFingerprintUnification:           updatedSettings.EnableFingerprintUnification,

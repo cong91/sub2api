@@ -172,6 +172,8 @@ type SystemSettings struct {
 	MinClaudeCodeVersion string `json:"min_claude_code_version"`
 	MaxClaudeCodeVersion string `json:"max_claude_code_version"`
 
+	AntigravityUserAgentVersion string `json:"antigravity_user_agent_version"`
+
 	// 分组隔离
 	AllowUngroupedKeyScheduling bool `json:"allow_ungrouped_key_scheduling"`
 
