@@ -66,9 +66,34 @@ func init() {
 	}
 }
 
+// UserAgentVersionProvider returns the runtime Antigravity version used in User-Agent.
+type UserAgentVersionProvider func() string
+
+var userAgentVersionProvider UserAgentVersionProvider
+
+// SetUserAgentVersionProvider configures a runtime version provider. Empty provider
+// results are ignored so callers keep the env/default fallback behavior.
+func SetUserAgentVersionProvider(provider UserAgentVersionProvider) {
+	userAgentVersionProvider = provider
+}
+
+// DefaultUserAgentVersion returns the env/default Antigravity User-Agent version.
+func DefaultUserAgentVersion() string {
+	return strings.TrimSpace(defaultUserAgentVersion)
+}
+
+func resolveUserAgentVersion() string {
+	if userAgentVersionProvider != nil {
+		if version := strings.TrimSpace(userAgentVersionProvider()); version != "" {
+			return version
+		}
+	}
+	return DefaultUserAgentVersion()
+}
+
 // GetUserAgent 返回当前配置的 User-Agent
 func GetUserAgent() string {
-	return fmt.Sprintf("antigravity/%s windows/amd64", defaultUserAgentVersion)
+	return fmt.Sprintf("antigravity/%s windows/amd64", resolveUserAgentVersion())
 }
 
 func getClientSecret() (string, error) {
