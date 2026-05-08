@@ -557,6 +557,9 @@ export interface SystemSettings {
   min_claude_code_version: string;
   max_claude_code_version: string;
 
+  // Antigravity runtime request settings
+  antigravity_user_agent_version: string;
+
   // 分组隔离
   allow_ungrouped_key_scheduling: boolean;
 
@@ -802,6 +805,7 @@ export interface UpdateSettingsRequest {
   ops_metrics_interval_seconds?: number;
   min_claude_code_version?: string;
   max_claude_code_version?: string;
+  antigravity_user_agent_version?: string;
   allow_ungrouped_key_scheduling?: boolean;
   enable_fingerprint_unification?: boolean;
   enable_metadata_passthrough?: boolean;
