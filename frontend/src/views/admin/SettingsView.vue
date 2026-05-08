@@ -3677,6 +3677,24 @@
                   {{ t("admin.settings.claudeCode.maxVersionHint") }}
                 </p>
               </div>
+              <div class="mt-4">
+                <label
+                  class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  {{ t("admin.settings.claudeCode.antigravityVersion") }}
+                </label>
+                <input
+                  v-model="form.antigravity_user_agent_version"
+                  type="text"
+                  class="input max-w-xs font-mono text-sm"
+                  :placeholder="
+                    t('admin.settings.claudeCode.antigravityVersionPlaceholder')
+                  "
+                />
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t("admin.settings.claudeCode.antigravityVersionHint") }}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -8161,6 +8179,8 @@ const form = reactive<SettingsForm>({
   // Claude Code version check
   min_claude_code_version: "",
   max_claude_code_version: "",
+  // Antigravity runtime request settings
+  antigravity_user_agent_version: "",
   // 分组隔离
   allow_ungrouped_key_scheduling: false,
   openai_advanced_scheduler_enabled: false,
@@ -9934,6 +9954,7 @@ async function saveSettings() {
       identity_patch_prompt: form.identity_patch_prompt,
       min_claude_code_version: form.min_claude_code_version,
       max_claude_code_version: form.max_claude_code_version,
+      antigravity_user_agent_version: form.antigravity_user_agent_version,
       allow_ungrouped_key_scheduling: form.allow_ungrouped_key_scheduling,
       enable_fingerprint_unification: form.enable_fingerprint_unification,
       enable_metadata_passthrough: form.enable_metadata_passthrough,
