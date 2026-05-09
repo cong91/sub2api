@@ -60,6 +60,7 @@ export async function list(
     role?: UserRole
     search?: string
     group_name?: string         // fuzzy filter by allowed group name
+    device_activation_status?: 'active' | 'pending_activation' | 'revoked' | 'blocked'
     attributes?: Record<number, string>  // attributeId -> value
     include_subscriptions?: boolean
     sort_by?: string
@@ -77,6 +78,7 @@ export async function list(
     role: filters?.role,
     search: filters?.search,
     group_name: filters?.group_name,
+    device_activation_status: filters?.device_activation_status,
     include_subscriptions: filters?.include_subscriptions,
     sort_by: filters?.sort_by,
     sort_order: filters?.sort_order
@@ -190,6 +192,19 @@ export async function updateConcurrency(id: number, concurrency: number): Promis
  */
 export async function toggleStatus(id: number, status: 'active' | 'disabled'): Promise<AdminUser> {
   return update(id, { status })
+}
+
+export interface ActivateUserDevicesResponse {
+  user: AdminUser
+  activated: number
+}
+
+/**
+ * Activate pending device bindings for a user.
+ */
+export async function activateDevices(id: number): Promise<ActivateUserDevicesResponse> {
+  const { data } = await apiClient.post<ActivateUserDevicesResponse>(`/admin/users/${id}/activate-devices`)
+  return data
 }
 
 /**
@@ -384,6 +399,7 @@ export const usersAPI = {
   updateBalance,
   updateConcurrency,
   toggleStatus,
+  activateDevices,
   getUserApiKeys,
   getUserUsageStats,
   getUserBalanceHistory,

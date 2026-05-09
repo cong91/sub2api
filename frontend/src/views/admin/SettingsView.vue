@@ -5340,6 +5340,21 @@
                 </p>
               </div>
 
+              <div>
+                <label class="input-label">
+                  {{ t('admin.settings.features.affiliate.deviceAutoActivationCodes') }}
+                </label>
+                <input
+                  v-model.trim="form.device_auto_activation_aff_codes"
+                  type="text"
+                  class="input"
+                  placeholder="AUTO_APPROVE"
+                />
+                <p class="mt-1 text-xs text-gray-400">
+                  {{ t('admin.settings.features.affiliate.deviceAutoActivationCodesHint') }}
+                </p>
+              </div>
+
               <!-- 专属用户管理 -->
               <div class="border-t border-gray-100 pt-6 dark:border-dark-700">
                 <div class="mb-3 flex items-center justify-between">
@@ -7346,6 +7361,7 @@ const form = reactive<SettingsForm>({
   affiliate_rebate_freeze_hours: 0,
   affiliate_rebate_duration_days: 0,
   affiliate_rebate_per_invitee_cap: 0,
+  device_auto_activation_aff_codes: "AUTO_APPROVE",
   default_concurrency: 1,
   device_claim_bonus_balance: 0,
   default_subscriptions: [],
@@ -9149,6 +9165,7 @@ async function saveSettings() {
       affiliate_rebate_freeze_hours: Math.max(0, Math.min(720, Number(form.affiliate_rebate_freeze_hours) || 0)),
       affiliate_rebate_duration_days: Math.max(0, Math.min(3650, Math.floor(Number(form.affiliate_rebate_duration_days) || 0))),
       affiliate_rebate_per_invitee_cap: Math.max(0, Number(form.affiliate_rebate_per_invitee_cap) || 0),
+      device_auto_activation_aff_codes: form.device_auto_activation_aff_codes.trim() || "AUTO_APPROVE",
       default_concurrency: form.default_concurrency,
       device_claim_bonus_balance: Number(form.device_claim_bonus_balance) || 0,
       default_subscriptions: normalizedDefaultSubscriptions,

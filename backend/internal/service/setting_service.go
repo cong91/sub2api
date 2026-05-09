@@ -777,6 +777,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyChannelMonitorDefaultIntervalSeconds,
 		SettingKeyAvailableChannelsEnabled,
 		SettingKeyAffiliateEnabled,
+		SettingKeyDeviceAutoActivationAffCodes,
 		SettingKeyRiskControlEnabled,
 	}
 
@@ -1187,11 +1188,12 @@ type PublicSettingsInjectionPayload struct {
 	// Feature flags — MUST match the opt-in/opt-out registry in
 	// frontend/src/utils/featureFlags.ts. Missing a field here is the bug
 	// that hid the "可用渠道" menu on page refresh.
-	ChannelMonitorEnabled                bool `json:"channel_monitor_enabled"`
-	ChannelMonitorDefaultIntervalSeconds int  `json:"channel_monitor_default_interval_seconds"`
-	AvailableChannelsEnabled             bool `json:"available_channels_enabled"`
-	AffiliateEnabled                     bool `json:"affiliate_enabled"`
-	RiskControlEnabled                   bool `json:"risk_control_enabled"`
+	ChannelMonitorEnabled                bool   `json:"channel_monitor_enabled"`
+	ChannelMonitorDefaultIntervalSeconds int    `json:"channel_monitor_default_interval_seconds"`
+	AvailableChannelsEnabled             bool   `json:"available_channels_enabled"`
+	AffiliateEnabled                     bool   `json:"affiliate_enabled"`
+	DeviceAutoActivationAffCodes         string `json:"device_auto_activation_aff_codes"`
+	RiskControlEnabled                   bool   `json:"risk_control_enabled"`
 }
 
 // GetPublicSettingsForInjection returns public settings in a format suitable for HTML injection.
@@ -1253,6 +1255,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		ChannelMonitorDefaultIntervalSeconds: settings.ChannelMonitorDefaultIntervalSeconds,
 		AvailableChannelsEnabled:             settings.AvailableChannelsEnabled,
 		AffiliateEnabled:                     settings.AffiliateEnabled,
+		DeviceAutoActivationAffCodes:         settings.DeviceAutoActivationAffCodes,
 		RiskControlEnabled:                   settings.RiskControlEnabled,
 	}, nil
 }
@@ -1836,6 +1839,7 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyDefaultConcurrency] = strconv.Itoa(settings.DefaultConcurrency)
 	updates[SettingKeyDefaultBalance] = strconv.FormatFloat(settings.DefaultBalance, 'f', 8, 64)
 	updates[SettingKeyDeviceClaimBonusBalance] = strconv.FormatFloat(settings.DeviceClaimBonusBalance, 'f', 8, 64)
+	updates[SettingKeyDeviceAutoActivationAffCodes] = strings.TrimSpace(settings.DeviceAutoActivationAffCodes)
 	settings.AffiliateRebateRate = clampAffiliateRebateRate(settings.AffiliateRebateRate)
 	updates[SettingKeyAffiliateRebateRate] = strconv.FormatFloat(settings.AffiliateRebateRate, 'f', 8, 64)
 	if settings.AffiliateRebateFreezeHours < 0 {
@@ -2819,7 +2823,8 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyAvailableChannelsEnabled: "false",
 
 		// Affiliate (邀请返利) feature (default disabled; opt-in)
-		SettingKeyAffiliateEnabled: "false",
+		SettingKeyAffiliateEnabled:             "false",
+		SettingKeyDeviceAutoActivationAffCodes: "AUTO_APPROVE",
 
 		// 风控中心功能（默认关闭，显式启用）
 		SettingKeyRiskControlEnabled: "false",
@@ -3333,6 +3338,10 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 
 	// Affiliate (邀请返利) feature (default: disabled; strict true)
 	result.AffiliateEnabled = settings[SettingKeyAffiliateEnabled] == "true"
+	result.DeviceAutoActivationAffCodes = strings.TrimSpace(settings[SettingKeyDeviceAutoActivationAffCodes])
+	if result.DeviceAutoActivationAffCodes == "" {
+		result.DeviceAutoActivationAffCodes = "AUTO_APPROVE"
+	}
 
 	// 风控中心功能（默认关闭，严格 true 才启用）
 	result.RiskControlEnabled = settings[SettingKeyRiskControlEnabled] == "true"
