@@ -300,6 +300,7 @@ export default {
     copiedToClipboard: '已复制到剪贴板',
     copied: '已复制',
     copyFailed: '复制失败',
+    failed: '失败',
     verifying: '验证中...',
     processing: '处理中...',
     contactSupport: '联系客服',
@@ -478,6 +479,18 @@ export default {
     redeemCodeRequired: '请输入登录代码',
     redeemLoginSuccess: '代码登录成功！',
     redeemLoginFailed: '代码登录失败，请检查代码后重试。',
+    loginAgreement: {
+      readAndAgree: '我已阅读并同意',
+      pendingTitle: '继续登录前需要先同意最新条款。',
+      pendingDescription: '未同意前，账号密码输入和快捷登录会保持禁用。',
+      viewTerms: '查看条款',
+      updateTitle: '条款更新通知',
+      updateDescription: '我们的服务条款已于 {date} 更新。在继续使用服务之前，请仔细阅读并同意以下条款。',
+      recently: '近期',
+      relatedDocuments: '相关文档',
+      reject: '拒绝',
+      acceptAndContinue: '同意并继续'
+    },
     linuxdo: {
       signIn: '使用 Linux.do 登录',
       orContinue: '或使用邮箱密码继续',
@@ -6808,6 +6821,20 @@ export default {
     notFoundDesc: '该自定义页面不存在或已被删除。',
     notConfiguredTitle: '页面链接未配置',
     notConfiguredDesc: '该自定义页面的 URL 未正确配置。',
+    tableOfContents: '目录',
+    markdownNotFound: '页面不存在',
+    markdownLoadFailed: '页面加载失败',
+  },
+
+  // Legal Document Page
+  legalDocument: {
+    loadFailedTitle: '文档加载失败',
+    loadFailedDesc: '请稍后刷新页面重试。',
+    notFoundTitle: '文档不存在',
+    notFoundDesc: '当前条款文档不存在或已被管理员移除。',
+    loginTerms: '登录条款',
+    updatedAt: '更新日期：{date}',
+    emptyContent: '暂无正文内容'
   },
 
   // Announcements Page

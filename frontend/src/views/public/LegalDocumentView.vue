@@ -14,7 +14,7 @@
           to="/login"
           class="inline-flex flex-shrink-0 items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-primary-600/20 transition hover:bg-primary-700"
         >
-          登录
+          {{ t('auth.signIn') }}
         </RouterLink>
       </div>
     </header>
@@ -28,8 +28,8 @@
         v-else-if="loadError"
         class="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
       >
-        <h1 class="text-lg font-semibold">文档加载失败</h1>
-        <p class="mt-2 text-sm">请稍后刷新页面重试。</p>
+        <h1 class="text-lg font-semibold">{{ t('legalDocument.loadFailedTitle') }}</h1>
+        <p class="mt-2 text-sm">{{ t('legalDocument.loadFailedDesc') }}</p>
       </section>
 
       <section
@@ -41,9 +41,9 @@
             <Icon name="document" size="sm" />
           </span>
           <div>
-            <h1 class="text-lg font-semibold text-gray-900 dark:text-white">文档不存在</h1>
+            <h1 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('legalDocument.notFoundTitle') }}</h1>
             <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-dark-300">
-              当前条款文档不存在或已被管理员移除。
+              {{ t('legalDocument.notFoundDesc') }}
             </p>
           </div>
         </div>
@@ -56,12 +56,12 @@
               <Icon :name="documentIcon" size="md" />
             </span>
             <div class="min-w-0">
-              <p class="text-sm font-medium text-primary-700 dark:text-primary-300">登录条款</p>
+              <p class="text-sm font-medium text-primary-700 dark:text-primary-300">{{ t('legalDocument.loginTerms') }}</p>
               <h1 class="mt-2 break-words text-2xl font-bold tracking-normal text-gray-950 dark:text-white sm:text-3xl">
                 {{ currentDocument.title }}
               </h1>
               <p v-if="updatedAt" class="mt-3 text-sm text-gray-500 dark:text-dark-400">
-                更新日期：{{ updatedAt }}
+                {{ t('legalDocument.updatedAt', { date: updatedAt }) }}
               </p>
             </div>
           </div>
@@ -76,7 +76,7 @@
           v-else
           class="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-14 text-center text-sm text-gray-500 dark:border-dark-700 dark:bg-dark-900 dark:text-dark-400"
         >
-          暂无正文内容
+          {{ t('legalDocument.emptyContent') }}
         </div>
       </article>
     </main>
@@ -86,6 +86,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import Icon from '@/components/icons/Icon.vue'
@@ -96,6 +97,7 @@ import type { LoginAgreementDocument, PublicSettings } from '@/types'
 type LegalDocumentIcon = 'document' | 'shield' | 'globe' | 'cog'
 
 const route = useRoute()
+const { t } = useI18n()
 const settings = ref<PublicSettings | null>(null)
 const loading = ref(true)
 const loadError = ref(false)
@@ -134,14 +136,14 @@ const renderedHtml = computed(() => {
 })
 
 const documentIcon = computed<LegalDocumentIcon>(() => {
-  const title = currentDocument.value?.title || ''
-  if (title.includes('政策') || title.includes('隐私')) {
+  const normalized = `${currentDocument.value?.id || ''} ${currentDocument.value?.title || ''}`.toLowerCase()
+  if (normalized.includes('policy') || normalized.includes('privacy')) {
     return 'shield'
   }
-  if (title.includes('国家') || title.includes('地区')) {
+  if (normalized.includes('country') || normalized.includes('region')) {
     return 'globe'
   }
-  if (title.includes('特定')) {
+  if (normalized.includes('specific')) {
     return 'cog'
   }
   return 'document'
