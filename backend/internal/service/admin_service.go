@@ -32,7 +32,6 @@ type AdminService interface {
 	CreateUser(ctx context.Context, input *CreateUserInput) (*User, error)
 	UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error)
 	DeleteUser(ctx context.Context, id int64) error
-	ActivateUserDevices(ctx context.Context, userID int64) (*User, int64, error)
 	UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*User, error)
 	BatchUpdateConcurrency(ctx context.Context, userIDs []int64, value int, mode string) (int, error)
 	GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int, sortBy, sortOrder string) ([]APIKey, int64, error)
@@ -740,8 +739,8 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		return nil, err
 	}
 
-	// Protect admin users: cannot disable admin accounts
-	if user.Role == "admin" && input.Status == "disabled" {
+	// Protect admin users: cannot disable/admin-block admin accounts
+	if user.Role == "admin" && (input.Status == StatusDisabled || input.Status == UserDeviceStatusBlocked) {
 		return nil, errors.New("cannot disable admin user")
 	}
 
@@ -766,6 +765,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		user.Notes = *input.Notes
 	}
 
+	statusUpdate := input.Status
 	if input.Status != "" {
 		user.Status = input.Status
 	}
@@ -785,8 +785,27 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		user.AllowedGroups = *input.AllowedGroups
 	}
 
+	if statusUpdate != "" {
+		user.Status = oldStatus
+	}
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, err
+	}
+	if statusUpdate != "" {
+		statusUpdater, ok := s.userRepo.(interface {
+			UpdateEffectiveStatus(ctx context.Context, userID int64, status string) error
+		})
+		if !ok {
+			return nil, ErrServiceUnavailable
+		}
+		if err := statusUpdater.UpdateEffectiveStatus(ctx, user.ID, statusUpdate); err != nil {
+			return nil, err
+		}
+		fresh, err := s.userRepo.GetByID(ctx, user.ID)
+		if err != nil {
+			return nil, err
+		}
+		user = fresh
 	}
 
 	// 同步用户专属分组倍率
@@ -845,27 +864,6 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, id)
 	}
 	return nil
-}
-
-func (s *adminServiceImpl) ActivateUserDevices(ctx context.Context, userID int64) (*User, int64, error) {
-	if userID <= 0 {
-		return nil, 0, ErrUserNotFound
-	}
-	activator, ok := s.userRepo.(interface {
-		ActivatePendingDevicesByUserID(ctx context.Context, userID int64) (int64, error)
-	})
-	if !ok {
-		return nil, 0, ErrServiceUnavailable
-	}
-	updated, err := activator.ActivatePendingDevicesByUserID(ctx, userID)
-	if err != nil {
-		return nil, 0, err
-	}
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, updated, err
-	}
-	return user, updated, nil
 }
 
 func (s *adminServiceImpl) BatchUpdateConcurrency(ctx context.Context, userIDs []int64, value int, mode string) (int, error) {

@@ -463,21 +463,15 @@
           </template>
 
           <template #cell-status="{ row }">
-            <div class="flex items-center gap-3">
-              <ToggleSwitch
-                :checked="isUserEffectiveActive(row)"
-                :disabled="!canToggleUserStatus(row)"
-                :loading="activatingUserIds.has(row.id)"
-                :aria-label="userStatusSwitchLabel(row)"
-                @toggle="handleUserStatusSwitchToggle(row)"
+            <div class="flex min-w-[12rem] flex-col gap-1">
+              <Select
+                :model-value="row.status"
+                :options="editableStatusOptions"
+                :disabled="!canEditUserStatus(row) || updatingStatusUserIds.has(row.id)"
+                @update:model-value="(status) => handleUserStatusSelect(row, status)"
               />
-              <div class="min-w-0">
-                <div :class="['text-sm font-medium', userStatusTextClass(row.status)]">
-                  {{ userStatusLabel(row.status) }}
-                </div>
-                <div class="text-xs text-gray-500 dark:text-dark-400">
-                  {{ userStatusHint(row) }}
-                </div>
+              <div class="text-xs text-gray-500 dark:text-dark-400">
+                {{ userStatusHint(row) }}
               </div>
             </div>
           </template>
@@ -507,22 +501,6 @@
               >
                 <Icon name="edit" size="sm" />
                 <span class="text-xs">{{ t('common.edit') }}</span>
-              </button>
-
-              <!-- Toggle Status Button (not for admin) -->
-              <button
-                v-if="row.role !== 'admin'"
-                @click="handleToggleStatus(row)"
-                :class="[
-                  'flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors',
-                  row.status === 'active'
-                    ? 'hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-900/20 dark:hover:text-orange-400'
-                    : 'hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-400'
-                ]"
-              >
-                <Icon v-if="row.status === 'active'" name="ban" size="sm" />
-                <Icon v-else name="checkCircle" size="sm" />
-                <span class="text-xs">{{ row.status === 'active' ? t('admin.users.disable') : t('admin.users.enable') }}</span>
               </button>
 
               <!-- More Actions Menu Trigger -->
@@ -679,7 +657,6 @@ import UserAllowedGroupsModal from '@/components/admin/user/UserAllowedGroupsMod
 import UserBalanceModal from '@/components/admin/user/UserBalanceModal.vue'
 import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryModal.vue'
 import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
-import ToggleSwitch from '@/components/common/ToggleSwitch.vue'
 
 const appStore = useAppStore()
 
@@ -689,26 +666,10 @@ const roleBadgeClass = (role: string) => {
   return 'badge-gray'
 }
 
-const userStatusLabel = (status?: string | null) => {
-  if (!status) return '-'
-  if (status === 'active') return t('common.active')
-  if (status === 'disabled') return t('admin.users.disabled')
-  return t(`admin.users.deviceActivation.${status}`, status)
-}
-
-const isDeviceActivationPending = (user: AdminUser) => user.status === 'pending_activation'
-const isUserEffectiveActive = (user: AdminUser) => user.status === 'active'
-const canToggleUserStatus = (user: AdminUser) => user.role !== 'admin' && (user.status === 'active' || user.status === 'disabled' || isDeviceActivationPending(user))
-
-const userStatusTextClass = (status?: string | null) => {
-  if (status === 'active') return 'text-green-600 dark:text-green-400'
-  if (status === 'pending_activation') return 'text-amber-600 dark:text-amber-400'
-  if (status === 'revoked' || status === 'blocked' || status === 'disabled') return 'text-red-600 dark:text-red-400'
-  return 'text-gray-500 dark:text-dark-400'
-}
+const canEditUserStatus = (user: AdminUser) => user.role !== 'admin'
 
 const userStatusHint = (user: AdminUser) => {
-  if (user.status === 'active') return user.has_device_binding ? t('admin.users.activationHints.active') : t('admin.users.statusHints.active')
+  if (user.status === 'active') return t('admin.users.statusHints.active')
   if (user.status === 'disabled') return t('admin.users.statusHints.disabled')
   if (user.status === 'pending_activation') return t('admin.users.activationHints.pending')
   if (user.status === 'revoked') return t('admin.users.activationHints.revoked')
@@ -716,20 +677,17 @@ const userStatusHint = (user: AdminUser) => {
   return t('admin.users.activationHints.none')
 }
 
-const userStatusSwitchLabel = (user: AdminUser) => {
-  if (isDeviceActivationPending(user)) return t('admin.users.activationSwitch.activate')
-  if (user.status === 'active') return t('admin.users.disable')
-  if (user.status === 'disabled') return t('admin.users.enable')
-  return userStatusHint(user)
-}
+const editableStatusOptions = computed(() => [
+  { value: 'active', label: t('common.active') },
+  { value: 'pending_activation', label: t('admin.users.effectiveStatus.pending_activation') },
+  { value: 'revoked', label: t('admin.users.effectiveStatus.revoked') },
+  { value: 'blocked', label: t('admin.users.effectiveStatus.blocked') },
+  { value: 'disabled', label: t('admin.users.disabled') }
+])
 
 const statusFilterOptions = computed(() => [
   { value: '', label: t('admin.users.allStatus') },
-  { value: 'pending_activation', label: t('admin.users.deviceActivation.pending_activation') },
-  { value: 'active', label: t('common.active') },
-  { value: 'disabled', label: t('admin.users.disabled') },
-  { value: 'revoked', label: t('admin.users.deviceActivation.revoked') },
-  { value: 'blocked', label: t('admin.users.deviceActivation.blocked') }
+  ...editableStatusOptions.value
 ])
 
 // Generate dynamic attribute columns from enabled definitions
@@ -1417,55 +1375,28 @@ const handleEditModalSuccess = (updatedUser?: AdminUser) => {
   loadUsers()
 }
 
-const handleToggleStatus = async (user: AdminUser) => {
-  const newStatus = user.status === 'active' ? 'disabled' : 'active'
+const updatingStatusUserIds = reactive<Set<number>>(new Set())
+
+const handleUserStatusSelect = async (user: AdminUser, status: unknown) => {
+  const newStatus = String(status || '') as AdminUser['status']
+  if (!newStatus || newStatus === user.status || !canEditUserStatus(user) || updatingStatusUserIds.has(user.id)) return
+  updatingStatusUserIds.add(user.id)
   try {
-    await adminAPI.users.toggleStatus(user.id, newStatus)
-    appStore.showSuccess(
-      newStatus === 'active' ? t('admin.users.userEnabled') : t('admin.users.userDisabled')
-    )
+    const updatedUser = await adminAPI.users.update(user.id, { status: newStatus })
+    const index = users.value.findIndex((item) => item.id === user.id)
+    if (index !== -1) {
+      users.value[index] = updatedUser
+    }
+    if (editingUser.value?.id === user.id) {
+      editingUser.value = updatedUser
+    }
+    appStore.showSuccess(t('admin.users.statusUpdated'))
     loadUsers()
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.users.failedToToggle'))
-    console.error('Error toggling user status:', error)
-  }
-}
-
-const activatingUserIds = reactive<Set<number>>(new Set())
-
-const handleActivateDevices = async (user: AdminUser) => {
-  if (!isDeviceActivationPending(user) || activatingUserIds.has(user.id)) return
-  activatingUserIds.add(user.id)
-  try {
-    const response = await adminAPI.users.activateDevices(user.id)
-    appStore.showSuccess(t('admin.users.deviceActivated', { count: response.activated }))
-    const index = users.value.findIndex((item) => item.id === user.id)
-    if (index !== -1) {
-      users.value[index] = response.user
-    }
-    if (editingUser.value?.id === user.id) {
-      editingUser.value = response.user
-    }
-    if (filters.status === 'pending_activation') {
-      filters.status = ''
-      saveFiltersToStorage()
-    }
-    loadUsers()
-  } catch (error: any) {
-    appStore.showError(error.response?.data?.detail || t('admin.users.failedToActivateDevice'))
-    console.error('Error activating app access:', error)
+    console.error('Error updating user status:', error)
   } finally {
-    activatingUserIds.delete(user.id)
-  }
-}
-
-const handleUserStatusSwitchToggle = (user: AdminUser) => {
-  if (isDeviceActivationPending(user)) {
-    void handleActivateDevices(user)
-    return
-  }
-  if (user.status === 'active' || user.status === 'disabled') {
-    void handleToggleStatus(user)
+    updatingStatusUserIds.delete(user.id)
   }
 }
 

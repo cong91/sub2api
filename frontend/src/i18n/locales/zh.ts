@@ -1782,10 +1782,7 @@ export default {
       allRoles: '全部角色',
       allStatus: '全部状态',
       allGroups: '全部分组',
-      activateDevice: '激活',
-      deviceActivated: '已为 {count} 条待处理记录激活 OpenClaw 访问权限',
-      failedToActivateDevice: '激活 OpenClaw 访问权限失败',
-      deviceActivation: {
+      effectiveStatus: {
         all: '全部激活状态',
         none: '未提交应用 claim',
         active: '已激活',
@@ -1799,10 +1796,6 @@ export default {
         none: '此记录尚未绑定应用/设备 claim。',
         revoked: '访问权限已撤销，不能在此重新启用。',
         blocked: '访问权限已阻止，不能在此重新启用。'
-      },
-      activationSwitch: {
-        activate: '激活 OpenClaw 访问权限',
-        active: 'OpenClaw 访问权限已激活'
       },
       searchGroups: '搜索分组...',
       fuzzySearch: '模糊搜索',
@@ -1840,7 +1833,7 @@ export default {
         usage: '用量',
         concurrency: '并发数',
         status: '状态',
-        deviceActivation: '激活',
+        activation: '激活',
         lastActive: '最后活跃时间',
         lastUsed: '最后使用时间',
         created: '创建时间',

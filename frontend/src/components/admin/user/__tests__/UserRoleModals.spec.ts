@@ -52,7 +52,7 @@ const SelectStub = {
   emits: ['update:modelValue'],
   template: `
     <select
-      data-test="role-select"
+      :data-test="options.some((option) => option.value === 'marketing') ? 'role-select' : 'status-select'"
       :value="modelValue"
       @change="$emit('update:modelValue', $event.target.value)"
     >

@@ -1741,10 +1741,7 @@ export default {
       allRoles: '모든 역할',
       allStatus: '모든 상태',
       allGroups: '모든 그룹',
-      activateDevice: '활성화',
-      deviceActivated: '대기 중인 레코드 {count}개의 OpenClaw 접근 권한이 활성화되었습니다',
-      failedToActivateDevice: 'OpenClaw 접근 권한 활성화 실패',
-      deviceActivation: {
+      effectiveStatus: {
         all: '모든 활성화 상태',
         none: '앱 claim 없음',
         active: '활성화됨',
@@ -1758,10 +1755,6 @@ export default {
         none: '이 레코드에는 아직 앱/기기 claim이 연결되지 않았습니다.',
         revoked: '접근 권한이 철회되어 여기서 다시 활성화할 수 없습니다.',
         blocked: '접근 권한이 차단되어 여기서 다시 활성화할 수 없습니다.'
-      },
-      activationSwitch: {
-        activate: 'OpenClaw 접근 권한 활성화',
-        active: 'OpenClaw 접근 권한 활성화됨'
       },
       searchGroups: '그룹 검색...',
       fuzzySearch: '퍼지 검색',
@@ -1799,7 +1792,7 @@ export default {
         usage: '사용량',
         concurrency: '동시성 수',
         status: '상태',
-        deviceActivation: '활성화',
+        activation: '활성화',
         lastActive: '마지막 활성 시간',
         lastUsed: '마지막 사용 시간',
         created: '생성 시간',

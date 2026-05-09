@@ -1775,10 +1775,7 @@ export default {
       allRoles: 'All Roles',
       allStatus: 'All Status',
       allGroups: 'All Groups',
-      activateDevice: 'Activate',
-      deviceActivated: 'Activated OpenClaw access for {count} pending record(s)',
-      failedToActivateDevice: 'Failed to activate OpenClaw access',
-      deviceActivation: {
+      effectiveStatus: {
         all: 'All activation states',
         none: 'No app claim',
         active: 'Activated',
@@ -1792,10 +1789,6 @@ export default {
         none: 'No linked app/device claim yet.',
         revoked: 'Access was revoked and cannot be re-enabled here.',
         blocked: 'Access is blocked and cannot be re-enabled here.'
-      },
-      activationSwitch: {
-        activate: 'Activate OpenClaw access',
-        active: 'OpenClaw access active'
       },
       searchGroups: 'Search groups...',
       fuzzySearch: 'Fuzzy search',
@@ -1856,7 +1849,7 @@ export default {
         usage: 'Usage',
         concurrency: 'Concurrency',
         status: 'Status',
-        deviceActivation: 'Activation',
+        activation: 'Activation',
         lastActive: 'Last Active',
         lastUsed: 'Last Used',
         created: 'Created',

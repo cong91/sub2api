@@ -184,14 +184,12 @@ describe('admin UsersView', () => {
           signup_source: 'invite',
           primary_redeem_code: 'DLG-FN7Y-NJQJ-XNV6',
           primary_redeem_type: 'device_login',
-          has_device_binding: true
         }),
         createAdminUser({
           id: 43,
           email: 'balance-topup@example.invalid.local',
           primary_redeem_code: 'PAY-SHOULD-NOT-RENDER',
           primary_redeem_type: 'balance',
-          has_device_binding: false
         })
       ],
       total: 2,

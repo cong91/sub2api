@@ -34,24 +34,14 @@
         <textarea v-model="form.notes" rows="3" class="input"></textarea>
       </div>
       <div v-if="user" class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800/60">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <label class="input-label mb-1">{{ t('admin.users.form.accountStatus') }}</label>
-            <p :class="['text-sm font-medium', accountStatusTextClass]">
-              {{ accountStatusLabel }}
-            </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
-              {{ accountStatusHint }}
-            </p>
-          </div>
-          <ToggleSwitch
-            :checked="isAccountActive"
-            :disabled="!canActivateAccount || activatingApp"
-            :loading="activatingApp"
-            :aria-label="accountStatusSwitchLabel"
-            @toggle="handleActivateApp"
-          />
-        </div>
+        <label class="input-label mb-1">{{ t('admin.users.form.accountStatus') }}</label>
+        <Select v-model="form.status" :options="statusOptions" :disabled="user.role === 'admin'" />
+        <p :class="['mt-2 text-sm font-medium', accountStatusTextClass]">
+          {{ accountStatusLabel }}
+        </p>
+        <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
+          {{ accountStatusHint }}
+        </p>
         <p v-if="user.primary_redeem_code" class="mt-3 text-xs text-gray-500 dark:text-dark-400">
           {{ t('admin.users.form.activationCode') }}:
           <span class="font-mono text-primary-600 dark:text-primary-400">{{ user.primary_redeem_code }}</span>
@@ -97,12 +87,11 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useClipboard } from '@/composables/useClipboard'
 import { adminAPI } from '@/api/admin'
-import type { AdminUser, UserAttributeValuesMap, UserRole, UpdateUserRequest } from '@/types'
+import type { AdminUser, AdminUserStatus, UserAttributeValuesMap, UserRole, UpdateUserRequest } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
 import UserAttributeForm from '@/components/user/UserAttributeForm.vue'
 import Icon from '@/components/icons/Icon.vue'
-import ToggleSwitch from '@/components/common/ToggleSwitch.vue'
 
 const props = defineProps<{ show: boolean, user: AdminUser | null }>()
 const emit = defineEmits(['close', 'success'])
@@ -114,29 +103,34 @@ const roleOptions = [
   { value: 'admin', label: t('admin.users.roles.admin') }
 ]
 
+const statusOptions = [
+  { value: 'active', label: t('common.active') },
+  { value: 'pending_activation', label: t('admin.users.effectiveStatus.pending_activation') },
+  { value: 'revoked', label: t('admin.users.effectiveStatus.revoked') },
+  { value: 'blocked', label: t('admin.users.effectiveStatus.blocked') },
+  { value: 'disabled', label: t('admin.users.disabled') }
+]
+
 const submitting = ref(false)
 const passwordCopied = ref(false)
-const activatingApp = ref(false)
-const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as UserRole, concurrency: 1, rpm_limit: 0, customAttributes: {} as UserAttributeValuesMap })
+const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as UserRole, status: 'active' as AdminUserStatus, concurrency: 1, rpm_limit: 0, customAttributes: {} as UserAttributeValuesMap })
 
-const isAccountActive = computed(() => props.user?.status === 'active')
-const canActivateAccount = computed(() => props.user?.status === 'pending_activation')
 const accountStatusLabel = computed(() => {
-  const status = props.user?.status
+  const status = form.status
   if (!status) return '-'
   if (status === 'active') return t('common.active')
   if (status === 'disabled') return t('admin.users.disabled')
-  return t(`admin.users.deviceActivation.${status}`, status)
+  return t(`admin.users.effectiveStatus.${status}`, status)
 })
 const accountStatusTextClass = computed(() => {
-  const status = props.user?.status
+  const status = form.status
   if (status === 'active') return 'text-green-600 dark:text-green-400'
   if (status === 'pending_activation') return 'text-amber-600 dark:text-amber-400'
   if (status === 'revoked' || status === 'blocked' || status === 'disabled') return 'text-red-600 dark:text-red-400'
   return 'text-gray-500 dark:text-dark-400'
 })
 const accountStatusHint = computed(() => {
-  const status = props.user?.status
+  const status = form.status
   if (status === 'active') return t('admin.users.activationHints.active')
   if (status === 'pending_activation') return t('admin.users.activationHints.pending')
   if (status === 'revoked') return t('admin.users.activationHints.revoked')
@@ -144,15 +138,9 @@ const accountStatusHint = computed(() => {
   if (status === 'disabled') return t('admin.users.statusHints.disabled')
   return t('admin.users.activationHints.none')
 })
-const accountStatusSwitchLabel = computed(() => {
-  if (canActivateAccount.value) return t('admin.users.activationSwitch.activate')
-  if (isAccountActive.value) return t('admin.users.activationSwitch.active')
-  return accountStatusHint.value
-})
-
 watch(() => props.user, (u) => {
   if (u) {
-    Object.assign(form, { email: u.email, password: '', username: u.username || '', notes: u.notes || '', role: u.role, concurrency: u.concurrency, rpm_limit: u.rpm_limit ?? 0, customAttributes: {} })
+    Object.assign(form, { email: u.email, password: '', username: u.username || '', notes: u.notes || '', role: u.role, status: u.status, concurrency: u.concurrency, rpm_limit: u.rpm_limit ?? 0, customAttributes: {} })
     passwordCopied.value = false
   }
 }, { immediate: true })
@@ -168,20 +156,6 @@ const copyPassword = async () => {
   }
 }
 
-const handleActivateApp = async () => {
-  if (!props.user || !canActivateAccount.value || activatingApp.value) return
-  activatingApp.value = true
-  try {
-    const response = await adminAPI.users.activateDevices(props.user.id)
-    appStore.showSuccess(t('admin.users.deviceActivated', { count: response.activated }))
-    emit('success', response.user)
-  } catch (e: any) {
-    appStore.showError(e.response?.data?.detail || t('admin.users.failedToActivateDevice'))
-  } finally {
-    activatingApp.value = false
-  }
-}
-
 const handleUpdateUser = async () => {
   if (!props.user) return
   if (!form.email.trim()) {
@@ -194,12 +168,12 @@ const handleUpdateUser = async () => {
   }
   submitting.value = true
   try {
-    const data: UpdateUserRequest = { email: form.email, username: form.username, notes: form.notes, role: form.role, concurrency: form.concurrency, rpm_limit: form.rpm_limit }
+    const data: UpdateUserRequest = { email: form.email, username: form.username, notes: form.notes, role: form.role, status: form.status, concurrency: form.concurrency, rpm_limit: form.rpm_limit }
     if (form.password.trim()) data.password = form.password.trim()
-    await adminAPI.users.update(props.user.id, data)
+    const updatedUser = await adminAPI.users.update(props.user.id, data)
     if (Object.keys(form.customAttributes).length > 0) await adminAPI.userAttributes.updateUserAttributeValues(props.user.id, form.customAttributes)
     appStore.showSuccess(t('admin.users.userUpdated'))
-    emit('success'); emit('close')
+    emit('success', updatedUser); emit('close')
   } catch (e: any) {
     appStore.showError(e.response?.data?.detail || t('admin.users.failedToUpdate'))
   } finally { submitting.value = false }

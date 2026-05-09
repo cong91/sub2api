@@ -263,6 +263,63 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User) error
 	return nil
 }
 
+func (r *userRepository) UpdateEffectiveStatus(ctx context.Context, userID int64, status string) error {
+	if userID <= 0 {
+		return service.ErrUserNotFound
+	}
+
+	tx, err := r.client.Tx(ctx)
+	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
+		return err
+	}
+
+	var txClient *dbent.Client
+	txCtx := ctx
+	if err == nil {
+		defer func() { _ = tx.Rollback() }()
+		txClient = tx.Client()
+		txCtx = dbent.NewTxContext(ctx, tx)
+	} else if existingTx := dbent.TxFromContext(ctx); existingTx != nil {
+		txClient = existingTx.Client()
+	} else {
+		txClient = r.client
+	}
+
+	if _, err := txClient.User.Get(txCtx, userID); err != nil {
+		return translatePersistenceError(err, service.ErrUserNotFound, nil)
+	}
+
+	switch status {
+	case service.StatusDisabled:
+		if _, err := txClient.User.UpdateOneID(userID).SetStatus(service.StatusDisabled).Save(txCtx); err != nil {
+			return translatePersistenceError(err, service.ErrUserNotFound, nil)
+		}
+	case service.StatusActive:
+		if _, err := txClient.User.UpdateOneID(userID).SetStatus(service.StatusActive).Save(txCtx); err != nil {
+			return translatePersistenceError(err, service.ErrUserNotFound, nil)
+		}
+		if _, err := txClient.UserDevice.Update().Where(userdevice.UserIDEQ(userID)).SetStatus(service.UserDeviceStatusActive).Save(txCtx); err != nil {
+			return err
+		}
+	case service.UserDeviceStatusPendingActivation, service.UserDeviceStatusRevoked, service.UserDeviceStatusBlocked:
+		if _, err := txClient.User.UpdateOneID(userID).SetStatus(service.StatusActive).Save(txCtx); err != nil {
+			return translatePersistenceError(err, service.ErrUserNotFound, nil)
+		}
+		if _, err := txClient.UserDevice.Update().Where(userdevice.UserIDEQ(userID)).SetStatus(status).Save(txCtx); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("invalid status: %s", status)
+	}
+
+	if tx != nil {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ensureEmailAuthIdentityWithClient(ctx context.Context, client *dbent.Client, userID int64, email string, source string) error {
 	client = clientFromContext(ctx, client)
 	if client == nil || userID <= 0 {
@@ -626,11 +683,7 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 	if err != nil {
 		return nil, nil, err
 	}
-	deviceStatusesByUser, err := r.loadUserDeviceActivationStatuses(ctx, userIDs)
-	if err != nil {
-		return nil, nil, err
-	}
-	deviceBindingsByUser, err := r.loadUserDeviceBindings(ctx, userIDs)
+	effectiveStatusesByUser, err := r.loadUserEffectiveStatuses(ctx, userIDs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -641,9 +694,8 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 		if redeemType, ok := redeemTypesByUser[id]; ok {
 			u.PrimaryRedeemType = redeemType
 		}
-		u.HasDeviceBinding = deviceBindingsByUser[id]
-		if status, ok := deviceStatusesByUser[id]; ok {
-			u.DeviceActivationStatus = status
+		if status, ok := effectiveStatusesByUser[id]; ok && u.Status != service.StatusDisabled {
+			u.Status = status
 		}
 	}
 
@@ -1162,8 +1214,8 @@ func (r *userRepository) loadPrimaryRedeemCodes(ctx context.Context, userIDs []i
 	return codesByUser, typesByUser, nil
 }
 
-func (r *userRepository) loadUserDeviceActivationStatuses(ctx context.Context, userIDs []int64) (map[int64]*string, error) {
-	statusesByUser := make(map[int64]*string, len(userIDs))
+func (r *userRepository) loadUserEffectiveStatuses(ctx context.Context, userIDs []int64) (map[int64]string, error) {
+	statusesByUser := make(map[int64]string, len(userIDs))
 	if len(userIDs) == 0 {
 		return statusesByUser, nil
 	}
@@ -1178,46 +1230,9 @@ func (r *userRepository) loadUserDeviceActivationStatuses(ctx context.Context, u
 		if _, exists := statusesByUser[device.UserID]; exists {
 			continue
 		}
-		status := device.Status
-		statusesByUser[device.UserID] = &status
+		statusesByUser[device.UserID] = device.Status
 	}
 	return statusesByUser, nil
-}
-
-func (r *userRepository) ActivatePendingDevicesByUserID(ctx context.Context, userID int64) (int64, error) {
-	if userID <= 0 {
-		return 0, service.ErrUserNotFound
-	}
-	client := clientFromContext(ctx, r.client)
-	n, err := client.UserDevice.Update().
-		Where(
-			userdevice.UserIDEQ(userID),
-			userdevice.StatusEQ(service.UserDeviceStatusPendingActivation),
-		).
-		SetStatus(service.UserDeviceStatusActive).
-		Save(ctx)
-	if err != nil {
-		return 0, err
-	}
-	return int64(n), nil
-}
-
-func (r *userRepository) loadUserDeviceBindings(ctx context.Context, userIDs []int64) (map[int64]bool, error) {
-	bindingsByUser := make(map[int64]bool, len(userIDs))
-	if len(userIDs) == 0 {
-		return bindingsByUser, nil
-	}
-
-	devices, err := r.client.UserDevice.Query().
-		Where(userdevice.UserIDIn(userIDs...)).
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, device := range devices {
-		bindingsByUser[device.UserID] = true
-	}
-	return bindingsByUser, nil
 }
 
 func applyUserEntityToService(dst *service.User, src *dbent.User) {

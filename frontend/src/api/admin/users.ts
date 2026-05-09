@@ -186,22 +186,10 @@ export async function updateConcurrency(id: number, concurrency: number): Promis
  * @param status - New status
  * @returns Updated user
  */
-export async function toggleStatus(id: number, status: 'active' | 'disabled'): Promise<AdminUser> {
+export async function toggleStatus(id: number, status: AdminUserStatus): Promise<AdminUser> {
   return update(id, { status })
 }
 
-export interface ActivateUserDevicesResponse {
-  user: AdminUser
-  activated: number
-}
-
-/**
- * Activate pending device bindings for a user.
- */
-export async function activateDevices(id: number): Promise<ActivateUserDevicesResponse> {
-  const { data } = await apiClient.post<ActivateUserDevicesResponse>(`/admin/users/${id}/activate-devices`)
-  return data
-}
 
 /**
  * Get user's API keys
@@ -323,7 +311,6 @@ export const usersAPI = {
   updateBalance,
   updateConcurrency,
   toggleStatus,
-  activateDevices,
   getUserApiKeys,
   getUserUsageStats,
   getUserBalanceHistory,

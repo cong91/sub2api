@@ -56,7 +56,7 @@ type UpdateUserRequest struct {
 	Concurrency   *int     `json:"concurrency"`
 	RPMLimit      *int     `json:"rpm_limit"`
 	Role          string   `json:"role" binding:"omitempty,oneof=admin marketing user"`
-	Status        string   `json:"status" binding:"omitempty,oneof=active disabled"`
+	Status        string   `json:"status" binding:"omitempty,oneof=active pending_activation revoked blocked disabled"`
 	AllowedGroups *[]int64 `json:"allowed_groups"`
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]*rate，nil 表示删除该分组的专属倍率
@@ -152,31 +152,6 @@ func (h *UserHandler) List(c *gin.Context) {
 	}
 
 	response.Paginated(c, out, total, page, pageSize)
-}
-
-// ActivateDevices approves pending device bindings for a user.
-// POST /api/v1/admin/users/:id/activate-devices
-func (h *UserHandler) ActivateDevices(c *gin.Context) {
-	userID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid user ID")
-		return
-	}
-
-	if !ensureMarketingCanManageUser(c, h.adminService, userID) {
-		return
-	}
-
-	user, activated, err := h.adminService.ActivateUserDevices(c.Request.Context(), userID)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, gin.H{
-		"user":      dto.UserFromServiceAdmin(user),
-		"activated": activated,
-	})
 }
 
 func applyMarketingUserScope(c *gin.Context, filters *service.UserListFilters) bool {
@@ -311,6 +286,10 @@ func (h *UserHandler) Update(c *gin.Context) {
 	var req UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	if !ensureMarketingCanManageUser(c, h.adminService, userID) {
 		return
 	}
 

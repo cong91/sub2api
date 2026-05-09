@@ -110,7 +110,6 @@ export type AdminUser = Omit<User, 'status'> & {
   signup_source?: 'email' | 'invite' | 'admin' | string | null
   primary_redeem_code?: string | null
   primary_redeem_type?: string | null
-  has_device_binding?: boolean
   status: AdminUserStatus
   // 用户专属分组倍率配置 (group_id -> rate_multiplier)
   group_rates?: Record<number, number>
@@ -1487,7 +1486,7 @@ export interface UpdateUserRequest {
   balance?: number
   concurrency?: number
   rpm_limit?: number
-  status?: 'active' | 'disabled'
+  status?: AdminUserStatus
   allowed_groups?: number[] | null
   // 用户专属分组倍率配置 (group_id -> rate_multiplier | null)
   // null 表示删除该分组的专属倍率

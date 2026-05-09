@@ -475,12 +475,11 @@ Client behavior: thiết bị đã bị revoke/blocked. Không show pending acti
 
 ```ts
 type ClaimResponseData = {
-  status: 'ok'
+  status: 'active' | 'pending_activation'
   mode: 'first_claim' | 'resume'
   user_id?: number
   device_login_code?: string
   device_binding_id?: number
-  status?: 'active' | 'pending_activation'
   claimed_at?: string
 }
 
