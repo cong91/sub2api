@@ -181,12 +181,12 @@ export async function updateConcurrency(id: number, concurrency: number): Promis
 }
 
 /**
- * Toggle user status
+ * Update user status
  * @param id - User ID
- * @param status - New status
+ * @param status - New effective admin user status
  * @returns Updated user
  */
-export async function toggleStatus(id: number, status: AdminUserStatus): Promise<AdminUser> {
+export async function updateStatus(id: number, status: AdminUserStatus): Promise<AdminUser> {
   return update(id, { status })
 }
 
@@ -310,7 +310,7 @@ export const usersAPI = {
   delete: deleteUser,
   updateBalance,
   updateConcurrency,
-  toggleStatus,
+  updateStatus,
   getUserApiKeys,
   getUserUsageStats,
   getUserBalanceHistory,

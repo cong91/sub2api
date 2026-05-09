@@ -65,7 +65,7 @@ export interface UserProfileSourceContext {
 
 export type UserRole = 'admin' | 'marketing' | 'user'
 export type UserStatus = 'active' | 'disabled'
-export type AdminUserStatus = UserStatus | 'pending_activation' | 'revoked' | 'blocked' | string
+export type AdminUserStatus = UserStatus | 'pending_activation' | 'revoked' | 'blocked'
 
 export interface User {
   id: number

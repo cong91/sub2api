@@ -641,10 +641,21 @@ func (s *adminServiceImpl) loadUserGroupRatesOneByOne(ctx context.Context, users
 }
 
 func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error) {
-	user, err := s.userRepo.GetByID(ctx, id)
+	return s.getAdminUser(ctx, id)
+}
+
+func (s *adminServiceImpl) getAdminUser(ctx context.Context, id int64) (*User, error) {
+	if id <= 0 {
+		return nil, ErrUserNotFound
+	}
+	users, result, err := s.userRepo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 1}, UserListFilters{UserID: &id})
 	if err != nil {
 		return nil, err
 	}
+	if result == nil || result.Total == 0 || len(users) == 0 {
+		return nil, ErrUserNotFound
+	}
+	user := &users[0]
 	lastUsedAt, latestErr := s.userRepo.GetLatestUsedAtByUserID(ctx, id)
 	if latestErr != nil {
 		logger.LegacyPrintf("service.admin", "failed to load user last_used_at: user_id=%d err=%v", id, latestErr)
@@ -791,6 +802,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, err
 	}
+	cacheRelevantChanged := user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit || statusUpdate != ""
 	if statusUpdate != "" {
 		statusUpdater, ok := s.userRepo.(interface {
 			UpdateEffectiveStatus(ctx context.Context, userID int64, status string) error
@@ -801,12 +813,12 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		if err := statusUpdater.UpdateEffectiveStatus(ctx, user.ID, statusUpdate); err != nil {
 			return nil, err
 		}
-		fresh, err := s.userRepo.GetByID(ctx, user.ID)
-		if err != nil {
-			return nil, err
-		}
-		user = fresh
 	}
+	fresh, err := s.getAdminUser(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	user = fresh
 
 	// 同步用户专属分组倍率
 	if input.GroupRates != nil && s.userGroupRateRepo != nil {
@@ -818,7 +830,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	if s.authCacheInvalidator != nil {
 		// RPMLimit 直接参与 billing_cache_service.checkRPM 的三级级联，
 		// 不失效缓存会让修改在一个 L2 TTL 内失去效果。
-		if user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit {
+		if cacheRelevantChanged {
 			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, user.ID)
 		}
 	}

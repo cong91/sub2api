@@ -101,3 +101,41 @@ func TestAdminService_UpdateUser_InvalidRole(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, repo.lastUpdated)
 }
+
+type effectiveStatusUpdateUserRepoStub struct {
+	*userRepoStubForListUsers
+	updatedEffectiveStatuses []string
+}
+
+func (s *effectiveStatusUpdateUserRepoStub) UpdateEffectiveStatus(_ context.Context, userID int64, status string) error {
+	s.updatedEffectiveStatuses = append(s.updatedEffectiveStatuses, status)
+	for i := range s.users {
+		if s.users[i].ID == userID {
+			s.users[i].Status = status
+		}
+	}
+	return nil
+}
+
+func TestAdminService_UpdateUserStatusReturnsEffectiveStatusAndInvalidatesAuthCache(t *testing.T) {
+	repo := &effectiveStatusUpdateUserRepoStub{
+		userRepoStubForListUsers: &userRepoStubForListUsers{
+			userRepoStub: userRepoStub{user: &User{ID: 42, Email: "u@example.com", Status: StatusActive}},
+			users:        []User{{ID: 42, Email: "u@example.com", Status: StatusActive}},
+		},
+	}
+	invalidator := &authCacheInvalidatorStub{}
+	svc := &adminServiceImpl{
+		userRepo:             repo,
+		authCacheInvalidator: invalidator,
+	}
+
+	updated, err := svc.UpdateUser(context.Background(), 42, &UpdateUserInput{
+		Status: UserDeviceStatusPendingActivation,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	require.Equal(t, UserDeviceStatusPendingActivation, updated.Status)
+	require.Equal(t, []string{UserDeviceStatusPendingActivation}, repo.updatedEffectiveStatuses)
+	require.Equal(t, []int64{42}, invalidator.userIDs)
+}
