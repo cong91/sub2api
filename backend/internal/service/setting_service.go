@@ -901,9 +901,9 @@ type PublicSettingsInjectionPayload struct {
 	// Feature flags — MUST match the opt-in/opt-out registry in
 	// frontend/src/utils/featureFlags.ts. Missing a field here is the bug
 	// that hid the "可用渠道" menu on page refresh.
-	ChannelMonitorEnabled                bool `json:"channel_monitor_enabled"`
-	ChannelMonitorDefaultIntervalSeconds int  `json:"channel_monitor_default_interval_seconds"`
-	AvailableChannelsEnabled             bool `json:"available_channels_enabled"`
+	ChannelMonitorEnabled                bool   `json:"channel_monitor_enabled"`
+	ChannelMonitorDefaultIntervalSeconds int    `json:"channel_monitor_default_interval_seconds"`
+	AvailableChannelsEnabled             bool   `json:"available_channels_enabled"`
 	AffiliateEnabled                     bool   `json:"affiliate_enabled"`
 	DeviceAutoActivationAffCodes         string `json:"device_auto_activation_aff_codes"`
 	RiskControlEnabled                   bool   `json:"risk_control_enabled"`
