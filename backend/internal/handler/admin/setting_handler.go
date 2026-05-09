@@ -232,6 +232,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		CyberSessionBlockEnabled:               settings.CyberSessionBlockEnabled,
 		CyberSessionBlockTTLSeconds:            settings.CyberSessionBlockTTLSeconds,
 		DeviceClaimBonusBalance:                settings.DeviceClaimBonusBalance,
+		AffiliateEnabled:                       settings.AffiliateEnabled,
 		DeviceAutoActivationAffCodes:           settings.DeviceAutoActivationAffCodes,
 		AffiliateRebateRate:                    settings.AffiliateRebateRate,
 		AffiliateRebateFreezeHours:             settings.AffiliateRebateFreezeHours,
@@ -309,8 +310,6 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		ChannelMonitorDefaultIntervalSeconds: settings.ChannelMonitorDefaultIntervalSeconds,
 
 		AvailableChannelsEnabled: settings.AvailableChannelsEnabled,
-
-		AffiliateEnabled: settings.AffiliateEnabled,
 
 		AllowUserViewErrorRequests: settings.AllowUserViewErrorRequests,
 	}
