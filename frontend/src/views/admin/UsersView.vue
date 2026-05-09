@@ -236,7 +236,7 @@
           :columns="columns"
           :data="users"
           :loading="loading"
-          :actions-count="7"
+          :actions-count="canManageUsers ? 7 : 0"
           :server-side-sort="true"
           default-sort-key="created_at"
           default-sort-order="desc"
@@ -429,6 +429,7 @@
                 </div>
               </div>
               <button
+                v-if="canManageUsers"
                 @click.stop="handleDeposit(row)"
                 class="rounded px-2 py-0.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
                 :title="t('admin.users.deposit')"
@@ -466,7 +467,7 @@
             <div class="flex min-w-[12rem] flex-col gap-1">
               <Select
                 :model-value="row.status"
-                :options="editableStatusOptions"
+                :options="editableStatusOptions(row)"
                 :disabled="!canEditStatus(row) || updatingStatusIds.has(row.id)"
                 @update:model-value="(status) => handleStatusSelect(row, status)"
               />
@@ -496,6 +497,7 @@
             <div class="flex items-center gap-1">
               <!-- Edit Button -->
               <button
+                v-if="canManageUsers"
                 @click="handleEdit(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
               >
@@ -505,6 +507,7 @@
 
               <!-- More Actions Menu Trigger -->
               <button
+                v-if="canManageUsers"
                 @click="openActionMenu(row, $event)"
                 class="action-menu-trigger flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white"
                 :class="{ 'bg-gray-100 text-gray-900 dark:bg-dark-700 dark:text-white': activeMenuId === row.id }"
@@ -631,6 +634,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatDateTime } from '@/utils/format'
 import Icon from '@/components/icons/Icon.vue'
@@ -659,6 +663,8 @@ import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryM
 import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const canManageUsers = computed(() => authStore.isAdmin)
 
 const roleBadgeClass = (role: string) => {
   if (role === 'admin') return 'badge-purple'
@@ -666,7 +672,11 @@ const roleBadgeClass = (role: string) => {
   return 'badge-gray'
 }
 
-const canEditStatus = (user: AdminUser) => user.role !== 'admin'
+const canEditStatus = (user: AdminUser) => {
+  if (user.role === 'admin') return false
+  if (authStore.isMarketing) return user.status === 'pending_activation'
+  return authStore.isAdmin
+}
 
 const statusHint = (user: AdminUser) => {
   if (user.status === 'active') return t('admin.users.statusHints.active')
@@ -676,16 +686,27 @@ const statusHint = (user: AdminUser) => {
   return t('admin.users.activationHints.none')
 }
 
-const editableStatusOptions = computed(() => [
+const allStatusOptions = computed(() => [
   { value: 'active', label: t('common.active') },
   { value: 'pending_activation', label: t('admin.users.status.pending_activation') },
   { value: 'blocked', label: t('admin.users.status.blocked') },
   { value: 'disabled', label: t('admin.users.disabled') }
 ])
 
+const editableStatusOptions = (user: AdminUser) => {
+  if (authStore.isMarketing) {
+    if (user.status === 'pending_activation') {
+      return allStatusOptions.value.filter((option) => ['pending_activation', 'active'].includes(String(option.value)))
+    }
+    return allStatusOptions.value.filter((option) => option.value === user.status)
+  }
+
+  return allStatusOptions.value
+}
+
 const statusFilterOptions = computed(() => [
   { value: '', label: t('admin.users.allStatus') },
-  ...editableStatusOptions.value
+  ...allStatusOptions.value
 ])
 
 // Generate dynamic attribute columns from enabled definitions
@@ -1087,6 +1108,7 @@ const activeMenuId = ref<number | null>(null)
 const menuPosition = ref<{ top: number; left: number } | null>(null)
 
 const openActionMenu = (user: AdminUser, e: MouseEvent) => {
+  if (!canManageUsers.value) return
   if (activeMenuId.value === user.id) {
     closeActionMenu()
   } else {
@@ -1171,6 +1193,7 @@ const allowedGroupsUser = ref<AdminUser | null>(null)
 // Expanded group dropdown state (click to show exclusive groups list)
 const expandedGroupUserId = ref<number | null>(null)
 const toggleExpandedGroup = (userId: number) => {
+  if (!canManageUsers.value) return
   expandedGroupUserId.value = expandedGroupUserId.value === userId ? null : userId
 }
 
@@ -1351,6 +1374,7 @@ const applyFilter = () => {
 }
 
 const handleEdit = (user: AdminUser) => {
+  if (!canManageUsers.value) return
   editingUser.value = user
   showEditModal.value = true
 }
@@ -1399,6 +1423,7 @@ const handleStatusSelect = async (user: AdminUser, status: unknown) => {
 }
 
 const handleViewApiKeys = (user: AdminUser) => {
+  if (!canManageUsers.value) return
   viewingUser.value = user
   showApiKeysModal.value = true
 }
@@ -1409,6 +1434,7 @@ const closeApiKeysModal = () => {
 }
 
 const handleAllowedGroups = (user: AdminUser) => {
+  if (!canManageUsers.value) return
   allowedGroupsUser.value = user
   showAllowedGroupsModal.value = true
 }
@@ -1419,6 +1445,7 @@ const closeAllowedGroupsModal = () => {
 }
 
 const openGroupReplace = (user: AdminUser, group: { id: number; name: string }) => {
+  if (!canManageUsers.value) return
   expandedGroupUserId.value = null
   groupReplaceUser.value = user
   groupReplaceOldGroup.value = group
@@ -1432,6 +1459,7 @@ const closeGroupReplaceModal = () => {
 }
 
 const handleDelete = (user: AdminUser) => {
+  if (!canManageUsers.value) return
   deletingUser.value = user
   showDeleteDialog.value = true
 }
@@ -1451,12 +1479,14 @@ const confirmDelete = async () => {
 }
 
 const handleDeposit = (user: AdminUser) => {
+  if (!canManageUsers.value) return
   balanceUser.value = user
   balanceOperation.value = 'add'
   showBalanceModal.value = true
 }
 
 const handleWithdraw = (user: AdminUser) => {
+  if (!canManageUsers.value) return
   balanceUser.value = user
   balanceOperation.value = 'subtract'
   showBalanceModal.value = true

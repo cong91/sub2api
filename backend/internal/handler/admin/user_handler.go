@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -289,7 +290,18 @@ func (h *UserHandler) Update(c *gin.Context) {
 		return
 	}
 
-	if !ensureMarketingCanManageUser(c, h.adminService, userID) {
+	if isMarketingRequest(c) {
+		if !validateMarketingUserStatusUpdate(c, req) {
+			return
+		}
+	}
+
+	if isMarketingRequest(c) {
+		pendingOnly := service.StatusPendingActivation
+		if !ensureMarketingCanManageUserWithStatus(c, h.adminService, userID, pendingOnly) {
+			return
+		}
+	} else if !ensureMarketingCanManageUser(c, h.adminService, userID) {
 		return
 	}
 
@@ -313,6 +325,28 @@ func (h *UserHandler) Update(c *gin.Context) {
 	}
 
 	response.Success(c, dto.UserFromServiceAdmin(user))
+}
+
+func validateMarketingUserStatusUpdate(c *gin.Context, req UpdateUserRequest) bool {
+	if req.Email != "" || req.Password != "" || req.Username != nil || req.Notes != nil ||
+		req.Balance != nil || req.Concurrency != nil || req.RPMLimit != nil || req.Role != "" ||
+		req.AllowedGroups != nil || req.GroupRates != nil {
+		response.ErrorFrom(c, infraerrors.Forbidden(
+			"FORBIDDEN",
+			"Marketing role can only activate pending users by updating status",
+		))
+		return false
+	}
+
+	if req.Status != service.StatusActive {
+		response.ErrorFrom(c, infraerrors.Forbidden(
+			"FORBIDDEN",
+			"Marketing role can only activate pending users",
+		))
+		return false
+	}
+
+	return true
 }
 
 // Delete handles deleting a user
