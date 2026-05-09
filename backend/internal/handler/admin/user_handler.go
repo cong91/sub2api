@@ -56,7 +56,7 @@ type UpdateUserRequest struct {
 	Concurrency   *int     `json:"concurrency"`
 	RPMLimit      *int     `json:"rpm_limit"`
 	Role          string   `json:"role" binding:"omitempty,oneof=admin marketing user"`
-	Status        string   `json:"status" binding:"omitempty,oneof=active pending_activation revoked blocked disabled"`
+	Status        string   `json:"status" binding:"omitempty,oneof=active pending_activation blocked disabled"`
 	AllowedGroups *[]int64 `json:"allowed_groups"`
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]*rate，nil 表示删除该分组的专属倍率

@@ -402,7 +402,7 @@ func TestVClawClaimServiceFirstClaimBindsAffiliateCodeOnce(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, first)
 	require.Equal(t, "first_claim", first.Mode)
-	require.Equal(t, UserDeviceStatusPendingActivation, first.Status)
+	require.Equal(t, StatusPendingActivation, first.Status)
 	require.Equal(t, int64(202), first.UserID)
 	require.Equal(t, []vclawClaimAffiliateBinding{{UserID: 202, InviterID: 901}}, affiliateRepo.bindings)
 
@@ -411,7 +411,7 @@ func TestVClawClaimServiceFirstClaimBindsAffiliateCodeOnce(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resume)
 	require.Equal(t, "resume", resume.Mode)
-	require.Equal(t, UserDeviceStatusPendingActivation, resume.Status)
+	require.Equal(t, StatusPendingActivation, resume.Status)
 	require.Equal(t, first.DeviceLoginCode, resume.DeviceLoginCode)
 	require.Equal(t, []vclawClaimAffiliateBinding{{UserID: 202, InviterID: 901}}, affiliateRepo.bindings)
 }

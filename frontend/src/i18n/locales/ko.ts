@@ -1741,19 +1741,15 @@ export default {
       allRoles: '모든 역할',
       allStatus: '모든 상태',
       allGroups: '모든 그룹',
-      effectiveStatus: {
-        all: '모든 활성화 상태',
-        none: '앱 claim 없음',
+      status: {
         active: '활성화됨',
         pending_activation: '활성화 대기',
-        revoked: '철회됨',
         blocked: '차단됨'
       },
       activationHints: {
         active: 'OpenClaw 접근이 허용되었습니다.',
         pending: '스위치를 켜서 이 초대 레코드를 승인하세요.',
         none: '이 레코드에는 아직 앱/기기 claim이 연결되지 않았습니다.',
-        revoked: '접근 권한이 철회되어 여기서 다시 활성화할 수 없습니다.',
         blocked: '접근 권한이 차단되어 여기서 다시 활성화할 수 없습니다.'
       },
       searchGroups: '그룹 검색...',
@@ -2051,7 +2047,7 @@ export default {
         userName: '사용자명',
         userEmail: '이메일',
         userNotes: '메모',
-        userStatus: '상태'
+        memberStatus: '상태'
       },
       usageToday: '오늘',
       usageTotal: '누적',
@@ -7222,7 +7218,6 @@ export default {
       subsStatus: {
         active: '활성 중',
         expired: '만료됨',
-        revoked: '취소됨',
       },
 
       allowUserRefund: 'Allow User Refund',

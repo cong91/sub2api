@@ -712,9 +712,9 @@ func normalizeUserRole(role string) (string, error) {
 	}
 }
 
-func isValidAdminUserEffectiveStatus(status string) bool {
+func isValidUserStatus(status string) bool {
 	switch status {
-	case StatusActive, StatusDisabled, UserDeviceStatusPendingActivation, UserDeviceStatusRevoked, UserDeviceStatusBlocked:
+	case StatusActive, StatusPendingActivation, StatusBlocked, StatusDisabled:
 		return true
 	default:
 		return false
@@ -760,7 +760,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	}
 
 	statusUpdate := strings.TrimSpace(input.Status)
-	if statusUpdate != "" && !isValidAdminUserEffectiveStatus(statusUpdate) {
+	if statusUpdate != "" && !isValidUserStatus(statusUpdate) {
 		return nil, fmt.Errorf("invalid status: %s", statusUpdate)
 	}
 
@@ -768,10 +768,10 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	if input.Role != "" {
 		newRole = input.Role
 	}
-	// Protect admin users: admin accounts cannot be disabled or device-blocked.
+	// Protect admin users: admin accounts cannot be moved into a non-active user status.
 	// Check both the existing role and the requested role so a single request cannot
 	// promote a user to admin while simultaneously making that admin inaccessible.
-	if (user.Role == RoleAdmin || newRole == RoleAdmin) && (statusUpdate == StatusDisabled || statusUpdate == UserDeviceStatusBlocked) {
+	if (user.Role == RoleAdmin || newRole == RoleAdmin) && statusUpdate != "" && statusUpdate != StatusActive {
 		return nil, errors.New("cannot disable admin user")
 	}
 
@@ -812,26 +812,14 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		user.AllowedGroups = *input.AllowedGroups
 	}
 
-	// `status` in the admin API is an effective status. Raw users.status only stores
-	// account availability (`active`/`disabled`), while activation states live on
-	// user_devices.status. Keep the profile update from writing values such as
-	// `pending_activation`, `revoked`, or `blocked` into users.status; persist the
-	// effective status through UpdateEffectiveStatus below.
+	if statusUpdate != "" {
+		user.Status = statusUpdate
+	}
+
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, err
 	}
-	cacheRelevantChanged := user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit || statusUpdate != ""
-	if statusUpdate != "" {
-		statusUpdater, ok := s.userRepo.(interface {
-			UpdateEffectiveStatus(ctx context.Context, userID int64, status string) error
-		})
-		if !ok {
-			return nil, ErrServiceUnavailable
-		}
-		if err := statusUpdater.UpdateEffectiveStatus(ctx, user.ID, statusUpdate); err != nil {
-			return nil, err
-		}
-	}
+	cacheRelevantChanged := user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit
 	fresh, err := s.getAdminUser(ctx, user.ID)
 	if err != nil {
 		return nil, err

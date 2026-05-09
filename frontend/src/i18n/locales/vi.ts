@@ -1740,19 +1740,15 @@ export default {
       allRoles: 'Tất cả vai trò',
       allStatus: 'Tất cả trạng thái',
       allGroups: 'Tất cả nhóm',
-      effectiveStatus: {
-        all: 'Tất cả trạng thái kích hoạt',
-        none: 'Chưa claim app',
+      status: {
         active: 'Đã kích hoạt',
         pending_activation: 'Chờ kích hoạt',
-        revoked: 'Đã thu hồi',
         blocked: 'Đã chặn'
       },
       activationHints: {
         active: 'Đã cho phép mở OpenClaw.',
         pending: 'Bật switch để duyệt bản ghi invite này.',
         none: 'Chưa có claim app/device gắn với bản ghi này.',
-        revoked: 'Quyền truy cập đã bị thu hồi và không thể bật lại tại đây.',
         blocked: 'Quyền truy cập đang bị chặn và không thể bật lại tại đây.'
       },
       searchGroups: 'Tìm nhóm...',
@@ -2050,7 +2046,7 @@ export default {
         userName: 'Tên người dùng',
         userEmail: 'Email',
         userNotes: 'Ghi chú',
-        userStatus: 'Trạng thái'
+        memberStatus: 'Trạng thái'
       },
       usageToday: 'Hôm nay',
       usageTotal: 'Lũy kế',

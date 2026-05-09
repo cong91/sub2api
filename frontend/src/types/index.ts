@@ -64,8 +64,7 @@ export interface UserProfileSourceContext {
 }
 
 export type UserRole = 'admin' | 'marketing' | 'user'
-export type UserStatus = 'active' | 'disabled'
-export type AdminUserStatus = UserStatus | 'pending_activation' | 'revoked' | 'blocked'
+export type UserStatus = 'active' | 'pending_activation' | 'blocked' | 'disabled'
 
 export interface User {
   id: number
@@ -110,7 +109,7 @@ export type AdminUser = Omit<User, 'status'> & {
   signup_source?: 'email' | 'invite' | 'admin' | string | null
   primary_redeem_code?: string | null
   primary_redeem_type?: string | null
-  status: AdminUserStatus
+  status: UserStatus
   // 用户专属分组倍率配置 (group_id -> rate_multiplier)
   group_rates?: Record<number, number>
   // 当前并发数（仅管理员列表接口返回）
@@ -1486,7 +1485,7 @@ export interface UpdateUserRequest {
   balance?: number
   concurrency?: number
   rpm_limit?: number
-  status?: AdminUserStatus
+  status?: UserStatus
   allowed_groups?: number[] | null
   // 用户专属分组倍率配置 (group_id -> rate_multiplier | null)
   // null 表示删除该分组的专属倍率

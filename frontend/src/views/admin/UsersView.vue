@@ -467,11 +467,11 @@
               <Select
                 :model-value="row.status"
                 :options="editableStatusOptions"
-                :disabled="!canEditUserStatus(row) || updatingStatusUserIds.has(row.id)"
-                @update:model-value="(status) => handleUserStatusSelect(row, status)"
+                :disabled="!canEditStatus(row) || updatingStatusIds.has(row.id)"
+                @update:model-value="(status) => handleStatusSelect(row, status)"
               />
               <div class="text-xs text-gray-500 dark:text-dark-400">
-                {{ userStatusHint(row) }}
+                {{ statusHint(row) }}
               </div>
             </div>
           </template>
@@ -666,22 +666,20 @@ const roleBadgeClass = (role: string) => {
   return 'badge-gray'
 }
 
-const canEditUserStatus = (user: AdminUser) => user.role !== 'admin'
+const canEditStatus = (user: AdminUser) => user.role !== 'admin'
 
-const userStatusHint = (user: AdminUser) => {
+const statusHint = (user: AdminUser) => {
   if (user.status === 'active') return t('admin.users.statusHints.active')
   if (user.status === 'disabled') return t('admin.users.statusHints.disabled')
   if (user.status === 'pending_activation') return t('admin.users.activationHints.pending')
-  if (user.status === 'revoked') return t('admin.users.activationHints.revoked')
   if (user.status === 'blocked') return t('admin.users.activationHints.blocked')
   return t('admin.users.activationHints.none')
 }
 
 const editableStatusOptions = computed(() => [
   { value: 'active', label: t('common.active') },
-  { value: 'pending_activation', label: t('admin.users.effectiveStatus.pending_activation') },
-  { value: 'revoked', label: t('admin.users.effectiveStatus.revoked') },
-  { value: 'blocked', label: t('admin.users.effectiveStatus.blocked') },
+  { value: 'pending_activation', label: t('admin.users.status.pending_activation') },
+  { value: 'blocked', label: t('admin.users.status.blocked') },
   { value: 'disabled', label: t('admin.users.disabled') }
 ])
 
@@ -1375,12 +1373,12 @@ const handleEditModalSuccess = (updatedUser?: AdminUser) => {
   loadUsers()
 }
 
-const updatingStatusUserIds = reactive<Set<number>>(new Set())
+const updatingStatusIds = reactive<Set<number>>(new Set())
 
-const handleUserStatusSelect = async (user: AdminUser, status: unknown) => {
+const handleStatusSelect = async (user: AdminUser, status: unknown) => {
   const newStatus = String(status || '') as AdminUser['status']
-  if (!newStatus || newStatus === user.status || !canEditUserStatus(user) || updatingStatusUserIds.has(user.id)) return
-  updatingStatusUserIds.add(user.id)
+  if (!newStatus || newStatus === user.status || !canEditStatus(user) || updatingStatusIds.has(user.id)) return
+  updatingStatusIds.add(user.id)
   try {
     const updatedUser = await adminAPI.users.update(user.id, { status: newStatus })
     const index = users.value.findIndex((item) => item.id === user.id)
@@ -1396,7 +1394,7 @@ const handleUserStatusSelect = async (user: AdminUser, status: unknown) => {
     appStore.showError(error.response?.data?.detail || t('admin.users.failedToToggle'))
     console.error('Error updating user status:', error)
   } finally {
-    updatingStatusUserIds.delete(user.id)
+    updatingStatusIds.delete(user.id)
   }
 }
 

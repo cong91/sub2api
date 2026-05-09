@@ -186,16 +186,16 @@ func TestAdminService_ListUsers_PopulatesLastUsedAt(t *testing.T) {
 	require.WithinDuration(t, lastUsed, *users[0].LastUsedAt, time.Second)
 }
 
-func TestAdminService_GetUserUsesEffectiveStatus(t *testing.T) {
+func TestAdminService_GetUserUsesUserStatus(t *testing.T) {
 	userRepo := &userRepoStubForListUsers{
-		users: []User{{ID: 42, Email: "pending@example.com", Status: UserDeviceStatusPendingActivation}},
+		users: []User{{ID: 42, Email: "pending@example.com", Status: StatusPendingActivation}},
 	}
 	svc := &adminServiceImpl{userRepo: userRepo}
 
-	user, err := svc.GetUser(context.Background(), 42)
+	user, err := svc.getAdminUser(context.Background(), 42)
 	require.NoError(t, err)
 	require.NotNil(t, user)
-	require.Equal(t, UserDeviceStatusPendingActivation, user.Status)
+	require.Equal(t, StatusPendingActivation, user.Status)
 	require.Equal(t, pagination.PaginationParams{Page: 1, PageSize: 1}, userRepo.listWithFiltersParams)
 	require.NotNil(t, userRepo.listWithFiltersFilter.UserID)
 	require.Equal(t, int64(42), *userRepo.listWithFiltersFilter.UserID)

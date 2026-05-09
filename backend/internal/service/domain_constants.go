@@ -4,12 +4,14 @@ import "github.com/Wei-Shaw/sub2api/internal/domain"
 
 // Status constants
 const (
-	StatusActive   = domain.StatusActive
-	StatusDisabled = domain.StatusDisabled
-	StatusError    = domain.StatusError
-	StatusUnused   = domain.StatusUnused
-	StatusUsed     = domain.StatusUsed
-	StatusExpired  = domain.StatusExpired
+	StatusActive            = domain.StatusActive
+	StatusPendingActivation = "pending_activation"
+	StatusBlocked           = "blocked"
+	StatusDisabled          = domain.StatusDisabled
+	StatusError             = domain.StatusError
+	StatusUnused            = domain.StatusUnused
+	StatusUsed              = domain.StatusUsed
+	StatusExpired           = domain.StatusExpired
 )
 
 // Role constants

@@ -1775,19 +1775,15 @@ export default {
       allRoles: 'All Roles',
       allStatus: 'All Status',
       allGroups: 'All Groups',
-      effectiveStatus: {
-        all: 'All activation states',
-        none: 'No app claim',
+      status: {
         active: 'Activated',
         pending_activation: 'Pending activation',
-        revoked: 'Revoked',
         blocked: 'Blocked'
       },
       activationHints: {
         active: 'OpenClaw access is enabled.',
         pending: 'Turn on to approve this invite record.',
         none: 'No linked app/device claim yet.',
-        revoked: 'Access was revoked and cannot be re-enabled here.',
         blocked: 'Access is blocked and cannot be re-enabled here.'
       },
       searchGroups: 'Search groups...',
@@ -2091,7 +2087,7 @@ export default {
         userName: 'Username',
         userEmail: 'Email',
         userNotes: 'Notes',
-        userStatus: 'Status',
+        memberStatus: 'Status',
         apiKeys: 'API Key Count',
         exclusive: 'Exclusive',
         priority: 'Priority',

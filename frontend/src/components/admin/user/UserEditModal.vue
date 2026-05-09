@@ -87,7 +87,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useClipboard } from '@/composables/useClipboard'
 import { adminAPI } from '@/api/admin'
-import type { AdminUser, AdminUserStatus, UserAttributeValuesMap, UserRole, UpdateUserRequest } from '@/types'
+import type { AdminUser, UserAttributeValuesMap, UserRole, UserStatus, UpdateUserRequest } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
 import UserAttributeForm from '@/components/user/UserAttributeForm.vue'
@@ -105,35 +105,33 @@ const roleOptions = [
 
 const statusOptions = [
   { value: 'active', label: t('common.active') },
-  { value: 'pending_activation', label: t('admin.users.effectiveStatus.pending_activation') },
-  { value: 'revoked', label: t('admin.users.effectiveStatus.revoked') },
-  { value: 'blocked', label: t('admin.users.effectiveStatus.blocked') },
+  { value: 'pending_activation', label: t('admin.users.status.pending_activation') },
+  { value: 'blocked', label: t('admin.users.status.blocked') },
   { value: 'disabled', label: t('admin.users.disabled') }
 ]
 
 const submitting = ref(false)
 const passwordCopied = ref(false)
-const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as UserRole, status: 'active' as AdminUserStatus, concurrency: 1, rpm_limit: 0, customAttributes: {} as UserAttributeValuesMap })
+const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as UserRole, status: 'active' as UserStatus, concurrency: 1, rpm_limit: 0, customAttributes: {} as UserAttributeValuesMap })
 
 const accountStatusLabel = computed(() => {
   const status = form.status
   if (!status) return '-'
   if (status === 'active') return t('common.active')
   if (status === 'disabled') return t('admin.users.disabled')
-  return t(`admin.users.effectiveStatus.${status}`, status)
+  return t(`admin.users.status.${status}`, status)
 })
 const accountStatusTextClass = computed(() => {
   const status = form.status
   if (status === 'active') return 'text-green-600 dark:text-green-400'
   if (status === 'pending_activation') return 'text-amber-600 dark:text-amber-400'
-  if (status === 'revoked' || status === 'blocked' || status === 'disabled') return 'text-red-600 dark:text-red-400'
+  if (status === 'blocked' || status === 'disabled') return 'text-red-600 dark:text-red-400'
   return 'text-gray-500 dark:text-dark-400'
 })
 const accountStatusHint = computed(() => {
   const status = form.status
   if (status === 'active') return t('admin.users.activationHints.active')
   if (status === 'pending_activation') return t('admin.users.activationHints.pending')
-  if (status === 'revoked') return t('admin.users.activationHints.revoked')
   if (status === 'blocked') return t('admin.users.activationHints.blocked')
   if (status === 'disabled') return t('admin.users.statusHints.disabled')
   return t('admin.users.activationHints.none')

@@ -1782,19 +1782,15 @@ export default {
       allRoles: '全部角色',
       allStatus: '全部状态',
       allGroups: '全部分组',
-      effectiveStatus: {
-        all: '全部激活状态',
-        none: '未提交应用 claim',
+      status: {
         active: '已激活',
         pending_activation: '待激活',
-        revoked: '已撤销',
         blocked: '已阻止'
       },
       activationHints: {
         active: '已允许打开 OpenClaw。',
         pending: '打开开关即可批准此邀请码记录。',
         none: '此记录尚未绑定应用/设备 claim。',
-        revoked: '访问权限已撤销，不能在此重新启用。',
         blocked: '访问权限已阻止，不能在此重新启用。'
       },
       searchGroups: '搜索分组...',
@@ -2092,7 +2088,7 @@ export default {
         userName: '用户名',
         userEmail: '邮箱',
         userNotes: '备注',
-        userStatus: '状态'
+        memberStatus: '状态'
       },
       usageToday: '今日',
       usageTotal: '累计',

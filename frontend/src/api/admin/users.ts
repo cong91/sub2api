@@ -4,7 +4,7 @@
  */
 
 import { apiClient } from '../client'
-import type { AdminUser, AdminUserStatus, UpdateUserRequest, PaginatedResponse, ApiKey, UserRole } from '@/types'
+import type { AdminUser, UpdateUserRequest, PaginatedResponse, ApiKey, UserRole, UserStatus } from '@/types'
 
 export interface AdminBindAuthIdentityChannelRequest {
   channel: string
@@ -56,7 +56,7 @@ export async function list(
   page: number = 1,
   pageSize: number = 20,
   filters?: {
-    status?: AdminUserStatus
+    status?: UserStatus
     role?: UserRole
     search?: string
     group_name?: string         // fuzzy filter by allowed group name
@@ -183,10 +183,10 @@ export async function updateConcurrency(id: number, concurrency: number): Promis
 /**
  * Update user status
  * @param id - User ID
- * @param status - New effective admin user status
+ * @param status - New user status
  * @returns Updated user
  */
-export async function updateStatus(id: number, status: AdminUserStatus): Promise<AdminUser> {
+export async function updateStatus(id: number, status: UserStatus): Promise<AdminUser> {
   return update(id, { status })
 }
 
