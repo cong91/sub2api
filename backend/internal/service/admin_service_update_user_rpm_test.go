@@ -104,7 +104,20 @@ func TestAdminService_UpdateUser_InvalidRole(t *testing.T) {
 
 type effectiveStatusUpdateUserRepoStub struct {
 	*userRepoStubForListUsers
+	lastUpdated              *User
 	updatedEffectiveStatuses []string
+}
+
+func (s *effectiveStatusUpdateUserRepoStub) Update(_ context.Context, user *User) error {
+	if user == nil {
+		return nil
+	}
+	clone := *user
+	s.lastUpdated = &clone
+	if s.userRepoStubForListUsers != nil {
+		s.userRepoStubForListUsers.user = &clone
+	}
+	return nil
 }
 
 func (s *effectiveStatusUpdateUserRepoStub) UpdateEffectiveStatus(_ context.Context, userID int64, status string) error {
@@ -137,5 +150,25 @@ func TestAdminService_UpdateUserStatusReturnsEffectiveStatusAndInvalidatesAuthCa
 	require.NotNil(t, updated)
 	require.Equal(t, UserDeviceStatusPendingActivation, updated.Status)
 	require.Equal(t, []string{UserDeviceStatusPendingActivation}, repo.updatedEffectiveStatuses)
+	require.NotNil(t, repo.lastUpdated)
+	require.Equal(t, StatusActive, repo.lastUpdated.Status, "raw users.status must not store device activation states")
 	require.Equal(t, []int64{42}, invalidator.userIDs)
+}
+
+func TestAdminService_UpdateUserRejectsAdminPromotionWithDisabledEffectiveStatus(t *testing.T) {
+	repo := &effectiveStatusUpdateUserRepoStub{
+		userRepoStubForListUsers: &userRepoStubForListUsers{
+			userRepoStub: userRepoStub{user: &User{ID: 42, Email: "u@example.com", Role: RoleUser, Status: StatusActive}},
+			users:        []User{{ID: 42, Email: "u@example.com", Role: RoleUser, Status: StatusActive}},
+		},
+	}
+	svc := &adminServiceImpl{userRepo: repo}
+
+	_, err := svc.UpdateUser(context.Background(), 42, &UpdateUserInput{
+		Role:   RoleAdmin,
+		Status: StatusDisabled,
+	})
+	require.Error(t, err)
+	require.Nil(t, repo.lastUpdated)
+	require.Empty(t, repo.updatedEffectiveStatuses)
 }

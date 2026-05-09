@@ -712,6 +712,15 @@ func normalizeUserRole(role string) (string, error) {
 	}
 }
 
+func isValidAdminUserEffectiveStatus(status string) bool {
+	switch status {
+	case StatusActive, StatusDisabled, UserDeviceStatusPendingActivation, UserDeviceStatusRevoked, UserDeviceStatusBlocked:
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *adminServiceImpl) assignDefaultSubscriptions(ctx context.Context, userID int64) {
 	if s.settingService == nil || s.defaultSubAssigner == nil || userID <= 0 {
 		return
@@ -750,8 +759,19 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		return nil, err
 	}
 
-	// Protect admin users: cannot disable/admin-block admin accounts
-	if user.Role == "admin" && (input.Status == StatusDisabled || input.Status == UserDeviceStatusBlocked) {
+	statusUpdate := strings.TrimSpace(input.Status)
+	if statusUpdate != "" && !isValidAdminUserEffectiveStatus(statusUpdate) {
+		return nil, fmt.Errorf("invalid status: %s", statusUpdate)
+	}
+
+	newRole := user.Role
+	if input.Role != "" {
+		newRole = input.Role
+	}
+	// Protect admin users: admin accounts cannot be disabled or device-blocked.
+	// Check both the existing role and the requested role so a single request cannot
+	// promote a user to admin while simultaneously making that admin inaccessible.
+	if (user.Role == RoleAdmin || newRole == RoleAdmin) && (statusUpdate == StatusDisabled || statusUpdate == UserDeviceStatusBlocked) {
 		return nil, errors.New("cannot disable admin user")
 	}
 
@@ -776,10 +796,6 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		user.Notes = *input.Notes
 	}
 
-	statusUpdate := input.Status
-	if input.Status != "" {
-		user.Status = input.Status
-	}
 	if input.Role != "" {
 		user.Role = input.Role
 	}
@@ -796,9 +812,11 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		user.AllowedGroups = *input.AllowedGroups
 	}
 
-	if statusUpdate != "" {
-		user.Status = oldStatus
-	}
+	// `status` in the admin API is an effective status. Raw users.status only stores
+	// account availability (`active`/`disabled`), while activation states live on
+	// user_devices.status. Keep the profile update from writing values such as
+	// `pending_activation`, `revoked`, or `blocked` into users.status; persist the
+	// effective status through UpdateEffectiveStatus below.
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, err
 	}
