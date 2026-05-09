@@ -14,7 +14,7 @@
           to="/login"
           class="inline-flex flex-shrink-0 items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-primary-600/20 transition hover:bg-primary-700"
         >
-          {{ t('home.login') }}
+          {{ t('auth.signIn') }}
         </RouterLink>
       </div>
     </header>
@@ -28,8 +28,8 @@
         v-else-if="loadError"
         class="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
       >
-        <h1 class="text-lg font-semibold">{{ t('legal.loadFailed') }}</h1>
-        <p class="mt-2 text-sm">{{ t('legal.retryLater') }}</p>
+        <h1 class="text-lg font-semibold">{{ t('legalDocument.loadFailedTitle') }}</h1>
+        <p class="mt-2 text-sm">{{ t('legalDocument.loadFailedDesc') }}</p>
       </section>
 
       <section
@@ -41,9 +41,9 @@
             <Icon name="document" size="sm" />
           </span>
           <div>
-            <h1 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('legal.notFound') }}</h1>
+            <h1 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('legalDocument.notFoundTitle') }}</h1>
             <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-dark-300">
-              {{ t('legal.notFoundDescription') }}
+              {{ t('legalDocument.notFoundDesc') }}
             </p>
           </div>
         </div>
@@ -61,7 +61,7 @@
                 {{ currentDocument.title }}
               </h1>
               <p v-if="updatedAt" class="mt-3 text-sm text-gray-500 dark:text-dark-400">
-                {{ t('legal.updatedAt', { date: updatedAt }) }}
+                {{ t('legalDocument.updatedAt', { date: updatedAt }) }}
               </p>
             </div>
           </div>
@@ -76,7 +76,7 @@
           v-else
           class="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-14 text-center text-sm text-gray-500 dark:border-dark-700 dark:bg-dark-900 dark:text-dark-400"
         >
-          {{ t('legal.empty') }}
+          {{ t('legalDocument.emptyContent') }}
         </div>
       </article>
     </main>
@@ -86,9 +86,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import { getPublicSettings } from '@/api/auth'
 import { getLocale } from '@/i18n'
@@ -122,7 +122,7 @@ const updatedAt = computed(() =>
   isAdminComplianceDocument.value ? '' : settings.value?.login_agreement_updated_at || ''
 )
 const documentTypeLabel = computed(() =>
-  isAdminComplianceDocument.value ? t('legal.adminCompliance') : t('legal.loginAgreement')
+  isAdminComplianceDocument.value ? t('legal.adminCompliance') : t('legalDocument.loginTerms')
 )
 
 const currentDocument = computed<LoginAgreementDocument | null>(() => {
@@ -130,7 +130,7 @@ const currentDocument = computed<LoginAgreementDocument | null>(() => {
     return {
       id: 'admin-compliance',
       title: t('adminCompliance.title'),
-      content_md: getLocale() === 'zh' ? zhAdminCompliance : enAdminCompliance
+      content_md: getLocale() === 'zh' ? zhAdminCompliance : enAdminCompliance,
     }
   }
   const id = documentId.value
@@ -152,14 +152,14 @@ const renderedHtml = computed(() => {
 })
 
 const documentIcon = computed<LegalDocumentIcon>(() => {
-  const title = currentDocument.value?.title || ''
-  if (title.includes('政策') || title.includes('隐私')) {
+  const normalized = `${currentDocument.value?.id || ''} ${currentDocument.value?.title || ''}`.toLowerCase()
+  if (normalized.includes('policy') || normalized.includes('privacy')) {
     return 'shield'
   }
-  if (title.includes('国家') || title.includes('地区')) {
+  if (normalized.includes('country') || normalized.includes('region')) {
     return 'globe'
   }
-  if (title.includes('特定')) {
+  if (normalized.includes('specific')) {
     return 'cog'
   }
   return 'document'
