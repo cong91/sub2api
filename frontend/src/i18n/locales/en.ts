@@ -1822,6 +1822,7 @@ export default {
         role: 'Role',
         roleHint: 'Choose the permission level for this admin-created user.',
         appActivation: 'OpenClaw access',
+        accountStatus: 'Account status',
         activationCode: 'Activation code',
         rpmLimit: 'Requests Per Minute (RPM)',
         rpmLimitPlaceholder: '0 = unlimited',

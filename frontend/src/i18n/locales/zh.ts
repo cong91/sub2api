@@ -1904,6 +1904,7 @@ export default {
         role: '角色',
         roleHint: '选择此用户的权限级别',
         appActivation: 'OpenClaw 访问权限',
+        accountStatus: '账号状态',
         activationCode: '激活码',
         roleLabel: '角色',
         selectRole: '选择角色',

@@ -1862,6 +1862,7 @@ export default {
         role: 'Vai trò',
         roleHint: 'Chọn cấp quyền cho người dùng này.',
         appActivation: 'Quyền mở OpenClaw',
+        accountStatus: 'Trạng thái tài khoản',
         activationCode: 'Mã kích hoạt',
         roleLabel: 'Vai trò',
         selectRole: 'Chọn vai trò',

@@ -36,19 +36,19 @@
       <div v-if="user" class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800/60">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <label class="input-label mb-1">{{ t('admin.users.form.appActivation') }}</label>
-            <p :class="['text-sm font-medium', appActivationTextClass]">
-              {{ appActivationLabel }}
+            <label class="input-label mb-1">{{ t('admin.users.form.accountStatus') }}</label>
+            <p :class="['text-sm font-medium', accountStatusTextClass]">
+              {{ accountStatusLabel }}
             </p>
             <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
-              {{ appActivationHint }}
+              {{ accountStatusHint }}
             </p>
           </div>
           <ToggleSwitch
-            :checked="isAppActivationActive"
-            :disabled="!canActivateApp || activatingApp"
+            :checked="isAccountActive"
+            :disabled="!canActivateAccount || activatingApp"
             :loading="activatingApp"
-            :aria-label="appActivationSwitchLabel"
+            :aria-label="accountStatusSwitchLabel"
             @toggle="handleActivateApp"
           />
         </div>
@@ -119,32 +119,35 @@ const passwordCopied = ref(false)
 const activatingApp = ref(false)
 const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as UserRole, concurrency: 1, rpm_limit: 0, customAttributes: {} as UserAttributeValuesMap })
 
-const isAppActivationActive = computed(() => props.user?.device_activation_status === 'active')
-const canActivateApp = computed(() => props.user?.device_activation_status === 'pending_activation')
-const appActivationLabel = computed(() => {
-  const status = props.user?.device_activation_status
-  if (!status) return t('admin.users.deviceActivation.none')
+const isAccountActive = computed(() => props.user?.status === 'active')
+const canActivateAccount = computed(() => props.user?.status === 'pending_activation')
+const accountStatusLabel = computed(() => {
+  const status = props.user?.status
+  if (!status) return '-'
+  if (status === 'active') return t('common.active')
+  if (status === 'disabled') return t('admin.users.disabled')
   return t(`admin.users.deviceActivation.${status}`, status)
 })
-const appActivationTextClass = computed(() => {
-  const status = props.user?.device_activation_status
+const accountStatusTextClass = computed(() => {
+  const status = props.user?.status
   if (status === 'active') return 'text-green-600 dark:text-green-400'
   if (status === 'pending_activation') return 'text-amber-600 dark:text-amber-400'
-  if (status === 'revoked' || status === 'blocked') return 'text-red-600 dark:text-red-400'
+  if (status === 'revoked' || status === 'blocked' || status === 'disabled') return 'text-red-600 dark:text-red-400'
   return 'text-gray-500 dark:text-dark-400'
 })
-const appActivationHint = computed(() => {
-  const status = props.user?.device_activation_status
+const accountStatusHint = computed(() => {
+  const status = props.user?.status
   if (status === 'active') return t('admin.users.activationHints.active')
   if (status === 'pending_activation') return t('admin.users.activationHints.pending')
   if (status === 'revoked') return t('admin.users.activationHints.revoked')
   if (status === 'blocked') return t('admin.users.activationHints.blocked')
+  if (status === 'disabled') return t('admin.users.statusHints.disabled')
   return t('admin.users.activationHints.none')
 })
-const appActivationSwitchLabel = computed(() => {
-  if (canActivateApp.value) return t('admin.users.activationSwitch.activate')
-  if (isAppActivationActive.value) return t('admin.users.activationSwitch.active')
-  return appActivationHint.value
+const accountStatusSwitchLabel = computed(() => {
+  if (canActivateAccount.value) return t('admin.users.activationSwitch.activate')
+  if (isAccountActive.value) return t('admin.users.activationSwitch.active')
+  return accountStatusHint.value
 })
 
 watch(() => props.user, (u) => {
@@ -166,7 +169,7 @@ const copyPassword = async () => {
 }
 
 const handleActivateApp = async () => {
-  if (!props.user || !canActivateApp.value || activatingApp.value) return
+  if (!props.user || !canActivateAccount.value || activatingApp.value) return
   activatingApp.value = true
   try {
     const response = await adminAPI.users.activateDevices(props.user.id)

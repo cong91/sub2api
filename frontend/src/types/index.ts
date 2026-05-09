@@ -64,6 +64,8 @@ export interface UserProfileSourceContext {
 }
 
 export type UserRole = 'admin' | 'marketing' | 'user'
+export type UserStatus = 'active' | 'disabled'
+export type AdminUserStatus = UserStatus | 'pending_activation' | 'revoked' | 'blocked' | string
 
 export interface User {
   id: number
@@ -90,7 +92,7 @@ export interface User {
   balance: number // User balance for API usage
   concurrency: number // Allowed concurrent requests
   rpm_limit?: number // User-level RPM cap (0 = unlimited); effective as fallback when group has no rpm_limit
-  status: 'active' | 'disabled' // Account status
+  status: UserStatus // Account status
   allowed_groups: number[] | null // Allowed group IDs (null = all non-exclusive groups)
   balance_notify_enabled: boolean
   balance_notify_threshold: number | null
@@ -101,7 +103,7 @@ export interface User {
   updated_at: string
 }
 
-export interface AdminUser extends User {
+export type AdminUser = Omit<User, 'status'> & {
   // 管理员备注（普通用户接口不返回）
   notes: string
   last_used_at?: string | null
@@ -109,7 +111,7 @@ export interface AdminUser extends User {
   primary_redeem_code?: string | null
   primary_redeem_type?: string | null
   has_device_binding?: boolean
-  device_activation_status?: 'active' | 'pending_activation' | 'revoked' | 'blocked' | string | null
+  status: AdminUserStatus
   // 用户专属分组倍率配置 (group_id -> rate_multiplier)
   group_rates?: Record<number, number>
   // 当前并发数（仅管理员列表接口返回）

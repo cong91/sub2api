@@ -1863,6 +1863,7 @@ export default {
         role: '역할',
         roleHint: '이 사용자의 권한 수준을 선택합니다.',
         appActivation: 'OpenClaw 접근 권한',
+        accountStatus: '계정 상태',
         activationCode: '활성화 코드',
         roleLabel: '역할',
         selectRole: '역할 선택',

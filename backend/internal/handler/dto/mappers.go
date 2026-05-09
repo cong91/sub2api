@@ -65,6 +65,7 @@ func UserFromServiceAdmin(u *service.User) *AdminUser {
 	if base == nil {
 		return nil
 	}
+	base.Status = effectiveAdminUserStatus(u)
 	return &AdminUser{
 		User:                   *base,
 		Notes:                  u.Notes,
@@ -72,8 +73,31 @@ func UserFromServiceAdmin(u *service.User) *AdminUser {
 		PrimaryRedeemCode:      u.PrimaryRedeemCode,
 		PrimaryRedeemType:      u.PrimaryRedeemType,
 		HasDeviceBinding:       u.HasDeviceBinding,
-		DeviceActivationStatus: u.DeviceActivationStatus,
 		GroupRates:             u.GroupRates,
+	}
+}
+
+func effectiveAdminUserStatus(u *service.User) string {
+	if u == nil {
+		return ""
+	}
+	// Disabled remains a hard account-level state. For active invite/device-login
+	// accounts, expose the activation state through the single admin-facing
+	// `status` field so the UI does not show account and device statuses as two
+	// competing concepts.
+	if u.Status == service.StatusDisabled {
+		return service.StatusDisabled
+	}
+	if u.DeviceActivationStatus == nil {
+		return u.Status
+	}
+	switch *u.DeviceActivationStatus {
+	case service.UserDeviceStatusPendingActivation,
+		service.UserDeviceStatusRevoked,
+		service.UserDeviceStatusBlocked:
+		return *u.DeviceActivationStatus
+	default:
+		return u.Status
 	}
 }
 

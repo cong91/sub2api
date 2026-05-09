@@ -486,8 +486,27 @@ func (r *userRepository) List(ctx context.Context, params pagination.PaginationP
 func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, filters service.UserListFilters) ([]service.User, *pagination.PaginationResult, error) {
 	q := r.client.User.Query()
 
-	if filters.Status != "" {
-		q = q.Where(dbuser.StatusEQ(filters.Status))
+	status := strings.TrimSpace(filters.Status)
+	switch status {
+	case "":
+	case service.StatusActive:
+		q = q.Where(
+			dbuser.StatusEQ(service.StatusActive),
+			dbuser.Not(dbuser.HasDevicesWith(userdevice.StatusIn(
+				service.UserDeviceStatusPendingActivation,
+				service.UserDeviceStatusRevoked,
+				service.UserDeviceStatusBlocked,
+			))),
+		)
+	case service.StatusDisabled:
+		q = q.Where(dbuser.StatusEQ(service.StatusDisabled))
+	case service.UserDeviceStatusPendingActivation, service.UserDeviceStatusRevoked, service.UserDeviceStatusBlocked:
+		q = q.Where(
+			dbuser.StatusNEQ(service.StatusDisabled),
+			dbuser.HasDevicesWith(userdevice.StatusEQ(status)),
+		)
+	default:
+		q = q.Where(dbuser.StatusEQ(status))
 	}
 	if filters.Role != "" {
 		q = q.Where(dbuser.RoleEQ(filters.Role))
