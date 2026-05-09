@@ -725,6 +725,9 @@ const deviceActivationBadgeClass = (status?: string | null) => {
 
 const isDeviceActivationPending = (user: AdminUser) => user.device_activation_status === 'pending_activation'
 
+const DEVICE_ACTIVATION_COLUMN_KEY = 'device_activation'
+const DEVICE_ACTIVATION_VISIBILITY_MIGRATION_KEY = 'user-device-activation-visible-v1'
+
 const deviceActivationFilterOptions = computed(() => [
   { value: '', label: t('admin.users.deviceActivation.all') },
   { value: 'pending_activation', label: t('admin.users.deviceActivation.pending_activation') },
@@ -794,7 +797,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'usage', label: t('admin.users.columns.usage'), sortable: false },
   { key: 'concurrency', label: t('admin.users.columns.concurrency'), sortable: true },
   { key: 'status', label: t('admin.users.columns.status'), sortable: true },
-  { key: 'device_activation', label: t('admin.users.columns.deviceActivation'), sortable: false },
+  { key: DEVICE_ACTIVATION_COLUMN_KEY, label: t('admin.users.columns.deviceActivation'), sortable: false },
   { key: 'last_active_at', label: t('admin.users.columns.lastActive'), sortable: true },
   { key: 'last_used_at', label: t('admin.users.columns.lastUsed'), sortable: true },
   { key: 'created_at', label: t('admin.users.columns.created'), sortable: true },
@@ -813,7 +816,7 @@ const hiddenColumns = reactive<Set<string>>(new Set())
 // Default hidden columns (columns hidden by default on first load)
 const DEFAULT_HIDDEN_COLUMNS = ['notes', 'groups', 'subscriptions', 'usage', 'concurrency']
 const REMOVED_COLUMNS = new Set(['last_login_at'])
-const FORCED_VISIBLE_COLUMNS = new Set(['last_active_at'])
+const FORCED_VISIBLE_COLUMNS = new Set(['last_active_at', DEVICE_ACTIVATION_COLUMN_KEY])
 
 // localStorage key for column settings
 const HIDDEN_COLUMNS_KEY = 'user-hidden-columns'
@@ -822,14 +825,21 @@ const HIDDEN_COLUMNS_KEY = 'user-hidden-columns'
 const loadSavedColumns = () => {
   try {
     const saved = localStorage.getItem(HIDDEN_COLUMNS_KEY)
+    const hasAppliedDeviceActivationMigration = localStorage.getItem(DEVICE_ACTIVATION_VISIBILITY_MIGRATION_KEY) === '1'
     if (saved) {
       const parsed = JSON.parse(saved) as string[]
       parsed
         .filter(key => !REMOVED_COLUMNS.has(key) && !FORCED_VISIBLE_COLUMNS.has(key))
         .forEach(key => hiddenColumns.add(key))
+      if (!hasAppliedDeviceActivationMigration) {
+        hiddenColumns.delete(DEVICE_ACTIVATION_COLUMN_KEY)
+        localStorage.setItem(DEVICE_ACTIVATION_VISIBILITY_MIGRATION_KEY, '1')
+        saveColumnsToStorage()
+      }
     } else {
       // Use default hidden columns on first load
       DEFAULT_HIDDEN_COLUMNS.forEach(key => hiddenColumns.add(key))
+      localStorage.setItem(DEVICE_ACTIVATION_VISIBILITY_MIGRATION_KEY, '1')
     }
   } catch (e) {
     console.error('Failed to load saved columns:', e)
@@ -1017,6 +1027,7 @@ const loadSavedFilters = () => {
       const parsed = JSON.parse(savedVisible) as string[]
       parsed.forEach(key => visibleFilters.add(key))
     }
+    visibleFilters.add(DEVICE_ACTIVATION_COLUMN_KEY)
     // Load filter values
     const savedValues = localStorage.getItem(FILTER_VALUES_KEY)
     if (savedValues) {
@@ -1430,6 +1441,10 @@ const handleActivateDevices = async (user: AdminUser) => {
   try {
     const response = await adminAPI.users.activateDevices(user.id)
     appStore.showSuccess(t('admin.users.deviceActivated', { count: response.activated }))
+    if (filters.deviceActivation === 'pending_activation') {
+      filters.deviceActivation = ''
+      saveFiltersToStorage()
+    }
     loadUsers()
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.users.failedToActivateDevice'))
