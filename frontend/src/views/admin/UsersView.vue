@@ -49,6 +49,15 @@
               />
             </div>
 
+            <!-- Device Activation Filter (visible when enabled) -->
+            <div v-if="visibleFilters.has('device_activation')" class="w-full sm:w-48">
+              <Select
+                v-model="filters.deviceActivation"
+                :options="deviceActivationFilterOptions"
+                @change="applyFilter"
+              />
+            </div>
+
             <!-- Group Filter (visible when enabled) -->
             <div v-if="visibleFilters.has('group')" class="w-full sm:w-44">
               <Select
@@ -480,6 +489,12 @@
             </div>
           </template>
 
+          <template #cell-device_activation="{ row }">
+            <span :class="['badge', deviceActivationBadgeClass(row.device_activation_status)]">
+              {{ deviceActivationLabel(row.device_activation_status) }}
+            </span>
+          </template>
+
           <template #cell-created_at="{ value }">
             <span class="text-sm text-gray-500 dark:text-dark-400">{{ formatDateTime(value) }}</span>
           </template>
@@ -521,6 +536,16 @@
                 <Icon v-if="row.status === 'active'" name="ban" size="sm" />
                 <Icon v-else name="checkCircle" size="sm" />
                 <span class="text-xs">{{ row.status === 'active' ? t('admin.users.disable') : t('admin.users.enable') }}</span>
+              </button>
+
+              <!-- Activate pending device binding -->
+              <button
+                v-if="isDeviceActivationPending(row)"
+                @click="handleActivateDevices(row)"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+              >
+                <Icon name="checkCircle" size="sm" />
+                <span class="text-xs">{{ t('admin.users.activateDevice') }}</span>
               </button>
 
               <!-- More Actions Menu Trigger -->
@@ -686,6 +711,28 @@ const roleBadgeClass = (role: string) => {
   return 'badge-gray'
 }
 
+const deviceActivationLabel = (status?: string | null) => {
+  if (!status) return t('admin.users.deviceActivation.none')
+  return t(`admin.users.deviceActivation.${status}`, status)
+}
+
+const deviceActivationBadgeClass = (status?: string | null) => {
+  if (status === 'active') return 'badge-green'
+  if (status === 'pending_activation') return 'badge-yellow'
+  if (status === 'revoked' || status === 'blocked') return 'badge-red'
+  return 'badge-gray'
+}
+
+const isDeviceActivationPending = (user: AdminUser) => user.device_activation_status === 'pending_activation'
+
+const deviceActivationFilterOptions = computed(() => [
+  { value: '', label: t('admin.users.deviceActivation.all') },
+  { value: 'pending_activation', label: t('admin.users.deviceActivation.pending_activation') },
+  { value: 'active', label: t('admin.users.deviceActivation.active') },
+  { value: 'revoked', label: t('admin.users.deviceActivation.revoked') },
+  { value: 'blocked', label: t('admin.users.deviceActivation.blocked') }
+])
+
 // Generate dynamic attribute columns from enabled definitions
 const attributeColumns = computed<Column[]>(() =>
   attributeDefinitions.value
@@ -747,6 +794,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'usage', label: t('admin.users.columns.usage'), sortable: false },
   { key: 'concurrency', label: t('admin.users.columns.concurrency'), sortable: true },
   { key: 'status', label: t('admin.users.columns.status'), sortable: true },
+  { key: 'device_activation', label: t('admin.users.columns.deviceActivation'), sortable: false },
   { key: 'last_active_at', label: t('admin.users.columns.lastActive'), sortable: true },
   { key: 'last_used_at', label: t('admin.users.columns.lastUsed'), sortable: true },
   { key: 'created_at', label: t('admin.users.columns.created'), sortable: true },
@@ -926,12 +974,13 @@ const groupFilterOptions = computed(() => {
 const filters = reactive({
   role: '',
   status: '',
+  deviceActivation: '',
   group: ''  // group name for fuzzy match, '' = all
 })
 const activeAttributeFilters = reactive<Record<number, string>>({})
 
 // Visible filters tracking (which filters are shown in the UI)
-// Keys: 'role', 'status', 'attr_${id}'
+// Keys: 'role', 'status', 'device_activation', 'attr_${id}'
 const visibleFilters = reactive<Set<string>>(new Set())
 
 // Dropdown states
@@ -955,6 +1004,7 @@ const filterableAttributes = computed(() =>
 const builtInFilters = computed(() => [
   { key: 'role', name: t('admin.users.columns.role'), type: 'select' as const },
   { key: 'status', name: t('admin.users.columns.status'), type: 'select' as const },
+  { key: 'device_activation', name: t('admin.users.columns.deviceActivation'), type: 'select' as const },
   { key: 'group', name: t('admin.users.columns.groups'), type: 'select' as const }
 ])
 
@@ -973,6 +1023,7 @@ const loadSavedFilters = () => {
       const parsed = JSON.parse(savedValues)
       if (parsed.role) filters.role = parsed.role
       if (parsed.status) filters.status = parsed.status
+      if (parsed.deviceActivation) filters.deviceActivation = parsed.deviceActivation
       if (parsed.group) filters.group = parsed.group
       if (parsed.attributes) {
         Object.assign(activeAttributeFilters, parsed.attributes)
@@ -992,6 +1043,7 @@ const saveFiltersToStorage = () => {
     const values = {
       role: filters.role,
       status: filters.status,
+      deviceActivation: filters.deviceActivation,
       group: filters.group,
       attributes: activeAttributeFilters
     }
@@ -1230,6 +1282,7 @@ const loadUsers = async () => {
       {
         role: filters.role as any,
         status: filters.status as any,
+        device_activation_status: filters.deviceActivation as any || undefined,
         search: searchQuery.value || undefined,
         group_name: filters.group || undefined,
         attributes: Object.keys(attrFilters).length > 0 ? attrFilters : undefined,
@@ -1313,6 +1366,7 @@ const toggleBuiltInFilter = (key: string) => {
     visibleFilters.delete(key)
     if (key === 'role') filters.role = ''
     if (key === 'status') filters.status = ''
+    if (key === 'device_activation') filters.deviceActivation = ''
     if (key === 'group') filters.group = ''
   } else {
     visibleFilters.add(key)
@@ -1369,6 +1423,17 @@ const handleToggleStatus = async (user: AdminUser) => {
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.users.failedToToggle'))
     console.error('Error toggling user status:', error)
+  }
+}
+
+const handleActivateDevices = async (user: AdminUser) => {
+  try {
+    const response = await adminAPI.users.activateDevices(user.id)
+    appStore.showSuccess(t('admin.users.deviceActivated', { count: response.activated }))
+    loadUsers()
+  } catch (error: any) {
+    appStore.showError(error.response?.data?.detail || t('admin.users.failedToActivateDevice'))
+    console.error('Error activating user devices:', error)
   }
 }
 
