@@ -650,5 +650,9 @@ func (s *stubAdminService) RevertAccountProxyFallback(ctx context.Context, id in
 	return nil
 }
 
+func (s *stubAdminService) ActivateUserDevices(ctx context.Context, userID int64) (*service.User, int64, error) {
+	return &service.User{ID: userID}, 0, nil
+}
+
 // Ensure stub implements interface.
 var _ service.AdminService = (*stubAdminService)(nil)
