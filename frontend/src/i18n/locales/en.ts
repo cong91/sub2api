@@ -300,6 +300,7 @@ export default {
     copiedToClipboard: 'Copied to clipboard',
     copied: 'Copied',
     copyFailed: 'Failed to copy',
+    failed: 'Failed',
     verifying: 'Verifying...',
     processing: 'Processing...',
     contactSupport: 'Contact Support',
@@ -479,6 +480,18 @@ export default {
     redeemCodeRequired: 'Login code is required',
     redeemLoginSuccess: 'Code login successful!',
     redeemLoginFailed: 'Code login failed. Please check your code and try again.',
+    loginAgreement: {
+      readAndAgree: 'I have read and agree to',
+      pendingTitle: 'You must agree to the latest terms before continuing to sign in.',
+      pendingDescription: 'Email/password input and quick sign-in will remain disabled until you agree.',
+      viewTerms: 'View terms',
+      updateTitle: 'Terms update notice',
+      updateDescription: 'Our service terms were updated on {date}. Please read and agree to the following terms before continuing to use the service.',
+      recently: 'recently',
+      relatedDocuments: 'Related documents',
+      reject: 'Decline',
+      acceptAndContinue: 'Agree and continue'
+    },
     linuxdo: {
       signIn: 'Continue with Linux.do',
       orContinue: 'or continue with email',
@@ -6889,6 +6902,20 @@ export default {
     notFoundDesc: 'This custom page does not exist or has been removed.',
     notConfiguredTitle: 'Page URL not configured',
     notConfiguredDesc: 'The URL for this custom page has not been properly configured.',
+    tableOfContents: 'Contents',
+    markdownNotFound: 'Page not found',
+    markdownLoadFailed: 'Failed to load page',
+  },
+
+  // Legal Document Page
+  legalDocument: {
+    loadFailedTitle: 'Failed to load document',
+    loadFailedDesc: 'Please refresh the page and try again later.',
+    notFoundTitle: 'Document not found',
+    notFoundDesc: 'The current terms document does not exist or has been removed by the administrator.',
+    loginTerms: 'Login terms',
+    updatedAt: 'Updated at: {date}',
+    emptyContent: 'No content yet'
   },
 
   // Announcements Page
