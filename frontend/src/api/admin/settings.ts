@@ -383,6 +383,7 @@ export interface SystemSettings {
   affiliate_rebate_freeze_hours: number;
   affiliate_rebate_duration_days: number;
   affiliate_rebate_per_invitee_cap: number;
+  device_auto_activation_aff_codes: string;
   default_concurrency: number;
   device_claim_bonus_balance: number;
   default_user_rpm_limit: number;
@@ -651,6 +652,7 @@ export interface UpdateSettingsRequest {
   affiliate_rebate_freeze_hours?: number;
   affiliate_rebate_duration_days?: number;
   affiliate_rebate_per_invitee_cap?: number;
+  device_auto_activation_aff_codes?: string;
   default_concurrency?: number;
   device_claim_bonus_balance?: number;
   default_user_rpm_limit?: number;
