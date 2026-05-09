@@ -68,13 +68,12 @@ type VClawClaimRequest struct {
 }
 
 type VClawClaimResult struct {
-	Status                 string    `json:"status"`
-	Mode                   string    `json:"mode"`
-	UserID                 int64     `json:"user_id,omitempty"`
-	DeviceLoginCode        string    `json:"device_login_code,omitempty"`
-	DeviceBindingID        int64     `json:"device_binding_id,omitempty"`
-	DeviceActivationStatus string    `json:"device_activation_status,omitempty"`
-	ClaimedAt              time.Time `json:"claimed_at,omitempty"`
+	Status          string    `json:"status"`
+	Mode            string    `json:"mode"`
+	UserID          int64     `json:"user_id,omitempty"`
+	DeviceLoginCode string    `json:"device_login_code,omitempty"`
+	DeviceBindingID int64     `json:"device_binding_id,omitempty"`
+	ClaimedAt       time.Time `json:"claimed_at,omitempty"`
 }
 
 func (s *VClawClaimService) Claim(ctx context.Context, req VClawClaimRequest) (*VClawClaimResult, error) {
@@ -160,13 +159,12 @@ func (s *VClawClaimService) resumeExistingClaim(ctx context.Context, binding *Us
 		return nil, ErrServiceUnavailable
 	}
 	return &VClawClaimResult{
-		Status:                 "ok",
-		Mode:                   "resume",
-		UserID:                 binding.UserID,
-		DeviceLoginCode:        loginCode.Code,
-		DeviceBindingID:        binding.ID,
-		DeviceActivationStatus: deviceStatus,
-		ClaimedAt:              now,
+		Status:          deviceStatus,
+		Mode:            "resume",
+		UserID:          binding.UserID,
+		DeviceLoginCode: loginCode.Code,
+		DeviceBindingID: binding.ID,
+		ClaimedAt:       now,
 	}, nil
 }
 
@@ -233,13 +231,12 @@ func (s *VClawClaimService) createFirstClaim(ctx context.Context, req VClawClaim
 		}
 
 		return &VClawClaimResult{
-			Status:                 "ok",
-			Mode:                   "first_claim",
-			UserID:                 user.ID,
-			DeviceLoginCode:        loginRedeemCode.Code,
-			DeviceBindingID:        binding.ID,
-			DeviceActivationStatus: deviceStatus,
-			ClaimedAt:              now,
+			Status:          deviceStatus,
+			Mode:            "first_claim",
+			UserID:          user.ID,
+			DeviceLoginCode: loginRedeemCode.Code,
+			DeviceBindingID: binding.ID,
+			ClaimedAt:       now,
 		}, nil
 	}
 

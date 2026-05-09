@@ -105,12 +105,11 @@ func (h *UserHandler) List(c *gin.Context) {
 	}
 
 	filters := service.UserListFilters{
-		Status:                 c.Query("status"),
-		Role:                   c.Query("role"),
-		Search:                 search,
-		GroupName:              strings.TrimSpace(c.Query("group_name")),
-		DeviceActivationStatus: strings.TrimSpace(c.Query("device_activation_status")),
-		Attributes:             parseAttributeFilters(c),
+		Status:     c.Query("status"),
+		Role:       c.Query("role"),
+		Search:     search,
+		GroupName:  strings.TrimSpace(c.Query("group_name")),
+		Attributes: parseAttributeFilters(c),
 	}
 	if !applyMarketingUserScope(c, &filters) {
 		return

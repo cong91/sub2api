@@ -534,10 +534,6 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 			dbgroup.NameContainsFold(filters.GroupName),
 		))
 	}
-	deviceActivationStatus := strings.TrimSpace(filters.DeviceActivationStatus)
-	if deviceActivationStatus != "" {
-		q = q.Where(dbuser.HasDevicesWith(userdevice.StatusEQ(deviceActivationStatus)))
-	}
 	if filters.AffiliateInviterID != nil {
 		inviteeUserIDs, scopeErr := r.filterUsersByAffiliateInviter(ctx, *filters.AffiliateInviterID)
 		if scopeErr != nil {
