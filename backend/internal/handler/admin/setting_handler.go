@@ -230,6 +230,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		DefaultBalance:                         settings.DefaultBalance,
 		RiskControlEnabled:                     settings.RiskControlEnabled,
 		DeviceClaimBonusBalance:                settings.DeviceClaimBonusBalance,
+		AffiliateEnabled:                       settings.AffiliateEnabled,
 		DeviceAutoActivationAffCodes:           settings.DeviceAutoActivationAffCodes,
 		AffiliateRebateRate:                    settings.AffiliateRebateRate,
 		AffiliateRebateFreezeHours:             settings.AffiliateRebateFreezeHours,
@@ -2112,6 +2113,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ChannelMonitorDefaultIntervalSeconds: updatedSettings.ChannelMonitorDefaultIntervalSeconds,
 
 		AvailableChannelsEnabled: updatedSettings.AvailableChannelsEnabled,
+
+		AffiliateEnabled: updatedSettings.AffiliateEnabled,
 
 		RiskControlEnabled: updatedSettings.RiskControlEnabled,
 	}
