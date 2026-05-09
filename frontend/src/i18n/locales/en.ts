@@ -1776,15 +1776,26 @@ export default {
       allStatus: 'All Status',
       allGroups: 'All Groups',
       activateDevice: 'Activate',
-      deviceActivated: 'Activated {count} pending device(s)',
-      failedToActivateDevice: 'Failed to activate device',
+      deviceActivated: 'Activated OpenClaw access for {count} pending record(s)',
+      failedToActivateDevice: 'Failed to activate OpenClaw access',
       deviceActivation: {
-        all: 'All device status',
-        none: 'No device',
-        active: 'Active',
+        all: 'All activation states',
+        none: 'No app claim',
+        active: 'Activated',
         pending_activation: 'Pending activation',
         revoked: 'Revoked',
         blocked: 'Blocked'
+      },
+      activationHints: {
+        active: 'OpenClaw access is enabled.',
+        pending: 'Turn on to approve this invite record.',
+        none: 'No linked app/device claim yet.',
+        revoked: 'Access was revoked and cannot be re-enabled here.',
+        blocked: 'Access is blocked and cannot be re-enabled here.'
+      },
+      activationSwitch: {
+        activate: 'Activate OpenClaw access',
+        active: 'OpenClaw access active'
       },
       searchGroups: 'Search groups...',
       fuzzySearch: 'Fuzzy search',
@@ -1810,6 +1821,8 @@ export default {
       form: {
         role: 'Role',
         roleHint: 'Choose the permission level for this admin-created user.',
+        appActivation: 'OpenClaw access',
+        activationCode: 'Activation code',
         rpmLimit: 'Requests Per Minute (RPM)',
         rpmLimitPlaceholder: '0 = unlimited',
         rpmLimitHint: 'Max requests per minute for this user; 0 = unlimited. Acts as a fallback only when the group has no rpm_limit set.',
@@ -1842,7 +1855,7 @@ export default {
         usage: 'Usage',
         concurrency: 'Concurrency',
         status: 'Status',
-        deviceActivation: 'Device activation',
+        deviceActivation: 'Activation',
         lastActive: 'Last Active',
         lastUsed: 'Last Used',
         created: 'Created',

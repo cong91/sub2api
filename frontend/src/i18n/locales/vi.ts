@@ -1741,15 +1741,26 @@ export default {
       allStatus: 'Tất cả trạng thái',
       allGroups: 'Tất cả nhóm',
       activateDevice: 'Kích hoạt',
-      deviceActivated: 'Đã kích hoạt {count} thiết bị đang chờ',
-      failedToActivateDevice: 'Kích hoạt thiết bị thất bại',
+      deviceActivated: 'Đã kích hoạt quyền mở OpenClaw cho {count} bản ghi đang chờ',
+      failedToActivateDevice: 'Kích hoạt quyền mở OpenClaw thất bại',
       deviceActivation: {
-        all: 'Tất cả trạng thái thiết bị',
-        none: 'Chưa có thiết bị',
+        all: 'Tất cả trạng thái kích hoạt',
+        none: 'Chưa claim app',
         active: 'Đã kích hoạt',
         pending_activation: 'Chờ kích hoạt',
         revoked: 'Đã thu hồi',
         blocked: 'Đã chặn'
+      },
+      activationHints: {
+        active: 'Đã cho phép mở OpenClaw.',
+        pending: 'Bật switch để duyệt bản ghi invite này.',
+        none: 'Chưa có claim app/device gắn với bản ghi này.',
+        revoked: 'Quyền truy cập đã bị thu hồi và không thể bật lại tại đây.',
+        blocked: 'Quyền truy cập đang bị chặn và không thể bật lại tại đây.'
+      },
+      activationSwitch: {
+        activate: 'Kích hoạt quyền mở OpenClaw',
+        active: 'Quyền mở OpenClaw đã active'
       },
       searchGroups: 'Tìm nhóm...',
       fuzzySearch: 'Tìm kiếm mờ',
@@ -1787,7 +1798,7 @@ export default {
         usage: 'Mức sử dụng',
         concurrency: 'Số lượng đồng thời',
         status: 'Trạng thái',
-        deviceActivation: 'Kích hoạt thiết bị',
+        deviceActivation: 'Kích hoạt',
         lastActive: 'Lần hoạt động cuối',
         lastUsed: 'Lần sử dụng cuối',
         created: 'Thời gian tạo',
@@ -1850,6 +1861,8 @@ export default {
         passwordPlaceholder: 'Vui lòng nhập mật khẩu (để trống nếu không thay đổi)',
         role: 'Vai trò',
         roleHint: 'Chọn cấp quyền cho người dùng này.',
+        appActivation: 'Quyền mở OpenClaw',
+        activationCode: 'Mã kích hoạt',
         roleLabel: 'Vai trò',
         selectRole: 'Chọn vai trò',
         balanceLabel: 'Số dư',

@@ -1742,15 +1742,26 @@ export default {
       allStatus: '모든 상태',
       allGroups: '모든 그룹',
       activateDevice: '활성화',
-      deviceActivated: '대기 중인 기기 {count}개가 활성화되었습니다',
-      failedToActivateDevice: '기기 활성화 실패',
+      deviceActivated: '대기 중인 레코드 {count}개의 OpenClaw 접근 권한이 활성화되었습니다',
+      failedToActivateDevice: 'OpenClaw 접근 권한 활성화 실패',
       deviceActivation: {
-        all: '모든 기기 상태',
-        none: '기기 없음',
+        all: '모든 활성화 상태',
+        none: '앱 claim 없음',
         active: '활성화됨',
         pending_activation: '활성화 대기',
         revoked: '철회됨',
         blocked: '차단됨'
+      },
+      activationHints: {
+        active: 'OpenClaw 접근이 허용되었습니다.',
+        pending: '스위치를 켜서 이 초대 레코드를 승인하세요.',
+        none: '이 레코드에는 아직 앱/기기 claim이 연결되지 않았습니다.',
+        revoked: '접근 권한이 철회되어 여기서 다시 활성화할 수 없습니다.',
+        blocked: '접근 권한이 차단되어 여기서 다시 활성화할 수 없습니다.'
+      },
+      activationSwitch: {
+        activate: 'OpenClaw 접근 권한 활성화',
+        active: 'OpenClaw 접근 권한 활성화됨'
       },
       searchGroups: '그룹 검색...',
       fuzzySearch: '퍼지 검색',
@@ -1788,7 +1799,7 @@ export default {
         usage: '사용량',
         concurrency: '동시성 수',
         status: '상태',
-        deviceActivation: '기기 활성화',
+        deviceActivation: '활성화',
         lastActive: '마지막 활성 시간',
         lastUsed: '마지막 사용 시간',
         created: '생성 시간',
@@ -1851,6 +1862,8 @@ export default {
         passwordPlaceholder: '비밀번호를 입력하세요(비워 두면 변경하지 않음)',
         role: '역할',
         roleHint: '이 사용자의 권한 수준을 선택합니다.',
+        appActivation: 'OpenClaw 접근 권한',
+        activationCode: '활성화 코드',
         roleLabel: '역할',
         selectRole: '역할 선택',
         balanceLabel: '잔액',

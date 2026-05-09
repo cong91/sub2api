@@ -490,9 +490,23 @@
           </template>
 
           <template #cell-device_activation="{ row }">
-            <span :class="['badge', deviceActivationBadgeClass(row.device_activation_status)]">
-              {{ deviceActivationLabel(row.device_activation_status) }}
-            </span>
+            <div class="flex items-center gap-3">
+              <ToggleSwitch
+                :checked="isAppActivationActive(row)"
+                :disabled="!canToggleAppActivation(row)"
+                :loading="activatingUserIds.has(row.id)"
+                :aria-label="appActivationSwitchLabel(row)"
+                @toggle="handleActivationSwitchToggle(row)"
+              />
+              <div class="min-w-0">
+                <div :class="['text-sm font-medium', appActivationTextClass(row.device_activation_status)]">
+                  {{ deviceActivationLabel(row.device_activation_status) }}
+                </div>
+                <div class="text-xs text-gray-500 dark:text-dark-400">
+                  {{ appActivationHint(row) }}
+                </div>
+              </div>
+            </div>
           </template>
 
           <template #cell-created_at="{ value }">
@@ -536,16 +550,6 @@
                 <Icon v-if="row.status === 'active'" name="ban" size="sm" />
                 <Icon v-else name="checkCircle" size="sm" />
                 <span class="text-xs">{{ row.status === 'active' ? t('admin.users.disable') : t('admin.users.enable') }}</span>
-              </button>
-
-              <!-- Activate pending device binding -->
-              <button
-                v-if="isDeviceActivationPending(row)"
-                @click="handleActivateDevices(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-400"
-              >
-                <Icon name="checkCircle" size="sm" />
-                <span class="text-xs">{{ t('admin.users.activateDevice') }}</span>
               </button>
 
               <!-- More Actions Menu Trigger -->
@@ -662,7 +666,7 @@
 
     <ConfirmDialog :show="showDeleteDialog" :title="t('admin.users.deleteUser')" :message="t('admin.users.deleteConfirm', { email: deletingUser?.email })" :danger="true" @confirm="confirmDelete" @cancel="showDeleteDialog = false" />
     <UserCreateModal :show="showCreateModal" @close="showCreateModal = false" @success="loadUsers" />
-    <UserEditModal :show="showEditModal" :user="editingUser" @close="closeEditModal" @success="loadUsers" />
+    <UserEditModal :show="showEditModal" :user="editingUser" @close="closeEditModal" @success="handleEditModalSuccess" />
     <UserApiKeysModal :show="showApiKeysModal" :user="viewingUser" @close="closeApiKeysModal" />
     <UserAllowedGroupsModal :show="showAllowedGroupsModal" :user="allowedGroupsUser" @close="closeAllowedGroupsModal" @success="loadUsers" />
     <UserBalanceModal :show="showBalanceModal" :user="balanceUser" :operation="balanceOperation" @close="closeBalanceModal" @success="loadUsers" />
@@ -702,6 +706,7 @@ import UserAllowedGroupsModal from '@/components/admin/user/UserAllowedGroupsMod
 import UserBalanceModal from '@/components/admin/user/UserBalanceModal.vue'
 import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryModal.vue'
 import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
+import ToggleSwitch from '@/components/common/ToggleSwitch.vue'
 
 const appStore = useAppStore()
 
@@ -716,14 +721,30 @@ const deviceActivationLabel = (status?: string | null) => {
   return t(`admin.users.deviceActivation.${status}`, status)
 }
 
-const deviceActivationBadgeClass = (status?: string | null) => {
-  if (status === 'active') return 'badge-green'
-  if (status === 'pending_activation') return 'badge-yellow'
-  if (status === 'revoked' || status === 'blocked') return 'badge-red'
-  return 'badge-gray'
+const isAppActivationActive = (user: AdminUser) => user.device_activation_status === 'active'
+const isDeviceActivationPending = (user: AdminUser) => user.device_activation_status === 'pending_activation'
+const canToggleAppActivation = (user: AdminUser) => isDeviceActivationPending(user)
+
+const appActivationTextClass = (status?: string | null) => {
+  if (status === 'active') return 'text-green-600 dark:text-green-400'
+  if (status === 'pending_activation') return 'text-amber-600 dark:text-amber-400'
+  if (status === 'revoked' || status === 'blocked') return 'text-red-600 dark:text-red-400'
+  return 'text-gray-500 dark:text-dark-400'
 }
 
-const isDeviceActivationPending = (user: AdminUser) => user.device_activation_status === 'pending_activation'
+const appActivationHint = (user: AdminUser) => {
+  if (user.device_activation_status === 'active') return t('admin.users.activationHints.active')
+  if (user.device_activation_status === 'pending_activation') return t('admin.users.activationHints.pending')
+  if (user.device_activation_status === 'revoked') return t('admin.users.activationHints.revoked')
+  if (user.device_activation_status === 'blocked') return t('admin.users.activationHints.blocked')
+  return t('admin.users.activationHints.none')
+}
+
+const appActivationSwitchLabel = (user: AdminUser) => {
+  if (isDeviceActivationPending(user)) return t('admin.users.activationSwitch.activate')
+  if (isAppActivationActive(user)) return t('admin.users.activationSwitch.active')
+  return appActivationHint(user)
+}
 
 const DEVICE_ACTIVATION_COLUMN_KEY = 'device_activation'
 const DEVICE_ACTIVATION_VISIBILITY_MIGRATION_KEY = 'user-device-activation-visible-v1'
@@ -1423,6 +1444,19 @@ const closeEditModal = () => {
   editingUser.value = null
 }
 
+const handleEditModalSuccess = (updatedUser?: AdminUser) => {
+  if (updatedUser) {
+    const index = users.value.findIndex((user) => user.id === updatedUser.id)
+    if (index !== -1) {
+      users.value[index] = updatedUser
+    }
+    if (editingUser.value?.id === updatedUser.id) {
+      editingUser.value = updatedUser
+    }
+  }
+  loadUsers()
+}
+
 const handleToggleStatus = async (user: AdminUser) => {
   const newStatus = user.status === 'active' ? 'disabled' : 'active'
   try {
@@ -1437,10 +1471,21 @@ const handleToggleStatus = async (user: AdminUser) => {
   }
 }
 
+const activatingUserIds = reactive<Set<number>>(new Set())
+
 const handleActivateDevices = async (user: AdminUser) => {
+  if (!isDeviceActivationPending(user) || activatingUserIds.has(user.id)) return
+  activatingUserIds.add(user.id)
   try {
     const response = await adminAPI.users.activateDevices(user.id)
     appStore.showSuccess(t('admin.users.deviceActivated', { count: response.activated }))
+    const index = users.value.findIndex((item) => item.id === user.id)
+    if (index !== -1) {
+      users.value[index] = response.user
+    }
+    if (editingUser.value?.id === user.id) {
+      editingUser.value = response.user
+    }
     if (filters.deviceActivation === 'pending_activation') {
       filters.deviceActivation = ''
       saveFiltersToStorage()
@@ -1448,8 +1493,15 @@ const handleActivateDevices = async (user: AdminUser) => {
     loadUsers()
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.users.failedToActivateDevice'))
-    console.error('Error activating user devices:', error)
+    console.error('Error activating app access:', error)
+  } finally {
+    activatingUserIds.delete(user.id)
   }
+}
+
+const handleActivationSwitchToggle = (user: AdminUser) => {
+  if (!canToggleAppActivation(user)) return
+  void handleActivateDevices(user)
 }
 
 const handleViewApiKeys = (user: AdminUser) => {
