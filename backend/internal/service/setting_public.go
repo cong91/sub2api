@@ -334,7 +334,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		AvailableChannelsEnabled: settings[SettingKeyAvailableChannelsEnabled] == "true",
 
 		AffiliateEnabled:             settings[SettingKeyAffiliateEnabled] == "true",
-		DeviceAutoActivationAffCodes: strings.TrimSpace(settings[SettingKeyDeviceAutoActivationAffCodes]),
+		DeviceAutoActivationAffCodes: deviceAutoActivationAffCodesSetting(settings),
 
 		RiskControlEnabled: settings[SettingKeyRiskControlEnabled] == "true",
 
