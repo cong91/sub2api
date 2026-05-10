@@ -66,14 +66,13 @@ var (
 
 // UserListFilters contains all filter options for listing users
 type UserListFilters struct {
-	Status                 string           // User status filter
-	Role                   string           // User role filter
-	Search                 string           // Search in email, username, notes, API key, redeem/device code
-	GroupName              string           // Filter by allowed group name (fuzzy match)
-	DeviceActivationStatus string           // Filter by latest/bound user device status
-	AffiliateInviterID     *int64           // Restrict to users invited by this affiliate owner
-	UserID                 *int64           // Restrict to a single user ID
-	Attributes             map[int64]string // Custom attribute filters: attributeID -> value
+	Status             string           // Effective user status filter; includes activation states for merged account/device rows
+	Role               string           // User role filter
+	Search             string           // Search in email, username, notes, API key, redeem/device code
+	GroupName          string           // Filter by allowed group name (fuzzy match)
+	AffiliateInviterID *int64           // Restrict to users invited by this affiliate owner
+	UserID             *int64           // Restrict to a single user ID
+	Attributes         map[int64]string // Custom attribute filters: attributeID -> value
 	// IncludeSubscriptions controls whether ListWithFilters should load active subscriptions.
 	// For large datasets this can be expensive; admin list pages should enable it on demand.
 	// nil means not specified (default: load subscriptions for backward compatibility).
