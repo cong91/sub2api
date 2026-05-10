@@ -37,7 +37,6 @@ type AdminService interface {
 	CreateUser(ctx context.Context, input *CreateUserInput) (*User, error)
 	UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error)
 	DeleteUser(ctx context.Context, id int64) error
-	ActivateUserDevices(ctx context.Context, userID int64) (*User, int64, error)
 	UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*User, error)
 	BatchUpdateConcurrency(ctx context.Context, userIDs []int64, value int, mode string) (int, error)
 	GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int, sortBy, sortOrder string) ([]APIKey, int64, error)
@@ -657,10 +656,21 @@ func (s *adminServiceImpl) loadUserGroupRatesOneByOne(ctx context.Context, users
 }
 
 func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error) {
-	user, err := s.userRepo.GetByID(ctx, id)
+	return s.getAdminUser(ctx, id)
+}
+
+func (s *adminServiceImpl) getAdminUser(ctx context.Context, id int64) (*User, error) {
+	if id <= 0 {
+		return nil, ErrUserNotFound
+	}
+	users, result, err := s.userRepo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 1}, UserListFilters{UserID: &id})
 	if err != nil {
 		return nil, err
 	}
+	if result == nil || result.Total == 0 || len(users) == 0 {
+		return nil, ErrUserNotFound
+	}
+	user := &users[0]
 	lastUsedAt, latestErr := s.userRepo.GetLatestUsedAtByUserID(ctx, id)
 	if latestErr != nil {
 		logger.LegacyPrintf("service.admin", "failed to load user last_used_at: user_id=%d err=%v", id, latestErr)
@@ -727,6 +737,15 @@ func normalizeUserRole(role string) (string, error) {
 	}
 }
 
+func isValidUserStatus(status string) bool {
+	switch status {
+	case StatusActive, StatusPendingActivation, StatusBlocked, StatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *adminServiceImpl) assignDefaultSubscriptions(ctx context.Context, userID int64) {
 	if s.settingService == nil || s.defaultSubAssigner == nil || userID <= 0 {
 		return
@@ -765,8 +784,19 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		return nil, err
 	}
 
-	// Protect admin users: cannot disable admin accounts
-	if user.Role == "admin" && input.Status == "disabled" {
+	statusUpdate := strings.TrimSpace(input.Status)
+	if statusUpdate != "" && !isValidUserStatus(statusUpdate) {
+		return nil, fmt.Errorf("invalid status: %s", statusUpdate)
+	}
+
+	newRole := user.Role
+	if input.Role != "" {
+		newRole = input.Role
+	}
+	// Protect admin users: admin accounts cannot be moved into a non-active user status.
+	// Check both the existing role and the requested role so a single request cannot
+	// promote a user to admin while simultaneously making that admin inaccessible.
+	if (user.Role == RoleAdmin || newRole == RoleAdmin) && statusUpdate != "" && statusUpdate != StatusActive {
 		return nil, errors.New("cannot disable admin user")
 	}
 
@@ -791,9 +821,6 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		user.Notes = *input.Notes
 	}
 
-	if input.Status != "" {
-		user.Status = input.Status
-	}
 	if input.Role != "" {
 		user.Role = input.Role
 	}
@@ -810,9 +837,19 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		user.AllowedGroups = *input.AllowedGroups
 	}
 
+	if statusUpdate != "" {
+		user.Status = statusUpdate
+	}
+
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, err
 	}
+	cacheRelevantChanged := user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit
+	fresh, err := s.getAdminUser(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	user = fresh
 
 	// 同步用户专属分组倍率
 	if input.GroupRates != nil && s.userGroupRateRepo != nil {
@@ -824,7 +861,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	if s.authCacheInvalidator != nil {
 		// RPMLimit 直接参与 billing_cache_service.checkRPM 的三级级联，
 		// 不失效缓存会让修改在一个 L2 TTL 内失去效果。
-		if user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit {
+		if cacheRelevantChanged {
 			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, user.ID)
 		}
 	}
@@ -942,27 +979,6 @@ func (s *adminServiceImpl) deleteUserWithAPIKeys(ctx context.Context, userID int
 		return err
 	}
 	return nil
-}
-
-func (s *adminServiceImpl) ActivateUserDevices(ctx context.Context, userID int64) (*User, int64, error) {
-	if userID <= 0 {
-		return nil, 0, ErrUserNotFound
-	}
-	activator, ok := s.userRepo.(interface {
-		ActivatePendingDevicesByUserID(ctx context.Context, userID int64) (int64, error)
-	})
-	if !ok {
-		return nil, 0, ErrServiceUnavailable
-	}
-	updated, err := activator.ActivatePendingDevicesByUserID(ctx, userID)
-	if err != nil {
-		return nil, 0, err
-	}
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, updated, err
-	}
-	return user, updated, nil
 }
 
 func (s *adminServiceImpl) BatchUpdateConcurrency(ctx context.Context, userIDs []int64, value int, mode string) (int, error) {
