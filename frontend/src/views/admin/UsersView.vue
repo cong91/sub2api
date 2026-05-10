@@ -212,6 +212,7 @@
               </div>
               <!-- Attributes Config Button -->
               <button
+                v-if="canManageUsers"
                 @click="showAttributesModal = true"
                 class="btn btn-secondary px-2 md:px-3"
                 :title="t('admin.users.attributes.configButton')"
@@ -222,7 +223,7 @@
             </div>
 
             <!-- Create User Button (full width on mobile, auto width on desktop) -->
-            <button @click="showCreateModal = true" class="btn btn-primary flex-1 md:flex-initial">
+            <button v-if="canManageUsers" @click="showCreateModal = true" class="btn btn-primary flex-1 md:flex-initial">
               <Icon name="plus" size="md" class="mr-2" />
               {{ t('admin.users.createUser') }}
             </button>
@@ -236,7 +237,7 @@
           :columns="columns"
           :data="users"
           :loading="loading"
-          :actions-count="canManageUsers ? 7 : 0"
+          :actions-count="canEditUsers ? (canManageUsers ? 7 : 1) : 0"
           :server-side-sort="true"
           default-sort-key="created_at"
           default-sort-order="desc"
@@ -497,7 +498,7 @@
             <div class="flex items-center gap-1">
               <!-- Edit Button -->
               <button
-                v-if="canManageUsers"
+                v-if="canEditUsers"
                 @click="handleEdit(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
               >
@@ -665,6 +666,7 @@ import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const canManageUsers = computed(() => authStore.isAdmin)
+const canEditUsers = computed(() => authStore.isAdmin || authStore.isMarketing)
 
 const roleBadgeClass = (role: string) => {
   if (role === 'admin') return 'badge-purple'
@@ -674,7 +676,7 @@ const roleBadgeClass = (role: string) => {
 
 const canEditStatus = (user: AdminUser) => {
   if (user.role === 'admin') return false
-  if (authStore.isMarketing) return user.status === 'pending_activation'
+  if (authStore.isMarketing) return true
   return authStore.isAdmin
 }
 
@@ -695,10 +697,8 @@ const allStatusOptions = computed(() => [
 
 const editableStatusOptions = (user: AdminUser) => {
   if (authStore.isMarketing) {
-    if (user.status === 'pending_activation') {
-      return allStatusOptions.value.filter((option) => ['pending_activation', 'active'].includes(String(option.value)))
-    }
-    return allStatusOptions.value.filter((option) => option.value === user.status)
+    const marketingStatuses = new Set(['active', 'pending_activation', 'blocked', user.status])
+    return allStatusOptions.value.filter((option) => marketingStatuses.has(String(option.value)))
   }
 
   return allStatusOptions.value
@@ -1374,7 +1374,7 @@ const applyFilter = () => {
 }
 
 const handleEdit = (user: AdminUser) => {
-  if (!canManageUsers.value) return
+  if (!canEditUsers.value) return
   editingUser.value = user
   showEditModal.value = true
 }

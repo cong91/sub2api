@@ -291,14 +291,13 @@ func (h *UserHandler) Update(c *gin.Context) {
 	}
 
 	if isMarketingRequest(c) {
-		if !validateMarketingUserStatusUpdate(c, req) {
+		if !validateMarketingUserUpdate(c, req) {
 			return
 		}
 	}
 
 	if isMarketingRequest(c) {
-		pendingOnly := service.StatusPendingActivation
-		if !ensureMarketingCanManageUserWithStatus(c, h.adminService, userID, pendingOnly) {
+		if !ensureMarketingCanManageUser(c, h.adminService, userID) {
 			return
 		}
 	} else if !ensureMarketingCanManageUser(c, h.adminService, userID) {
@@ -327,22 +326,9 @@ func (h *UserHandler) Update(c *gin.Context) {
 	response.Success(c, dto.UserFromServiceAdmin(user))
 }
 
-func validateMarketingUserStatusUpdate(c *gin.Context, req UpdateUserRequest) bool {
-	if req.Email != "" || req.Password != "" || req.Username != nil || req.Notes != nil ||
-		req.Balance != nil || req.Concurrency != nil || req.RPMLimit != nil || req.Role != "" ||
-		req.AllowedGroups != nil || req.GroupRates != nil {
-		response.ErrorFrom(c, infraerrors.Forbidden(
-			"FORBIDDEN",
-			"Marketing role can only activate pending users by updating status",
-		))
-		return false
-	}
-
-	if req.Status != service.StatusActive {
-		response.ErrorFrom(c, infraerrors.Forbidden(
-			"FORBIDDEN",
-			"Marketing role can only activate pending users",
-		))
+func validateMarketingUserUpdate(c *gin.Context, req UpdateUserRequest) bool {
+	if req.Role != "" {
+		response.ErrorFrom(c, infraerrors.Forbidden("FORBIDDEN", "Marketing role cannot update user roles"))
 		return false
 	}
 

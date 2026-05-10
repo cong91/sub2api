@@ -115,15 +115,22 @@ func (s *userStatusUpdateUserRepoStub) Update(_ context.Context, user *User) err
 	s.lastUpdated = &clone
 	if s.userRepoStubForListUsers != nil {
 		s.userRepoStubForListUsers.user = &clone
+		for i := range s.userRepoStubForListUsers.users {
+			if s.userRepoStubForListUsers.users[i].ID == clone.ID {
+				s.userRepoStubForListUsers.users[i] = clone
+				break
+			}
+		}
 	}
 	return nil
 }
 
 func TestAdminService_UpdateUserStatusStoresUserStatus(t *testing.T) {
 	repo := &userStatusUpdateUserRepoStub{userRepoStubForListUsers: &userRepoStubForListUsers{
-		users: []User{{ID: 42, Email: "pending@example.com", Status: StatusActive, Role: RoleUser}},
+		userRepoStub: userRepoStub{user: &User{ID: 42, Email: "pending@example.com", Status: StatusActive, Role: RoleUser}},
+		users:        []User{{ID: 42, Email: "pending@example.com", Status: StatusActive, Role: RoleUser}},
 	}}
-	svc := &adminServiceImpl{userRepo: repo, groupRepo: &groupRepoStubForListUsers{groups: []Group{{ID: 1, Name: "default"}}}}
+	svc := &adminServiceImpl{userRepo: repo, groupRepo: &groupRepoStubForAdmin{listWithFiltersGroups: []Group{{ID: 1, Name: "default"}}}}
 
 	updated, err := svc.UpdateUser(context.Background(), 42, &UpdateUserInput{
 		Status: StatusPendingActivation,

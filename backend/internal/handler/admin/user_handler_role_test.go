@@ -107,7 +107,7 @@ func TestUserHandlerUpdateStatusMarketingRequiresAffiliateScope(t *testing.T) {
 	require.Equal(t, int64(42), *adminSvc.lastListUsers.filters.UserID)
 }
 
-func TestUserHandlerUpdateStatusMarketingAllowsAffiliateScopedPendingActivation(t *testing.T) {
+func TestUserHandlerUpdateMarketingAllowsAffiliateScopedPendingActivation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	adminSvc := newStubAdminService()
@@ -133,10 +133,10 @@ func TestUserHandlerUpdateStatusMarketingAllowsAffiliateScopedPendingActivation(
 	require.Equal(t, int64(7), *adminSvc.lastListUsers.filters.AffiliateInviterID)
 	require.NotNil(t, adminSvc.lastListUsers.filters.UserID)
 	require.Equal(t, int64(42), *adminSvc.lastListUsers.filters.UserID)
-	require.Equal(t, service.StatusPendingActivation, adminSvc.lastListUsers.filters.Status)
+	require.Empty(t, adminSvc.lastListUsers.filters.Status)
 }
 
-func TestUserHandlerUpdateStatusMarketingRejectsAlreadyActiveUser(t *testing.T) {
+func TestUserHandlerUpdateMarketingAllowsAffiliateScopedActiveUserBlock(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	adminSvc := newStubAdminService()
@@ -148,18 +148,63 @@ func TestUserHandlerUpdateStatusMarketingRejectsAlreadyActiveUser(t *testing.T) 
 	c.Params = gin.Params{{Key: "id", Value: "42"}}
 	c.Set(string(middleware.ContextKeyUserRole), service.RoleMarketing)
 	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 7})
-	c.Request = httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42", bytes.NewBufferString(`{"status":"active"}`))
+	c.Request = httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42", bytes.NewBufferString(`{"status":"blocked"}`))
 	c.Request.Header.Set("Content-Type", "application/json")
 
 	handler.Update(c)
 
-	require.Equal(t, http.StatusForbidden, recorder.Code)
-	require.Empty(t, adminSvc.updatedUserIDs)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Equal(t, []int64{42}, adminSvc.updatedUserIDs)
+	require.Len(t, adminSvc.updatedUsers, 1)
+	require.Equal(t, service.StatusBlocked, adminSvc.updatedUsers[0].Status)
 	require.Equal(t, 1, adminSvc.lastListUsers.calls)
-	require.Equal(t, service.StatusPendingActivation, adminSvc.lastListUsers.filters.Status)
+	require.Empty(t, adminSvc.lastListUsers.filters.Status)
 }
 
-func TestUserHandlerUpdateStatusMarketingRejectsProfilePayload(t *testing.T) {
+func TestUserHandlerUpdateMarketingAllowsAffiliateScopedProfilePayload(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	adminSvc := newStubAdminService()
+	adminSvc.users = []service.User{{ID: 42, Email: "customer@example.com", Status: service.StatusActive}}
+	handler := NewUserHandler(adminSvc, nil)
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Params = gin.Params{{Key: "id", Value: "42"}}
+	c.Set(string(middleware.ContextKeyUserRole), service.RoleMarketing)
+	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 7})
+	c.Request = httptest.NewRequest(
+		http.MethodPut,
+		"/api/v1/admin/users/42",
+		bytes.NewBufferString(`{"email":"customer+edited@example.com","password":"safe-password","username":"edited","notes":"managed by marketing","balance":12.5,"concurrency":3,"rpm_limit":60,"status":"blocked"}`),
+	)
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	handler.Update(c)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Equal(t, []int64{42}, adminSvc.updatedUserIDs)
+	require.Len(t, adminSvc.updatedUsers, 1)
+	input := adminSvc.updatedUsers[0]
+	require.Equal(t, "customer+edited@example.com", input.Email)
+	require.Equal(t, "safe-password", input.Password)
+	require.NotNil(t, input.Username)
+	require.Equal(t, "edited", *input.Username)
+	require.NotNil(t, input.Notes)
+	require.Equal(t, "managed by marketing", *input.Notes)
+	require.NotNil(t, input.Balance)
+	require.Equal(t, 12.5, *input.Balance)
+	require.NotNil(t, input.Concurrency)
+	require.Equal(t, 3, *input.Concurrency)
+	require.NotNil(t, input.RPMLimit)
+	require.Equal(t, 60, *input.RPMLimit)
+	require.Equal(t, service.StatusBlocked, input.Status)
+	require.Empty(t, input.Role)
+	require.Equal(t, 1, adminSvc.lastListUsers.calls)
+	require.Empty(t, adminSvc.lastListUsers.filters.Status)
+}
+
+func TestUserHandlerUpdateMarketingRejectsRolePayload(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	adminSvc := newStubAdminService()

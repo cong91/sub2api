@@ -47,7 +47,7 @@
           <span class="font-mono text-primary-600 dark:text-primary-400">{{ user.primary_redeem_code }}</span>
         </p>
       </div>
-      <div>
+      <div v-if="authStore.isAdmin">
         <label class="input-label">{{ t('admin.users.form.role') }}</label>
         <Select v-model="form.role" :options="roleOptions" />
         <p class="input-hint">{{ t('admin.users.form.roleHint') }}</p>
@@ -85,6 +85,7 @@
 import { ref, reactive, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { useClipboard } from '@/composables/useClipboard'
 import { adminAPI } from '@/api/admin'
 import type { AdminUser, UserAttributeValuesMap, UserRole, UserStatus, UpdateUserRequest } from '@/types'
@@ -95,7 +96,7 @@ import Icon from '@/components/icons/Icon.vue'
 
 const props = defineProps<{ show: boolean, user: AdminUser | null }>()
 const emit = defineEmits(['close', 'success'])
-const { t } = useI18n(); const appStore = useAppStore(); const { copyToClipboard } = useClipboard()
+const { t } = useI18n(); const appStore = useAppStore(); const authStore = useAuthStore(); const { copyToClipboard } = useClipboard()
 
 const roleOptions = [
   { value: 'user', label: t('admin.users.roles.user') },
@@ -166,7 +167,8 @@ const handleUpdateUser = async () => {
   }
   submitting.value = true
   try {
-    const data: UpdateUserRequest = { email: form.email, username: form.username, notes: form.notes, role: form.role, status: form.status, concurrency: form.concurrency, rpm_limit: form.rpm_limit }
+    const data: UpdateUserRequest = { email: form.email, username: form.username, notes: form.notes, status: form.status, concurrency: form.concurrency, rpm_limit: form.rpm_limit }
+    if (authStore.isAdmin) data.role = form.role
     if (form.password.trim()) data.password = form.password.trim()
     const updatedUser = await adminAPI.users.update(props.user.id, data)
     if (Object.keys(form.customAttributes).length > 0) await adminAPI.userAttributes.updateUserAttributeValues(props.user.id, form.customAttributes)
