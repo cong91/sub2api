@@ -889,7 +889,8 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 
 		AvailableChannelsEnabled: settings[SettingKeyAvailableChannelsEnabled] == "true",
 
-		AffiliateEnabled: settings[SettingKeyAffiliateEnabled] == "true",
+		AffiliateEnabled:             settings[SettingKeyAffiliateEnabled] == "true",
+		DeviceAutoActivationAffCodes: deviceAutoActivationAffCodesSetting(settings),
 
 		RiskControlEnabled: settings[SettingKeyRiskControlEnabled] == "true",
 
@@ -3358,10 +3359,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 
 	// Affiliate (邀请返利) feature (default: disabled; strict true)
 	result.AffiliateEnabled = settings[SettingKeyAffiliateEnabled] == "true"
-	result.DeviceAutoActivationAffCodes = strings.TrimSpace(settings[SettingKeyDeviceAutoActivationAffCodes])
-	if result.DeviceAutoActivationAffCodes == "" {
-		result.DeviceAutoActivationAffCodes = "AUTO_APPROVE"
-	}
+	result.DeviceAutoActivationAffCodes = deviceAutoActivationAffCodesSetting(settings)
 
 	// 风控中心功能（默认关闭，严格 true 才启用）
 	result.RiskControlEnabled = settings[SettingKeyRiskControlEnabled] == "true"
@@ -3435,6 +3433,14 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	result.AllowUserViewErrorRequests = settings[SettingKeyAllowUserViewErrorRequests] == "true" // default false
 
 	return result
+}
+
+func deviceAutoActivationAffCodesSetting(settings map[string]string) string {
+	raw, ok := settings[SettingKeyDeviceAutoActivationAffCodes]
+	if !ok {
+		return "AUTO_APPROVE"
+	}
+	return strings.TrimSpace(raw)
 }
 
 func clampAffiliateRebateRate(value float64) float64 {
