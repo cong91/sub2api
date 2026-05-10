@@ -33,7 +33,21 @@
         <label class="input-label">{{ t('admin.users.notes') }}</label>
         <textarea v-model="form.notes" rows="3" class="input"></textarea>
       </div>
-      <div>
+      <div v-if="user" class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800/60">
+        <label class="input-label mb-1">{{ t('admin.users.form.accountStatus') }}</label>
+        <Select v-model="form.status" :options="statusOptions" :disabled="user.role === 'admin'" />
+        <p :class="['mt-2 text-sm font-medium', accountStatusTextClass]">
+          {{ accountStatusLabel }}
+        </p>
+        <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
+          {{ accountStatusHint }}
+        </p>
+        <p v-if="user.primary_redeem_code" class="mt-3 text-xs text-gray-500 dark:text-dark-400">
+          {{ t('admin.users.form.activationCode') }}:
+          <span class="font-mono text-primary-600 dark:text-primary-400">{{ user.primary_redeem_code }}</span>
+        </p>
+      </div>
+      <div v-if="authStore.isAdmin">
         <label class="input-label">{{ t('admin.users.form.role') }}</label>
         <Select v-model="form.role" :options="roleOptions" />
         <p class="input-hint">{{ t('admin.users.form.roleHint') }}</p>
@@ -68,12 +82,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { useClipboard } from '@/composables/useClipboard'
 import { adminAPI } from '@/api/admin'
-import type { AdminUser, UserAttributeValuesMap, UserRole, UpdateUserRequest } from '@/types'
+import type { AdminUser, UserAttributeValuesMap, UserRole, UserStatus, UpdateUserRequest } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
 import UserAttributeForm from '@/components/user/UserAttributeForm.vue'
@@ -81,7 +96,7 @@ import Icon from '@/components/icons/Icon.vue'
 
 const props = defineProps<{ show: boolean, user: AdminUser | null }>()
 const emit = defineEmits(['close', 'success'])
-const { t } = useI18n(); const appStore = useAppStore(); const { copyToClipboard } = useClipboard()
+const { t } = useI18n(); const appStore = useAppStore(); const authStore = useAuthStore(); const { copyToClipboard } = useClipboard()
 
 const roleOptions = [
   { value: 'user', label: t('admin.users.roles.user') },
@@ -89,12 +104,42 @@ const roleOptions = [
   { value: 'admin', label: t('admin.users.roles.admin') }
 ]
 
-const submitting = ref(false); const passwordCopied = ref(false)
-const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as UserRole, concurrency: 1, rpm_limit: 0, customAttributes: {} as UserAttributeValuesMap })
+const statusOptions = [
+  { value: 'active', label: t('common.active') },
+  { value: 'pending_activation', label: t('admin.users.status.pending_activation') },
+  { value: 'blocked', label: t('admin.users.status.blocked') },
+  { value: 'disabled', label: t('admin.users.disabled') }
+]
 
+const submitting = ref(false)
+const passwordCopied = ref(false)
+const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as UserRole, status: 'active' as UserStatus, concurrency: 1, rpm_limit: 0, customAttributes: {} as UserAttributeValuesMap })
+
+const accountStatusLabel = computed(() => {
+  const status = form.status
+  if (!status) return '-'
+  if (status === 'active') return t('common.active')
+  if (status === 'disabled') return t('admin.users.disabled')
+  return t(`admin.users.status.${status}`, status)
+})
+const accountStatusTextClass = computed(() => {
+  const status = form.status
+  if (status === 'active') return 'text-green-600 dark:text-green-400'
+  if (status === 'pending_activation') return 'text-amber-600 dark:text-amber-400'
+  if (status === 'blocked' || status === 'disabled') return 'text-red-600 dark:text-red-400'
+  return 'text-gray-500 dark:text-dark-400'
+})
+const accountStatusHint = computed(() => {
+  const status = form.status
+  if (status === 'active') return t('admin.users.activationHints.active')
+  if (status === 'pending_activation') return t('admin.users.activationHints.pending')
+  if (status === 'blocked') return t('admin.users.activationHints.blocked')
+  if (status === 'disabled') return t('admin.users.statusHints.disabled')
+  return t('admin.users.activationHints.none')
+})
 watch(() => props.user, (u) => {
   if (u) {
-    Object.assign(form, { email: u.email, password: '', username: u.username || '', notes: u.notes || '', role: u.role, concurrency: u.concurrency, rpm_limit: u.rpm_limit ?? 0, customAttributes: {} })
+    Object.assign(form, { email: u.email, password: '', username: u.username || '', notes: u.notes || '', role: u.role, status: u.status, concurrency: u.concurrency, rpm_limit: u.rpm_limit ?? 0, customAttributes: {} })
     passwordCopied.value = false
   }
 }, { immediate: true })
@@ -109,6 +154,7 @@ const copyPassword = async () => {
     passwordCopied.value = true; setTimeout(() => passwordCopied.value = false, 2000)
   }
 }
+
 const handleUpdateUser = async () => {
   if (!props.user) return
   if (!form.email.trim()) {
@@ -121,12 +167,13 @@ const handleUpdateUser = async () => {
   }
   submitting.value = true
   try {
-    const data: UpdateUserRequest = { email: form.email, username: form.username, notes: form.notes, role: form.role, concurrency: form.concurrency, rpm_limit: form.rpm_limit }
+    const data: UpdateUserRequest = { email: form.email, username: form.username, notes: form.notes, status: form.status, concurrency: form.concurrency, rpm_limit: form.rpm_limit }
+    if (authStore.isAdmin) data.role = form.role
     if (form.password.trim()) data.password = form.password.trim()
-    await adminAPI.users.update(props.user.id, data)
+    const updatedUser = await adminAPI.users.update(props.user.id, data)
     if (Object.keys(form.customAttributes).length > 0) await adminAPI.userAttributes.updateUserAttributeValues(props.user.id, form.customAttributes)
     appStore.showSuccess(t('admin.users.userUpdated'))
-    emit('success'); emit('close')
+    emit('success', updatedUser); emit('close')
   } catch (e: any) {
     appStore.showError(e.response?.data?.detail || t('admin.users.failedToUpdate'))
   } finally { submitting.value = false }

@@ -4,7 +4,7 @@
  */
 
 import { apiClient } from '../client'
-import type { AdminUser, UpdateUserRequest, PaginatedResponse, ApiKey, UserRole } from '@/types'
+import type { AdminUser, UpdateUserRequest, PaginatedResponse, ApiKey, UserRole, UserStatus } from '@/types'
 
 export interface AdminBindAuthIdentityChannelRequest {
   channel: string
@@ -56,7 +56,7 @@ export async function list(
   page: number = 1,
   pageSize: number = 20,
   filters?: {
-    status?: 'active' | 'disabled'
+    status?: UserStatus
     role?: UserRole
     search?: string
     group_name?: string         // fuzzy filter by allowed group name
@@ -187,27 +187,15 @@ export async function updateConcurrency(id: number, concurrency: number): Promis
 }
 
 /**
- * Toggle user status
+ * Update user status
  * @param id - User ID
- * @param status - New status
+ * @param status - New user status
  * @returns Updated user
  */
-export async function toggleStatus(id: number, status: 'active' | 'disabled'): Promise<AdminUser> {
+export async function updateStatus(id: number, status: UserStatus): Promise<AdminUser> {
   return update(id, { status })
 }
 
-export interface ActivateUserDevicesResponse {
-  user: AdminUser
-  activated: number
-}
-
-/**
- * Activate pending device bindings for a user.
- */
-export async function activateDevices(id: number): Promise<ActivateUserDevicesResponse> {
-  const { data } = await apiClient.post<ActivateUserDevicesResponse>(`/admin/users/${id}/activate-devices`)
-  return data
-}
 
 /**
  * Get user's API keys
@@ -400,8 +388,7 @@ export const usersAPI = {
   delete: deleteUser,
   updateBalance,
   updateConcurrency,
-  toggleStatus,
-  activateDevices,
+  updateStatus,
   getUserApiKeys,
   getUserUsageStats,
   getUserBalanceHistory,
