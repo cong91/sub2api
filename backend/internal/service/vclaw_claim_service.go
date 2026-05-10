@@ -69,6 +69,7 @@ type VClawClaimRequest struct {
 
 type VClawClaimResult struct {
 	Status          string    `json:"status"`
+	DeviceStatus    string    `json:"device_status,omitempty"`
 	Mode            string    `json:"mode"`
 	UserID          int64     `json:"user_id,omitempty"`
 	DeviceLoginCode string    `json:"device_login_code,omitempty"`
@@ -164,6 +165,7 @@ func (s *VClawClaimService) resumeExistingClaim(ctx context.Context, binding *Us
 	}
 	return &VClawClaimResult{
 		Status:          user.Status,
+		DeviceStatus:    deviceStatus,
 		Mode:            "resume",
 		UserID:          binding.UserID,
 		DeviceLoginCode: loginCode.Code,
@@ -242,6 +244,7 @@ func (s *VClawClaimService) createFirstClaim(ctx context.Context, req VClawClaim
 
 		return &VClawClaimResult{
 			Status:          userStatus,
+			DeviceStatus:    UserDeviceStatusActive,
 			Mode:            "first_claim",
 			UserID:          user.ID,
 			DeviceLoginCode: loginRedeemCode.Code,
