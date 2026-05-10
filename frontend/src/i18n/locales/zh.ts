@@ -1865,16 +1865,16 @@ export default {
       allRoles: '全部角色',
       allStatus: '全部状态',
       allGroups: '全部分组',
-      activateDevice: '激活',
-      deviceActivated: '已激活 {count} 个待激活设备',
-      failedToActivateDevice: '激活设备失败',
-      deviceActivation: {
-        all: '全部设备状态',
-        none: '无设备',
+      status: {
         active: '已激活',
         pending_activation: '待激活',
-        revoked: '已撤销',
         blocked: '已阻止'
+      },
+      activationHints: {
+        active: '已允许打开 OpenClaw。',
+        pending: '打开开关即可批准此邀请码记录。',
+        none: '此记录尚未绑定应用/设备 claim。',
+        blocked: '访问权限已阻止，不能在此重新启用。'
       },
       searchGroups: '搜索分组...',
       fuzzySearch: '模糊搜索',
@@ -1923,7 +1923,7 @@ export default {
         usage: '用量',
         concurrency: '并发数',
         status: '状态',
-        deviceActivation: '设备激活',
+        activation: '激活',
         lastActive: '最后活跃时间',
         lastUsed: '最后使用时间',
         created: '创建时间',
@@ -1986,6 +1986,9 @@ export default {
         passwordPlaceholder: '请输入密码（留空则不修改）',
         role: '角色',
         roleHint: '选择此用户的权限级别',
+        appActivation: 'OpenClaw 访问权限',
+        accountStatus: '账号状态',
+        activationCode: '激活码',
         roleLabel: '角色',
         selectRole: '选择角色',
         balanceLabel: '余额',
@@ -2214,7 +2217,7 @@ export default {
         userName: '用户名',
         userEmail: '邮箱',
         userNotes: '备注',
-        userStatus: '状态'
+        memberStatus: '状态'
       },
       usageToday: '今日',
       usageTotal: '累计',

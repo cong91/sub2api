@@ -1858,16 +1858,16 @@ export default {
       allRoles: 'All Roles',
       allStatus: 'All Status',
       allGroups: 'All Groups',
-      activateDevice: 'Activate',
-      deviceActivated: 'Activated {count} pending device(s)',
-      failedToActivateDevice: 'Failed to activate device',
-      deviceActivation: {
-        all: 'All device status',
-        none: 'No device',
-        active: 'Active',
+      status: {
+        active: 'Activated',
         pending_activation: 'Pending activation',
-        revoked: 'Revoked',
         blocked: 'Blocked'
+      },
+      activationHints: {
+        active: 'OpenClaw access is enabled.',
+        pending: 'Turn on to approve this invite record.',
+        none: 'No linked app/device claim yet.',
+        blocked: 'Access is blocked and cannot be re-enabled here.'
       },
       searchGroups: 'Search groups...',
       fuzzySearch: 'Fuzzy search',
@@ -1903,6 +1903,9 @@ export default {
       form: {
         role: 'Role',
         roleHint: 'Choose the permission level for this admin-created user.',
+        appActivation: 'OpenClaw access',
+        accountStatus: 'Account status',
+        activationCode: 'Activation code',
         rpmLimit: 'Requests Per Minute (RPM)',
         rpmLimitPlaceholder: '0 = unlimited',
         rpmLimitHint: 'Max requests per minute for this user; 0 = unlimited. Acts as a fallback only when the group has no rpm_limit set.',
@@ -1936,7 +1939,7 @@ export default {
         usage: 'Usage',
         concurrency: 'Concurrency',
         status: 'Status',
-        deviceActivation: 'Device activation',
+        activation: 'Activation',
         lastActive: 'Last Active',
         lastUsed: 'Last Used',
         created: 'Created',
@@ -2213,7 +2216,7 @@ export default {
         userName: 'Username',
         userEmail: 'Email',
         userNotes: 'Notes',
-        userStatus: 'Status',
+        memberStatus: 'Status',
         apiKeys: 'API Key Count',
         exclusive: 'Exclusive',
         priority: 'Priority',
