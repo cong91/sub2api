@@ -11,6 +11,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/handler/quotaview"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -70,7 +71,7 @@ type UpdateUserRequest struct {
 	Concurrency   *int     `json:"concurrency"`
 	RPMLimit      *int     `json:"rpm_limit"`
 	Role          string   `json:"role" binding:"omitempty,oneof=admin marketing user"`
-	Status        string   `json:"status" binding:"omitempty,oneof=active disabled"`
+	Status        string   `json:"status" binding:"omitempty,oneof=active pending_activation blocked disabled"`
 	AllowedGroups *[]int64 `json:"allowed_groups"`
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]*rate，nil 表示删除该分组的专属倍率
@@ -119,12 +120,11 @@ func (h *UserHandler) List(c *gin.Context) {
 	}
 
 	filters := service.UserListFilters{
-		Status:                 c.Query("status"),
-		Role:                   c.Query("role"),
-		Search:                 search,
-		GroupName:              strings.TrimSpace(c.Query("group_name")),
-		DeviceActivationStatus: strings.TrimSpace(c.Query("device_activation_status")),
-		Attributes:             parseAttributeFilters(c),
+		Status:     c.Query("status"),
+		Role:       c.Query("role"),
+		Search:     search,
+		GroupName:  strings.TrimSpace(c.Query("group_name")),
+		Attributes: parseAttributeFilters(c),
 	}
 	if !applyMarketingUserScope(c, &filters) {
 		return
@@ -167,31 +167,6 @@ func (h *UserHandler) List(c *gin.Context) {
 	}
 
 	response.Paginated(c, out, total, page, pageSize)
-}
-
-// ActivateDevices approves pending device bindings for a user.
-// POST /api/v1/admin/users/:id/activate-devices
-func (h *UserHandler) ActivateDevices(c *gin.Context) {
-	userID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid user ID")
-		return
-	}
-
-	if !ensureMarketingCanManageUser(c, h.adminService, userID) {
-		return
-	}
-
-	user, activated, err := h.adminService.ActivateUserDevices(c.Request.Context(), userID)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, gin.H{
-		"user":      dto.UserFromServiceAdmin(user),
-		"activated": activated,
-	})
 }
 
 func applyMarketingUserScope(c *gin.Context, filters *service.UserListFilters) bool {
@@ -329,6 +304,20 @@ func (h *UserHandler) Update(c *gin.Context) {
 		return
 	}
 
+	if isMarketingRequest(c) {
+		if !validateMarketingUserUpdate(c, req) {
+			return
+		}
+	}
+
+	if isMarketingRequest(c) {
+		if !ensureMarketingCanManageUser(c, h.adminService, userID) {
+			return
+		}
+	} else if !ensureMarketingCanManageUser(c, h.adminService, userID) {
+		return
+	}
+
 	// 使用指针类型直接传递，nil 表示未提供该字段
 	user, err := h.adminService.UpdateUser(c.Request.Context(), userID, &service.UpdateUserInput{
 		Email:         req.Email,
@@ -349,6 +338,15 @@ func (h *UserHandler) Update(c *gin.Context) {
 	}
 
 	response.Success(c, dto.UserFromServiceAdmin(user))
+}
+
+func validateMarketingUserUpdate(c *gin.Context, req UpdateUserRequest) bool {
+	if req.Role != "" {
+		response.ErrorFrom(c, infraerrors.Forbidden("FORBIDDEN", "Marketing role cannot update user roles"))
+		return false
+	}
+
+	return true
 }
 
 // Delete handles deleting a user
