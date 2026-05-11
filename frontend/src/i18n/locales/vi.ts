@@ -1751,6 +1751,10 @@ export default {
         none: 'Chưa có claim app/device gắn với bản ghi này.',
         blocked: 'Quyền truy cập đang bị chặn và không thể bật lại tại đây.'
       },
+      statusHints: {
+        active: 'Tài khoản đang hoạt động và có thể dùng khóa API.',
+        disabled: 'Tài khoản đã bị vô hiệu hóa và không thể dùng khóa API.'
+      },
       activateDevice: 'Kích hoạt',
       deviceActivated: 'Đã kích hoạt {count} thiết bị đang chờ',
       failedToActivateDevice: 'Kích hoạt thiết bị thất bại',

@@ -1752,6 +1752,10 @@ export default {
         none: '이 레코드에는 아직 앱/기기 claim이 연결되지 않았습니다.',
         blocked: '접근 권한이 차단되어 여기서 다시 활성화할 수 없습니다.'
       },
+      statusHints: {
+        active: '계정이 활성화되어 API 키를 사용할 수 있습니다.',
+        disabled: '계정이 비활성화되어 API 키를 사용할 수 없습니다.'
+      },
       activateDevice: '활성화',
       deviceActivated: '대기 중인 기기 {count}개를 활성화했습니다',
       failedToActivateDevice: '기기 활성화 실패',
@@ -7236,6 +7240,7 @@ export default {
       subsStatus: {
         active: '활성 중',
         expired: '만료됨',
+        revoked: '취소됨',
       },
 
       allowUserRefund: 'Allow User Refund',
