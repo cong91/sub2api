@@ -71,6 +71,10 @@ func isMarketingAdminPathAllowed(method, requestPath string) bool {
 	if method == "PUT" && hasAnyPrefix(path, "/admin/users") {
 		return true
 	}
+	// Marketing can adjust balance only for users scoped by its own affiliate code.
+	if method == "POST" && hasAnyPrefix(path, "/admin/users") && strings.HasSuffix(path, "/balance") {
+		return true
+	}
 
 	// Subscription administration is the primary marketing operation: grant,
 	// extend, reset, or revoke package access for customer-care workflows.
