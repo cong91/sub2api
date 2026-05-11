@@ -1842,6 +1842,10 @@ export default {
         none: '此记录尚未绑定应用/设备 claim。',
         blocked: '访问权限已阻止，不能在此重新启用。'
       },
+      statusHints: {
+        active: '账号已激活，可以使用 API 密钥。',
+        disabled: '账号已禁用，无法使用 API 密钥。'
+      },
       activateDevice: '激活',
       deviceActivated: '已激活 {count} 个待激活设备',
       failedToActivateDevice: '激活设备失败',
@@ -5616,6 +5620,35 @@ export default {
         email: '邮件设置',
         backup: '数据备份',
         payment: '支付设置',
+      },
+      loginAgreementSettings: {
+        title: '登录条款设置',
+        description: '要求用户在登录前阅读并同意最新服务条款。',
+        displayMode: '展示方式',
+        modal: '弹窗',
+        checkbox: '复选框',
+        modalHint: '登录继续前展示强制弹窗和条款文档。',
+        checkboxHint: '在登录和注册表单中展示同意条款复选框。',
+        updatedDate: '更新日期',
+        updatedDateHint: '修改此日期后，用户需要重新同意最新条款。',
+        documents: '条款文档',
+        documentsHint: '配置登录条款提示中展示的法律文档。',
+        addDocument: '添加文档',
+        untitledDocument: '未命名文档',
+        documentTitle: '文档标题',
+        documentTitlePlaceholder: '例如：服务条款',
+        routeSlug: '路由标识',
+        markdownContent: 'Markdown 内容',
+        markdownContentPlaceholder: '使用 Markdown 输入文档内容。留空时，公开法律页面会展示暂无内容。',
+        documentRequiredError: '启用登录条款前，请至少添加一个条款文档。',
+        documentTitleRequiredError: '每个条款文档都必须填写标题。',
+        duplicateRouteError: '条款文档路由重复：{path}',
+        defaultDocuments: {
+          terms: '服务条款',
+          usagePolicy: '使用政策',
+          supportedRegions: '支持地区',
+          serviceSpecificTerms: '特定服务条款',
+        },
       },
       features: {
         channelMonitor: {
