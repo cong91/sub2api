@@ -581,9 +581,9 @@ describe("admin SettingsView registration and tab layout", () => {
       expect(tab.classes()).not.toContain("flex-1");
     }
 
-    const nav = wrapper.find("nav.settings-tabs");
+    const nav = wrapper.find("nav.settings-tabs-scroll");
     expect(nav.exists()).toBe(true);
-    expect(nav.attributes("aria-label")).toBe("Settings sections");
+    expect(nav.attributes("aria-label")).toBe("admin.settings.title");
 
     const scrollContainer = wrapper.find(".settings-tabs-scroll");
     expect(scrollContainer.exists()).toBe(true);
