@@ -662,7 +662,7 @@ func NewSettingService(settingRepo SettingRepository, cfg *config.Config) *Setti
 		settingRepo: settingRepo,
 		cfg:         cfg,
 	}
-	antigravity.SetUserAgentVersionProvider(service.GetAntigravityUserAgentVersion)
+	antigravity.SetUserAgentVersionResolver(service.GetAntigravityUserAgentVersion)
 	return service
 }
 
@@ -771,15 +771,6 @@ func (s *SettingService) GetCyberSessionBlockRuntime(ctx context.Context) (bool,
 // GetPublicSettings 获取公开设置（无需登录）
 func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings, error) {
 	keys := []string{
-		SettingKeyRegistrationEnabled,
-		SettingKeyEmailVerifyEnabled,
-		SettingKeyForceEmailOnThirdPartySignup,
-		SettingKeyRegistrationEmailSuffixWhitelist,
-		SettingKeyPromoCodeEnabled,
-		SettingKeyPasswordResetEnabled,
-		SettingKeyInvitationCodeEnabled,
-		SettingKeyTotpEnabled,
-		SettingKeyLoginAgreementEnabled,
 		SettingKeyLoginAgreementMode,
 		SettingKeyLoginAgreementUpdatedAt,
 		SettingKeyLoginAgreementDocuments,
@@ -2199,8 +2190,6 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyMaxClaudeCodeVersion] = settings.MaxClaudeCodeVersion
 
 	// Antigravity runtime request settings
-	updates[SettingKeyAntigravityUserAgentVersion] = strings.TrimSpace(settings.AntigravityUserAgentVersion)
-
 	// 分组隔离
 	updates[SettingKeyAllowUngroupedKeyScheduling] = strconv.FormatBool(settings.AllowUngroupedKeyScheduling)
 
@@ -3185,7 +3174,6 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 
 		// Antigravity runtime request settings (empty = use env/default fallback)
 		SettingKeyAntigravityUserAgentVersion: "",
-
 		// 分组隔离（默认不允许未分组 Key 调度）
 		SettingKeyAllowUngroupedKeyScheduling:        "false",
 		SettingKeyEnableAnthropicCacheTTL1hInjection: "false",
@@ -3705,7 +3693,6 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	// Claude Code version check
 	result.MinClaudeCodeVersion = strings.TrimSpace(settings[SettingKeyMinClaudeCodeVersion])
 	result.MaxClaudeCodeVersion = strings.TrimSpace(settings[SettingKeyMaxClaudeCodeVersion])
-	result.AntigravityUserAgentVersion = strings.TrimSpace(settings[SettingKeyAntigravityUserAgentVersion])
 
 	// 分组隔离
 	result.AllowUngroupedKeyScheduling = settings[SettingKeyAllowUngroupedKeyScheduling] == "true"
