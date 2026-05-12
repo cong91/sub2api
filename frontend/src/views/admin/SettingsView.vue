@@ -3207,6 +3207,24 @@
                   {{ t("admin.settings.claudeCode.maxVersionHint") }}
                 </p>
               </div>
+              <div class="mt-4">
+                <label
+                  class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  {{ t("admin.settings.claudeCode.antigravityVersion") }}
+                </label>
+                <input
+                  v-model="form.antigravity_user_agent_version"
+                  type="text"
+                  class="input max-w-xs font-mono text-sm"
+                  :placeholder="
+                    t('admin.settings.claudeCode.antigravityVersionPlaceholder')
+                  "
+                />
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t("admin.settings.claudeCode.antigravityVersionHint") }}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -3373,36 +3391,6 @@
                   </p>
                 </div>
                 <Toggle v-model="form.rewrite_message_cache_control" />
-              </div>
-
-              <!-- Antigravity UA 版本 -->
-              <div>
-                <label
-                  class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  {{
-                    t(
-                      "admin.settings.gatewayForwarding.antigravityUserAgentVersion",
-                    )
-                  }}
-                </label>
-                <input
-                  v-model="form.antigravity_user_agent_version"
-                  type="text"
-                  class="input max-w-xs font-mono text-sm"
-                  :placeholder="
-                    t(
-                      'admin.settings.gatewayForwarding.antigravityUserAgentVersionPlaceholder',
-                    )
-                  "
-                />
-                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  {{
-                    t(
-                      "admin.settings.gatewayForwarding.antigravityUserAgentVersionHint",
-                    )
-                  }}
-                </p>
               </div>
             </div>
           </div>
