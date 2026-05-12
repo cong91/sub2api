@@ -177,15 +177,6 @@ const remainingSeconds = ref(0)
 const cancelling = ref(false)
 const paidOrder = ref<PaymentOrder | null>(null)
 const paymentCurrency = computed(() => normalizePaymentCurrency(props.paymentCurrency || props.currency))
-const localeCode = computed(() => {
-  const raw = i18n.locale as unknown
-  if (typeof raw === 'string') return raw
-  if (raw && typeof raw === 'object' && 'value' in raw) {
-    return String((raw as { value?: string }).value || '')
-  }
-  return undefined
-})
-
 // Terminal outcome: null = still active, 'success' | 'cancelled' | 'expired'
 const outcome = ref<PaymentOutcome | null>(null)
 
