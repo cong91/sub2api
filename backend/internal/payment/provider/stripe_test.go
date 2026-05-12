@@ -82,6 +82,15 @@ func TestStripeCurrencyDefaultsToCNY(t *testing.T) {
 	}
 }
 
+func TestStripeIntentCurrencyDefaultsToCNY(t *testing.T) {
+	if got := stripeIntentCurrency(stripe.Currency(""), ""); got != "CNY" {
+		t.Fatalf("stripeIntentCurrency empty = %q, want CNY", got)
+	}
+	if got := stripeIntentCurrency(stripe.Currency(" vnd "), ""); got != "VND" {
+		t.Fatalf("stripeIntentCurrency vnd = %q, want VND", got)
+	}
+}
+
 func TestStripeParsePaymentIntentUsesEventCurrencyMinorUnits(t *testing.T) {
 	intent := stripe.PaymentIntent{
 		ID:       "pi_123",
@@ -120,9 +129,9 @@ func TestStripeMinorUnitConversionSupportsLocalCurrencies(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.currency, func(t *testing.T) {
-			got, err := payment.AmountToMinorUnits(tt.amount, tt.currency)
+			got, err := payment.AmountToMinorUnit(tt.amount, tt.currency)
 			if err != nil {
-				t.Fatalf("AmountToMinorUnits returned error: %v", err)
+				t.Fatalf("AmountToMinorUnit returned error: %v", err)
 			}
 			if got != tt.want {
 				t.Fatalf("minor units = %d, want %d", got, tt.want)
