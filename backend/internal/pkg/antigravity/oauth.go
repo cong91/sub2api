@@ -141,8 +141,6 @@ func BuildUserAgent(version string) string {
 	return fmt.Sprintf("antigravity/%s windows/amd64", GetDefaultUserAgentVersion())
 }
 
-}
-
 // GetUserAgentForContext 返回当前请求应使用的 User-Agent。
 func GetUserAgentForContext(ctx context.Context) string {
 	return BuildUserAgent(GetUserAgentVersionForContext(ctx))
