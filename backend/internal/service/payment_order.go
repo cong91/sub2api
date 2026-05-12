@@ -847,13 +847,6 @@ func buildCreateOrderResponse(order *dbent.PaymentOrder, req CreateOrderRequest,
 	return resp
 }
 
-func paymentOrderStringValue(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
-}
-
 func buildWeChatPaymentOAuthStartURL(req CreateOrderRequest, scope string) (string, error) {
 	u, err := url.Parse("/api/v1/auth/oauth/wechat/payment/start")
 	if err != nil {
