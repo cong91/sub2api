@@ -184,6 +184,9 @@ vi.mock("vue-i18n", async () => {
     "admin.settings.openaiExperimentalScheduler.upstreamCostWeight": "计费倍率",
     "admin.settings.openaiExperimentalScheduler.previousResponseWeight": "previous_response 粘性",
     "admin.settings.openaiExperimentalScheduler.sessionStickyWeight": "session_hash 粘性",
+    "admin.settings.claudeCode.antigravityVersion": "Antigravity User-Agent 版本",
+    "admin.settings.claudeCode.antigravityVersionPlaceholder": "例如 1.23.2",
+    "admin.settings.claudeCode.antigravityVersionHint": "用于 Antigravity 上游 API 请求。留空时使用 ANTIGRAVITY_USER_AGENT_VERSION 或内置默认值 1.23.2；填写后后台设置优先。",
     "admin.settings.site.uploadImage": "上传图片",
     "admin.settings.site.remove": "移除",
     "admin.settings.platformQuota.platform": "平台",
@@ -890,6 +893,28 @@ describe("admin SettingsView payment visible method controls", () => {
         },
       },
     ]);
+  });
+
+  it("renders Antigravity user agent version inside Claude Code settings", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      antigravity_user_agent_version: "1.23.2",
+    });
+
+    const wrapper = mountView();
+
+    await flushPromises();
+
+    const antigravityInput = wrapper
+      .findAll('input[type="text"]')
+      .find((input) => input.element.getAttribute("placeholder") === "例如 1.23.2");
+
+    expect(antigravityInput?.exists()).toBe(true);
+    expect((antigravityInput?.element as HTMLInputElement).value).toBe(
+      "1.23.2",
+    );
+    expect(wrapper.text()).toContain("Antigravity User-Agent 版本");
+    expect(wrapper.text()).toContain("内置默认值 1.23.2");
   });
 
   it("submits Antigravity user agent version gateway setting", async () => {
