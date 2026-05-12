@@ -466,10 +466,3 @@ func psStringValue(value *string) string {
 	}
 	return *value
 }
-
-func psTimeValue(value *time.Time) time.Time {
-	if value == nil {
-		return time.Time{}
-	}
-	return *value
-}
