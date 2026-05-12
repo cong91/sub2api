@@ -840,6 +840,9 @@ WHERE user_id = $1`, userID)
 		v := rebateRate.Float64
 		out.AffRebateRatePercent = &v
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	codes, err := listAffiliateCodesForUsers(ctx, client, []int64{out.UserID})
 	if err != nil {
 		return nil, err
@@ -901,6 +904,9 @@ LIMIT 1`, strings.ToUpper(strings.TrimSpace(code)))
 	if rebateRate.Valid {
 		v := rebateRate.Float64
 		out.AffRebateRatePercent = &v
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	codes, err := listAffiliateCodesForUsers(ctx, client, []int64{out.UserID})
 	if err != nil {
