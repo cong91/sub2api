@@ -128,7 +128,7 @@ func TestBuildPaymentSubjectUsesVClawCreditForBalanceTopUp(t *testing.T) {
 		LedgerCurrency:    "USD",
 		ProductNamePrefix: "Sub2API",
 		ProductNameSuffix: "USD",
-	})
+	}, &payment.InstanceSelection{ProviderKey: payment.TypePaddle})
 
 	if got != "VClaw Credit" {
 		t.Fatalf("subject = %q, want VClaw Credit", got)
