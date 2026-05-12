@@ -644,7 +644,7 @@ func NewSettingService(settingRepo SettingRepository, cfg *config.Config) *Setti
 		settingRepo: settingRepo,
 		cfg:         cfg,
 	}
-	antigravity.SetUserAgentVersionProvider(service.GetAntigravityUserAgentVersion)
+	antigravity.SetUserAgentVersionResolver(service.GetAntigravityUserAgentVersion)
 	return service
 }
 
@@ -692,21 +692,6 @@ func (s *SettingService) GetFrontendURL(ctx context.Context) string {
 		return strings.TrimSpace(val)
 	}
 	return s.cfg.Server.FrontendURL
-}
-
-// GetAntigravityUserAgentVersion returns the runtime Antigravity version used by upstream API requests.
-// Empty DB values fall back to ANTIGRAVITY_USER_AGENT_VERSION/default for backwards compatibility.
-func (s *SettingService) GetAntigravityUserAgentVersion() string {
-	if s != nil && s.settingRepo != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		if val, err := s.settingRepo.GetValue(ctx, SettingKeyAntigravityUserAgentVersion); err == nil {
-			if version := strings.TrimSpace(val); version != "" {
-				return version
-			}
-		}
-	}
-	return antigravity.DefaultUserAgentVersion()
 }
 
 // GetPublicSettings 获取公开设置（无需登录）
@@ -1924,8 +1909,6 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyMaxClaudeCodeVersion] = settings.MaxClaudeCodeVersion
 
 	// Antigravity runtime request settings
-	updates[SettingKeyAntigravityUserAgentVersion] = strings.TrimSpace(settings.AntigravityUserAgentVersion)
-
 	// 分组隔离
 	updates[SettingKeyAllowUngroupedKeyScheduling] = strconv.FormatBool(settings.AllowUngroupedKeyScheduling)
 
@@ -2852,9 +2835,6 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyMinClaudeCodeVersion: "",
 		SettingKeyMaxClaudeCodeVersion: "",
 
-		// Antigravity runtime request settings (empty = use env/default fallback)
-		SettingKeyAntigravityUserAgentVersion: "",
-
 		// 分组隔离（默认不允许未分组 Key 调度）
 		SettingKeyAllowUngroupedKeyScheduling:        "false",
 		SettingKeyEnableAnthropicCacheTTL1hInjection: "false",
@@ -3367,7 +3347,6 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	// Claude Code version check
 	result.MinClaudeCodeVersion = strings.TrimSpace(settings[SettingKeyMinClaudeCodeVersion])
 	result.MaxClaudeCodeVersion = strings.TrimSpace(settings[SettingKeyMaxClaudeCodeVersion])
-	result.AntigravityUserAgentVersion = strings.TrimSpace(settings[SettingKeyAntigravityUserAgentVersion])
 
 	// 分组隔离
 	result.AllowUngroupedKeyScheduling = settings[SettingKeyAllowUngroupedKeyScheduling] == "true"
