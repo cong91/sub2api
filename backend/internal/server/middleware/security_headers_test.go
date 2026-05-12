@@ -433,3 +433,20 @@ func BenchmarkSecurityHeadersMiddleware(b *testing.B) {
 		middleware(c)
 	}
 }
+
+func countDirectiveValue(policy, directive, value string) int {
+	for _, part := range strings.Split(policy, ";") {
+		fields := strings.Fields(strings.TrimSpace(part))
+		if len(fields) == 0 || fields[0] != directive {
+			continue
+		}
+		count := 0
+		for _, field := range fields[1:] {
+			if field == value {
+				count++
+			}
+		}
+		return count
+	}
+	return 0
+}
