@@ -1,11 +1,9 @@
 package admin
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -58,18 +56,16 @@ func firstNonEmpty(values ...string) string {
 
 // SettingHandler 系统设置处理器
 type SettingHandler struct {
-	settingService           *service.SettingService
-	emailService             *service.EmailService
-	turnstileService         *service.TurnstileService
-	opsService               *service.OpsService
-	paymentConfigService     *service.PaymentConfigService
-	paymentService           *service.PaymentService
-	userAttributeService     *service.UserAttributeService
-	notificationEmailService *service.NotificationEmailService
+	settingService       *service.SettingService
+	emailService         *service.EmailService
+	turnstileService     *service.TurnstileService
+	opsService           *service.OpsService
+	paymentConfigService *service.PaymentConfigService
+	paymentService       *service.PaymentService
 }
 
 // NewSettingHandler 创建系统设置处理器
-func NewSettingHandler(settingService *service.SettingService, emailService *service.EmailService, turnstileService *service.TurnstileService, opsService *service.OpsService, paymentConfigService *service.PaymentConfigService, paymentService *service.PaymentService, userAttributeService *service.UserAttributeService) *SettingHandler {
+func NewSettingHandler(settingService *service.SettingService, emailService *service.EmailService, turnstileService *service.TurnstileService, opsService *service.OpsService, paymentConfigService *service.PaymentConfigService, paymentService *service.PaymentService) *SettingHandler {
 	return &SettingHandler{
 		settingService:       settingService,
 		emailService:         emailService,
@@ -77,14 +73,7 @@ func NewSettingHandler(settingService *service.SettingService, emailService *ser
 		opsService:           opsService,
 		paymentConfigService: paymentConfigService,
 		paymentService:       paymentService,
-		userAttributeService: userAttributeService,
 	}
-}
-
-// SetNotificationEmailService attaches the notification template service without changing
-// the constructor signature used by existing unit tests.
-func (h *SettingHandler) SetNotificationEmailService(notificationEmailService *service.NotificationEmailService) {
-	h.notificationEmailService = notificationEmailService
 }
 
 // GetSettings 获取所有系统设置
@@ -149,22 +138,6 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		LinuxDoConnectClientID:                 settings.LinuxDoConnectClientID,
 		LinuxDoConnectClientSecretConfigured:   settings.LinuxDoConnectClientSecretConfigured,
 		LinuxDoConnectRedirectURL:              settings.LinuxDoConnectRedirectURL,
-		DingTalkConnectEnabled:                 settings.DingTalkConnectEnabled,
-		DingTalkConnectClientID:                settings.DingTalkConnectClientID,
-		DingTalkConnectClientSecretConfigured:  settings.DingTalkConnectClientSecretConfigured,
-		DingTalkConnectRedirectURL:             settings.DingTalkConnectRedirectURL,
-		DingTalkConnectCorpRestrictionPolicy:   settings.DingTalkConnectCorpRestrictionPolicy,
-		DingTalkConnectInternalCorpID:          settings.DingTalkConnectInternalCorpID,
-		DingTalkConnectBypassRegistration:      settings.DingTalkConnectBypassRegistration,
-		DingTalkConnectSyncCorpEmail:           settings.DingTalkConnectSyncCorpEmail,
-		DingTalkConnectSyncDisplayName:         settings.DingTalkConnectSyncDisplayName,
-		DingTalkConnectSyncDept:                settings.DingTalkConnectSyncDept,
-		DingTalkConnectSyncCorpEmailAttrKey:    settings.DingTalkConnectSyncCorpEmailAttrKey,
-		DingTalkConnectSyncDisplayNameAttrKey:  settings.DingTalkConnectSyncDisplayNameAttrKey,
-		DingTalkConnectSyncDeptAttrKey:         settings.DingTalkConnectSyncDeptAttrKey,
-		DingTalkConnectSyncCorpEmailAttrName:   settings.DingTalkConnectSyncCorpEmailAttrName,
-		DingTalkConnectSyncDisplayNameAttrName: settings.DingTalkConnectSyncDisplayNameAttrName,
-		DingTalkConnectSyncDeptAttrName:        settings.DingTalkConnectSyncDeptAttrName,
 		WeChatConnectEnabled:                   settings.WeChatConnectEnabled,
 		WeChatConnectAppID:                     settings.WeChatConnectAppID,
 		WeChatConnectAppSecretConfigured:       settings.WeChatConnectAppSecretConfigured,
@@ -264,7 +237,6 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		ClaudeOAuthSystemPromptBlocks:          settings.ClaudeOAuthSystemPromptBlocks,
 		EnableAnthropicCacheTTL1hInjection:     settings.EnableAnthropicCacheTTL1hInjection,
 		RewriteMessageCacheControl:             settings.RewriteMessageCacheControl,
-		AntigravityUserAgentVersion:            settings.AntigravityUserAgentVersion,
 		OpenAICodexUserAgent:                   settings.OpenAICodexUserAgent,
 		OpenAIAllowClaudeCodeCodexPlugin:       settings.OpenAIAllowClaudeCodeCodexPlugin,
 		WebSearchEmulationEnabled:              settings.WebSearchEmulationEnabled,
@@ -304,7 +276,6 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		PaymentCancelRateLimitWindow:           paymentCfg.CancelRateLimitWindow,
 		PaymentCancelRateLimitUnit:             paymentCfg.CancelRateLimitUnit,
 		PaymentCancelRateLimitMode:             paymentCfg.CancelRateLimitMode,
-		PaymentAlipayForceQRCode:               paymentCfg.AlipayForceQRCode,
 
 		ChannelMonitorEnabled:                settings.ChannelMonitorEnabled,
 		ChannelMonitorDefaultIntervalSeconds: settings.ChannelMonitorDefaultIntervalSeconds,
@@ -432,24 +403,6 @@ type UpdateSettingsRequest struct {
 	LinuxDoConnectClientID     string `json:"linuxdo_connect_client_id"`
 	LinuxDoConnectClientSecret string `json:"linuxdo_connect_client_secret"`
 	LinuxDoConnectRedirectURL  string `json:"linuxdo_connect_redirect_url"`
-
-	// DingTalk Connect OAuth 登录
-	DingTalkConnectEnabled                 bool   `json:"dingtalk_connect_enabled"`
-	DingTalkConnectClientID                string `json:"dingtalk_connect_client_id"`
-	DingTalkConnectClientSecret            string `json:"dingtalk_connect_client_secret"`
-	DingTalkConnectRedirectURL             string `json:"dingtalk_connect_redirect_url"`
-	DingTalkConnectCorpRestrictionPolicy   string `json:"dingtalk_connect_corp_restriction_policy"`
-	DingTalkConnectInternalCorpID          string `json:"dingtalk_connect_internal_corp_id"`
-	DingTalkConnectBypassRegistration      bool   `json:"dingtalk_connect_bypass_registration"`
-	DingTalkConnectSyncCorpEmail           bool   `json:"dingtalk_connect_sync_corp_email"`
-	DingTalkConnectSyncDisplayName         bool   `json:"dingtalk_connect_sync_display_name"`
-	DingTalkConnectSyncDept                bool   `json:"dingtalk_connect_sync_dept"`
-	DingTalkConnectSyncCorpEmailAttrKey    string `json:"dingtalk_connect_sync_corp_email_attr_key"`
-	DingTalkConnectSyncDisplayNameAttrKey  string `json:"dingtalk_connect_sync_display_name_attr_key"`
-	DingTalkConnectSyncDeptAttrKey         string `json:"dingtalk_connect_sync_dept_attr_key"`
-	DingTalkConnectSyncCorpEmailAttrName   string `json:"dingtalk_connect_sync_corp_email_attr_name"`
-	DingTalkConnectSyncDisplayNameAttrName string `json:"dingtalk_connect_sync_display_name_attr_name"`
-	DingTalkConnectSyncDeptAttrName        string `json:"dingtalk_connect_sync_dept_attr_name"`
 
 	// WeChat Connect OAuth 登录
 	WeChatConnectEnabled             bool   `json:"wechat_connect_enabled"`
@@ -583,8 +536,6 @@ type UpdateSettingsRequest struct {
 	MinClaudeCodeVersion string `json:"min_claude_code_version"`
 	MaxClaudeCodeVersion string `json:"max_claude_code_version"`
 
-	AntigravityUserAgentVersion string `json:"antigravity_user_agent_version"`
-
 	// 分组隔离
 	AllowUngroupedKeyScheduling bool `json:"allow_ungrouped_key_scheduling"`
 
@@ -649,9 +600,6 @@ type UpdateSettingsRequest struct {
 	PaymentCancelRateLimitWindow  *int    `json:"payment_cancel_rate_limit_window"`
 	PaymentCancelRateLimitUnit    *string `json:"payment_cancel_rate_limit_unit"`
 	PaymentCancelRateLimitMode    *string `json:"payment_cancel_rate_limit_window_mode"`
-
-	// Force Alipay mobile clients to use QR code payment instead of mobile redirect
-	PaymentAlipayForceQRCode *bool `json:"payment_alipay_force_qrcode"`
 
 	// Channel Monitor feature switch
 	ChannelMonitorEnabled                *bool `json:"channel_monitor_enabled"`
@@ -775,7 +723,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	req.AuthSourceDefaultLinuxDoSubscriptions = normalizeOptionalDefaultSubscriptions(req.AuthSourceDefaultLinuxDoSubscriptions)
 	req.AuthSourceDefaultOIDCSubscriptions = normalizeOptionalDefaultSubscriptions(req.AuthSourceDefaultOIDCSubscriptions)
 	req.AuthSourceDefaultWeChatSubscriptions = normalizeOptionalDefaultSubscriptions(req.AuthSourceDefaultWeChatSubscriptions)
-	req.AuthSourceDefaultDingTalkSubscriptions = normalizeOptionalDefaultSubscriptions(req.AuthSourceDefaultDingTalkSubscriptions)
 
 	// SMTP 配置保护：如果请求中 smtp_host 为空但数据库中已有配置，则保留已有 SMTP 配置
 	// 防止前端加载设置失败时空表单覆盖已保存的 SMTP 配置
@@ -889,100 +836,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 				return
 			}
 			req.LinuxDoConnectClientSecret = previousSettings.LinuxDoConnectClientSecret
-		}
-	}
-
-	// DingTalk Connect 参数验证
-	// 防御性：任何写入路径上把已废弃的 corp_restriction_policy=whitelist 入参 coerce 为 none，
-	// 避免任何直连 admin API 的客户端把死值写回 DB（前端 UI 已无此选项）。
-	req.DingTalkConnectCorpRestrictionPolicy = service.CoerceDingTalkCorpPolicyForWrite(req.DingTalkConnectCorpRestrictionPolicy)
-
-	if req.DingTalkConnectEnabled {
-		req.DingTalkConnectClientID = strings.TrimSpace(req.DingTalkConnectClientID)
-		req.DingTalkConnectClientSecret = strings.TrimSpace(req.DingTalkConnectClientSecret)
-		req.DingTalkConnectRedirectURL = strings.TrimSpace(req.DingTalkConnectRedirectURL)
-		req.DingTalkConnectCorpRestrictionPolicy = strings.TrimSpace(req.DingTalkConnectCorpRestrictionPolicy)
-		req.DingTalkConnectInternalCorpID = strings.TrimSpace(req.DingTalkConnectInternalCorpID)
-
-		if req.DingTalkConnectClientID == "" {
-			response.BadRequest(c, "DingTalk Client ID is required when enabled")
-			return
-		}
-		if req.DingTalkConnectRedirectURL == "" {
-			response.BadRequest(c, "DingTalk Redirect URL is required when enabled")
-			return
-		}
-		if err := config.ValidateAbsoluteHTTPURL(req.DingTalkConnectRedirectURL); err != nil {
-			response.BadRequest(c, "DingTalk Redirect URL must be an absolute http(s) URL")
-			return
-		}
-
-		// 如果未提供 client_secret，则保留现有值（如有）。
-		if req.DingTalkConnectClientSecret == "" {
-			if previousSettings.DingTalkConnectClientSecret == "" {
-				response.BadRequest(c, "DingTalk Client Secret is required when enabled")
-				return
-			}
-			req.DingTalkConnectClientSecret = previousSettings.DingTalkConnectClientSecret
-		}
-
-		// Corp 策略校验（V1/V4 fail-closed）
-		dingTalkCfg := config.DingTalkConnectConfig{
-			Enabled:               true,
-			DingTalkAppKind:       "internal_app", // 硬编码：settings 层仅支持 internal_app
-			AppType:               "internal",     // 对于 internal_only 策略的默认值
-			CorpRestrictionPolicy: req.DingTalkConnectCorpRestrictionPolicy,
-			InternalCorpID:        req.DingTalkConnectInternalCorpID,
-		}
-		// 若未填 corp_restriction_policy，保留已有配置
-		if dingTalkCfg.CorpRestrictionPolicy == "" {
-			dingTalkCfg.CorpRestrictionPolicy = previousSettings.DingTalkConnectCorpRestrictionPolicy
-		}
-		// 对于 internal_only 策略，app_type 必须为 internal（V1 校验）
-		if dingTalkCfg.CorpRestrictionPolicy == "internal_only" {
-			dingTalkCfg.AppType = "internal"
-		} else {
-			dingTalkCfg.AppType = "public"
-		}
-		if err := config.ValidateDingTalkConfig(dingTalkCfg); err != nil {
-			response.ErrorWithDetails(c, http.StatusBadRequest, err.Error(), mapDingTalkValidateError(err), nil)
-			return
-		}
-
-		// bypass_registration 仅在 internal_only 模式下有意义；其它策略下强制为 false，
-		// 防止 admin 在切换 policy 时把 bypass 残留在 DB 中（前端 UI 也已隐藏该开关）。
-		if dingTalkCfg.CorpRestrictionPolicy != "internal_only" {
-			req.DingTalkConnectBypassRegistration = false
-			// 身份同步三开关同理：仅 internal_only 模式下有意义，其它策略强制 false。
-			req.DingTalkConnectSyncCorpEmail = false
-			req.DingTalkConnectSyncDisplayName = false
-			req.DingTalkConnectSyncDept = false
-		}
-		// 身份同步目标 attr key：trimSpace + 空值 fallback 到默认值
-		req.DingTalkConnectSyncCorpEmailAttrKey = strings.TrimSpace(req.DingTalkConnectSyncCorpEmailAttrKey)
-		if req.DingTalkConnectSyncCorpEmailAttrKey == "" {
-			req.DingTalkConnectSyncCorpEmailAttrKey = "dingtalk_email"
-		}
-		req.DingTalkConnectSyncDisplayNameAttrKey = strings.TrimSpace(req.DingTalkConnectSyncDisplayNameAttrKey)
-		if req.DingTalkConnectSyncDisplayNameAttrKey == "" {
-			req.DingTalkConnectSyncDisplayNameAttrKey = "dingtalk_name"
-		}
-		req.DingTalkConnectSyncDeptAttrKey = strings.TrimSpace(req.DingTalkConnectSyncDeptAttrKey)
-		if req.DingTalkConnectSyncDeptAttrKey == "" {
-			req.DingTalkConnectSyncDeptAttrKey = "dingtalk_department"
-		}
-		// 身份同步目标 attr 显示名称：trim + 空值 fallback 到默认中文名
-		req.DingTalkConnectSyncCorpEmailAttrName = strings.TrimSpace(req.DingTalkConnectSyncCorpEmailAttrName)
-		if req.DingTalkConnectSyncCorpEmailAttrName == "" {
-			req.DingTalkConnectSyncCorpEmailAttrName = "钉钉企业邮箱"
-		}
-		req.DingTalkConnectSyncDisplayNameAttrName = strings.TrimSpace(req.DingTalkConnectSyncDisplayNameAttrName)
-		if req.DingTalkConnectSyncDisplayNameAttrName == "" {
-			req.DingTalkConnectSyncDisplayNameAttrName = "钉钉姓名"
-		}
-		req.DingTalkConnectSyncDeptAttrName = strings.TrimSpace(req.DingTalkConnectSyncDeptAttrName)
-		if req.DingTalkConnectSyncDeptAttrName == "" {
-			req.DingTalkConnectSyncDeptAttrName = "钉钉部门"
 		}
 	}
 
@@ -1471,15 +1324,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			return
 		}
 	}
-	if req.OpenAICodexUserAgent != nil {
-		normalized := strings.TrimSpace(*req.OpenAICodexUserAgent)
-		req.OpenAICodexUserAgent = &normalized
-		// 仅做长度上限保护，不限制具体格式（运维需要可自由调整 codex 版本号）
-		if len(normalized) > 512 {
-			response.Error(c, http.StatusBadRequest, "openai_codex_user_agent must be at most 512 characters")
-			return
-		}
-	}
 
 	// 交叉验证：如果同时设置了最低和最高版本号，最高版本号必须 >= 最低版本号
 	if req.MinClaudeCodeVersion != "" && req.MaxClaudeCodeVersion != "" {
@@ -1633,7 +1477,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		IdentityPatchPrompt:          req.IdentityPatchPrompt,
 		MinClaudeCodeVersion:         req.MinClaudeCodeVersion,
 		MaxClaudeCodeVersion:         req.MaxClaudeCodeVersion,
-		AntigravityUserAgentVersion:  strings.TrimSpace(req.AntigravityUserAgentVersion),
 		AllowUngroupedKeyScheduling:  req.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:           req.BackendModeEnabled,
 		AllowUserViewErrorRequests: func() bool {
@@ -1945,7 +1788,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			CancelRateLimitWindow:     req.PaymentCancelRateLimitWindow,
 			CancelRateLimitUnit:       req.PaymentCancelRateLimitUnit,
 			CancelRateLimitMode:       req.PaymentCancelRateLimitMode,
-			AlipayForceQRCode:         req.PaymentAlipayForceQRCode,
 		}
 		if err := h.paymentConfigService.UpdatePaymentConfig(c.Request.Context(), paymentReq); err != nil {
 			response.ErrorFrom(c, err)
@@ -1965,7 +1807,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	h.ensureDingTalkSyncAttributes(c.Request.Context(), updatedSettings)
 	updatedAuthSourceDefaults, err := h.settingService.GetAuthSourceDefaultSettings(c.Request.Context())
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -2017,22 +1858,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		LinuxDoConnectClientID:                 updatedSettings.LinuxDoConnectClientID,
 		LinuxDoConnectClientSecretConfigured:   updatedSettings.LinuxDoConnectClientSecretConfigured,
 		LinuxDoConnectRedirectURL:              updatedSettings.LinuxDoConnectRedirectURL,
-		DingTalkConnectEnabled:                 updatedSettings.DingTalkConnectEnabled,
-		DingTalkConnectClientID:                updatedSettings.DingTalkConnectClientID,
-		DingTalkConnectClientSecretConfigured:  updatedSettings.DingTalkConnectClientSecretConfigured,
-		DingTalkConnectRedirectURL:             updatedSettings.DingTalkConnectRedirectURL,
-		DingTalkConnectCorpRestrictionPolicy:   updatedSettings.DingTalkConnectCorpRestrictionPolicy,
-		DingTalkConnectInternalCorpID:          updatedSettings.DingTalkConnectInternalCorpID,
-		DingTalkConnectBypassRegistration:      updatedSettings.DingTalkConnectBypassRegistration,
-		DingTalkConnectSyncCorpEmail:           updatedSettings.DingTalkConnectSyncCorpEmail,
-		DingTalkConnectSyncDisplayName:         updatedSettings.DingTalkConnectSyncDisplayName,
-		DingTalkConnectSyncDept:                updatedSettings.DingTalkConnectSyncDept,
-		DingTalkConnectSyncCorpEmailAttrKey:    updatedSettings.DingTalkConnectSyncCorpEmailAttrKey,
-		DingTalkConnectSyncDisplayNameAttrKey:  updatedSettings.DingTalkConnectSyncDisplayNameAttrKey,
-		DingTalkConnectSyncDeptAttrKey:         updatedSettings.DingTalkConnectSyncDeptAttrKey,
-		DingTalkConnectSyncCorpEmailAttrName:   updatedSettings.DingTalkConnectSyncCorpEmailAttrName,
-		DingTalkConnectSyncDisplayNameAttrName: updatedSettings.DingTalkConnectSyncDisplayNameAttrName,
-		DingTalkConnectSyncDeptAttrName:        updatedSettings.DingTalkConnectSyncDeptAttrName,
 		WeChatConnectEnabled:                   updatedSettings.WeChatConnectEnabled,
 		WeChatConnectAppID:                     updatedSettings.WeChatConnectAppID,
 		WeChatConnectAppSecretConfigured:       updatedSettings.WeChatConnectAppSecretConfigured,
@@ -2129,7 +1954,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ClaudeOAuthSystemPromptBlocks:          updatedSettings.ClaudeOAuthSystemPromptBlocks,
 		EnableAnthropicCacheTTL1hInjection:     updatedSettings.EnableAnthropicCacheTTL1hInjection,
 		RewriteMessageCacheControl:             updatedSettings.RewriteMessageCacheControl,
-		AntigravityUserAgentVersion:            updatedSettings.AntigravityUserAgentVersion,
 		OpenAICodexUserAgent:                   updatedSettings.OpenAICodexUserAgent,
 		OpenAIAllowClaudeCodeCodexPlugin:       updatedSettings.OpenAIAllowClaudeCodeCodexPlugin,
 		PaymentVisibleMethodAlipaySource:       updatedSettings.PaymentVisibleMethodAlipaySource,
@@ -2168,7 +1992,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		PaymentCancelRateLimitWindow:           updatedPaymentCfg.CancelRateLimitWindow,
 		PaymentCancelRateLimitUnit:             updatedPaymentCfg.CancelRateLimitUnit,
 		PaymentCancelRateLimitMode:             updatedPaymentCfg.CancelRateLimitMode,
-		PaymentAlipayForceQRCode:               updatedPaymentCfg.AlipayForceQRCode,
 
 		ChannelMonitorEnabled:                updatedSettings.ChannelMonitorEnabled,
 		ChannelMonitorDefaultIntervalSeconds: updatedSettings.ChannelMonitorDefaultIntervalSeconds,
@@ -2220,18 +2043,6 @@ func paymentFXStatusDTO(status service.PaymentFXStatus) dto.PaymentFXStatus {
 }
 
 // hasPaymentFields returns true if any payment-related field was explicitly provided.
-// mapDingTalkValidateError maps ValidateDingTalkConfig errors to machine-readable reason codes.
-func mapDingTalkValidateError(err error) string {
-	switch {
-	case errors.Is(err, config.ErrDingTalkV1AppTypeMismatch):
-		return "dingtalk_apptype_mismatch"
-	case errors.Is(err, config.ErrDingTalkV4InvalidAppKind):
-		return "dingtalk_app_kind_invalid"
-	default:
-		return "dingtalk_corp_config_invalid"
-	}
-}
-
 func hasPaymentFields(req UpdateSettingsRequest) bool {
 	return req.PaymentEnabled != nil || req.PaymentMinAmount != nil ||
 		req.PaymentMaxAmount != nil || req.PaymentDailyLimit != nil ||
@@ -2245,8 +2056,7 @@ func hasPaymentFields(req UpdateSettingsRequest) bool {
 		req.PaymentCurrencyCapabilities != nil || req.PaymentFXRatesStaleAfterSeconds != nil ||
 		req.PaymentCancelRateLimitEnabled != nil ||
 		req.PaymentCancelRateLimitMax != nil || req.PaymentCancelRateLimitWindow != nil ||
-		req.PaymentCancelRateLimitUnit != nil || req.PaymentCancelRateLimitMode != nil ||
-		req.PaymentAlipayForceQRCode != nil
+		req.PaymentCancelRateLimitUnit != nil || req.PaymentCancelRateLimitMode != nil
 }
 
 func (h *SettingHandler) auditSettingsUpdate(c *gin.Context, before *service.SystemSettings, after *service.SystemSettings, beforeAuthSourceDefaults *service.AuthSourceDefaultSettings, afterAuthSourceDefaults *service.AuthSourceDefaultSettings, req UpdateSettingsRequest) {
@@ -2351,45 +2161,6 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.LinuxDoConnectRedirectURL != after.LinuxDoConnectRedirectURL {
 		changed = append(changed, "linuxdo_connect_redirect_url")
-	}
-	if before.DingTalkConnectEnabled != after.DingTalkConnectEnabled {
-		changed = append(changed, "dingtalk_connect_enabled")
-	}
-	if before.DingTalkConnectClientID != after.DingTalkConnectClientID {
-		changed = append(changed, "dingtalk_connect_client_id")
-	}
-	if req.DingTalkConnectClientSecret != "" {
-		changed = append(changed, "dingtalk_connect_client_secret")
-	}
-	if before.DingTalkConnectRedirectURL != after.DingTalkConnectRedirectURL {
-		changed = append(changed, "dingtalk_connect_redirect_url")
-	}
-	if before.DingTalkConnectCorpRestrictionPolicy != after.DingTalkConnectCorpRestrictionPolicy {
-		changed = append(changed, "dingtalk_connect_corp_restriction_policy")
-	}
-	if before.DingTalkConnectInternalCorpID != after.DingTalkConnectInternalCorpID {
-		changed = append(changed, "dingtalk_connect_internal_corp_id")
-	}
-	if before.DingTalkConnectBypassRegistration != after.DingTalkConnectBypassRegistration {
-		changed = append(changed, "dingtalk_connect_bypass_registration")
-	}
-	if before.DingTalkConnectSyncCorpEmail != after.DingTalkConnectSyncCorpEmail {
-		changed = append(changed, "dingtalk_connect_sync_corp_email")
-	}
-	if before.DingTalkConnectSyncDisplayName != after.DingTalkConnectSyncDisplayName {
-		changed = append(changed, "dingtalk_connect_sync_display_name")
-	}
-	if before.DingTalkConnectSyncDept != after.DingTalkConnectSyncDept {
-		changed = append(changed, "dingtalk_connect_sync_dept")
-	}
-	if before.DingTalkConnectSyncCorpEmailAttrKey != after.DingTalkConnectSyncCorpEmailAttrKey {
-		changed = append(changed, "dingtalk_connect_sync_corp_email_attr_key")
-	}
-	if before.DingTalkConnectSyncDisplayNameAttrKey != after.DingTalkConnectSyncDisplayNameAttrKey {
-		changed = append(changed, "dingtalk_connect_sync_display_name_attr_key")
-	}
-	if before.DingTalkConnectSyncDeptAttrKey != after.DingTalkConnectSyncDeptAttrKey {
-		changed = append(changed, "dingtalk_connect_sync_dept_attr_key")
 	}
 	if before.WeChatConnectEnabled != after.WeChatConnectEnabled {
 		changed = append(changed, "wechat_connect_enabled")
@@ -2736,7 +2507,6 @@ func appendAuthSourceDefaultChanges(changed []string, before *service.AuthSource
 		{name: "wechat", before: before.WeChat, after: after.WeChat},
 		{name: "github", before: before.GitHub, after: after.GitHub},
 		{name: "google", before: before.Google, after: after.Google},
-		{name: "dingtalk", before: before.DingTalk, after: after.DingTalk},
 	}
 	for _, field := range fields {
 		if field.before.Balance != field.after.Balance {
@@ -2856,11 +2626,6 @@ func systemSettingsResponseData(settings dto.SystemSettings, authSourceDefaults 
 	data["auth_source_default_linuxdo_subscriptions"] = authSourceDefaults.LinuxDo.Subscriptions
 	data["auth_source_default_linuxdo_grant_on_signup"] = authSourceDefaults.LinuxDo.GrantOnSignup
 	data["auth_source_default_linuxdo_grant_on_first_bind"] = authSourceDefaults.LinuxDo.GrantOnFirstBind
-	data["auth_source_default_dingtalk_balance"] = authSourceDefaults.DingTalk.Balance
-	data["auth_source_default_dingtalk_concurrency"] = authSourceDefaults.DingTalk.Concurrency
-	data["auth_source_default_dingtalk_subscriptions"] = authSourceDefaults.DingTalk.Subscriptions
-	data["auth_source_default_dingtalk_grant_on_signup"] = authSourceDefaults.DingTalk.GrantOnSignup
-	data["auth_source_default_dingtalk_grant_on_first_bind"] = authSourceDefaults.DingTalk.GrantOnFirstBind
 	data["auth_source_default_oidc_balance"] = authSourceDefaults.OIDC.Balance
 	data["auth_source_default_oidc_concurrency"] = authSourceDefaults.OIDC.Concurrency
 	data["auth_source_default_oidc_subscriptions"] = authSourceDefaults.OIDC.Subscriptions
