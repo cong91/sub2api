@@ -14,14 +14,14 @@ type BufferedStreamResult struct {
 }
 
 func GenerateSearchIndicatorEvents(query, toolUseID string, results *WebSearchResults, startIndex int) [][]byte {
-	searchContent := make([]map[string]interface{}, 0)
+	searchContent := make([]map[string]any, 0)
 	if results != nil {
 		for _, result := range results.Results {
 			snippet := ""
 			if result.Snippet != nil {
 				snippet = strings.TrimSpace(*result.Snippet)
 			}
-			searchContent = append(searchContent, map[string]interface{}{
+			searchContent = append(searchContent, map[string]any{
 				"type":              "web_search_result",
 				"title":             result.Title,
 				"url":               result.URL,
@@ -33,21 +33,21 @@ func GenerateSearchIndicatorEvents(query, toolUseID string, results *WebSearchRe
 
 	inputJSON, _ := json.Marshal(map[string]string{"query": query})
 
-	events := []map[string]interface{}{
+	events := []map[string]any{
 		{
 			"type":  "content_block_start",
 			"index": startIndex,
-			"content_block": map[string]interface{}{
+			"content_block": map[string]any{
 				"type":  "server_tool_use",
 				"id":    toolUseID,
 				"name":  "web_search",
-				"input": map[string]interface{}{},
+				"input": map[string]any{},
 			},
 		},
 		{
 			"type":  "content_block_delta",
 			"index": startIndex,
-			"delta": map[string]interface{}{
+			"delta": map[string]any{
 				"type":         "input_json_delta",
 				"partial_json": string(inputJSON),
 			},
@@ -59,7 +59,7 @@ func GenerateSearchIndicatorEvents(query, toolUseID string, results *WebSearchRe
 		{
 			"type":  "content_block_start",
 			"index": startIndex + 1,
-			"content_block": map[string]interface{}{
+			"content_block": map[string]any{
 				"type":    "web_search_tool_result",
 				"content": searchContent,
 			},
@@ -96,20 +96,20 @@ func AnalyzeBufferedStream(chunks [][]byte) BufferedStreamResult {
 				continue
 			}
 
-			var event map[string]interface{}
+			var event map[string]any
 			if err := json.Unmarshal([]byte(payload), &event); err != nil {
 				continue
 			}
 
 			switch eventType, _ := event["type"].(string); eventType {
 			case "message_delta":
-				if delta, ok := event["delta"].(map[string]interface{}); ok {
+				if delta, ok := event["delta"].(map[string]any); ok {
 					if stopReason, ok := delta["stop_reason"].(string); ok && strings.TrimSpace(stopReason) != "" {
 						result.StopReason = stopReason
 					}
 				}
 			case "content_block_start":
-				contentBlock, ok := event["content_block"].(map[string]interface{})
+				contentBlock, ok := event["content_block"].(map[string]any)
 				if !ok {
 					continue
 				}
@@ -130,7 +130,7 @@ func AnalyzeBufferedStream(chunks [][]byte) BufferedStreamResult {
 				if currentToolName == "" {
 					continue
 				}
-				delta, ok := event["delta"].(map[string]interface{})
+				delta, ok := event["delta"].(map[string]any)
 				if !ok {
 					continue
 				}
@@ -139,7 +139,7 @@ func AnalyzeBufferedStream(chunks [][]byte) BufferedStreamResult {
 					continue
 				}
 				if partialJSON, ok := delta["partial_json"].(string); ok {
-					toolInputBuilder.WriteString(partialJSON)
+					_, _ = toolInputBuilder.WriteString(partialJSON)
 				}
 			case "content_block_stop":
 				if !isWebSearchToolName(currentToolName, "") {
@@ -191,7 +191,7 @@ func MaxContentBlockIndex(chunks [][]byte) int {
 			if payload == "" || payload == "[DONE]" {
 				continue
 			}
-			var event map[string]interface{}
+			var event map[string]any
 			if err := json.Unmarshal([]byte(payload), &event); err != nil {
 				continue
 			}
@@ -221,7 +221,7 @@ func filterSSEChunk(chunk []byte, webSearchToolUseIndex, indexOffset int) ([]byt
 					continue
 				}
 			}
-			builder.WriteString(line + "\n")
+			_, _ = builder.WriteString(line + "\n")
 			hasContent = true
 			continue
 		}
@@ -238,12 +238,12 @@ func filterSSEChunk(chunk []byte, webSearchToolUseIndex, indexOffset int) ([]byt
 			if adjusted == "" {
 				continue
 			}
-			builder.WriteString("data: " + adjusted + "\n")
+			_, _ = builder.WriteString("data: " + adjusted + "\n")
 			hasContent = true
 			continue
 		}
 
-		builder.WriteString(line + "\n")
+		_, _ = builder.WriteString(line + "\n")
 		if strings.TrimSpace(line) != "" {
 			hasContent = true
 		}
@@ -259,7 +259,7 @@ func shouldSuppressEventPayload(payload string, webSearchToolUseIndex int) bool 
 	if payload == "" {
 		return false
 	}
-	var event map[string]interface{}
+	var event map[string]any
 	if err := json.Unmarshal([]byte(payload), &event); err != nil {
 		return false
 	}
@@ -280,7 +280,7 @@ func adjustEventPayload(payload string, indexOffset int) string {
 	if payload == "" || indexOffset == 0 {
 		return payload
 	}
-	var event map[string]interface{}
+	var event map[string]any
 	if err := json.Unmarshal([]byte(payload), &event); err != nil {
 		return payload
 	}

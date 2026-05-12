@@ -185,7 +185,7 @@ func (s *Store) ReserveRequest(ctx context.Context, tokenKey string) (time.Durat
 	if err != nil {
 		return 0, fmt.Errorf("kiro cooldown reserve request: %w", err)
 	}
-	parts, ok := values.([]interface{})
+	parts, ok := values.([]any)
 	if !ok || len(parts) != 3 {
 		return 0, fmt.Errorf("kiro cooldown reserve request: unexpected response %T", values)
 	}

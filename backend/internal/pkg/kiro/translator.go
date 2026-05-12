@@ -158,7 +158,7 @@ type KiroToolSpecification struct {
 }
 
 type KiroInputSchema struct {
-	JSON interface{} `json:"json"`
+	JSON any `json:"json"`
 }
 
 type KiroAssistantResponseMessage struct {
@@ -167,11 +167,11 @@ type KiroAssistantResponseMessage struct {
 }
 
 type KiroToolUse struct {
-	ToolUseID    string                 `json:"toolUseId"`
-	Name         string                 `json:"name"`
-	Input        map[string]interface{} `json:"input"`
-	IsTruncated  bool                   `json:"-"`
-	TruncatedRaw string                 `json:"-"`
+	ToolUseID    string         `json:"toolUseId"`
+	Name         string         `json:"name"`
+	Input        map[string]any `json:"input"`
+	IsTruncated  bool           `json:"-"`
+	TruncatedRaw string         `json:"-"`
 }
 
 type toolUseState struct {
@@ -497,7 +497,7 @@ func StreamEventStreamAsAnthropicWithContext(ctx context.Context, body io.Reader
 			},
 		})
 	}
-	processStreamingToolUseEvent := func(event map[string]interface{}) error {
+	processStreamingToolUseEvent := func(event map[string]any) error {
 		tu := nestedEvent(event, "toolUseEvent")
 		toolUseID := getString(tu, "toolUseId")
 		name := getString(tu, "name")
@@ -510,7 +510,7 @@ func StreamEventStreamAsAnthropicWithContext(ctx context.Context, body io.Reader
 				if err := emitStreamingToolInput(toolUseID, name, v); err != nil {
 					return err
 				}
-			case map[string]interface{}:
+			case map[string]any:
 				encoded, err := json.Marshal(v)
 				if err != nil {
 					return err
@@ -818,7 +818,7 @@ func StreamEventStreamAsAnthropicWithContext(ctx context.Context, body io.Reader
 			continue
 		}
 
-		var event map[string]interface{}
+		var event map[string]any
 		if err := json.Unmarshal(msg.Payload, &event); err != nil {
 			continue
 		}
@@ -967,6 +967,7 @@ func extractSystemPrompt(claudeBody []byte) string {
 	return systemField.String()
 }
 
+//nolint:unused // exercised from same-package tests and kept as a focused helper for thinking-header behavior.
 func isThinkingEnabledWithHeaders(body []byte, headers http.Header) bool {
 	return deriveThinkingDirective(body, headers) != nil
 }
@@ -1108,6 +1109,7 @@ func isToolChoiceNone(claudeBody []byte) bool {
 	return strings.EqualFold(strings.TrimSpace(toolChoice.Get("type").String()), "none")
 }
 
+//nolint:unused // exposed for focused tool-alias regression tests in this package.
 func kiroToolNameAlias(name string) string {
 	return mapKiroToolName(name, nil)
 }
@@ -1199,9 +1201,7 @@ func appendChunkedToolDescription(name, description string) string {
 	if suffix == "" {
 		return description
 	}
-	if strings.Contains(description, suffix) {
-		description = strings.Replace(description, suffix, "", 1)
-	}
+	description = strings.Replace(description, suffix, "", 1)
 	if strings.TrimSpace(description) == "" {
 		return suffix
 	}
@@ -1290,11 +1290,11 @@ func normalizeKiroJSONSchema(schema any) any {
 }
 
 func normalizeKiroJSONSchemaValue(schema any, enforceObjectKeywords bool) any {
-	obj, ok := schema.(map[string]interface{})
+	obj, ok := schema.(map[string]any)
 	if !ok || obj == nil {
 		return defaultKiroJSONSchema()
 	}
-	normalized := make(map[string]interface{}, len(obj)+4)
+	normalized := make(map[string]any, len(obj)+4)
 	for key, value := range obj {
 		normalized[key] = normalizeSchemaChild(key, value)
 	}
@@ -1308,9 +1308,9 @@ func normalizeKiroJSONSchemaValue(schema any, enforceObjectKeywords bool) any {
 		hasSchemaKey(normalized, "required") ||
 		hasSchemaKey(normalized, "additionalProperties")
 	if needsObjectKeywords {
-		properties, ok := normalized["properties"].(map[string]interface{})
+		properties, ok := normalized["properties"].(map[string]any)
 		if !ok || properties == nil {
-			normalized["properties"] = map[string]interface{}{}
+			normalized["properties"] = map[string]any{}
 		} else {
 			for key, value := range properties {
 				properties[key] = normalizeKiroJSONSchemaValue(value, false)
@@ -1320,7 +1320,7 @@ func normalizeKiroJSONSchemaValue(schema any, enforceObjectKeywords bool) any {
 		normalized["required"] = normalizeSchemaRequired(normalized["required"])
 		switch additional := normalized["additionalProperties"].(type) {
 		case bool:
-		case map[string]interface{}:
+		case map[string]any:
 			normalized["additionalProperties"] = normalizeKiroJSONSchemaValue(additional, false)
 		default:
 			normalized["additionalProperties"] = true
@@ -1329,26 +1329,26 @@ func normalizeKiroJSONSchemaValue(schema any, enforceObjectKeywords bool) any {
 	return normalized
 }
 
-func hasSchemaKey(schema map[string]interface{}, key string) bool {
+func hasSchemaKey(schema map[string]any, key string) bool {
 	_, ok := schema[key]
 	return ok
 }
 
-func defaultKiroJSONSchema() map[string]interface{} {
-	return map[string]interface{}{
+func defaultKiroJSONSchema() map[string]any {
+	return map[string]any{
 		"type":                 "object",
-		"properties":           map[string]interface{}{},
-		"required":             []interface{}{},
+		"properties":           map[string]any{},
+		"required":             []any{},
 		"additionalProperties": true,
 	}
 }
 
-func normalizeSchemaRequired(value interface{}) []interface{} {
-	arr, ok := value.([]interface{})
+func normalizeSchemaRequired(value any) []any {
+	arr, ok := value.([]any)
 	if !ok {
-		return []interface{}{}
+		return []any{}
 	}
-	out := make([]interface{}, 0, len(arr))
+	out := make([]any, 0, len(arr))
 	for _, item := range arr {
 		if s, ok := item.(string); ok {
 			out = append(out, s)
@@ -1357,22 +1357,22 @@ func normalizeSchemaRequired(value interface{}) []interface{} {
 	return out
 }
 
-func normalizeSchemaChild(key string, value interface{}) interface{} {
+func normalizeSchemaChild(key string, value any) any {
 	switch key {
 	case "items", "not":
-		if obj, ok := value.(map[string]interface{}); ok {
+		if obj, ok := value.(map[string]any); ok {
 			return normalizeKiroJSONSchemaValue(obj, false)
 		}
-		if arr, ok := value.([]interface{}); ok {
-			out := make([]interface{}, 0, len(arr))
+		if arr, ok := value.([]any); ok {
+			out := make([]any, 0, len(arr))
 			for _, item := range arr {
 				out = append(out, normalizeKiroJSONSchemaValue(item, false))
 			}
 			return out
 		}
 	case "oneOf", "anyOf", "allOf":
-		if arr, ok := value.([]interface{}); ok {
-			out := make([]interface{}, 0, len(arr))
+		if arr, ok := value.([]any); ok {
+			out := make([]any, 0, len(arr))
 			for _, item := range arr {
 				out = append(out, normalizeKiroJSONSchemaValue(item, false))
 			}
@@ -1637,7 +1637,7 @@ func buildAssistantMessageStruct(msg gjson.Result, requestCtx *KiroRequestContex
 				_, _ = contentBuilder.WriteString(part.Get("text").String())
 			case "tool_use":
 				toolName := mapKiroToolName(part.Get("name").String(), requestCtx)
-				input := map[string]interface{}{}
+				input := map[string]any{}
 				toolInput := part.Get("input")
 				if toolInput.IsObject() {
 					toolInput.ForEach(func(key, value gjson.Result) bool {
@@ -1683,7 +1683,7 @@ func mergeAdjacentMessages(messages []gjson.Result) []gjson.Result {
 			merged = append(merged, msg)
 			continue
 		}
-		mergedMsg := map[string]interface{}{
+		mergedMsg := map[string]any{
 			"role":    role,
 			"content": json.RawMessage(mergeMessageContent(lastMsg, msg)),
 		}
@@ -1694,7 +1694,7 @@ func mergeAdjacentMessages(messages []gjson.Result) []gjson.Result {
 }
 
 func mergeMessageContent(msg1, msg2 gjson.Result) string {
-	var blocks1, blocks2 []map[string]interface{}
+	var blocks1, blocks2 []map[string]any
 	content1 := msg1.Get("content")
 	content2 := msg2.Get("content")
 	if content1.IsArray() {
@@ -1702,14 +1702,14 @@ func mergeMessageContent(msg1, msg2 gjson.Result) string {
 			blocks1 = append(blocks1, blockToMap(block))
 		}
 	} else if content1.Type == gjson.String {
-		blocks1 = append(blocks1, map[string]interface{}{"type": "text", "text": content1.String()})
+		blocks1 = append(blocks1, map[string]any{"type": "text", "text": content1.String()})
 	}
 	if content2.IsArray() {
 		for _, block := range content2.Array() {
 			blocks2 = append(blocks2, blockToMap(block))
 		}
 	} else if content2.Type == gjson.String {
-		blocks2 = append(blocks2, map[string]interface{}{"type": "text", "text": content2.String()})
+		blocks2 = append(blocks2, map[string]any{"type": "text", "text": content2.String()})
 	}
 	if len(blocks1) > 0 && len(blocks2) > 0 && blocks1[len(blocks1)-1]["type"] == "text" && blocks2[0]["type"] == "text" {
 		leftText, leftOK := blocks1[len(blocks1)-1]["text"].(string)
@@ -1724,13 +1724,13 @@ func mergeMessageContent(msg1, msg2 gjson.Result) string {
 	return string(result)
 }
 
-func blockToMap(block gjson.Result) map[string]interface{} {
-	result := make(map[string]interface{})
+func blockToMap(block gjson.Result) map[string]any {
+	result := make(map[string]any)
 	block.ForEach(func(key, value gjson.Result) bool {
 		if value.IsObject() {
 			result[key.String()] = blockToMap(value)
 		} else if value.IsArray() {
-			var arr []interface{}
+			var arr []any
 			for _, item := range value.Array() {
 				if item.IsObject() {
 					arr = append(arr, blockToMap(item))
@@ -1768,7 +1768,7 @@ func parseEventStream(body io.Reader) (string, []KiroToolUse, Usage, string, err
 			continue
 		}
 
-		var event map[string]interface{}
+		var event map[string]any
 		if err := json.Unmarshal(msg.Payload, &event); err != nil {
 			continue
 		}
@@ -1814,8 +1814,8 @@ func parseEventStream(body io.Reader) (string, []KiroToolUse, Usage, string, err
 	}
 
 	if currentTool != nil && currentTool.ToolUseID != "" && !processedIDs[currentTool.ToolUseID] {
-		completed, _ := processToolUseEvent(map[string]interface{}{
-			"toolUseEvent": map[string]interface{}{
+		completed, _ := processToolUseEvent(map[string]any{
+			"toolUseEvent": map[string]any{
 				"toolUseId": currentTool.ToolUseID,
 				"name":      currentTool.Name,
 				"stop":      true,
@@ -1842,7 +1842,7 @@ func parseEventStream(body io.Reader) (string, []KiroToolUse, Usage, string, err
 }
 
 func buildClaudeResponse(content string, toolUses []KiroToolUse, model string, usage Usage, stopReason string, requestCtx KiroRequestContext) []byte {
-	var blocks []map[string]interface{}
+	var blocks []map[string]any
 	blocks = append(blocks, extractThinkingBlocks(content)...)
 	usableTools := 0
 	for _, tool := range toolUses {
@@ -1850,7 +1850,7 @@ func buildClaudeResponse(content string, toolUses []KiroToolUse, model string, u
 			continue
 		}
 		usableTools++
-		blocks = append(blocks, map[string]interface{}{
+		blocks = append(blocks, map[string]any{
 			"type":  "tool_use",
 			"id":    tool.ToolUseID,
 			"name":  restoreResponseToolName(tool.Name, requestCtx),
@@ -1859,11 +1859,11 @@ func buildClaudeResponse(content string, toolUses []KiroToolUse, model string, u
 	}
 	pureThinking := hasThinkingBlocksOnly(blocks) && usableTools == 0
 	if pureThinking {
-		blocks = append(blocks, map[string]interface{}{"type": "text", "text": ""})
+		blocks = append(blocks, map[string]any{"type": "text", "text": ""})
 		stopReason = "max_tokens"
 	}
 	if len(blocks) == 0 {
-		blocks = append(blocks, map[string]interface{}{"type": "text", "text": ""})
+		blocks = append(blocks, map[string]any{"type": "text", "text": ""})
 	}
 	if stopReason == "" {
 		if usableTools > 0 {
@@ -1872,14 +1872,14 @@ func buildClaudeResponse(content string, toolUses []KiroToolUse, model string, u
 			stopReason = "end_turn"
 		}
 	}
-	response := map[string]interface{}{
+	response := map[string]any{
 		"id":          "msg_" + uuid.NewString()[:24],
 		"type":        "message",
 		"role":        "assistant",
 		"model":       model,
 		"content":     blocks,
 		"stop_reason": stopReason,
-		"usage": map[string]interface{}{
+		"usage": map[string]any{
 			"input_tokens":            usage.InputTokens,
 			"output_tokens":           usage.OutputTokens,
 			"cache_read_input_tokens": usage.CacheReadInputTokens,
@@ -1900,7 +1900,7 @@ func restoreResponseToolName(name string, requestCtx KiroRequestContext) string 
 	return name
 }
 
-func hasThinkingBlocksOnly(blocks []map[string]interface{}) bool {
+func hasThinkingBlocksOnly(blocks []map[string]any) bool {
 	if len(blocks) == 0 {
 		return false
 	}
@@ -1919,36 +1919,36 @@ func hasThinkingBlocksOnly(blocks []map[string]interface{}) bool {
 	return hasThinking
 }
 
-func extractThinkingBlocks(content string) []map[string]interface{} {
+func extractThinkingBlocks(content string) []map[string]any {
 	if content == "" {
 		return nil
 	}
 	if findRealThinkingStartTag(content, 0) == -1 {
-		return []map[string]interface{}{{"type": "text", "text": content}}
+		return []map[string]any{{"type": "text", "text": content}}
 	}
-	var blocks []map[string]interface{}
+	var blocks []map[string]any
 	pos := 0
 	for pos < len(content) {
 		start := findRealThinkingStartTag(content, pos)
 		if start == -1 {
 			if text := content[pos:]; strings.TrimSpace(text) != "" {
-				blocks = append(blocks, map[string]interface{}{"type": "text", "text": text})
+				blocks = append(blocks, map[string]any{"type": "text", "text": text})
 			}
 			break
 		}
 		end := findRealThinkingEndTag(content, start+len(thinkingStartTag))
 		if end == -1 {
 			if text := content[pos:]; strings.TrimSpace(text) != "" {
-				blocks = append(blocks, map[string]interface{}{"type": "text", "text": text})
+				blocks = append(blocks, map[string]any{"type": "text", "text": text})
 			}
 			break
 		}
 		if text := content[pos:start]; strings.TrimSpace(text) != "" {
-			blocks = append(blocks, map[string]interface{}{"type": "text", "text": text})
+			blocks = append(blocks, map[string]any{"type": "text", "text": text})
 		}
 		thinking := strings.TrimPrefix(content[start+len(thinkingStartTag):end], "\n")
 		if strings.TrimSpace(thinking) != "" {
-			blocks = append(blocks, map[string]interface{}{
+			blocks = append(blocks, map[string]any{
 				"type":      "thinking",
 				"thinking":  thinking,
 				"signature": thinkingSignature(thinking),
@@ -1960,7 +1960,7 @@ func extractThinkingBlocks(content string) []map[string]interface{} {
 		}
 	}
 	if len(blocks) == 0 {
-		blocks = append(blocks, map[string]interface{}{"type": "text", "text": ""})
+		blocks = append(blocks, map[string]any{"type": "text", "text": ""})
 	}
 	return blocks
 }
@@ -2213,19 +2213,19 @@ func skipHeaderValue(headers []byte, offset int, valueType byte) (int, bool) {
 	}
 }
 
-func processToolUseEvent(event map[string]interface{}, currentTool *toolUseState, processedIDs map[string]bool) ([]KiroToolUse, *toolUseState) {
+func processToolUseEvent(event map[string]any, currentTool *toolUseState, processedIDs map[string]bool) ([]KiroToolUse, *toolUseState) {
 	tu := nestedEvent(event, "toolUseEvent")
 	toolUseID := getString(tu, "toolUseId")
 	name := getString(tu, "name")
 	isStop, _ := tu["stop"].(bool)
 
 	var inputFragment string
-	var inputMap map[string]interface{}
+	var inputMap map[string]any
 	if inputRaw, ok := tu["input"]; ok {
 		switch v := inputRaw.(type) {
 		case string:
 			inputFragment = v
-		case map[string]interface{}:
+		case map[string]any:
 			inputMap = v
 		}
 	}
@@ -2258,7 +2258,7 @@ func repairJSON(input string) string {
 	if str == "" {
 		return "{}"
 	}
-	var parsed interface{}
+	var parsed any
 	if err := json.Unmarshal([]byte(str), &parsed); err == nil {
 		return str
 	}
@@ -2357,7 +2357,7 @@ func finalizeRawToolUse(toolUseID, name, rawInput string) KiroToolUse {
 	tool := KiroToolUse{
 		ToolUseID: toolUseID,
 		Name:      normalizeResponseToolName(name),
-		Input:     map[string]interface{}{},
+		Input:     map[string]any{},
 	}
 	rawInput = strings.TrimSpace(rawInput)
 	tool.TruncatedRaw = rawInput
@@ -2369,9 +2369,9 @@ func finalizeRawToolUse(toolUseID, name, rawInput string) KiroToolUse {
 	return tool
 }
 
-func finalizeStructuredToolUse(toolUseID, name string, input map[string]interface{}) KiroToolUse {
+func finalizeStructuredToolUse(toolUseID, name string, input map[string]any) KiroToolUse {
 	if input == nil {
-		input = map[string]interface{}{}
+		input = map[string]any{}
 	}
 	tool := KiroToolUse{
 		ToolUseID: toolUseID,
@@ -2483,14 +2483,14 @@ func parseEmbeddedToolCalls(text string) (string, []KiroToolUse) {
 	for index < len(text) {
 		start := strings.Index(text[index:], embeddedToolCallPrefix)
 		if start == -1 {
-			builder.WriteString(text[index:])
+			_, _ = builder.WriteString(text[index:])
 			break
 		}
 		start += index
-		builder.WriteString(text[index:start])
+		_, _ = builder.WriteString(text[index:start])
 		tool, _, end, ok := parseEmbeddedToolCallAt(text, start)
 		if !ok {
-			builder.WriteString(text[start:])
+			_, _ = builder.WriteString(text[start:])
 			break
 		}
 		toolUses = append(toolUses, tool)
@@ -2571,7 +2571,7 @@ func findMatchingJSONBracket(text string, start int) int {
 	return -1
 }
 
-func isTruncatedToolUse(name, rawInput string, input map[string]interface{}) bool {
+func isTruncatedToolUse(name, rawInput string, input map[string]any) bool {
 	rawInput = strings.TrimSpace(rawInput)
 	if rawInput == "" {
 		return hasToolRequirements(name)
@@ -2600,7 +2600,7 @@ func hasToolRequirements(name string) bool {
 	return ok
 }
 
-func hasMissingRequiredFields(name string, input map[string]interface{}) bool {
+func hasMissingRequiredFields(name string, input map[string]any) bool {
 	groups, ok := requiredToolFields[strings.ToLower(strings.TrimSpace(name))]
 	if !ok {
 		return false
@@ -2620,7 +2620,7 @@ func hasMissingRequiredFields(name string, input map[string]interface{}) bool {
 	return false
 }
 
-func updateUsageFromEvent(usage *Usage, eventType string, event map[string]interface{}) {
+func updateUsageFromEvent(usage *Usage, eventType string, event map[string]any) {
 	if usage == nil {
 		return
 	}
@@ -2628,7 +2628,7 @@ func updateUsageFromEvent(usage *Usage, eventType string, event map[string]inter
 	if len(meta) == 0 {
 		meta = event
 	}
-	if tokenUsage, ok := meta["tokenUsage"].(map[string]interface{}); ok {
+	if tokenUsage, ok := meta["tokenUsage"].(map[string]any); ok {
 		if value, ok := toInt(tokenUsage["uncachedInputTokens"]); ok {
 			usage.InputTokens = value
 		}
@@ -2667,11 +2667,11 @@ func updateUsageFromEvent(usage *Usage, eventType string, event map[string]inter
 	}
 }
 
-func readToolUses(primary, fallback map[string]interface{}) []KiroToolUse {
-	var raw []interface{}
-	if value, ok := primary["toolUses"].([]interface{}); ok {
+func readToolUses(primary, fallback map[string]any) []KiroToolUse {
+	var raw []any
+	if value, ok := primary["toolUses"].([]any); ok {
 		raw = value
-	} else if value, ok := fallback["toolUses"].([]interface{}); ok {
+	} else if value, ok := fallback["toolUses"].([]any); ok {
 		raw = value
 	}
 	if len(raw) == 0 {
@@ -2679,12 +2679,12 @@ func readToolUses(primary, fallback map[string]interface{}) []KiroToolUse {
 	}
 	out := make([]KiroToolUse, 0, len(raw))
 	for _, item := range raw {
-		tool, ok := item.(map[string]interface{})
+		tool, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
-		input := map[string]interface{}{}
-		if value, ok := tool["input"].(map[string]interface{}); ok {
+		input := map[string]any{}
+		if value, ok := tool["input"].(map[string]any); ok {
 			input = value
 		}
 		out = append(out, finalizeStructuredToolUse(getString(tool, "toolUseId"), getString(tool, "name"), input))
@@ -2692,28 +2692,28 @@ func readToolUses(primary, fallback map[string]interface{}) []KiroToolUse {
 	return out
 }
 
-func nestedEvent(event map[string]interface{}, key string) map[string]interface{} {
-	if nested, ok := event[key].(map[string]interface{}); ok {
+func nestedEvent(event map[string]any, key string) map[string]any {
+	if nested, ok := event[key].(map[string]any); ok {
 		return nested
 	}
 	return event
 }
 
-func getString(m map[string]interface{}, key string) string {
+func getString(m map[string]any, key string) string {
 	if value, ok := m[key].(string); ok {
 		return value
 	}
 	return ""
 }
 
-func readStopReason(m map[string]interface{}) string {
+func readStopReason(m map[string]any) string {
 	if stop := getString(m, "stop_reason"); stop != "" {
 		return stop
 	}
 	return getString(m, "stopReason")
 }
 
-func toInt(value interface{}) (int, bool) {
+func toInt(value any) (int, bool) {
 	switch v := value.(type) {
 	case float64:
 		return int(v), true

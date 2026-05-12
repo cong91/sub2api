@@ -357,11 +357,11 @@ func buildKiroWebSearchMCPRequest(query string) kiropkg.MCPRequest {
 		ID:      fmt.Sprintf("web_search_%s", kiropkg.GenerateToolUseID()),
 		JSONRPC: "2.0",
 		Method:  "tools/call",
-		Params: map[string]interface{}{
+		Params: map[string]any{
 			"name": "web_search",
-			"arguments": map[string]interface{}{
+			"arguments": map[string]any{
 				"query": query,
-				"_meta": map[string]interface{}{
+				"_meta": map[string]any{
 					"_isValid":        true,
 					"_activePath":     []string{"query"},
 					"_completedPaths": [][]string{{"query"}},

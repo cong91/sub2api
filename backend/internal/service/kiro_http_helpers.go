@@ -84,6 +84,7 @@ func buildKiroRequestID(resp *http.Response) string {
 	return strings.TrimSpace(resp.Header.Get("x-amz-request-id"))
 }
 
+//nolint:unused // used by unit-tag tests in kiro_http_helpers_test.go.
 func isKiroInvalidModelIDBody(respBody []byte) bool {
 	var payload struct {
 		Reason  string `json:"reason"`

@@ -17,10 +17,10 @@ const remoteWebSearchDescription = "WebSearch looks up information outside the m
 var cachedWebSearchDescription atomic.Value // stores string
 
 type MCPRequest struct {
-	ID      string      `json:"id"`
-	JSONRPC string      `json:"jsonrpc"`
-	Method  string      `json:"method"`
-	Params  interface{} `json:"params,omitempty"`
+	ID      string `json:"id"`
+	JSONRPC string `json:"jsonrpc"`
+	Method  string `json:"method"`
+	Params  any    `json:"params,omitempty"`
 }
 
 type MCPResponse struct {
@@ -63,7 +63,11 @@ type SearchIndicator struct {
 
 func GetCachedWebSearchDescription() string {
 	if v := cachedWebSearchDescription.Load(); v != nil {
-		return strings.TrimSpace(v.(string))
+		desc, ok := v.(string)
+		if !ok {
+			return ""
+		}
+		return strings.TrimSpace(desc)
 	}
 	return ""
 }
@@ -138,18 +142,18 @@ func GenerateToolUseID() string {
 }
 
 func ReplaceWebSearchToolDescription(body []byte) ([]byte, error) {
-	var payload map[string]interface{}
+	var payload map[string]any
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return body, err
 	}
-	rawTools, ok := payload["tools"].([]interface{})
+	rawTools, ok := payload["tools"].([]any)
 	if !ok {
 		return body, nil
 	}
 
-	replaced := make([]interface{}, 0, len(rawTools))
+	replaced := make([]any, 0, len(rawTools))
 	for _, rawTool := range rawTools {
-		tool, ok := rawTool.(map[string]interface{})
+		tool, ok := rawTool.(map[string]any)
 		if !ok {
 			replaced = append(replaced, rawTool)
 			continue
@@ -160,13 +164,13 @@ func ReplaceWebSearchToolDescription(body []byte) ([]byte, error) {
 			replaced = append(replaced, rawTool)
 			continue
 		}
-		replaced = append(replaced, map[string]interface{}{
+		replaced = append(replaced, map[string]any{
 			"name":        "web_search",
 			"description": minimalWebSearchDescription,
-			"input_schema": map[string]interface{}{
+			"input_schema": map[string]any{
 				"type": "object",
-				"properties": map[string]interface{}{
-					"query": map[string]interface{}{
+				"properties": map[string]any{
+					"query": map[string]any{
 						"type":        "string",
 						"description": "The search query to execute",
 					},
@@ -186,42 +190,42 @@ func ReplaceWebSearchToolDescription(body []byte) ([]byte, error) {
 }
 
 func InjectToolResultsClaude(claudePayload []byte, toolUseID, query string, results *WebSearchResults) ([]byte, error) {
-	var payload map[string]interface{}
+	var payload map[string]any
 	if err := json.Unmarshal(claudePayload, &payload); err != nil {
 		return claudePayload, fmt.Errorf("parse claude payload: %w", err)
 	}
 
-	rawMessages, ok := payload["messages"].([]interface{})
+	rawMessages, ok := payload["messages"].([]any)
 	if !ok {
 		return claudePayload, fmt.Errorf("claude payload missing messages array")
 	}
 
-	assistantMsg := map[string]interface{}{
+	assistantMsg := map[string]any{
 		"role": "assistant",
-		"content": []interface{}{
-			map[string]interface{}{
+		"content": []any{
+			map[string]any{
 				"type":  "tool_use",
 				"id":    toolUseID,
 				"name":  "web_search",
-				"input": map[string]interface{}{"query": query},
+				"input": map[string]any{"query": query},
 			},
 		},
 	}
 
-	userContent := []interface{}{
-		map[string]interface{}{
+	userContent := []any{
+		map[string]any{
 			"type":        "tool_result",
 			"tool_use_id": toolUseID,
 			"content":     formatToolResultText(results),
 		},
 	}
 	if guidance := searchGuidanceText(); guidance != "" {
-		userContent = append(userContent, map[string]interface{}{
+		userContent = append(userContent, map[string]any{
 			"type": "text",
 			"text": guidance,
 		})
 	}
-	userMsg := map[string]interface{}{
+	userMsg := map[string]any{
 		"role":    "user",
 		"content": userContent,
 	}
@@ -240,20 +244,20 @@ func InjectSearchIndicatorsInResponse(responsePayload []byte, searches []SearchI
 		return responsePayload, nil
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal(responsePayload, &response); err != nil {
 		return responsePayload, err
 	}
-	content, _ := response["content"].([]interface{})
-	updated := make([]interface{}, 0, len(searches)*2+len(content))
+	content, _ := response["content"].([]any)
+	updated := make([]any, 0, len(searches)*2+len(content))
 	for _, search := range searches {
-		updated = append(updated, map[string]interface{}{
+		updated = append(updated, map[string]any{
 			"type":  "server_tool_use",
 			"id":    search.ToolUseID,
 			"name":  "web_search",
-			"input": map[string]interface{}{"query": search.Query},
+			"input": map[string]any{"query": search.Query},
 		})
-		updated = append(updated, map[string]interface{}{
+		updated = append(updated, map[string]any{
 			"type":    "web_search_tool_result",
 			"content": buildSearchResultContent(search.Results),
 		})
@@ -268,8 +272,8 @@ func InjectSearchIndicatorsInResponse(responsePayload []byte, searches []SearchI
 	return encoded, nil
 }
 
-func buildSearchResultContent(results *WebSearchResults) []map[string]interface{} {
-	content := make([]map[string]interface{}, 0)
+func buildSearchResultContent(results *WebSearchResults) []map[string]any {
+	content := make([]map[string]any, 0)
 	if results == nil {
 		return content
 	}
@@ -278,7 +282,7 @@ func buildSearchResultContent(results *WebSearchResults) []map[string]interface{
 		if result.Snippet != nil {
 			snippet = strings.TrimSpace(*result.Snippet)
 		}
-		content = append(content, map[string]interface{}{
+		content = append(content, map[string]any{
 			"type":              "web_search_result",
 			"title":             result.Title,
 			"url":               result.URL,
@@ -325,7 +329,7 @@ func isWebSearchToolName(name, toolType string) bool {
 	}
 }
 
-func getInterfaceString(v interface{}) string {
+func getInterfaceString(v any) string {
 	if v == nil {
 		return ""
 	}

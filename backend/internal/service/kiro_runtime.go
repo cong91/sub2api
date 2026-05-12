@@ -491,6 +491,7 @@ func buildKiroEndpoints(account *Account) []kiroEndpointConfig {
 	}
 }
 
+//nolint:unused // used by unit-tag tests for payload building helpers.
 func buildKiroPayloadForAccount(ctx context.Context, account *Account, anthropicBody []byte, modelID, token, requestModel string, headers http.Header) ([]byte, error) {
 	result, err := buildKiroPayloadForAccountWithRepo(ctx, nil, account, anthropicBody, modelID, token, requestModel, headers)
 	if err != nil {
