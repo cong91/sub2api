@@ -180,6 +180,16 @@ func ProvideGrokTokenProvider(
 	return p
 }
 
+func ProvideEntitlementService(
+	userRepo UserRepository,
+	groupRepo GroupRepository,
+	apiKeyService *APIKeyService,
+	apiKeyRepo APIKeyRepository,
+	userSubRepo UserSubscriptionRepository,
+) *EntitlementService {
+	return NewEntitlementService(userRepo, groupRepo, apiKeyService, apiKeyRepo, userSubRepo)
+}
+
 // ProvideDashboardAggregationService 创建并启动仪表盘聚合服务
 func ProvideDashboardAggregationService(repo DashboardAggregationRepository, timingWheel *TimingWheelService, lockCache LeaderLockCache, db *sql.DB, cfg *config.Config) *DashboardAggregationService {
 	svc := NewDashboardAggregationService(repo, timingWheel, cfg)
@@ -543,6 +553,12 @@ func ProvideAPIKeyService(
 	return svc
 }
 
+func ProvidePaymentService(entClient *dbent.Client, registry *payment.Registry, loadBalancer payment.LoadBalancer, redeemService *RedeemService, subscriptionSvc *SubscriptionService, configService *PaymentConfigService, userRepo UserRepository, groupRepo GroupRepository, affiliateService *AffiliateService, entitlementService *EntitlementService) *PaymentService {
+	svc := NewPaymentService(entClient, registry, loadBalancer, redeemService, subscriptionSvc, configService, userRepo, groupRepo, affiliateService)
+	svc.SetEntitlementBinder(entitlementService)
+	return svc
+}
+
 // ProvideAuthService wires AuthService and attaches dependencies used by invite-login.
 func ProvideAuthService(
 	entClient *dbent.Client,
@@ -655,6 +671,7 @@ var ProviderSet = wire.NewSet(
 	ProvideEmailQueueService,
 	NewTurnstileService,
 	NewSubscriptionService,
+	ProvideEntitlementService,
 	wire.Bind(new(DefaultSubscriptionAssigner), new(*SubscriptionService)),
 	ProvideConcurrencyService,
 	ProvideUserMessageQueueService,
@@ -690,7 +707,7 @@ var ProviderSet = wire.NewSet(
 	NewContentModerationService,
 	NewAffiliateService,
 	ProvidePaymentConfigService,
-	NewPaymentService,
+	ProvidePaymentService,
 	ProvidePaymentOrderExpiryService,
 	ProvideBalanceNotifyService,
 	ProvideChannelMonitorService,
