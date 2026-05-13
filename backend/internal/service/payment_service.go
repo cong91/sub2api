@@ -194,19 +194,20 @@ type TopUserStat struct {
 // --- Service ---
 
 type PaymentService struct {
-	providerMu        sync.Mutex
-	providersLoaded   bool
-	entClient         *dbent.Client
-	registry          *payment.Registry
-	loadBalancer      payment.LoadBalancer
-	redeemService     *RedeemService
-	subscriptionSvc   *SubscriptionService
-	configService     *PaymentConfigService
-	userRepo          UserRepository
-	groupRepo         GroupRepository
-	resumeService     *PaymentResumeService
-	affiliateService  *AffiliateService
-	entitlementBinder PaymentEntitlementBinder
+	providerMu               sync.Mutex
+	providersLoaded          bool
+	entClient                *dbent.Client
+	registry                 *payment.Registry
+	loadBalancer             payment.LoadBalancer
+	redeemService            *RedeemService
+	subscriptionSvc          *SubscriptionService
+	configService            *PaymentConfigService
+	userRepo                 UserRepository
+	groupRepo                GroupRepository
+	resumeService            *PaymentResumeService
+	affiliateService         *AffiliateService
+	entitlementBinder        PaymentEntitlementBinder
+	notificationEmailService *NotificationEmailService
 }
 
 type PaymentEntitlementBinder interface {
@@ -221,6 +222,10 @@ func NewPaymentService(entClient *dbent.Client, registry *payment.Registry, load
 
 func (s *PaymentService) SetEntitlementBinder(binder PaymentEntitlementBinder) {
 	s.entitlementBinder = binder
+}
+
+func (s *PaymentService) SetNotificationEmailService(notificationEmailService *NotificationEmailService) {
+	s.notificationEmailService = notificationEmailService
 }
 
 // --- Provider Registry ---
