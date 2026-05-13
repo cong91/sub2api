@@ -56,6 +56,8 @@ func TestDefaultKiroModelMapping_MatchesKiroReferenceModels(t *testing.T) {
 	t.Parallel()
 
 	expected := map[string]string{
+		"claude-opus-4-7":                     "claude-opus-4.7",
+		"claude-opus-4-7-thinking":            "claude-opus-4.7",
 		"claude-opus-4-6":                     "claude-opus-4.6",
 		"claude-opus-4-6-thinking":            "claude-opus-4.6",
 		"claude-sonnet-4-6":                   "claude-sonnet-4.6",
@@ -88,7 +90,7 @@ func TestDefaultKiroModelMapping_MatchesKiroReferenceModels(t *testing.T) {
 		"deepseek-3-2",
 		"minimax-m2-1",
 		"qwen3-coder-next",
-		"claude-opus-4-7",
+		"claude-sonnet-4-7",
 		"claude-sonnet-4-6-chat",
 	} {
 		if _, ok := DefaultKiroModelMapping[model]; ok {
