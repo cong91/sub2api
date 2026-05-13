@@ -421,6 +421,46 @@ var (
 			},
 		},
 	}
+	// BalancePackagesColumns holds the columns for the "balance_packages" table.
+	BalancePackagesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "code", Type: field.TypeString, Unique: true, Size: 64},
+		{Name: "label", Type: field.TypeString, Size: 100},
+		{Name: "description", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "amount_ledger", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,2)"}},
+		{Name: "credit_ledger", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,2)"}},
+		{Name: "bonus_ledger", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,2)"}},
+		{Name: "credit_multiplier", Type: field.TypeFloat64, Default: 1, SchemaType: map[string]string{"postgres": "decimal(20,6)"}},
+		{Name: "badge", Type: field.TypeString, Size: 100, Default: ""},
+		{Name: "popular", Type: field.TypeBool, Default: false},
+		{Name: "for_sale", Type: field.TypeBool, Default: true},
+		{Name: "sort_order", Type: field.TypeInt, Default: 0},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// BalancePackagesTable holds the schema information for the "balance_packages" table.
+	BalancePackagesTable = &schema.Table{
+		Name:       "balance_packages",
+		Columns:    BalancePackagesColumns,
+		PrimaryKey: []*schema.Column{BalancePackagesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "balancepackage_code",
+				Unique:  true,
+				Columns: []*schema.Column{BalancePackagesColumns[1]},
+			},
+			{
+				Name:    "balancepackage_for_sale",
+				Unique:  false,
+				Columns: []*schema.Column{BalancePackagesColumns[10]},
+			},
+			{
+				Name:    "balancepackage_sort_order",
+				Unique:  false,
+				Columns: []*schema.Column{BalancePackagesColumns[11]},
+			},
+		},
+	}
 	// ChannelMonitorsColumns holds the columns for the "channel_monitors" table.
 	ChannelMonitorsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -1863,6 +1903,7 @@ var (
 		AnnouncementReadsTable,
 		AuthIdentitiesTable,
 		AuthIdentityChannelsTable,
+		BalancePackagesTable,
 		ChannelMonitorsTable,
 		ChannelMonitorDailyRollupsTable,
 		ChannelMonitorHistoriesTable,
@@ -1925,6 +1966,9 @@ func init() {
 	AuthIdentityChannelsTable.ForeignKeys[0].RefTable = AuthIdentitiesTable
 	AuthIdentityChannelsTable.Annotation = &entsql.Annotation{
 		Table: "auth_identity_channels",
+	}
+	BalancePackagesTable.Annotation = &entsql.Annotation{
+		Table: "balance_packages",
 	}
 	ChannelMonitorsTable.ForeignKeys[0].RefTable = ChannelMonitorRequestTemplatesTable
 	ChannelMonitorsTable.Annotation = &entsql.Annotation{
