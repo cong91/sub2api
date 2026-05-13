@@ -432,6 +432,33 @@ func (s *PaymentService) usesOfficialWxpayVisibleMethod(ctx context.Context) boo
 }
 
 func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.PaymentOrder, req CreateOrderRequest, cfg *PaymentConfig, limitAmount float64, payAmountStr string, payAmount float64, plan *dbent.SubscriptionPlan, sel *payment.InstanceSelection) (*CreateOrderResponse, error) {
+	if isManualPaymentSelection(sel) {
+		pr, err := buildManualCreatePaymentResponse(sel)
+		if err != nil {
+			return nil, err
+		}
+		_, err = s.entClient.PaymentOrder.UpdateOneID(order.ID).
+			SetNillablePayURL(psNilIfEmpty(pr.PayURL)).
+			SetNillableQrCode(psNilIfEmpty(pr.QRCode)).
+			SetNillableQrCodeImg(psNilIfEmpty(pr.QRCodeImg)).
+			SetNillableProviderInstanceID(psNilIfEmpty(sel.InstanceID)).
+			SetNillableProviderKey(psNilIfEmpty(sel.ProviderKey)).
+			Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("update manual order with payment details: %w", err)
+		}
+		s.writeAuditLog(ctx, order.ID, "ORDER_CREATED", fmt.Sprintf("user:%d", req.UserID), map[string]any{
+			"paymentAmount":  req.Amount,
+			"creditedAmount": order.Amount,
+			"payAmount":      order.PayAmount,
+			"paymentType":    req.PaymentType,
+			"orderType":      req.OrderType,
+			"paymentSource":  NormalizePaymentSource(req.PaymentSource),
+			"paymentMode":    paymentModeManual,
+		})
+		resp := buildCreateOrderResponse(order, req, payAmount, sel, pr, payment.CreatePaymentResultOrderCreated)
+		return resp, nil
+	}
 	prov, err := provider.CreateProvider(sel.ProviderKey, sel.InstanceID, sel.Config)
 	if err != nil {
 		slog.Error("[PaymentService] CreateProvider failed", "provider", sel.ProviderKey, "instance", sel.InstanceID, "error", err)
@@ -504,6 +531,7 @@ func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.Paymen
 		SetNillablePaymentTradeNo(psNilIfEmpty(pr.TradeNo)).
 		SetNillablePayURL(psNilIfEmpty(pr.PayURL)).
 		SetNillableQrCode(psNilIfEmpty(pr.QRCode)).
+		SetNillableQrCodeImg(psNilIfEmpty(pr.QRCodeImg)).
 		SetNillableProviderInstanceID(psNilIfEmpty(sel.InstanceID)).
 		SetNillableProviderKey(psNilIfEmpty(sel.ProviderKey)).
 		Save(ctx)
@@ -853,6 +881,7 @@ func buildCreateOrderResponse(order *dbent.PaymentOrder, req CreateOrderRequest,
 		PayURL:          pr.PayURL,
 		CheckoutURL:     pr.CheckoutURL,
 		QRCode:          pr.QRCode,
+		QRCodeImg:       pr.QRCodeImg,
 		ClientSecret:    pr.ClientSecret,
 		IntentID:        pr.IntentID,
 		Currency:        pr.Currency,
