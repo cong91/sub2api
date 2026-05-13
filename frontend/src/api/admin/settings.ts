@@ -460,6 +460,24 @@ export interface SystemSettings {
   linuxdo_connect_client_secret_configured: boolean;
   linuxdo_connect_redirect_url: string;
 
+  // DingTalk Connect OAuth settings
+  dingtalk_connect_enabled: boolean;
+  dingtalk_connect_client_id: string;
+  dingtalk_connect_client_secret_configured: boolean;
+  dingtalk_connect_redirect_url: string;
+  dingtalk_connect_corp_restriction_policy: string;
+  dingtalk_connect_internal_corp_id: string;
+  dingtalk_connect_bypass_registration: boolean;
+  dingtalk_connect_sync_corp_email: boolean;
+  dingtalk_connect_sync_display_name: boolean;
+  dingtalk_connect_sync_dept: boolean;
+  dingtalk_connect_sync_corp_email_attr_key: string;
+  dingtalk_connect_sync_display_name_attr_key: string;
+  dingtalk_connect_sync_dept_attr_key: string;
+  dingtalk_connect_sync_corp_email_attr_name: string;
+  dingtalk_connect_sync_display_name_attr_name: string;
+  dingtalk_connect_sync_dept_attr_name: string;
+
   // WeChat Connect OAuth settings
   wechat_connect_enabled: boolean;
   wechat_connect_app_id: string;
@@ -734,6 +752,22 @@ export interface UpdateSettingsRequest {
   linuxdo_connect_client_id?: string;
   linuxdo_connect_client_secret?: string;
   linuxdo_connect_redirect_url?: string;
+  dingtalk_connect_enabled?: boolean;
+  dingtalk_connect_client_id?: string;
+  dingtalk_connect_client_secret?: string;
+  dingtalk_connect_redirect_url?: string;
+  dingtalk_connect_corp_restriction_policy?: string;
+  dingtalk_connect_internal_corp_id?: string;
+  dingtalk_connect_bypass_registration?: boolean;
+  dingtalk_connect_sync_corp_email?: boolean;
+  dingtalk_connect_sync_display_name?: boolean;
+  dingtalk_connect_sync_dept?: boolean;
+  dingtalk_connect_sync_corp_email_attr_key?: string;
+  dingtalk_connect_sync_display_name_attr_key?: string;
+  dingtalk_connect_sync_dept_attr_key?: string;
+  dingtalk_connect_sync_corp_email_attr_name?: string;
+  dingtalk_connect_sync_display_name_attr_name?: string;
+  dingtalk_connect_sync_dept_attr_name?: string;
   wechat_connect_enabled?: boolean;
   wechat_connect_app_id?: string;
   wechat_connect_app_secret?: string;
@@ -1387,6 +1421,11 @@ export const settingsAPI = {
   updateRectifierSettings,
   getBetaPolicySettings,
   updateBetaPolicySettings,
+  getEmailTemplates,
+  getEmailTemplate,
+  updateEmailTemplate,
+  restoreOfficialEmailTemplate,
+  previewEmailTemplate,
   getWebSearchEmulationConfig,
   updateWebSearchEmulationConfig,
   testWebSearchEmulation,
