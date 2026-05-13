@@ -303,6 +303,7 @@ import { usePaymentStore } from '@/stores/payment'
 import { useSubscriptionStore } from '@/stores/subscriptions'
 import { useAppStore } from '@/stores'
 import { paymentAPI } from '@/api/payment'
+import type { PublicOrderVerifyResult } from '@/api/payment'
 import { extractApiErrorMessage, extractI18nErrorMessage } from '@/utils/apiError'
 import { isMobileDevice } from '@/utils/device'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel, type PeakRateFields } from '@/utils/peak-rate'
@@ -1267,15 +1268,32 @@ function buildPaddleOrderFromCreateResult(
   }
 }
 
+function publicOrderToPaymentOrder(result: PublicOrderVerifyResult): PaymentOrder {
+  return {
+    id: 0,
+    user_id: 0,
+    amount: 0,
+    pay_amount: 0,
+    fee_rate: 0,
+    payment_type: 'paddle',
+    out_trade_no: result.out_trade_no,
+    status: result.status as PaymentOrder['status'],
+    order_type: 'balance',
+    created_at: result.created_at,
+    expires_at: result.expires_at,
+    refund_amount: 0,
+  }
+}
+
 async function resolvePaddleCheckoutOrder(resumeToken: string, outTradeNo: string): Promise<PaymentOrder | null> {
   try {
     if (resumeToken) {
       const result = await paymentAPI.resolveOrderPublicByResumeToken(resumeToken)
-      return result.data
+      return publicOrderToPaymentOrder(result.data)
     }
     if (outTradeNo) {
       const result = await paymentAPI.verifyOrderPublic(outTradeNo)
-      return result.data
+      return publicOrderToPaymentOrder(result.data)
     }
   } catch (_err: unknown) {
     return null

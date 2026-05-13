@@ -149,8 +149,8 @@ const refreshAttempts = ref(0)
 /** 充值金额 = pay_amount / (1 + fee_rate/100)，fee_rate=0 时等于 pay_amount */
 const baseAmount = computed(() => {
   if (!order.value) return 0
-  if (order.value.payment_amount != null && order.value.payment_amount > 0) return order.value.payment_amount
   if (!hasAmountFields(order.value)) return 0
+  if (order.value.payment_amount != null && order.value.payment_amount > 0) return order.value.payment_amount
   const feeRate = Number(order.value.fee_rate) || 0
   if (feeRate <= 0) return order.value.pay_amount ?? 0
   return Math.round((order.value.pay_amount / (1 + feeRate / 100)) * 100) / 100
