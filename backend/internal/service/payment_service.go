@@ -77,23 +77,24 @@ const (
 )
 
 type CreateOrderRequest struct {
-	UserID          int64
-	Amount          float64
-	AmountMode      string
-	PaymentCurrency string
-	QuoteID         string
-	paymentQuote    *PaymentQuoteClaims
-	PaymentType     string
-	OpenID          string
-	ClientIP        string
-	IsMobile        bool
-	IsWeChatBrowser bool
-	SrcHost         string
-	SrcURL          string
-	ReturnURL       string
-	PaymentSource   string
-	OrderType       string
-	PlanID          int64
+	UserID           int64
+	Amount           float64
+	AmountMode       string
+	PaymentCurrency  string
+	QuoteID          string
+	BalancePackageID string
+	paymentQuote     *PaymentQuoteClaims
+	PaymentType      string
+	OpenID           string
+	ClientIP         string
+	IsMobile         bool
+	IsWeChatBrowser  bool
+	SrcHost          string
+	SrcURL           string
+	ReturnURL        string
+	PaymentSource    string
+	OrderType        string
+	PlanID           int64
 }
 
 type CreateOrderResponse struct {
