@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	kiropkg "github.com/Wei-Shaw/sub2api/internal/pkg/kiro"
 	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 )
 
@@ -46,6 +47,7 @@ func NewTokenRefreshService(
 	openaiOAuthService *OpenAIOAuthService,
 	geminiOAuthService *GeminiOAuthService,
 	antigravityOAuthService *AntigravityOAuthService,
+	kiroOAuthService *KiroOAuthService,
 	cacheInvalidator TokenCacheInvalidator,
 	schedulerCache SchedulerCache,
 	cfg *config.Config,
@@ -72,6 +74,7 @@ func NewTokenRefreshService(
 		grokOAuthService = grokOAuthServices[0]
 	}
 	grokRefresher := NewGrokTokenRefresher(grokOAuthService)
+	kiroRefresher := NewKiroTokenRefresher(kiroOAuthService)
 
 	// 注册平台特定的刷新器（TokenRefresher 接口）
 	s.refreshers = []TokenRefresher{
@@ -80,6 +83,7 @@ func NewTokenRefreshService(
 		geminiRefresher,
 		agRefresher,
 		grokRefresher,
+		kiroRefresher,
 	}
 
 	// 注册对应的 OAuthRefreshExecutor（带 CacheKey 方法）
@@ -89,6 +93,7 @@ func NewTokenRefreshService(
 		geminiRefresher,
 		agRefresher,
 		grokRefresher,
+		kiroRefresher,
 	}
 
 	return s
@@ -441,6 +446,10 @@ var errRefreshSkipped = fmt.Errorf("refresh skipped")
 func isNonRetryableRefreshError(err error) bool {
 	if err == nil {
 		return false
+	}
+	var kiroInvalidGrant *kiropkg.RefreshTokenInvalidError
+	if errors.As(err, &kiroInvalidGrant) {
+		return true
 	}
 	msg := strings.ToLower(err.Error())
 	nonRetryable := []string{
