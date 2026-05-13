@@ -49,6 +49,7 @@ export const METHOD_ORDER = ['alipay', 'alipay_direct', 'wxpay', 'wxpay_direct',
 /** Payment mode constants */
 export const PAYMENT_MODE_QRCODE = 'qrcode'
 export const PAYMENT_MODE_POPUP = 'popup'
+export const PAYMENT_MODE_MANUAL = 'manual'
 
 /** Common settlement currencies admins can assign to provider instances; custom ISO-4217 codes can still be typed in the UI. */
 export const PAYMENT_CURRENCY_CODES = [
@@ -140,11 +141,13 @@ export const PROVIDER_CONFIG_FIELDS: Record<string, ConfigFieldDef[]> = {
     { key: 'cidWxpay', label: '', sensitive: false, optional: true },
   ],
   alipay: [
+    { key: 'manualQrCodeImg', label: '', sensitive: false, optional: true, clearable: true },
     { key: 'appId', label: 'App ID', sensitive: false },
     { key: 'privateKey', label: '', sensitive: true },
     { key: 'publicKey', label: '', sensitive: true },
   ],
   wxpay: [
+    { key: 'manualQrCodeImg', label: '', sensitive: false, optional: true, clearable: true },
     { key: 'appId', label: 'App ID', sensitive: false },
     { key: 'mchId', label: '', sensitive: false },
     { key: 'privateKey', label: '', sensitive: true },
