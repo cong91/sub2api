@@ -69,6 +69,8 @@ describe('useModelWhitelist', () => {
     const models = getModelsByPlatform('kiro')
 
     expect(models).toEqual([
+      'claude-opus-4-7',
+      'claude-opus-4-7-thinking',
       'claude-opus-4-6',
       'claude-opus-4-6-thinking',
       'claude-sonnet-4-6',
@@ -136,6 +138,8 @@ describe('useModelWhitelist', () => {
     const mappingTargets = mappings.map(item => item.to)
 
     expect(mappings.map(({ from, to }) => ({ from, to }))).toEqual([
+      { from: 'claude-opus-4-7', to: 'claude-opus-4.7' },
+      { from: 'claude-opus-4-7-thinking', to: 'claude-opus-4.7' },
       { from: 'claude-opus-4-6', to: 'claude-opus-4.6' },
       { from: 'claude-opus-4-6-thinking', to: 'claude-opus-4.6' },
       { from: 'claude-sonnet-4-6', to: 'claude-sonnet-4.6' },
@@ -172,6 +176,8 @@ describe('useModelWhitelist', () => {
     const mappings = await fetchKiroDefaultMappings()
 
     expect(mappings).toEqual(expect.arrayContaining([
+      { from: 'claude-opus-4-7', to: 'claude-opus-4.7' },
+      { from: 'claude-opus-4-7-thinking', to: 'claude-opus-4.7' },
       { from: 'claude-opus-4-6', to: 'claude-opus-4.6' },
       { from: 'claude-opus-4-6-thinking', to: 'claude-opus-4.6' },
       { from: 'claude-sonnet-4-6', to: 'claude-sonnet-4.6' },
@@ -183,7 +189,7 @@ describe('useModelWhitelist', () => {
       { from: 'claude-haiku-4-5-20251001', to: 'claude-haiku-4.5' },
       { from: 'claude-haiku-4-5-20251001-thinking', to: 'claude-haiku-4.5' }
     ]))
-    expect(mappings).toHaveLength(10)
+    expect(mappings).toHaveLength(12)
     expect(mappings.every(item => !item.from.startsWith('kiro-'))).toBe(true)
     expect(mappings.every(item => !item.to.startsWith('kiro-'))).toBe(true)
     expect(mappings.every(item => !item.from.endsWith('-agentic'))).toBe(true)
@@ -193,5 +199,6 @@ describe('useModelWhitelist', () => {
     expect(mappings.every(item => item.from.startsWith('claude-'))).toBe(true)
     expect(mappings.every(item => item.to.startsWith('claude-'))).toBe(true)
     expect(mappings.some(item => item.to === 'claude-opus-4-7')).toBe(false)
+    expect(mappings.some(item => item.to === 'claude-opus-4.7')).toBe(true)
   })
 })
