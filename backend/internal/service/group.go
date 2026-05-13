@@ -141,6 +141,10 @@ func (g *Group) IsSubscriptionType() bool {
 	return g.SubscriptionType == SubscriptionTypeSubscription
 }
 
+func (g *Group) IsStandardType() bool {
+	return g.SubscriptionType == "" || g.SubscriptionType == SubscriptionTypeStandard
+}
+
 func (g *Group) HasDailyLimit() bool {
 	return g.DailyLimitUSD != nil && *g.DailyLimitUSD > 0
 }
