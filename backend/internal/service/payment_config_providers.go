@@ -31,6 +31,19 @@ func (s *PaymentConfigService) validateProviderConfig(providerKey string, config
 	return err
 }
 
+func (s *PaymentConfigService) validateProviderModeConfig(providerKey, paymentMode string, config map[string]string) error {
+	if isManualPaymentMode(paymentMode) {
+		if !supportsManualPaymentMode(providerKey) {
+			return infraerrors.BadRequest("VALIDATION_ERROR", "manual payment mode is only supported for alipay and wxpay")
+		}
+		if manualQRCodeImageFromConfig(config) == "" {
+			return infraerrors.BadRequest("MANUAL_QR_CODE_REQUIRED", "manual payment mode requires an uploaded QR code image")
+		}
+		return nil
+	}
+	return s.validateProviderConfig(providerKey, config)
+}
+
 // --- Provider Instance CRUD ---
 
 func (s *PaymentConfigService) ListProviderInstances(ctx context.Context) ([]*dbent.PaymentProviderInstance, error) {
@@ -194,7 +207,7 @@ func (s *PaymentConfigService) CreateProviderInstance(ctx context.Context, req C
 		return nil, err
 	}
 	if req.Enabled {
-		if err := s.validateProviderConfig(req.ProviderKey, req.Config); err != nil {
+		if err := s.validateProviderModeConfig(req.ProviderKey, req.PaymentMode, req.Config); err != nil {
 			return nil, err
 		}
 	}
@@ -291,6 +304,10 @@ func (s *PaymentConfigService) UpdateProviderInstance(ctx context.Context, id in
 	if req.Enabled != nil {
 		finalEnabled = *req.Enabled
 	}
+	finalPaymentMode := current.PaymentMode
+	if req.PaymentMode != nil {
+		finalPaymentMode = *req.PaymentMode
+	}
 	if finalEnabled {
 		configToValidate := mergedConfig
 		if configToValidate == nil {
@@ -299,7 +316,7 @@ func (s *PaymentConfigService) UpdateProviderInstance(ctx context.Context, id in
 				return nil, fmt.Errorf("decrypt existing config: %w", err)
 			}
 		}
-		if err := s.validateProviderConfig(current.ProviderKey, configToValidate); err != nil {
+		if err := s.validateProviderModeConfig(current.ProviderKey, finalPaymentMode, configToValidate); err != nil {
 			return nil, err
 		}
 	}

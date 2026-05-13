@@ -1,10 +1,16 @@
 package admin
 
 import (
+	"encoding/base64"
+	"fmt"
+	"io"
+	"net/http"
 	"strconv"
+	"strings"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	servermiddleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -147,6 +153,79 @@ func (h *PaymentHandler) RetryFulfillment(c *gin.Context) {
 	response.Success(c, gin.H{"message": "fulfillment retried"})
 }
 
+// AdminCompleteManualOrder marks a pending manual QR payment as paid and runs fulfillment.
+// POST /api/v1/admin/payment/orders/:id/manual-complete
+func (h *PaymentHandler) AdminCompleteManualOrder(c *gin.Context) {
+	orderID, ok := parseIDParam(c, "id")
+	if !ok {
+		return
+	}
+	order, err := h.paymentService.GetOrderByID(c.Request.Context(), orderID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if !ensureMarketingCanManageUser(c, h.adminService, order.UserID) {
+		return
+	}
+
+	var req struct {
+		TradeNo string `json:"trade_no"`
+		Note    string `json:"note"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil && err != io.EOF {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	adminUserID := int64(0)
+	if subject, ok := servermiddleware.GetAuthSubjectFromContext(c); ok {
+		adminUserID = subject.UserID
+	}
+	if err := h.paymentService.AdminCompleteManualOrder(c.Request.Context(), orderID, adminUserID, req.TradeNo, req.Note); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"message": "manual payment completed"})
+}
+
+// UploadManualQRCode accepts a small QR-code image and returns a data URL that
+// can be stored in provider config under manualQrCodeImg.
+// POST /api/v1/admin/payment/providers/manual-qr
+func (h *PaymentHandler) UploadManualQRCode(c *gin.Context) {
+	const maxManualQRBytes = 1024 * 1024
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.BadRequest(c, "file is required")
+		return
+	}
+	if file.Size <= 0 || file.Size > maxManualQRBytes {
+		response.BadRequest(c, "file must be a non-empty image up to 1MB")
+		return
+	}
+	src, err := file.Open()
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "failed to read upload")
+		return
+	}
+	defer func() { _ = src.Close() }()
+	data, err := io.ReadAll(io.LimitReader(src, maxManualQRBytes+1))
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "failed to read upload")
+		return
+	}
+	if len(data) == 0 || len(data) > maxManualQRBytes {
+		response.BadRequest(c, "file must be a non-empty image up to 1MB")
+		return
+	}
+	contentType := http.DetectContentType(data)
+	if !strings.HasPrefix(contentType, "image/") {
+		response.BadRequest(c, "file must be an image")
+		return
+	}
+	dataURL := fmt.Sprintf("data:%s;base64,%s", contentType, base64.StdEncoding.EncodeToString(data))
+	response.Success(c, gin.H{"url": dataURL, "content_type": contentType, "size": len(data)})
+}
+
 func sanitizeAdminPaymentOrdersForResponse(orders []*dbent.PaymentOrder) []*dbent.PaymentOrder {
 	if len(orders) == 0 {
 		return orders
@@ -163,8 +242,25 @@ func sanitizeAdminPaymentOrderForResponse(order *dbent.PaymentOrder) *dbent.Paym
 		return nil
 	}
 	cloned := *order
-	cloned.ProviderSnapshot = nil
+	if len(order.ProviderSnapshot) > 0 {
+		cloned.ProviderSnapshot = sanitizeAdminProviderSnapshot(order.ProviderSnapshot)
+	} else {
+		cloned.ProviderSnapshot = nil
+	}
 	return &cloned
+}
+
+func sanitizeAdminProviderSnapshot(snapshot map[string]any) map[string]any {
+	out := make(map[string]any)
+	for _, key := range []string{"schema_version", "provider_instance_id", "provider_key", "payment_mode", "currency"} {
+		if value, ok := snapshot[key]; ok {
+			out[key] = value
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // AdminProcessRefundRequest is the request body for admin refund processing.
