@@ -86,6 +86,7 @@ func RegisterPaymentRoutes(
 			adminOrders.GET("/:id", adminPaymentHandler.GetOrderDetail)
 			adminOrders.POST("/:id/cancel", adminPaymentHandler.CancelOrder)
 			adminOrders.POST("/:id/retry", adminPaymentHandler.RetryFulfillment)
+			adminOrders.POST("/:id/manual-complete", adminPaymentHandler.AdminCompleteManualOrder)
 			adminOrders.POST("/:id/refund", adminPaymentHandler.ProcessRefund)
 		}
 
@@ -111,6 +112,7 @@ func RegisterPaymentRoutes(
 		providers := adminGroup.Group("/providers")
 		{
 			providers.POST("/sepay/bank-accounts", adminPaymentHandler.ListSepayBankAccounts)
+			providers.POST("/manual-qr", adminPaymentHandler.UploadManualQRCode)
 			providers.GET("", adminPaymentHandler.ListProviders)
 			providers.POST("", adminPaymentHandler.CreateProvider)
 			providers.PUT("/:id", adminPaymentHandler.UpdateProvider)
