@@ -213,6 +213,9 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 	if providerSnapshot != nil {
 		b.SetProviderSnapshot(providerSnapshot)
 	}
+	if amounts.BalancePackage != nil && amounts.BalancePackage.BalanceGroupID != nil && *amounts.BalancePackage.BalanceGroupID > 0 {
+		b.SetBalanceGroupID(*amounts.BalancePackage.BalanceGroupID)
+	}
 	if plan != nil {
 		b.SetPlanID(plan.ID).SetSubscriptionGroupID(plan.GroupID).SetSubscriptionDays(psComputeValidityDays(plan.ValidityDays, plan.ValidityUnit))
 	}
@@ -242,6 +245,8 @@ func withBalancePackageProviderSnapshot(snapshot map[string]any, pkg BalanceRech
 		"credit_ledger":     pkg.CreditLedger,
 		"bonus_ledger":      pkg.BonusLedger,
 		"credit_multiplier": pkg.CreditMultiplier,
+		"balance_group_id":  pkg.BalanceGroupID,
+		"group_id":          pkg.BalanceGroupID,
 	}
 	return snapshot
 }
