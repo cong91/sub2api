@@ -92,7 +92,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if oauthResp != nil {
 		return oauthResp, nil
 	}
-	order, err := s.createOrderInTx(ctx, req, user, plan, cfg, amounts.FXSnapshot, ledgerAmount, paymentAmount, feeRate, payAmount, sel)
+	order, err := s.createOrderInTx(ctx, req, user, plan, cfg, amounts, ledgerAmount, paymentAmount, feeRate, payAmount, sel)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,8 @@ func (s *PaymentService) validateSubOrder(ctx context.Context, req CreateOrderRe
 	return plan, nil
 }
 
-func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, snapshot fxSnapshot, ledgerAmount, paymentAmount, feeRate, payAmount float64, sel *payment.InstanceSelection) (*dbent.PaymentOrder, error) {
+func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, amounts createOrderAmounts, ledgerAmount, paymentAmount, feeRate, payAmount float64, sel *payment.InstanceSelection) (*dbent.PaymentOrder, error) {
+	snapshot := amounts.FXSnapshot
 	tx, err := s.entClient.Tx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
@@ -167,6 +168,9 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 		ledgerCurrency = normalizeCurrencyCode(cfg.LedgerCurrency, defaultLedgerCurrency)
 	}
 	providerSnapshot := buildPaymentOrderProviderSnapshot(sel, req)
+	if amounts.BalancePackage != nil {
+		providerSnapshot = withBalancePackageProviderSnapshot(providerSnapshot, *amounts.BalancePackage)
+	}
 	selectedInstanceID := ""
 	selectedProviderKey := ""
 	if sel != nil {
@@ -225,6 +229,21 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 		return nil, fmt.Errorf("commit order transaction: %w", err)
 	}
 	return order, nil
+}
+
+func withBalancePackageProviderSnapshot(snapshot map[string]any, pkg BalanceRechargePackage) map[string]any {
+	if snapshot == nil {
+		snapshot = map[string]any{"schema_version": 2}
+	}
+	snapshot["balance_package"] = map[string]any{
+		"id":                pkg.ID,
+		"label":             pkg.Label,
+		"amount_ledger":     pkg.AmountLedger,
+		"credit_ledger":     pkg.CreditLedger,
+		"bonus_ledger":      pkg.BonusLedger,
+		"credit_multiplier": pkg.CreditMultiplier,
+	}
+	return snapshot
 }
 
 func (s *PaymentService) allocateOutTradeNo(ctx context.Context, tx *dbent.Tx) (string, error) {
