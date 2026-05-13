@@ -93,6 +93,7 @@ export interface CheckoutInfoResponse {
   global_min: number
   global_max: number
   plans: SubscriptionPlan[]
+  balance_packages?: BalancePackage[]
   balance_disabled: boolean
   balance_recharge_multiplier: number
   /** Subscription CNY conversion rate (1 USD = X CNY); 0 = disabled, plan price is charged as-is */
@@ -175,6 +176,23 @@ export interface SubscriptionPlan {
   sort_order: number
 }
 
+export interface BalancePackage {
+  id: number
+  code: string
+  label: string
+  description: string
+  amount_ledger: number
+  credit_ledger: number
+  bonus_ledger: number
+  credit_multiplier: number
+  badge: string
+  popular: boolean
+  for_sale: boolean
+  sort_order: number
+  created_at?: string
+  updated_at?: string
+}
+
 export interface PaymentChannel {
   id: number
   group_id?: number
@@ -213,6 +231,7 @@ export interface CreateOrderRequest {
   payment_type: string
   order_type: string
   plan_id?: number
+  balance_package_id?: string
   return_url?: string
   payment_source?: string
   openid?: string
@@ -227,6 +246,7 @@ export interface CreatePaymentQuoteRequest {
   payment_type: string
   order_type: string
   plan_id?: number
+  balance_package_id?: string
 }
 
 export interface PaymentQuoteResult {
