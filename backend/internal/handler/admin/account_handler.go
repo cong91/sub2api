@@ -22,6 +22,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
+	kiropkg "github.com/Wei-Shaw/sub2api/internal/pkg/kiro"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
@@ -179,6 +180,9 @@ type AccountWithConcurrency struct {
 const accountListGroupUngroupedQueryValue = "ungrouped"
 
 func (h *AccountHandler) buildAccountResponseWithRuntime(ctx context.Context, account *service.Account) AccountWithConcurrency {
+	if h.accountUsageService != nil {
+		h.accountUsageService.EnrichAccountWithKiroRuntimeState(ctx, account)
+	}
 	item := AccountWithConcurrency{
 		Account:            dto.AccountFromService(account),
 		CurrentConcurrency: 0,
@@ -351,6 +355,9 @@ func (h *AccountHandler) List(c *gin.Context) {
 	result := make([]AccountWithConcurrency, len(accounts))
 	for i := range accounts {
 		acc := &accounts[i]
+		if h.accountUsageService != nil {
+			h.accountUsageService.EnrichAccountWithKiroRuntimeState(c.Request.Context(), acc)
+		}
 		item := AccountWithConcurrency{
 			Account:            dto.AccountFromService(acc),
 			CurrentConcurrency: concurrencyCounts[acc.ID],
@@ -1737,7 +1744,7 @@ func (h *OAuthHandler) SetupTokenCookieAuth(c *gin.Context) {
 }
 
 // GetUsage handles getting account usage information
-// GET /api/v1/admin/accounts/:id/usage?source=passive|active&force=true
+// GET /api/v1/admin/accounts/:id/usage?source=passive|active
 func (h *AccountHandler) GetUsage(c *gin.Context) {
 	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -1746,13 +1753,12 @@ func (h *AccountHandler) GetUsage(c *gin.Context) {
 	}
 
 	source := c.DefaultQuery("source", "active")
-	force := c.Query("force") == "true"
 
 	var usage *service.UsageInfo
 	if source == "passive" {
 		usage, err = h.accountUsageService.GetPassiveUsage(c.Request.Context(), accountID)
 	} else {
-		usage, err = h.accountUsageService.GetUsage(c.Request.Context(), accountID, force)
+		usage, err = h.accountUsageService.GetUsage(c.Request.Context(), accountID)
 	}
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -2048,6 +2054,18 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 		return
 	}
 
+	// Handle Kiro accounts
+	if account.Platform == service.PlatformKiro {
+		mapping := account.GetModelMapping()
+		if len(mapping) == 0 {
+			response.Success(c, kiropkg.DefaultModels)
+			return
+		}
+
+		response.Success(c, buildMappedKiroModels(mapping))
+		return
+	}
+
 	// Handle Claude/Anthropic accounts
 	// For OAuth and Setup-Token accounts: return default models
 	if account.IsOAuth() {
@@ -2089,46 +2107,26 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 	response.Success(c, models)
 }
 
-// SyncUpstreamModels handles syncing live supported models from an account's upstream.
-// POST /api/v1/admin/accounts/:id/models/sync-upstream
-func (h *AccountHandler) SyncUpstreamModels(c *gin.Context) {
-	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid account ID")
-		return
-	}
-
-	account, err := h.adminService.GetAccount(c.Request.Context(), accountID)
-	if err != nil {
-		response.NotFound(c, "Account not found")
-		return
-	}
-
-	if h.accountTestService == nil {
-		response.InternalError(c, "Account test service is not configured")
-		return
-	}
-
-	models, err := h.accountTestService.FetchUpstreamSupportedModels(c.Request.Context(), account)
-	if err != nil {
-		var syncErr *service.UpstreamModelSyncError
-		if errors.As(err, &syncErr) {
-			switch syncErr.Kind {
-			case service.UpstreamModelSyncErrorConfiguration, service.UpstreamModelSyncErrorUnsupported:
-				response.BadRequest(c, syncErr.SafeMessage())
-			default:
-				slog.Warn("sync_upstream_models_failed", "account_id", accountID, "kind", syncErr.Kind)
-				response.Error(c, http.StatusBadGateway, syncErr.SafeMessage())
+func buildMappedKiroModels(mapping map[string]string) []kiropkg.Model {
+	models := make([]kiropkg.Model, 0, len(mapping))
+	for requestedModel := range mapping {
+		var found bool
+		for _, dm := range kiropkg.DefaultModels {
+			if dm.ID == requestedModel {
+				models = append(models, dm)
+				found = true
+				break
 			}
-			return
 		}
-
-		slog.Warn("sync_upstream_models_failed", "account_id", accountID)
-		response.Error(c, http.StatusBadGateway, "Failed to sync upstream models from upstream")
-		return
+		if !found {
+			models = append(models, kiropkg.Model{
+				ID:          requestedModel,
+				Type:        "model",
+				DisplayName: requestedModel,
+			})
+		}
 	}
-
-	response.Success(c, gin.H{"models": models})
+	return models
 }
 
 // SyncUpstreamModelsPreview handles syncing live supported models using provided credentials (no account ID needed).
@@ -2391,6 +2389,12 @@ func (h *AccountHandler) BatchRefreshTier(c *gin.Context) {
 // GET /api/v1/admin/accounts/antigravity/default-model-mapping
 func (h *AccountHandler) GetAntigravityDefaultModelMapping(c *gin.Context) {
 	response.Success(c, domain.DefaultAntigravityModelMapping)
+}
+
+// GetKiroDefaultModelMapping 获取 Kiro 平台的默认模型映射
+// GET /api/v1/admin/accounts/kiro/default-model-mapping
+func (h *AccountHandler) GetKiroDefaultModelMapping(c *gin.Context) {
+	response.Success(c, domain.DefaultKiroModelMapping)
 }
 
 // sanitizeExtraBaseRPM 对 extra map 中的 base_rpm 值进行范围校验和归一化。
