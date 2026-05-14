@@ -149,6 +149,24 @@ func (h *UsageHandler) List(c *gin.Context) {
 	response.Paginated(c, out, result.Total, page, pageSize)
 }
 
+// CreditUsageSummary handles aggregate credit usage reconstructed from usage logs and completed balance orders.
+// GET /api/v1/usage/credit-usage
+func (h *UsageHandler) CreditUsageSummary(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	summary, err := h.usageService.GetUserCreditUsageSummary(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, summary)
+}
+
 // GetByID handles getting a single usage record
 // GET /api/v1/usage/:id
 func (h *UsageHandler) GetByID(c *gin.Context) {
