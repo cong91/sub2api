@@ -198,19 +198,6 @@ type APIKeyUsageTrendPoint struct {
 	Tokens   int64  `json:"tokens"`
 }
 
-// APIKeyDailyUsagePoint represents one day of usage for a single API key.
-type APIKeyDailyUsagePoint struct {
-	Date             string  `json:"date"`
-	Requests         int64   `json:"requests"`
-	InputTokens      int64   `json:"input_tokens"`
-	OutputTokens     int64   `json:"output_tokens"`
-	CacheReadTokens  int64   `json:"cache_read_tokens"`
-	CacheWriteTokens int64   `json:"cache_write_tokens"`
-	TotalTokens      int64   `json:"total_tokens"`
-	Cost             float64 `json:"cost"`        // 标准计费
-	ActualCost       float64 `json:"actual_cost"` // 实际扣除
-}
-
 // UserDashboardStats 用户仪表盘统计
 type UserDashboardStats struct {
 	// API Key 统计
@@ -243,20 +230,6 @@ type UserDashboardStats struct {
 	// 性能指标
 	Rpm int64 `json:"rpm"` // 近5分钟平均每分钟请求数
 	Tpm int64 `json:"tpm"` // 近5分钟平均每分钟Token数
-
-	// 按"有效平台"维度拆分（与 ops 路径口径一致：group.platform 优先，否则 account.platform）
-	ByPlatform []PlatformDashboardStats `json:"by_platform,omitempty"`
-}
-
-// PlatformDashboardStats 单个平台的用量明细。
-type PlatformDashboardStats struct {
-	Platform        string  `json:"platform"`
-	TotalRequests   int64   `json:"total_requests"`
-	TotalTokens     int64   `json:"total_tokens"`
-	TotalActualCost float64 `json:"total_actual_cost"`
-	TodayRequests   int64   `json:"today_requests"`
-	TodayTokens     int64   `json:"today_tokens"`
-	TodayActualCost float64 `json:"today_actual_cost"`
 }
 
 // UsageLogFilters represents filters for usage log queries
@@ -292,20 +265,37 @@ type UsageStats struct {
 	EndpointPaths     []EndpointStat `json:"endpoint_paths,omitempty"`
 }
 
-// PlatformUsage 表示某用户/某 API key 在单个"有效平台"维度的用量明细。
-// Platform 取值与 ops 路径口径一致：优先 groups.platform，否则 accounts.platform。
-type PlatformUsage struct {
-	Platform        string  `json:"platform"`
-	TodayActualCost float64 `json:"today_actual_cost"`
-	TotalActualCost float64 `json:"total_actual_cost"`
+// CreditUsageGroupEstimate represents credit entitlement/remaining estimates for a group multiplier.
+type CreditUsageGroupEstimate struct {
+	GroupID               int64   `json:"group_id"`
+	GroupName             string  `json:"group_name"`
+	RateMultiplier        float64 `json:"rate_multiplier"`
+	PurchasedLedgerAmount float64 `json:"purchased_ledger_amount"`
+	PurchasedCredits      float64 `json:"purchased_credits"`
+	RemainingCredits      float64 `json:"remaining_credits"`
+}
+
+// CreditUsageSummary represents aggregate credit usage reconstructed from existing logs and orders.
+type CreditUsageSummary struct {
+	UserID                          int64                      `json:"user_id"`
+	CreditUnitScale                 float64                    `json:"credit_unit_scale"`
+	BalanceLedgerAmount             float64                    `json:"balance_ledger_amount"`
+	TotalPurchasedLedgerAmount      float64                    `json:"total_purchased_ledger_amount"`
+	UnassignedPurchasedLedgerAmount float64                    `json:"unassigned_purchased_ledger_amount"`
+	TotalPurchasedCredits           float64                    `json:"total_purchased_credits"`
+	TotalUsedLedgerAmount           float64                    `json:"total_used_ledger_amount"`
+	TotalUsedCredits                float64                    `json:"total_used_credits"`
+	UsageLogCount                   int64                      `json:"usage_log_count"`
+	GroupEstimates                  []CreditUsageGroupEstimate `json:"group_estimates"`
+	Accuracy                        string                     `json:"accuracy"`
+	AccuracyNotes                   []string                   `json:"accuracy_notes"`
 }
 
 // BatchUserUsageStats represents usage stats for a single user
 type BatchUserUsageStats struct {
-	UserID          int64           `json:"user_id"`
-	TodayActualCost float64         `json:"today_actual_cost"`
-	TotalActualCost float64         `json:"total_actual_cost"`
-	ByPlatform      []PlatformUsage `json:"by_platform,omitempty"`
+	UserID          int64   `json:"user_id"`
+	TodayActualCost float64 `json:"today_actual_cost"`
+	TotalActualCost float64 `json:"total_actual_cost"`
 }
 
 // BatchAPIKeyUsageStats represents usage stats for a single API key
