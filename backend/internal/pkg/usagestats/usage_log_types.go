@@ -265,6 +265,32 @@ type UsageStats struct {
 	EndpointPaths     []EndpointStat `json:"endpoint_paths,omitempty"`
 }
 
+// CreditUsageGroupEstimate represents credit entitlement/remaining estimates for a group multiplier.
+type CreditUsageGroupEstimate struct {
+	GroupID               int64   `json:"group_id"`
+	GroupName             string  `json:"group_name"`
+	RateMultiplier        float64 `json:"rate_multiplier"`
+	PurchasedLedgerAmount float64 `json:"purchased_ledger_amount"`
+	PurchasedCredits      float64 `json:"purchased_credits"`
+	RemainingCredits      float64 `json:"remaining_credits"`
+}
+
+// CreditUsageSummary represents aggregate credit usage reconstructed from existing logs and orders.
+type CreditUsageSummary struct {
+	UserID                          int64                      `json:"user_id"`
+	CreditUnitScale                 float64                    `json:"credit_unit_scale"`
+	BalanceLedgerAmount             float64                    `json:"balance_ledger_amount"`
+	TotalPurchasedLedgerAmount      float64                    `json:"total_purchased_ledger_amount"`
+	UnassignedPurchasedLedgerAmount float64                    `json:"unassigned_purchased_ledger_amount"`
+	TotalPurchasedCredits           float64                    `json:"total_purchased_credits"`
+	TotalUsedLedgerAmount           float64                    `json:"total_used_ledger_amount"`
+	TotalUsedCredits                float64                    `json:"total_used_credits"`
+	UsageLogCount                   int64                      `json:"usage_log_count"`
+	GroupEstimates                  []CreditUsageGroupEstimate `json:"group_estimates"`
+	Accuracy                        string                     `json:"accuracy"`
+	AccuracyNotes                   []string                   `json:"accuracy_notes"`
+}
+
 // BatchUserUsageStats represents usage stats for a single user
 type BatchUserUsageStats struct {
 	UserID          int64   `json:"user_id"`
