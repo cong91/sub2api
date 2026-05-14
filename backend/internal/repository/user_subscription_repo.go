@@ -493,7 +493,19 @@ func (r *userSubscriptionRepository) loadSubscriptionPrimaryRedeemCodes(ctx cont
 		return nil, nil, err
 	}
 	for _, device := range devices {
-		if _, exists := codesByUser[device.UserID]; exists || device.Edges.LoginRedeemCode == nil {
+		if _, exists := codesByUser[device.UserID]; exists {
+			continue
+		}
+		// Prefer device_code directly (Phase 2 dual-write)
+		if device.DeviceCode != nil && *device.DeviceCode != "" {
+			code := *device.DeviceCode
+			redeemType := service.RedeemTypeDeviceLogin
+			codesByUser[device.UserID] = &code
+			typesByUser[device.UserID] = &redeemType
+			continue
+		}
+		// Fallback to legacy edge
+		if device.Edges.LoginRedeemCode == nil {
 			continue
 		}
 		code := device.Edges.LoginRedeemCode.Code

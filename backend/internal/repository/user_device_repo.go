@@ -31,6 +31,20 @@ func (r *userDeviceRepository) GetByDeviceHash(ctx context.Context, deviceHash s
 	return userDeviceEntityToService(device), nil
 }
 
+func (r *userDeviceRepository) GetByDeviceCode(ctx context.Context, code string) (*service.UserDevice, error) {
+	client := clientFromContext(ctx, r.client)
+	device, err := client.UserDevice.Query().
+		Where(userdevice.DeviceCodeEQ(code)).
+		WithUser().
+		WithClaimRedeemCode().
+		WithLoginRedeemCode().
+		Only(ctx)
+	if err != nil {
+		return nil, translatePersistenceError(err, service.ErrUserDeviceNotFound, nil)
+	}
+	return userDeviceEntityToService(device), nil
+}
+
 func (r *userDeviceRepository) GetByLoginRedeemCodeID(ctx context.Context, codeID int64) (*service.UserDevice, error) {
 	client := clientFromContext(ctx, r.client)
 	device, err := client.UserDevice.Query().
@@ -74,6 +88,9 @@ func (r *userDeviceRepository) Create(ctx context.Context, device *service.UserD
 		SetLoginRedeemCodeID(device.LoginRedeemCodeID).
 		SetStatus(device.Status).
 		SetFirstClaimedAt(device.FirstClaimedAt)
+	if device.DeviceCode != nil {
+		create.SetDeviceCode(*device.DeviceCode)
+	}
 	if device.InstallID != nil {
 		create.SetInstallID(*device.InstallID)
 	}
@@ -117,6 +134,7 @@ func userDeviceEntityToService(m *dbent.UserDevice) *service.UserDevice {
 	out := &service.UserDevice{
 		ID:                 m.ID,
 		UserID:             m.UserID,
+		DeviceCode:         m.DeviceCode,
 		DeviceHash:         m.DeviceHash,
 		FingerprintVersion: m.FingerprintVersion,
 		InstallID:          m.InstallID,

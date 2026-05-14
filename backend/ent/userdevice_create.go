@@ -30,6 +30,20 @@ func (_c *UserDeviceCreate) SetUserID(v int64) *UserDeviceCreate {
 	return _c
 }
 
+// SetDeviceCode sets the "device_code" field.
+func (_c *UserDeviceCreate) SetDeviceCode(v string) *UserDeviceCreate {
+	_c.mutation.SetDeviceCode(v)
+	return _c
+}
+
+// SetNillableDeviceCode sets the "device_code" field if the given value is not nil.
+func (_c *UserDeviceCreate) SetNillableDeviceCode(v *string) *UserDeviceCreate {
+	if v != nil {
+		_c.SetDeviceCode(*v)
+	}
+	return _c
+}
+
 // SetDeviceHash sets the "device_hash" field.
 func (_c *UserDeviceCreate) SetDeviceHash(v string) *UserDeviceCreate {
 	_c.mutation.SetDeviceHash(v)
@@ -271,6 +285,11 @@ func (_c *UserDeviceCreate) check() error {
 	if _, ok := _c.mutation.UserID(); !ok {
 		return &ValidationError{Name: "user_id", err: errors.New(`ent: missing required field "UserDevice.user_id"`)}
 	}
+	if v, ok := _c.mutation.DeviceCode(); ok {
+		if err := userdevice.DeviceCodeValidator(v); err != nil {
+			return &ValidationError{Name: "device_code", err: fmt.Errorf(`ent: validator failed for field "UserDevice.device_code": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.DeviceHash(); !ok {
 		return &ValidationError{Name: "device_hash", err: errors.New(`ent: missing required field "UserDevice.device_hash"`)}
 	}
@@ -361,6 +380,10 @@ func (_c *UserDeviceCreate) createSpec() (*UserDevice, *sqlgraph.CreateSpec) {
 		_spec = sqlgraph.NewCreateSpec(userdevice.Table, sqlgraph.NewFieldSpec(userdevice.FieldID, field.TypeInt64))
 	)
 	_spec.OnConflict = _c.conflict
+	if value, ok := _c.mutation.DeviceCode(); ok {
+		_spec.SetField(userdevice.FieldDeviceCode, field.TypeString, value)
+		_node.DeviceCode = &value
+	}
 	if value, ok := _c.mutation.DeviceHash(); ok {
 		_spec.SetField(userdevice.FieldDeviceHash, field.TypeString, value)
 		_node.DeviceHash = value
@@ -521,6 +544,24 @@ func (u *UserDeviceUpsert) SetUserID(v int64) *UserDeviceUpsert {
 // UpdateUserID sets the "user_id" field to the value that was provided on create.
 func (u *UserDeviceUpsert) UpdateUserID() *UserDeviceUpsert {
 	u.SetExcluded(userdevice.FieldUserID)
+	return u
+}
+
+// SetDeviceCode sets the "device_code" field.
+func (u *UserDeviceUpsert) SetDeviceCode(v string) *UserDeviceUpsert {
+	u.Set(userdevice.FieldDeviceCode, v)
+	return u
+}
+
+// UpdateDeviceCode sets the "device_code" field to the value that was provided on create.
+func (u *UserDeviceUpsert) UpdateDeviceCode() *UserDeviceUpsert {
+	u.SetExcluded(userdevice.FieldDeviceCode)
+	return u
+}
+
+// ClearDeviceCode clears the value of the "device_code" field.
+func (u *UserDeviceUpsert) ClearDeviceCode() *UserDeviceUpsert {
+	u.SetNull(userdevice.FieldDeviceCode)
 	return u
 }
 
@@ -772,6 +813,27 @@ func (u *UserDeviceUpsertOne) SetUserID(v int64) *UserDeviceUpsertOne {
 func (u *UserDeviceUpsertOne) UpdateUserID() *UserDeviceUpsertOne {
 	return u.Update(func(s *UserDeviceUpsert) {
 		s.UpdateUserID()
+	})
+}
+
+// SetDeviceCode sets the "device_code" field.
+func (u *UserDeviceUpsertOne) SetDeviceCode(v string) *UserDeviceUpsertOne {
+	return u.Update(func(s *UserDeviceUpsert) {
+		s.SetDeviceCode(v)
+	})
+}
+
+// UpdateDeviceCode sets the "device_code" field to the value that was provided on create.
+func (u *UserDeviceUpsertOne) UpdateDeviceCode() *UserDeviceUpsertOne {
+	return u.Update(func(s *UserDeviceUpsert) {
+		s.UpdateDeviceCode()
+	})
+}
+
+// ClearDeviceCode clears the value of the "device_code" field.
+func (u *UserDeviceUpsertOne) ClearDeviceCode() *UserDeviceUpsertOne {
+	return u.Update(func(s *UserDeviceUpsert) {
+		s.ClearDeviceCode()
 	})
 }
 
@@ -1221,6 +1283,27 @@ func (u *UserDeviceUpsertBulk) SetUserID(v int64) *UserDeviceUpsertBulk {
 func (u *UserDeviceUpsertBulk) UpdateUserID() *UserDeviceUpsertBulk {
 	return u.Update(func(s *UserDeviceUpsert) {
 		s.UpdateUserID()
+	})
+}
+
+// SetDeviceCode sets the "device_code" field.
+func (u *UserDeviceUpsertBulk) SetDeviceCode(v string) *UserDeviceUpsertBulk {
+	return u.Update(func(s *UserDeviceUpsert) {
+		s.SetDeviceCode(v)
+	})
+}
+
+// UpdateDeviceCode sets the "device_code" field to the value that was provided on create.
+func (u *UserDeviceUpsertBulk) UpdateDeviceCode() *UserDeviceUpsertBulk {
+	return u.Update(func(s *UserDeviceUpsert) {
+		s.UpdateDeviceCode()
+	})
+}
+
+// ClearDeviceCode clears the value of the "device_code" field.
+func (u *UserDeviceUpsertBulk) ClearDeviceCode() *UserDeviceUpsertBulk {
+	return u.Update(func(s *UserDeviceUpsert) {
+		s.ClearDeviceCode()
 	})
 }
 

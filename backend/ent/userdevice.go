@@ -21,6 +21,8 @@ type UserDevice struct {
 	ID int64 `json:"id,omitempty"`
 	// UserID holds the value of the "user_id" field.
 	UserID int64 `json:"user_id,omitempty"`
+	// Device login code (DLG-XXXX-XXXX-XXXX). Canonical device identifier, replaces login_redeem_code lookup.
+	DeviceCode *string `json:"device_code,omitempty"`
 	// DeviceHash holds the value of the "device_hash" field.
 	DeviceHash string `json:"device_hash,omitempty"`
 	// FingerprintVersion holds the value of the "fingerprint_version" field.
@@ -108,7 +110,7 @@ func (*UserDevice) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case userdevice.FieldID, userdevice.FieldUserID, userdevice.FieldFingerprintVersion, userdevice.FieldClaimRedeemCodeID, userdevice.FieldLoginRedeemCodeID:
 			values[i] = new(sql.NullInt64)
-		case userdevice.FieldDeviceHash, userdevice.FieldInstallID, userdevice.FieldPlatform, userdevice.FieldArch, userdevice.FieldAppVersion, userdevice.FieldStatus:
+		case userdevice.FieldDeviceCode, userdevice.FieldDeviceHash, userdevice.FieldInstallID, userdevice.FieldPlatform, userdevice.FieldArch, userdevice.FieldAppVersion, userdevice.FieldStatus:
 			values[i] = new(sql.NullString)
 		case userdevice.FieldFirstClaimedAt, userdevice.FieldLastClaimedAt, userdevice.FieldLastLoginAt, userdevice.FieldCreatedAt, userdevice.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -138,6 +140,13 @@ func (_m *UserDevice) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field user_id", values[i])
 			} else if value.Valid {
 				_m.UserID = value.Int64
+			}
+		case userdevice.FieldDeviceCode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field device_code", values[i])
+			} else if value.Valid {
+				_m.DeviceCode = new(string)
+				*_m.DeviceCode = value.String
 			}
 		case userdevice.FieldDeviceHash:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -281,6 +290,11 @@ func (_m *UserDevice) String() string {
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
 	builder.WriteString("user_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.UserID))
+	builder.WriteString(", ")
+	if v := _m.DeviceCode; v != nil {
+		builder.WriteString("device_code=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	builder.WriteString("device_hash=")
 	builder.WriteString(_m.DeviceHash)

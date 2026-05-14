@@ -156,10 +156,20 @@ func (s *VClawClaimService) resumeExistingClaim(ctx context.Context, binding *Us
 	if err != nil || user == nil {
 		return nil, ErrServiceUnavailable
 	}
-	loginCode, err := s.redeemRepo.GetByID(ctx, binding.LoginRedeemCodeID)
-	if err != nil || loginCode == nil {
-		return nil, ErrServiceUnavailable
+
+	// Prefer device_code directly (Phase 2 dual-write)
+	var deviceLoginCode string
+	if binding.DeviceCode != nil && *binding.DeviceCode != "" {
+		deviceLoginCode = *binding.DeviceCode
+	} else {
+		// Fallback to legacy redeem_codes lookup
+		loginCode, err := s.redeemRepo.GetByID(ctx, binding.LoginRedeemCodeID)
+		if err != nil || loginCode == nil {
+			return nil, ErrServiceUnavailable
+		}
+		deviceLoginCode = loginCode.Code
 	}
+
 	if err := s.userDeviceRepo.UpdateLastClaimedAt(ctx, binding.ID, now); err != nil {
 		return nil, ErrServiceUnavailable
 	}
@@ -168,7 +178,7 @@ func (s *VClawClaimService) resumeExistingClaim(ctx context.Context, binding *Us
 		DeviceStatus:    deviceStatus,
 		Mode:            "resume",
 		UserID:          binding.UserID,
-		DeviceLoginCode: loginCode.Code,
+		DeviceLoginCode: deviceLoginCode,
 		DeviceBindingID: binding.ID,
 		ClaimedAt:       now,
 	}, nil
@@ -226,6 +236,7 @@ func (s *VClawClaimService) createFirstClaim(ctx context.Context, req VClawClaim
 		}
 		binding := &UserDevice{
 			UserID:             user.ID,
+			DeviceCode:         &loginCodeText,
 			DeviceHash:         deviceHash,
 			FingerprintVersion: req.Device.FingerprintVersion,
 			InstallID:          installID,

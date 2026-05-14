@@ -26,6 +26,8 @@ func (UserDevice) Annotations() []schema.Annotation {
 func (UserDevice) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int64("user_id"),
+		field.String("device_code").MaxLen(20).Optional().Nillable().
+			Comment("Device login code (DLG-XXXX-XXXX-XXXX). Canonical device identifier, replaces login_redeem_code lookup."),
 		field.String("device_hash").MaxLen(64).NotEmpty(),
 		field.Int("fingerprint_version").Default(1),
 		field.String("install_id").Optional().Nillable().MaxLen(128),
@@ -64,6 +66,7 @@ func (UserDevice) Edges() []ent.Edge {
 
 func (UserDevice) Indexes() []ent.Index {
 	return []ent.Index{
+		index.Fields("device_code").Unique(),
 		index.Fields("device_hash").Unique(),
 		index.Fields("claim_redeem_code_id").Unique(),
 		index.Fields("login_redeem_code_id").Unique(),

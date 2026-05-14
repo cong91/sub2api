@@ -220,6 +220,10 @@ func (s *vclawClaimUserDeviceRepoStub) GetByLoginRedeemCodeID(context.Context, i
 	return nil, ErrUserDeviceNotFound
 }
 
+func (s *vclawClaimUserDeviceRepoStub) GetByDeviceCode(context.Context, string) (*UserDevice, error) {
+	return nil, ErrUserDeviceNotFound
+}
+
 func (s *vclawClaimUserDeviceRepoStub) GetByClaimRedeemCodeID(ctx context.Context, codeID int64) (*UserDevice, error) {
 	if s.byClaimRedeemCodeID == nil {
 		return nil, ErrUserDeviceNotFound

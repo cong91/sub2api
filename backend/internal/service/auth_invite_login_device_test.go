@@ -117,6 +117,20 @@ func (s *inviteLoginUserDeviceRepoStub) GetByDeviceHash(context.Context, string)
 	panic("unexpected GetByDeviceHash call")
 }
 
+func (s *inviteLoginUserDeviceRepoStub) GetByDeviceCode(_ context.Context, code string) (*UserDevice, error) {
+	if s.deviceByLoginCodeID == nil {
+		return nil, ErrUserDeviceNotFound
+	}
+	// Search by device_code field in the stub devices
+	for _, device := range s.deviceByLoginCodeID {
+		if device.DeviceCode != nil && *device.DeviceCode == code {
+			clone := *device
+			return &clone, nil
+		}
+	}
+	return nil, ErrUserDeviceNotFound
+}
+
 func (s *inviteLoginUserDeviceRepoStub) GetByLoginRedeemCodeID(_ context.Context, codeID int64) (*UserDevice, error) {
 	if s.deviceByLoginCodeID == nil {
 		return nil, ErrUserDeviceNotFound

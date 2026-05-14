@@ -103,6 +103,7 @@ type InviteBootstrapAPIKeyService interface {
 }
 
 type InviteLoginDeviceResolver interface {
+	GetByDeviceCode(ctx context.Context, code string) (*UserDevice, error)
 	GetByLoginRedeemCodeID(ctx context.Context, codeID int64) (*UserDevice, error)
 	UpdateLastLoginAt(ctx context.Context, id int64, at time.Time) error
 }
@@ -520,6 +521,16 @@ func (s *AuthService) InviteLogin(ctx context.Context, input InviteLoginInput) (
 	invitationCode := NormalizeRedeemCode(input.InvitationCode)
 	if invitationCode == "" {
 		return nil, ErrInvitationCodeRequired
+	}
+
+	// Phase 2 dual-path: try device_code lookup directly on user_devices first
+	if s.inviteLoginDeviceRepo != nil && isDeviceLoginCodePrefix(invitationCode) {
+		device, err := s.inviteLoginDeviceRepo.GetByDeviceCode(ctx, invitationCode)
+		if err == nil && device != nil {
+			// Found device by device_code — use the new path (no redeem_codes dependency)
+			return s.completeDeviceInviteLoginByDevice(ctx, input, device)
+		}
+		// Fallback to legacy redeem_codes path if not found
 	}
 
 	code, err := s.redeemRepo.GetByCode(ctx, invitationCode)
