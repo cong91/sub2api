@@ -1738,6 +1738,7 @@ export default {
         invitee: 'Invitee',
         user: 'User',
         affCode: 'Invite Code',
+        deviceCode: 'Device Code',
         order: 'Order',
         totalRebate: 'Total Rebate',
         orderAmount: 'Top-up Amount',

@@ -1742,6 +1742,7 @@ export default {
         invitee: '被邀请人',
         user: '用户',
         affCode: '邀请码',
+        deviceCode: '设备码',
         order: '订单',
         totalRebate: '累计返利',
         orderAmount: '充值金额',
