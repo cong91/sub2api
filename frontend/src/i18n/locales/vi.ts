@@ -2610,6 +2610,7 @@ export default {
       allStatus: 'Tất cả trạng thái',
       allGroups: 'Tất cả nhóm',
       allPlatforms: 'Tất cả nền tảng',
+      searchDeviceCode: 'Tìm theo device code...',
       daily: 'Ngày',
       weekly: 'Tuần',
       monthly: 'Tháng',

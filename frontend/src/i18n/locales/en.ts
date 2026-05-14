@@ -2859,6 +2859,7 @@ export default {
       allStatus: 'All Status',
       allGroups: 'All Groups',
       allPlatforms: 'All Platforms',
+      searchDeviceCode: 'Search by device code...',
       daily: 'Daily',
       weekly: 'Weekly',
       monthly: 'Monthly',
