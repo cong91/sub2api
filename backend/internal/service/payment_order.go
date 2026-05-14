@@ -1045,24 +1045,5 @@ func (s *PaymentService) AdminListOrders(ctx context.Context, userID int64, p Or
 // GetDeviceCodesByUserIDs returns a map of userID -> device_code for the given user IDs.
 // It picks the primary device (most recently logged in) for each user.
 func (s *PaymentService) GetDeviceCodesByUserIDs(ctx context.Context, userIDs []int64) map[int64]string {
-	if len(userIDs) == 0 {
-		return nil
-	}
-	devices, err := s.entClient.UserDevice.Query().
-		Where(userdevice.UserIDIn(userIDs...)).
-		Order(dbent.Desc(userdevice.FieldLastLoginAt), dbent.Desc(userdevice.FieldCreatedAt)).
-		All(ctx)
-	if err != nil || len(devices) == 0 {
-		return nil
-	}
-	result := make(map[int64]string, len(userIDs))
-	for _, d := range devices {
-		if _, exists := result[d.UserID]; exists {
-			continue
-		}
-		if d.DeviceCode != nil && *d.DeviceCode != "" {
-			result[d.UserID] = *d.DeviceCode
-		}
-	}
-	return result
+	return LookupDeviceCodesByUserIDs(ctx, s.entClient, userIDs)
 }

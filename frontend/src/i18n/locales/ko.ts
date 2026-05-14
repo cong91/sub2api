@@ -4371,6 +4371,8 @@ export default {
       billingModeImage: '요청별(이미지)',
       allBillingModes: '모든 청구 모드',
       ipAddress: 'IP',
+      deviceCode: '디바이스 코드',
+      searchDeviceCodePlaceholder: '디바이스 코드로 검색...',
       clickToViewBalance: '충전 기록 보려면 클릭',
       failedToLoadUser: '사용자 정보 로드 실패',
       cleanup: {
@@ -4651,6 +4653,7 @@ export default {
         group: '그룹',
         user: '사용자',
         userId: '사용자 ID',
+        deviceCode: '디바이스 코드',
         account: '계정',
         accountId: '계정 ID',
         status: '상태 코드',

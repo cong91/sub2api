@@ -4647,6 +4647,8 @@ export default {
       billingModeImage: 'Image',
       allBillingModes: 'All Billing Modes',
       ipAddress: 'IP',
+      deviceCode: 'Device Code',
+      searchDeviceCodePlaceholder: 'Search by device code...',
       clickToViewBalance: 'Click to view balance history',
       failedToLoadUser: 'Failed to load user info',
       cleanup: {
@@ -4922,6 +4924,7 @@ export default {
         group: 'Group',
         user: 'User',
         userId: 'User ID',
+        deviceCode: 'Device Code',
         account: 'Account',
         accountId: 'Account ID',
         status: 'Status',

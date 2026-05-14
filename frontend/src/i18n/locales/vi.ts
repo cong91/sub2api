@@ -4371,6 +4371,8 @@ export default {
       billingModeImage: 'Theo lượt (hình ảnh)',
       allBillingModes: 'Tất cả chế độ tính phí',
       ipAddress: 'IP',
+      deviceCode: 'Mã thiết bị',
+      searchDeviceCodePlaceholder: 'Tìm theo mã thiết bị...',
       clickToViewBalance: 'Nhấp để xem lịch sử nạp tiền',
       failedToLoadUser: 'Tải thông tin người dùng thất bại',
       cleanup: {

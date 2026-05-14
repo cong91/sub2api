@@ -4624,6 +4624,8 @@ export default {
       billingModeImage: '按次(图片)',
       allBillingModes: '全部计费模式',
       ipAddress: 'IP',
+      deviceCode: '设备码',
+      searchDeviceCodePlaceholder: '按设备码搜索...',
       clickToViewBalance: '点击查看充值记录',
       failedToLoadUser: '加载用户信息失败',
       cleanup: {
@@ -4904,6 +4906,7 @@ export default {
         group: '分组',
         user: '用户',
         userId: '用户 ID',
+        deviceCode: '设备码',
         account: '账号',
         accountId: '账号 ID',
         status: '状态码',
