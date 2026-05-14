@@ -7262,6 +7262,7 @@ export default {
       dailyRevenue: 'Doanh thu theo ngày',
       paymentDistribution: 'Phân bố phương thức thanh toán',
       colUser: 'Người dùng',
+      colDeviceCode: 'Device Code',
       topUsers: 'Xếp hạng chi tiêu',
       noData: 'Chưa có dữ liệu',
       days: 'ngày',

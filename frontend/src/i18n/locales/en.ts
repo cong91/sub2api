@@ -7269,6 +7269,7 @@ export default {
       dailyRevenue: 'Daily Revenue',
       paymentDistribution: 'Payment Distribution',
       colUser: 'User',
+      colDeviceCode: 'Device Code',
       topUsers: 'Top Users',
       noData: 'No data',
       days: 'days',
