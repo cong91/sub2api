@@ -680,7 +680,7 @@ async function redirectAfterPasswordLogin(): Promise<void> {
   await router.push(redirectTo)
 }
 
-async function redirectAfterRedeemLogin(): Promise<void> {
+async function redirectAfterDeviceCodeLogin(): Promise<void> {
   await router.push({
     path: '/profile',
     query: { inviteBootstrap: '1' }
@@ -719,7 +719,7 @@ async function handlePasswordLogin(): Promise<void> {
   await redirectAfterPasswordLogin()
 }
 
-async function handleRedeemLogin(): Promise<void> {
+async function handleDeviceCodeLogin(): Promise<void> {
   await authStore.inviteLogin({
     invitation_code: inviteForm.invitation_code,
     client_kind: 'web',
@@ -732,8 +732,8 @@ async function handleRedeemLogin(): Promise<void> {
   })
 
   clearAllAffiliateReferralCodes()
-  appStore.showSuccess(t('auth.redeemLoginSuccess'))
-  await redirectAfterRedeemLogin()
+  appStore.showSuccess(t('auth.deviceCodeLoginSuccess'))
+  await redirectAfterDeviceCodeLogin()
 }
 
 async function handleSubmit(): Promise<void> {
@@ -753,13 +753,13 @@ async function handleSubmit(): Promise<void> {
 
   try {
     if (loginMode.value === 'redeem') {
-      await handleRedeemLogin()
+      await handleDeviceCodeLogin()
       return
     }
 
     await handlePasswordLogin()
   } catch (error: unknown) {
-    const fallback = loginMode.value === 'redeem' ? t('auth.redeemLoginFailed') : t('auth.loginFailed')
+    const fallback = loginMode.value === 'redeem' ? t('auth.deviceCodeLoginFailed') : t('auth.loginFailed')
     errorMessage.value = extractI18nErrorMessage(error, t, 'auth.errors', fallback)
     appStore.showError(errorMessage.value)
   } finally {
