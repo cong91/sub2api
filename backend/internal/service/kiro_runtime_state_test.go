@@ -21,6 +21,7 @@ import (
 type stubKiroCooldownStore struct {
 	reserveWait  time.Duration
 	reserveErr   error
+	reserveKeys  []string
 	successErr   error
 	mark429TTL   time.Duration
 	mark429Err   error
@@ -76,7 +77,8 @@ func (r *recordingKiroErrorRepo) SetError(_ context.Context, id int64, errorMsg 
 	return nil
 }
 
-func (s *stubKiroCooldownStore) ReserveRequest(context.Context, string) (time.Duration, error) {
+func (s *stubKiroCooldownStore) ReserveRequest(_ context.Context, tokenKey string) (time.Duration, error) {
+	s.reserveKeys = append(s.reserveKeys, tokenKey)
 	return s.reserveWait, s.reserveErr
 }
 
@@ -291,6 +293,42 @@ func TestExecuteKiroUpstreamCooldownReturnsFailoverError(t *testing.T) {
 	require.Equal(t, http.StatusTooManyRequests, failoverErr.StatusCode)
 	require.Equal(t, "kiro token is in cooldown for 33s (reason: rate_limit_exceeded)", string(failoverErr.ResponseBody))
 	require.False(t, failoverErr.RetryableOnSameAccount)
+}
+
+func TestExecuteKiroUpstreamChecksCooldownBeforeEachRetry(t *testing.T) {
+	account := &Account{
+		ID:          42,
+		Platform:    PlatformKiro,
+		Type:        AccountTypeOAuth,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+	}
+	store := &stubKiroCooldownStore{}
+	upstream := &queuedHTTPUpstream{
+		errors: []error{
+			errors.New("transient network reset"),
+		},
+		responses: []*http.Response{
+			newJSONResponse(http.StatusOK, `{"ok":true}`),
+		},
+	}
+	svc := &GatewayService{
+		httpUpstream:        upstream,
+		kiroCooldownStore:   store,
+		tlsFPProfileService: &TLSFingerprintProfileService{},
+	}
+
+	payload, err := createTestPayload("claude-sonnet-4-6")
+	require.NoError(t, err)
+	payloadBytes, err := json.Marshal(payload)
+	require.NoError(t, err)
+
+	resp, _, err := svc.executeKiroUpstream(context.Background(), account, payloadBytes, "claude-sonnet-4-6", "claude-sonnet-4-6", "test-token", nil)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Len(t, upstream.requests, 2)
+	require.Equal(t, []string{buildKiroAccountKey(account), buildKiroAccountKey(account)}, store.reserveKeys)
 }
 
 func TestExecuteKiroUpstreamInvalidModelDoesNotRefreshProfileArnOrRetry(t *testing.T) {
