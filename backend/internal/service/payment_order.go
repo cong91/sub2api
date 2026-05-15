@@ -241,14 +241,13 @@ func withBalancePackageProviderSnapshot(snapshot map[string]any, pkg BalanceRech
 		snapshot = map[string]any{"schema_version": 2}
 	}
 	snapshot["balance_package"] = map[string]any{
-		"id":                pkg.ID,
-		"label":             pkg.Label,
-		"amount_ledger":     pkg.AmountLedger,
-		"credit_ledger":     pkg.CreditLedger,
-		"bonus_ledger":      pkg.BonusLedger,
-		"credit_multiplier": pkg.CreditMultiplier,
-		"balance_group_id":  pkg.BalanceGroupID,
-		"group_id":          pkg.BalanceGroupID,
+		"id":               pkg.ID,
+		"label":            pkg.Label,
+		"amount_ledger":    pkg.AmountLedger,
+		"actual_credits":   pkg.ActualCredits,
+		"credit_unit":      pkg.CreditUnit,
+		"balance_group_id": pkg.BalanceGroupID,
+		"group_id":         pkg.BalanceGroupID,
 	}
 	return snapshot
 }
