@@ -11,7 +11,6 @@ import (
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
-
 func validateBalancePackageRequired(code, label string, amountLedger float64) error {
 	if strings.TrimSpace(code) == "" {
 		return infraerrors.BadRequest("BALANCE_PACKAGE_CODE_REQUIRED", "package code is required")
@@ -38,8 +37,6 @@ func validateBalancePackagePatch(req UpdateBalancePackageRequest) error {
 	return nil
 }
 
-
-
 func balancePackageGroupID(balanceGroupID, legacyGroupID *int64) *int64 {
 	if balanceGroupID != nil {
 		return balanceGroupID
@@ -54,7 +51,6 @@ func normalizeBalancePackageCreditUnit(value string) string {
 	}
 	return unit
 }
-
 
 func (s *PaymentConfigService) loadBalancePackageGroup(ctx context.Context, groupID *int64) (*dbent.Group, error) {
 	if groupID == nil {

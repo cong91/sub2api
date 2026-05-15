@@ -238,10 +238,10 @@ type UpdateBalancePackageRequest struct {
 	CreditUnit     *string  `json:"credit_unit"`
 	BalanceGroupID *int64   `json:"balance_group_id"`
 	GroupID        *int64   `json:"group_id"` // Backward-compatible alias for balance_group_id.
-	Badge            *string  `json:"badge"`
-	Popular          *bool    `json:"popular"`
-	ForSale          *bool    `json:"for_sale"`
-	SortOrder        *int     `json:"sort_order"`
+	Badge          *string  `json:"badge"`
+	Popular        *bool    `json:"popular"`
+	ForSale        *bool    `json:"for_sale"`
+	SortOrder      *int     `json:"sort_order"`
 }
 
 // PaymentConfigService manages payment configuration and CRUD for
