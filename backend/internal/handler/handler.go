@@ -66,6 +66,7 @@ type Handlers struct {
 	AvailableChannel *AvailableChannelHandler
 	AsyncImage       *AsyncImageHandler
 	BatchImage       *BatchImageHandler
+	ProviderCatalog  *ProviderCatalogHandler
 }
 
 // BuildInfo contains build-time information
