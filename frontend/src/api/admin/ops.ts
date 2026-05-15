@@ -839,6 +839,7 @@ export interface OpsSystemLog {
   platform?: string
   model?: string
   extra?: Record<string, any>
+  device_code?: string
 }
 
 export type OpsSystemLogListResponse = PaginatedResponse<OpsSystemLog>
@@ -936,6 +937,7 @@ export interface OpsErrorLog {
   // 用户列以此回退显示所有者
   deleted_key_owner_user_id?: number | null
   deleted_key_owner_email?: string | null
+  device_code?: string
 }
 
 export interface OpsErrorDetail extends OpsErrorLog {
