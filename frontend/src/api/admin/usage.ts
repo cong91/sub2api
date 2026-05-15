@@ -87,6 +87,7 @@ export interface AdminUsageQueryParams extends UsageQueryParams {
   billing_mode?: string
   sort_by?: string
   sort_order?: 'asc' | 'desc'
+  device_code?: string
 }
 
 // ==================== API Functions ====================
