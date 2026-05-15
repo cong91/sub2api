@@ -59,6 +59,51 @@ BEGIN
 END $$;`,
 		},
 		{
+			name: "preserves BEGIN inside CREATE FUNCTION AS $$ block",
+			input: `CREATE OR REPLACE FUNCTION foo()
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    parsed JSONB;
+BEGIN
+    IF true THEN
+        RETURN;
+    END IF;
+END;
+$$;
+
+DO $$
+BEGIN
+    IF to_regclass('public.test') IS NULL THEN
+        RETURN;
+    END IF;
+END $$;
+
+ALTER TABLE foo ADD COLUMN bar TEXT;`,
+			expected: `CREATE OR REPLACE FUNCTION foo()
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    parsed JSONB;
+BEGIN
+    IF true THEN
+        RETURN;
+    END IF;
+END;
+$$;
+
+DO $$
+BEGIN
+    IF to_regclass('public.test') IS NULL THEN
+        RETURN;
+    END IF;
+END $$;
+
+ALTER TABLE foo ADD COLUMN bar TEXT;`,
+		},
+		{
 			name:     "no-op for plain SQL",
 			input:    "ALTER TABLE users ADD COLUMN name TEXT;",
 			expected: "ALTER TABLE users ADD COLUMN name TEXT;",
