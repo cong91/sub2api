@@ -140,6 +140,7 @@ const formatSystemLogDetail = (row: OpsSystemLog) => {
   if (row.request_id) corrParts.push(`req=${row.request_id}`)
   if (row.client_request_id) corrParts.push(`client_req=${row.client_request_id}`)
   if (row.user_id != null) corrParts.push(`user=${row.user_id}`)
+  if (row.device_code) corrParts.push(`device=${row.device_code}`)
   if (row.account_id != null) corrParts.push(`acc=${row.account_id}`)
   if (row.platform) corrParts.push(`platform=${row.platform}`)
   if (row.model) corrParts.push(`model=${row.model}`)
