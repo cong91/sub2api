@@ -284,8 +284,21 @@ func prepareNonTransactionalMigration(ctx context.Context, db *sql.DB, name stri
 func stripRedundantTransactionControl(content string) string {
 	lines := strings.Split(content, "\n")
 	var result []string
+	inDollarBlock := false
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(strings.ToUpper(line))
+		// Track DO $$ ... END $$; blocks to avoid stripping BEGIN inside them
+		if !inDollarBlock && (strings.Contains(trimmed, "$$") && (strings.HasPrefix(trimmed, "DO") || strings.HasPrefix(trimmed, "CREATE"))) {
+			inDollarBlock = true
+		}
+		if inDollarBlock {
+			result = append(result, line)
+			// End of dollar-quoted block
+			if strings.Contains(trimmed, "$$;") || (strings.HasSuffix(trimmed, "$$") && trimmed != "DO $$" && !strings.HasPrefix(trimmed, "DO")) {
+				inDollarBlock = false
+			}
+			continue
+		}
 		// Strip standalone BEGIN; / COMMIT; / ROLLBACK; at top level
 		if trimmed == "BEGIN;" || trimmed == "BEGIN" ||
 			trimmed == "COMMIT;" || trimmed == "COMMIT" ||
