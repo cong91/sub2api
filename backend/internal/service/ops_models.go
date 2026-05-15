@@ -15,6 +15,7 @@ type OpsSystemLog struct {
 	Platform        string         `json:"platform"`
 	Model           string         `json:"model"`
 	Extra           map[string]any `json:"extra,omitempty"`
+	DeviceCode      string         `json:"device_code,omitempty"`
 }
 
 type OpsErrorLog struct {
@@ -64,6 +65,8 @@ type OpsErrorLog struct {
 	RequestedModel   string `json:"requested_model"`
 	UpstreamModel    string `json:"upstream_model"`
 	RequestType      *int16 `json:"request_type"`
+
+	DeviceCode string `json:"device_code,omitempty"`
 }
 
 type OpsErrorLogDetail struct {
