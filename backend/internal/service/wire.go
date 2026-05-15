@@ -670,6 +670,7 @@ var ProviderSet = wire.NewSet(
 	ProvideScheduledTestRunnerService,
 	NewGroupCapacityService,
 	NewChannelService,
+	NewProviderCatalogService,
 	NewModelPricingResolver,
 	NewContentModerationService,
 	NewAffiliateService,
