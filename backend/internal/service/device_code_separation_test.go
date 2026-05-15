@@ -126,63 +126,24 @@ func TestInviteLoginUsesDeviceCodeDirectly(t *testing.T) {
 	require.Equal(t, []int64{10}, userDeviceRepo.updatedLoginIDs)
 }
 
-func TestInviteLoginFallsBackToRedeemWhenDeviceCodeNotFound(t *testing.T) {
-	// When device_code is NOT populated (legacy data), the system should
-	// fall back to the redeem_codes path.
+func TestInviteLoginReturnsErrorWhenDeviceCodeNotFound(t *testing.T) {
+	// When device_code is NOT found in user_devices, should return error
+	// (no fallback to redeem_codes).
 	const (
 		loginCode  = "DLG-FALL-BACK-0001"
 		deviceHash = "bc1addf134d4ac9d6ac98ffdb1f4796dd2b27d6ab2b66ec0bab9e181a007b668"
 	)
 
-	boundUser := &User{
-		ID:       200,
-		Email:    "fallback@example.com",
-		Username: "fallback-user",
-		Role:     RoleUser,
-		Status:   StatusActive,
-	}
-
-	// Device has NO device_code set (legacy)
+	// Device repo has no matching device_code
 	userDeviceRepo := &inviteLoginUserDeviceRepoStub{
-		deviceByLoginCodeID: map[int64]*UserDevice{
-			60: {
-				ID:                20,
-				UserID:            200,
-				DeviceCode:        nil, // NOT populated — legacy
-				DeviceHash:        deviceHash,
-				LoginRedeemCodeID: 60,
-				Status:            UserDeviceStatusActive,
-			},
-		},
+		deviceByLoginCodeID: map[int64]*UserDevice{},
 	}
 
-	usedAt := time.Now().UTC().Add(-24 * time.Hour)
-	loginRedeem := &RedeemCode{
-		ID:     60,
-		Code:   loginCode,
-		Type:   RedeemTypeDeviceLogin,
-		Status: StatusUsed,
-		UsedAt: &usedAt,
-	}
-	redeemRepo := &dcTestRedeemRepo{
-		codesByCode: map[string]*RedeemCode{loginCode: loginRedeem},
-		codesByID:   map[int64]*RedeemCode{60: loginRedeem},
-	}
-
-	bootstrapSvc := &inviteBootstrapAPIKeyServiceStub{
-		groups: []Group{
-			{
-				ID:                 101,
-				Platform:           "openai",
-				Status:             StatusActive,
-				SubscriptionType:   SubscriptionTypeStandard,
-				ActiveAccountCount: 1,
-			},
-		},
-	}
+	redeemRepo := &dcTestRedeemRepo{codesByCode: map[string]*RedeemCode{}}
+	bootstrapSvc := &inviteBootstrapAPIKeyServiceStub{}
 
 	authService := newAuthServiceForInviteLoginTest(
-		&userRepoStub{user: boundUser},
+		&userRepoStub{user: &User{ID: 200, Status: StatusActive, Role: RoleUser}},
 		redeemRepo,
 		userDeviceRepo,
 		map[string]string{
@@ -197,12 +158,8 @@ func TestInviteLoginFallsBackToRedeemWhenDeviceCodeNotFound(t *testing.T) {
 		ClientKind:     "desktop",
 	})
 
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	require.NotNil(t, result.User)
-	require.Equal(t, int64(200), result.User.ID)
-	// Should still update last_login_at via legacy path
-	require.Equal(t, []int64{20}, userDeviceRepo.updatedLoginIDs)
+	require.Error(t, err)
+	require.Nil(t, result)
 }
 
 func TestInviteLoginByDeviceCodeRejectsRevokedDevice(t *testing.T) {
@@ -494,8 +451,9 @@ func TestVClawClaimResumeUsesDeviceCodeDirectly(t *testing.T) {
 	require.Equal(t, deviceCode, result.DeviceLoginCode)
 }
 
-func TestVClawClaimResumeFallsBackToRedeemWhenNoDeviceCode(t *testing.T) {
-	// When resuming and device_code is nil (legacy), should fall back to redeem lookup
+func TestVClawClaimResumeReturnsErrorWhenNoDeviceCode(t *testing.T) {
+	// When resuming and device_code is nil (legacy device without migration),
+	// should return error since we no longer fall back to redeem_codes.
 	deviceHash := "fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321"
 
 	existingDevice := &UserDevice{
@@ -507,15 +465,7 @@ func TestVClawClaimResumeFallsBackToRedeemWhenNoDeviceCode(t *testing.T) {
 		Status:            UserDeviceStatusActive,
 	}
 
-	loginRedeem := &RedeemCode{
-		ID:   888,
-		Code: "DLG-LEGA-CYCO-DE01",
-		Type: RedeemTypeDeviceLogin,
-	}
-	redeemRepo := &vclawClaimRedeemRepoStub{
-		codes:     map[string]*RedeemCode{loginRedeem.Code: loginRedeem},
-		codesByID: map[int64]*RedeemCode{888: loginRedeem},
-	}
+	redeemRepo := &vclawClaimRedeemRepoStub{}
 	deviceRepo := &vclawClaimUserDeviceRepoStub{
 		byDeviceHash: map[string]*UserDevice{
 			deviceHash: existingDevice,
@@ -543,10 +493,8 @@ func TestVClawClaimResumeFallsBackToRedeemWhenNoDeviceCode(t *testing.T) {
 		},
 	})
 
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	require.Equal(t, "resume", result.Mode)
-	require.Equal(t, "DLG-LEGA-CYCO-DE01", result.DeviceLoginCode)
+	require.Error(t, err)
+	require.Nil(t, result)
 }
 
 // =============================================================================

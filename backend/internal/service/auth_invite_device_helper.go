@@ -71,13 +71,8 @@ func (s *AuthService) completeDeviceInviteLoginByDevice(ctx context.Context, inp
 
 	var bootstrapKeys []InviteBootstrapAPIKey
 	if !allowWebLoginWithoutDeviceHash {
-		// For the new path, we need the redeem code to provision API keys.
-		// Fetch it via the still-existing FK for backward compat.
-		code, codeErr := s.redeemRepo.GetByID(ctx, device.LoginRedeemCodeID)
-		if codeErr != nil {
-			return nil, ErrServiceUnavailable
-		}
-		bootstrapKeys, err = s.provisionInviteBootstrapAPIKeys(ctx, user.ID, code)
+		// Provision bootstrap API keys directly without redeem_codes dependency
+		bootstrapKeys, err = s.provisionInviteBootstrapAPIKeysForDevice(ctx, user.ID)
 		if err != nil {
 			return nil, err
 		}

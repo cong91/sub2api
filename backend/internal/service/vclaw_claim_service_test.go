@@ -284,6 +284,7 @@ func TestVClawClaimServiceResumesUsedClaimCodeByBinding(t *testing.T) {
 	binding := &UserDevice{
 		ID:                77,
 		UserID:            88,
+		DeviceCode:        ptrStringVClaw("DLL-LOGIN-CODE-1234"),
 		DeviceHash:        "existing-device-hash",
 		ClaimRedeemCodeID: ptrInt64VClaw(claimCode.ID),
 		LoginRedeemCodeID: loginCode.ID,
@@ -492,3 +493,5 @@ func validDeviceHash(seed byte) string {
 }
 
 func ptrInt64VClaw(v int64) *int64 { return &v }
+
+func ptrStringVClaw(v string) *string { return &v }

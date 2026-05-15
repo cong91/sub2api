@@ -523,32 +523,16 @@ func (s *AuthService) InviteLogin(ctx context.Context, input InviteLoginInput) (
 		return nil, ErrInvitationCodeRequired
 	}
 
-	// Phase 2 dual-path: try device_code lookup directly on user_devices first
-	if s.inviteLoginDeviceRepo != nil && isDeviceLoginCodePrefix(invitationCode) {
-		device, err := s.inviteLoginDeviceRepo.GetByDeviceCode(ctx, invitationCode)
-		if err == nil && device != nil {
-			// Found device by device_code — use the new path (no redeem_codes dependency)
-			return s.completeDeviceInviteLoginByDevice(ctx, input, device)
-		}
-		// Fallback to legacy redeem_codes path if not found
-	}
-
-	code, err := s.redeemRepo.GetByCode(ctx, invitationCode)
-	if err != nil {
-		if errors.Is(err, ErrRedeemCodeNotFound) {
-			return nil, ErrInvitationCodeInvalid
-		}
+	// All invite-login codes are stored on user_devices.device_code
+	// No redeem_codes dependency — client sends invitation_code, we lookup device directly
+	if s.inviteLoginDeviceRepo == nil {
 		return nil, ErrServiceUnavailable
 	}
-	if code == nil {
+	device, err := s.inviteLoginDeviceRepo.GetByDeviceCode(ctx, invitationCode)
+	if err != nil || device == nil {
 		return nil, ErrInvitationCodeInvalid
 	}
-
-	if code.Type == RedeemTypeDeviceLogin {
-		return s.completeDeviceInviteLogin(ctx, input, code)
-	}
-
-	return s.completeInviteBootstrapLogin(ctx, invitationCode)
+	return s.completeDeviceInviteLoginByDevice(ctx, input, device)
 }
 
 // RedeemLogin handles the web redeem login.
@@ -655,6 +639,88 @@ func (s *AuthService) createInviteBootstrapUser(ctx context.Context, invitationR
 	}
 
 	return nil, ErrServiceUnavailable
+}
+
+// provisionInviteBootstrapAPIKeysForDevice provisions bootstrap API keys for device login
+// without depending on redeem_codes. Uses GetAvailableGroups directly and selects best per platform.
+func (s *AuthService) provisionInviteBootstrapAPIKeysForDevice(ctx context.Context, userID int64) ([]InviteBootstrapAPIKey, error) {
+	if s.inviteBootstrapAPIKeySvc == nil {
+		return nil, ErrBootstrapAPIKeyUnavailable
+	}
+
+	groups, err := s.inviteBootstrapAPIKeySvc.GetAvailableGroups(ctx, userID)
+	if err != nil {
+		return nil, ErrBootstrapAPIKeyUnavailable
+	}
+
+	// Select best group per platform (prefer subscription type, then lower rate)
+	selected := selectInviteBootstrapGroupsForDevice(groups)
+	if len(selected) == 0 {
+		return nil, ErrBootstrapAPIKeyUnavailable
+	}
+
+	platforms := make([]string, 0, len(selected))
+	for platform := range selected {
+		platforms = append(platforms, platform)
+	}
+	sort.Strings(platforms)
+
+	keys := make([]InviteBootstrapAPIKey, 0, len(platforms))
+	for _, platform := range platforms {
+		group := selected[platform]
+		groupID := group.ID
+		created, createErr := s.inviteBootstrapAPIKeySvc.Create(ctx, userID, CreateAPIKeyRequest{
+			Name:    "bootstrap-" + sanitizePlatformForBootstrapKey(platform),
+			GroupID: &groupID,
+		})
+		if createErr != nil {
+			logger.LegacyPrintf("service.auth", "[InviteBootstrap] create api key failed: device_login user_id=%d platform=%s group_id=%d err=%v", userID, platform, groupID, createErr)
+			continue
+		}
+		keys = append(keys, InviteBootstrapAPIKey{
+			ID:       created.ID,
+			Name:     created.Name,
+			Key:      created.Key,
+			GroupID:  group.ID,
+			Platform: platform,
+		})
+	}
+	if len(keys) == 0 {
+		return nil, ErrBootstrapAPIKeyUnavailable
+	}
+	return keys, nil
+}
+
+// selectInviteBootstrapGroupsForDevice selects the best group per platform for device login.
+// Prefers subscription-type groups; among same type, prefers longer validity or lower rate.
+func selectInviteBootstrapGroupsForDevice(groups []Group) map[string]Group {
+	selected := make(map[string]Group)
+	for _, group := range groups {
+		platform := strings.TrimSpace(group.Platform)
+		if platform == "" || !group.IsActive() || group.ActiveAccountCount <= 0 {
+			continue
+		}
+		current, exists := selected[platform]
+		if !exists || isDeviceBootstrapGroupBetter(group, current) {
+			selected[platform] = group
+		}
+	}
+	return selected
+}
+
+func isDeviceBootstrapGroupBetter(a, b Group) bool {
+	// Prefer subscription type over standard
+	if a.IsSubscriptionType() != b.IsSubscriptionType() {
+		return a.IsSubscriptionType()
+	}
+	if a.IsSubscriptionType() {
+		if a.DefaultValidityDays != b.DefaultValidityDays {
+			return a.DefaultValidityDays > b.DefaultValidityDays
+		}
+	} else if a.RateMultiplier != b.RateMultiplier {
+		return a.RateMultiplier < b.RateMultiplier
+	}
+	return a.ID < b.ID
 }
 
 func (s *AuthService) provisionInviteBootstrapAPIKeys(ctx context.Context, userID int64, redeemCode *RedeemCode) ([]InviteBootstrapAPIKey, error) {

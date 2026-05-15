@@ -260,6 +260,7 @@ func TestAuthServiceInviteLoginAcceptsDeviceLoginCode(t *testing.T) {
 			50: {
 				ID:                2,
 				UserID:            51,
+				DeviceCode:        stringPtr(loginCode),
 				DeviceHash:        deviceHash,
 				InstallID:         stringPtr(installID),
 				LoginRedeemCodeID: 50,
@@ -358,6 +359,7 @@ func TestAuthServiceInviteLoginAllowsWebLoginWithoutDeviceHash(t *testing.T) {
 			50: {
 				ID:                2,
 				UserID:            51,
+				DeviceCode:        stringPtr(loginCode),
 				DeviceHash:        "ac0addf134d4ac9d6ac98ffdb1f4796dd2b27d6ab2b66ec0bab9e181a007b668",
 				InstallID:         stringPtr("000f0c66-0a84-4a72-a7bb-a82249dbc3c7"),
 				LoginRedeemCodeID: 50,
@@ -419,6 +421,7 @@ func TestAuthServiceInviteLoginAllowsMissingOrRotatedInstallIDForSameDeviceHash(
 				deviceByLoginCodeID: map[int64]*UserDevice{
 					50: {
 						ID:                2,
+						DeviceCode:        stringPtr(loginCode),
 						UserID:            51,
 						DeviceHash:        deviceHash,
 						InstallID:         stringPtr(boundInstallID),
@@ -480,6 +483,7 @@ func TestAuthServiceInviteLoginRejectsDeviceMismatch(t *testing.T) {
 			50: {
 				ID:                2,
 				UserID:            51,
+				DeviceCode:        stringPtr(loginCode),
 				DeviceHash:        "ac0addf134d4ac9d6ac98ffdb1f4796dd2b27d6ab2b66ec0bab9e181a007b668",
 				InstallID:         stringPtr("000f0c66-0a84-4a72-a7bb-a82249dbc3c7"),
 				LoginRedeemCodeID: 50,
