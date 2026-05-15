@@ -284,15 +284,21 @@ func prepareNonTransactionalMigration(ctx context.Context, db *sql.DB, name stri
 func stripRedundantTransactionControl(content string) string {
 	lines := strings.Split(content, "\n")
 	var result []string
+	insideDollarQuotedBlock := false
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(strings.ToUpper(line))
-		// Strip standalone BEGIN; / COMMIT; / ROLLBACK; at top level
-		if trimmed == "BEGIN;" || trimmed == "BEGIN" ||
+		// Strip standalone BEGIN; / COMMIT; / ROLLBACK; only at top level.
+		// PL/pgSQL blocks such as DO $$ ... BEGIN ... END $$ require their
+		// inner BEGIN/END statements to remain intact.
+		if !insideDollarQuotedBlock && (trimmed == "BEGIN;" || trimmed == "BEGIN" ||
 			trimmed == "COMMIT;" || trimmed == "COMMIT" ||
-			trimmed == "ROLLBACK;" || trimmed == "ROLLBACK" {
+			trimmed == "ROLLBACK;" || trimmed == "ROLLBACK") {
 			continue
 		}
 		result = append(result, line)
+		if strings.Count(line, "$$")%2 == 1 {
+			insideDollarQuotedBlock = !insideDollarQuotedBlock
+		}
 	}
 	return strings.Join(result, "\n")
 }
