@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -17,6 +19,7 @@ import (
 
 type OpsHandler struct {
 	opsService *service.OpsService
+	entClient  *dbent.Client
 }
 
 // GetErrorLogByID returns ops error log detail.
@@ -70,8 +73,8 @@ func parseOpsViewParam(c *gin.Context) string {
 	}
 }
 
-func NewOpsHandler(opsService *service.OpsService) *OpsHandler {
-	return &OpsHandler{opsService: opsService}
+func NewOpsHandler(opsService *service.OpsService, entClient *dbent.Client) *OpsHandler {
+	return &OpsHandler{opsService: opsService, entClient: entClient}
 }
 
 // GetErrorLogs lists ops error logs.
@@ -175,6 +178,12 @@ func (h *OpsHandler) GetErrorLogs(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
+
+	// Enrich with device_code from user_devices
+	if h.entClient != nil && len(result.Errors) > 0 {
+		enrichOpsErrorLogsWithDeviceCode(c.Request.Context(), h.entClient, result.Errors)
+	}
+
 	response.Paginated(c, result.Errors, int64(result.Total), result.Page, result.PageSize)
 }
 
@@ -276,6 +285,12 @@ func (h *OpsHandler) ListRequestErrors(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
+
+	// Enrich with device_code from user_devices
+	if h.entClient != nil && len(result.Errors) > 0 {
+		enrichOpsErrorLogsWithDeviceCode(c.Request.Context(), h.entClient, result.Errors)
+	}
+
 	response.Paginated(c, result.Errors, int64(result.Total), result.Page, result.PageSize)
 }
 
@@ -921,5 +936,30 @@ func parseOpsDuration(v string) (time.Duration, bool) {
 		return 30 * 24 * time.Hour, true
 	default:
 		return 0, false
+	}
+}
+
+// enrichOpsErrorLogsWithDeviceCode batch-resolves device_code for error log entries.
+func enrichOpsErrorLogsWithDeviceCode(ctx context.Context, entClient *dbent.Client, logs []*service.OpsErrorLog) {
+	userIDSet := make(map[int64]struct{})
+	for _, l := range logs {
+		if l.UserID != nil && *l.UserID > 0 {
+			userIDSet[*l.UserID] = struct{}{}
+		}
+	}
+	if len(userIDSet) == 0 {
+		return
+	}
+	userIDs := make([]int64, 0, len(userIDSet))
+	for id := range userIDSet {
+		userIDs = append(userIDs, id)
+	}
+	deviceCodes := service.LookupDeviceCodesByUserIDs(ctx, entClient, userIDs)
+	for _, l := range logs {
+		if l.UserID != nil {
+			if code, ok := deviceCodes[*l.UserID]; ok {
+				l.DeviceCode = code
+			}
+		}
 	}
 }
