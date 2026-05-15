@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -84,7 +85,11 @@ func (h *PaymentHandler) ListOrders(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Paginated(c, sanitizeAdminPaymentOrdersForResponse(orders), int64(total), page, pageSize)
+	sanitized := sanitizeAdminPaymentOrdersForResponse(orders)
+
+	// Enrich orders with device_code from user_devices
+	enriched := enrichOrdersWithDeviceCode(c.Request.Context(), h.paymentService, sanitized)
+	response.Paginated(c, enriched, int64(total), page, pageSize)
 }
 
 // GetOrderDetail returns detailed information about a single order.
@@ -235,6 +240,40 @@ func sanitizeAdminPaymentOrdersForResponse(orders []*dbent.PaymentOrder) []*dben
 		out = append(out, sanitizeAdminPaymentOrderForResponse(order))
 	}
 	return out
+}
+
+// AdminOrderWithDeviceCode wraps a PaymentOrder with an optional device_code field.
+type AdminOrderWithDeviceCode struct {
+	*dbent.PaymentOrder
+	DeviceCode string `json:"device_code,omitempty"`
+}
+
+func enrichOrdersWithDeviceCode(ctx context.Context, paymentService *service.PaymentService, orders []*dbent.PaymentOrder) []AdminOrderWithDeviceCode {
+	if len(orders) == 0 {
+		return nil
+	}
+	// Collect unique user IDs
+	userIDSet := make(map[int64]struct{}, len(orders))
+	for _, o := range orders {
+		if o.UserID > 0 {
+			userIDSet[o.UserID] = struct{}{}
+		}
+	}
+	userIDs := make([]int64, 0, len(userIDSet))
+	for id := range userIDSet {
+		userIDs = append(userIDs, id)
+	}
+
+	deviceCodes := paymentService.GetDeviceCodesByUserIDs(ctx, userIDs)
+
+	result := make([]AdminOrderWithDeviceCode, len(orders))
+	for i, o := range orders {
+		result[i] = AdminOrderWithDeviceCode{
+			PaymentOrder: o,
+			DeviceCode:   deviceCodes[o.UserID],
+		}
+	}
+	return result
 }
 
 func sanitizeAdminPaymentOrderForResponse(order *dbent.PaymentOrder) *dbent.PaymentOrder {
