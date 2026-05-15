@@ -144,13 +144,18 @@ func userDeviceEntityToService(m *dbent.UserDevice) *service.UserDevice {
 		Arch:               m.Arch,
 		AppVersion:         m.AppVersion,
 		ClaimRedeemCodeID:  m.ClaimRedeemCodeID,
-		LoginRedeemCodeID:  func() int64 { if m.LoginRedeemCodeID != nil { return *m.LoginRedeemCodeID }; return 0 }(),
-		Status:             m.Status,
-		FirstClaimedAt:     m.FirstClaimedAt,
-		LastClaimedAt:      m.LastClaimedAt,
-		LastLoginAt:        m.LastLoginAt,
-		CreatedAt:          m.CreatedAt,
-		UpdatedAt:          m.UpdatedAt,
+		LoginRedeemCodeID: func() int64 {
+			if m.LoginRedeemCodeID != nil {
+				return *m.LoginRedeemCodeID
+			}
+			return 0
+		}(),
+		Status:         m.Status,
+		FirstClaimedAt: m.FirstClaimedAt,
+		LastClaimedAt:  m.LastClaimedAt,
+		LastLoginAt:    m.LastLoginAt,
+		CreatedAt:      m.CreatedAt,
+		UpdatedAt:      m.UpdatedAt,
 	}
 	if m.Edges.User != nil {
 		out.User = userEntityToService(m.Edges.User)

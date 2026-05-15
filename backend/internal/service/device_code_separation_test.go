@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +18,10 @@ import (
 // =============================================================================
 
 // --- Helper: isDeviceLoginCodePrefix ---
+
+func isDeviceLoginCodePrefix(code string) bool {
+	return len(code) >= 4 && strings.ToUpper(code[:4]) == "DLG-"
+}
 
 func TestIsDeviceLoginCodePrefix(t *testing.T) {
 	tests := []struct {

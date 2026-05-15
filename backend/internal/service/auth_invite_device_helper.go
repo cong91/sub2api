@@ -10,11 +10,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 )
 
-// isDeviceLoginCodePrefix checks if the code starts with the DLG- prefix.
-func isDeviceLoginCodePrefix(code string) bool {
-	return strings.HasPrefix(strings.ToUpper(code), "DLG-")
-}
-
 // completeDeviceInviteLoginByDevice handles device login using the new device_code path
 // (no redeem_codes dependency). This is the Phase 2 dual-write path.
 func (s *AuthService) completeDeviceInviteLoginByDevice(ctx context.Context, input InviteLoginInput, device *UserDevice) (*InviteLoginResult, error) {
