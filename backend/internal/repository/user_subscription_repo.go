@@ -7,6 +7,7 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
+	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/userdevice"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -193,7 +194,7 @@ func (r *userSubscriptionRepository) ListByGroupID(ctx context.Context, groupID 
 	return userSubscriptionEntitiesToService(subs), paginationResultFromTotal(int64(total), params), nil
 }
 
-func (r *userSubscriptionRepository) List(ctx context.Context, params pagination.PaginationParams, userID, groupID *int64, scopedUserIDs []int64, status, platform, sortBy, sortOrder string) ([]service.UserSubscription, *pagination.PaginationResult, error) {
+func (r *userSubscriptionRepository) List(ctx context.Context, params pagination.PaginationParams, userID, groupID *int64, scopedUserIDs []int64, status, platform, deviceCode, sortBy, sortOrder string) ([]service.UserSubscription, *pagination.PaginationResult, error) {
 	client := clientFromContext(ctx, r.client)
 	q := client.UserSubscription.Query()
 	if userID != nil {
@@ -211,6 +212,9 @@ func (r *userSubscriptionRepository) List(ctx context.Context, params pagination
 	}
 	if platform != "" {
 		q = q.Where(usersubscription.HasGroupWith(group.PlatformEQ(platform)))
+	}
+	if deviceCode != "" {
+		q = q.Where(usersubscription.HasUserWith(dbuser.HasDevicesWith(userdevice.DeviceCodeContainsFold(deviceCode))))
 	}
 
 	// Status filtering with real-time expiration check
@@ -493,7 +497,19 @@ func (r *userSubscriptionRepository) loadSubscriptionPrimaryRedeemCodes(ctx cont
 		return nil, nil, err
 	}
 	for _, device := range devices {
-		if _, exists := codesByUser[device.UserID]; exists || device.Edges.LoginRedeemCode == nil {
+		if _, exists := codesByUser[device.UserID]; exists {
+			continue
+		}
+		// Prefer device_code directly (Phase 2 dual-write)
+		if device.DeviceCode != nil && *device.DeviceCode != "" {
+			code := *device.DeviceCode
+			redeemType := service.RedeemTypeDeviceLogin
+			codesByUser[device.UserID] = &code
+			typesByUser[device.UserID] = &redeemType
+			continue
+		}
+		// Fallback to legacy edge
+		if device.Edges.LoginRedeemCode == nil {
 			continue
 		}
 		code := device.Edges.LoginRedeemCode.Code
