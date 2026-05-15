@@ -180,6 +180,8 @@ export interface BalancePackage {
   credit_ledger: number
   bonus_ledger: number
   credit_multiplier: number
+  actual_credits: number
+  credit_unit: string
   balance_group_id?: number | null
   group_id?: number | null
   group_name?: string

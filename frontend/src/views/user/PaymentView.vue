@@ -89,7 +89,7 @@
                   >
                     <span v-if="pkg.badge" class="absolute -top-2 right-2 rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{{ pkg.badge }}</span>
                     <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ pkg.label }}</p>
-                    <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ formatLedgerMoney(pkg.credit_ledger) }} credit</p>
+                    <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ formatTokens(pkg.actual_credits) }} tokens</p>
                   </button>
                 </div>
               </div>
@@ -645,6 +645,12 @@ function formatPaymentMoney(value: number): string {
 }
 function formatLedgerMoney(value: number): string {
   return formatMoney(value, ledgerCurrency.value, checkout.value.currency_meta)
+}
+function formatTokens(value: number): string {
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(0)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`
+  return String(value)
 }
 const fxStatusClass = computed(() => checkout.value.fx_status?.stale
   ? 'text-amber-600 dark:text-amber-300'

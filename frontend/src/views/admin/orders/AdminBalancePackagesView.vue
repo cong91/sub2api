@@ -25,13 +25,12 @@
         <template #cell-amount_ledger="{ row }">
           <div class="text-sm">
             <div><span class="text-gray-500">{{ t('payment.admin.payAmount') }}:</span> <span class="font-medium text-gray-900 dark:text-white">${{ row.amount_ledger.toFixed(2) }}</span></div>
-            <div><span class="text-gray-500">{{ t('payment.admin.creditAmount') }}:</span> <span class="font-medium text-primary-600 dark:text-primary-400">${{ row.credit_ledger.toFixed(2) }}</span></div>
+            <div><span class="text-gray-500">Tokens:</span> <span class="font-medium text-primary-600 dark:text-primary-400">{{ formatTokens(row.actual_credits) }}</span></div>
           </div>
         </template>
-        <template #cell-credit_multiplier="{ value, row }">
-          <div class="text-sm">
-            <span class="font-medium">{{ Number(value || 0).toFixed(4) }}x</span>
-            <span class="ml-2 text-xs text-gray-500">+${{ Number(row.bonus_ledger || 0).toFixed(2) }}</span>
+        <template #cell-credit_multiplier>
+          <div class="text-sm text-gray-400">
+            <span>legacy</span>
           </div>
         </template>
         <template #cell-balance_group_id="{ row }">
@@ -115,6 +114,13 @@ async function loadPackages() {
   } finally {
     loading.value = false
   }
+}
+
+function formatTokens(value: number): string {
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(0)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`
+  return String(value)
 }
 
 function openEdit(pkg: BalancePackage | null) {

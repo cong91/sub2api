@@ -11,7 +11,8 @@ import (
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
-const balancePackageCreditsPerLedgerUnit = 10000.0
+// balancePackageActualCreditsDeprecated is kept for backward compatibility.
+// actual_credits is now set directly by admin, not computed from this formula.
 
 func validateBalancePackageRequired(code, label string, amountLedger, creditLedger, creditMultiplier float64) error {
 	if strings.TrimSpace(code) == "" {
@@ -85,12 +86,11 @@ func normalizeBalancePackageCreditUnit(value string) string {
 	return unit
 }
 
+// computeBalancePackageActualCredits is deprecated. actual_credits is now
+// set directly by admin in the DB, not computed from this formula.
+// Kept as a no-op stub so existing tests can be removed gracefully.
 func computeBalancePackageActualCredits(amountLedger, creditMultiplier float64, balanceGroup *dbent.Group) int64 {
-	if amountLedger <= 0 || creditMultiplier <= 0 || balanceGroup == nil || balanceGroup.RateMultiplier <= 0 {
-		return 0
-	}
-	ledgerCredits := amountLedger * creditMultiplier
-	return int64(math.Round((ledgerCredits / balanceGroup.RateMultiplier) * balancePackageCreditsPerLedgerUnit))
+	return 0
 }
 
 func (s *PaymentConfigService) loadBalancePackageGroup(ctx context.Context, groupID *int64) (*dbent.Group, error) {

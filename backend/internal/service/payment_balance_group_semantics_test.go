@@ -1,7 +1,6 @@
 package service
 
 import (
-	"math"
 	"os"
 	"strings"
 	"testing"
@@ -52,12 +51,10 @@ func TestBalancePackageConfigRejectsSubscriptionGroups(t *testing.T) {
 }
 
 func TestBalancePackageActualCreditsComputedFromLedgerAndGroupRate(t *testing.T) {
+	// actual_credits is now set directly by admin, not computed.
+	// This test verifies the deprecated stub returns 0.
 	got := computeBalancePackageActualCredits(50, 3.1576, &dbent.Group{RateMultiplier: 0.0463})
-	want := int64(math.Round(((50 * 3.1576) / 0.0463) * balancePackageCreditsPerLedgerUnit))
-	if got != want {
-		t.Fatalf("actual credits = %d, want %d", got, want)
-	}
-	if got == int64(math.Round(157.88)) {
-		t.Fatalf("actual credits must not be the ledger balance amount")
+	if got != 0 {
+		t.Fatalf("deprecated computeBalancePackageActualCredits should return 0, got %d", got)
 	}
 }
