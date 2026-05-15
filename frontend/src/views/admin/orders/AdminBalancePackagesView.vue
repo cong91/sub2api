@@ -28,11 +28,6 @@
             <div><span class="text-gray-500">Tokens:</span> <span class="font-medium text-primary-600 dark:text-primary-400">{{ formatTokens(row.actual_credits) }}</span></div>
           </div>
         </template>
-        <template #cell-credit_multiplier>
-          <div class="text-sm text-gray-400">
-            <span>legacy</span>
-          </div>
-        </template>
         <template #cell-balance_group_id="{ row }">
           <div v-if="row.balance_group_id || row.group_id" class="text-sm">
             <div class="font-medium text-gray-900 dark:text-white">#{{ row.balance_group_id || row.group_id }} · {{ row.group_name || '-' }}</div>
@@ -96,7 +91,6 @@ const columns = computed((): Column[] => [
   { key: 'id', label: 'ID' },
   { key: 'label', label: t('payment.admin.packageLabel') },
   { key: 'amount_ledger', label: t('payment.admin.packageAmounts') },
-  { key: 'credit_multiplier', label: t('payment.admin.creditMultiplier') },
   { key: 'balance_group_id', label: t('payment.admin.balanceGroup') },
   { key: 'badge', label: t('payment.admin.badge') },
   { key: 'for_sale', label: t('payment.admin.forSale') },

@@ -4,8 +4,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	dbent "github.com/Wei-Shaw/sub2api/ent"
 )
 
 func TestBalancePackageOrderUsesBalanceGroupID(t *testing.T) {
@@ -47,14 +45,5 @@ func TestBalancePackageConfigRejectsSubscriptionGroups(t *testing.T) {
 	text := string(source)
 	if !strings.Contains(text, "standard balance group") || !strings.Contains(text, "not a subscription group") {
 		t.Fatalf("balance package config must reject subscription groups and require standard balance groups")
-	}
-}
-
-func TestBalancePackageActualCreditsComputedFromLedgerAndGroupRate(t *testing.T) {
-	// actual_credits is now set directly by admin, not computed.
-	// This test verifies the deprecated stub returns 0.
-	got := computeBalancePackageActualCredits(50, 3.1576, &dbent.Group{RateMultiplier: 0.0463})
-	if got != 0 {
-		t.Fatalf("deprecated computeBalancePackageActualCredits should return 0, got %d", got)
 	}
 }

@@ -28,3 +28,8 @@ UPDATE balance_packages SET credit_ledger = amount_ledger, bonus_ledger = 0, cre
 
 -- Update credit_unit to 'tokens' for clarity
 UPDATE balance_packages SET credit_unit = 'tokens' WHERE credit_unit = 'credits';
+
+-- Drop deprecated columns (no longer used in code)
+ALTER TABLE balance_packages DROP COLUMN IF EXISTS credit_ledger;
+ALTER TABLE balance_packages DROP COLUMN IF EXISTS bonus_ledger;
+ALTER TABLE balance_packages DROP COLUMN IF EXISTS credit_multiplier;
