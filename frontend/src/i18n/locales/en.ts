@@ -478,8 +478,9 @@ export default {
     redeemCodePlaceholder: 'Enter your login code, e.g. DLG-7TTY-SQ2Q-47TE',
     redeemCodeHint: 'Use your DLG login code to sign in to your account.',
     redeemCodeRequired: 'Login code is required',
-    redeemLoginSuccess: 'Code login successful!',
-    redeemLoginFailed: 'Code login failed. Please check your code and try again.',
+    deviceCodeLoginSuccess: 'Device code login successful!',
+    deviceCodeLoginFailed: 'Device code login failed. Please check your code and try again.',
+    
     loginAgreement: {
       readAndAgree: 'I have read and agree to',
       pendingTitle: 'You must agree to the latest terms before continuing to sign in.',

@@ -475,8 +475,9 @@ export default {
     redeemCodePlaceholder: 'Nhập mã đăng nhập, ví dụ DLG-7TTY-SQ2Q-47TE',
     redeemCodeHint: 'Dùng mã đăng nhập DLG của bạn để đăng nhập vào tài khoản.',
     redeemCodeRequired: 'Vui lòng nhập mã đăng nhập',
-    redeemLoginSuccess: 'Đăng nhập bằng mã thành công!',
-    redeemLoginFailed: 'Đăng nhập bằng mã thất bại. Vui lòng kiểm tra mã và thử lại.',
+    deviceCodeLoginSuccess: 'Đăng nhập bằng mã thiết bị thành công!',
+    deviceCodeLoginFailed: 'Đăng nhập bằng mã thiết bị thất bại. Vui lòng kiểm tra mã và thử lại.',
+    
     loginAgreement: {
       readAndAgree: 'Tôi đã đọc và đồng ý với',
       pendingTitle: 'Bạn cần đồng ý với điều khoản mới nhất trước khi tiếp tục đăng nhập.',

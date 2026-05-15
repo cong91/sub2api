@@ -477,8 +477,9 @@ export default {
     redeemCodePlaceholder: '请输入登录代码，例如 DLG-7TTY-SQ2Q-47TE',
     redeemCodeHint: '使用你的 DLG 登录代码登录账户。',
     redeemCodeRequired: '请输入登录代码',
-    redeemLoginSuccess: '代码登录成功！',
-    redeemLoginFailed: '代码登录失败，请检查代码后重试。',
+    deviceCodeLoginSuccess: '设备码登录成功！',
+    deviceCodeLoginFailed: '设备码登录失败，请检查代码后重试。',
+    
     loginAgreement: {
       readAndAgree: '我已阅读并同意',
       pendingTitle: '继续登录前需要先同意最新条款。',

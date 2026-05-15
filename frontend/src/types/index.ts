@@ -130,11 +130,6 @@ export interface InviteLoginRequest {
   turnstile_token?: string
 }
 
-export interface RedeemLoginRequest {
-  invitation_code: string
-  turnstile_token?: string
-}
-
 export interface RegisterRequest {
   email: string
   password: string
