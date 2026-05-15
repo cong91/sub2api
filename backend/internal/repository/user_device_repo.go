@@ -85,9 +85,11 @@ func (r *userDeviceRepository) Create(ctx context.Context, device *service.UserD
 		SetFingerprintVersion(device.FingerprintVersion).
 		SetPlatform(device.Platform).
 		SetArch(device.Arch).
-		SetLoginRedeemCodeID(device.LoginRedeemCodeID).
 		SetStatus(device.Status).
 		SetFirstClaimedAt(device.FirstClaimedAt)
+	if device.LoginRedeemCodeID != 0 {
+		create.SetLoginRedeemCodeID(device.LoginRedeemCodeID)
+	}
 	if device.DeviceCode != nil {
 		create.SetDeviceCode(*device.DeviceCode)
 	}
@@ -142,7 +144,7 @@ func userDeviceEntityToService(m *dbent.UserDevice) *service.UserDevice {
 		Arch:               m.Arch,
 		AppVersion:         m.AppVersion,
 		ClaimRedeemCodeID:  m.ClaimRedeemCodeID,
-		LoginRedeemCodeID:  m.LoginRedeemCodeID,
+		LoginRedeemCodeID:  func() int64 { if m.LoginRedeemCodeID != nil { return *m.LoginRedeemCodeID }; return 0 }(),
 		Status:             m.Status,
 		FirstClaimedAt:     m.FirstClaimedAt,
 		LastClaimedAt:      m.LastClaimedAt,

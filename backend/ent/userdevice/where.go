@@ -665,6 +665,16 @@ func LoginRedeemCodeIDNotIn(vs ...int64) predicate.UserDevice {
 	return predicate.UserDevice(sql.FieldNotIn(FieldLoginRedeemCodeID, vs...))
 }
 
+// LoginRedeemCodeIDIsNil applies the IsNil predicate on the "login_redeem_code_id" field.
+func LoginRedeemCodeIDIsNil() predicate.UserDevice {
+	return predicate.UserDevice(sql.FieldIsNull(FieldLoginRedeemCodeID))
+}
+
+// LoginRedeemCodeIDNotNil applies the NotNil predicate on the "login_redeem_code_id" field.
+func LoginRedeemCodeIDNotNil() predicate.UserDevice {
+	return predicate.UserDevice(sql.FieldNotNull(FieldLoginRedeemCodeID))
+}
+
 // StatusEQ applies the EQ predicate on the "status" field.
 func StatusEQ(v string) predicate.UserDevice {
 	return predicate.UserDevice(sql.FieldEQ(FieldStatus, v))

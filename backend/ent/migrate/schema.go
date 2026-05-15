@@ -1694,7 +1694,7 @@ var (
 		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "claim_redeem_code_id", Type: field.TypeInt64, Nullable: true},
-		{Name: "login_redeem_code_id", Type: field.TypeInt64},
+		{Name: "login_redeem_code_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "user_id", Type: field.TypeInt64},
 	}
 	// UserDevicesTable holds the schema information for the "user_devices" table.
@@ -1713,7 +1713,7 @@ var (
 				Symbol:     "user_devices_redeem_codes_login_devices",
 				Columns:    []*schema.Column{UserDevicesColumns[15]},
 				RefColumns: []*schema.Column{RedeemCodesColumns[0]},
-				OnDelete:   schema.NoAction,
+				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "user_devices_users_devices",
@@ -1737,11 +1737,6 @@ var (
 				Name:    "userdevice_claim_redeem_code_id",
 				Unique:  true,
 				Columns: []*schema.Column{UserDevicesColumns[14]},
-			},
-			{
-				Name:    "userdevice_login_redeem_code_id",
-				Unique:  true,
-				Columns: []*schema.Column{UserDevicesColumns[15]},
 			},
 			{
 				Name:    "userdevice_user_id",

@@ -45881,7 +45881,7 @@ func (m *UserDeviceMutation) LoginRedeemCodeID() (r int64, exists bool) {
 // OldLoginRedeemCodeID returns the old "login_redeem_code_id" field's value of the UserDevice entity.
 // If the UserDevice object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UserDeviceMutation) OldLoginRedeemCodeID(ctx context.Context) (v int64, err error) {
+func (m *UserDeviceMutation) OldLoginRedeemCodeID(ctx context.Context) (v *int64, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldLoginRedeemCodeID is only allowed on UpdateOne operations")
 	}
@@ -45895,9 +45895,22 @@ func (m *UserDeviceMutation) OldLoginRedeemCodeID(ctx context.Context) (v int64,
 	return oldValue.LoginRedeemCodeID, nil
 }
 
+// ClearLoginRedeemCodeID clears the value of the "login_redeem_code_id" field.
+func (m *UserDeviceMutation) ClearLoginRedeemCodeID() {
+	m.login_redeem_code = nil
+	m.clearedFields[userdevice.FieldLoginRedeemCodeID] = struct{}{}
+}
+
+// LoginRedeemCodeIDCleared returns if the "login_redeem_code_id" field was cleared in this mutation.
+func (m *UserDeviceMutation) LoginRedeemCodeIDCleared() bool {
+	_, ok := m.clearedFields[userdevice.FieldLoginRedeemCodeID]
+	return ok
+}
+
 // ResetLoginRedeemCodeID resets all changes to the "login_redeem_code_id" field.
 func (m *UserDeviceMutation) ResetLoginRedeemCodeID() {
 	m.login_redeem_code = nil
+	delete(m.clearedFields, userdevice.FieldLoginRedeemCodeID)
 }
 
 // SetStatus sets the "status" field.
@@ -46204,7 +46217,7 @@ func (m *UserDeviceMutation) ClearLoginRedeemCode() {
 
 // LoginRedeemCodeCleared reports if the "login_redeem_code" edge to the RedeemCode entity was cleared.
 func (m *UserDeviceMutation) LoginRedeemCodeCleared() bool {
-	return m.clearedlogin_redeem_code
+	return m.LoginRedeemCodeIDCleared() || m.clearedlogin_redeem_code
 }
 
 // LoginRedeemCodeIDs returns the "login_redeem_code" edge IDs in the mutation.
@@ -46565,6 +46578,9 @@ func (m *UserDeviceMutation) ClearedFields() []string {
 	if m.FieldCleared(userdevice.FieldClaimRedeemCodeID) {
 		fields = append(fields, userdevice.FieldClaimRedeemCodeID)
 	}
+	if m.FieldCleared(userdevice.FieldLoginRedeemCodeID) {
+		fields = append(fields, userdevice.FieldLoginRedeemCodeID)
+	}
 	if m.FieldCleared(userdevice.FieldLastClaimedAt) {
 		fields = append(fields, userdevice.FieldLastClaimedAt)
 	}
@@ -46596,6 +46612,9 @@ func (m *UserDeviceMutation) ClearField(name string) error {
 		return nil
 	case userdevice.FieldClaimRedeemCodeID:
 		m.ClearClaimRedeemCodeID()
+		return nil
+	case userdevice.FieldLoginRedeemCodeID:
+		m.ClearLoginRedeemCodeID()
 		return nil
 	case userdevice.FieldLastClaimedAt:
 		m.ClearLastClaimedAt()

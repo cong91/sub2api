@@ -201,6 +201,12 @@ func (_u *UserDeviceUpdate) SetNillableLoginRedeemCodeID(v *int64) *UserDeviceUp
 	return _u
 }
 
+// ClearLoginRedeemCodeID clears the value of the "login_redeem_code_id" field.
+func (_u *UserDeviceUpdate) ClearLoginRedeemCodeID() *UserDeviceUpdate {
+	_u.mutation.ClearLoginRedeemCodeID()
+	return _u
+}
+
 // SetStatus sets the "status" field.
 func (_u *UserDeviceUpdate) SetStatus(v string) *UserDeviceUpdate {
 	_u.mutation.SetStatus(v)
@@ -388,9 +394,6 @@ func (_u *UserDeviceUpdate) check() error {
 	}
 	if _u.mutation.UserCleared() && len(_u.mutation.UserIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "UserDevice.user"`)
-	}
-	if _u.mutation.LoginRedeemCodeCleared() && len(_u.mutation.LoginRedeemCodeIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "UserDevice.login_redeem_code"`)
 	}
 	return nil
 }
@@ -739,6 +742,12 @@ func (_u *UserDeviceUpdateOne) SetNillableLoginRedeemCodeID(v *int64) *UserDevic
 	return _u
 }
 
+// ClearLoginRedeemCodeID clears the value of the "login_redeem_code_id" field.
+func (_u *UserDeviceUpdateOne) ClearLoginRedeemCodeID() *UserDeviceUpdateOne {
+	_u.mutation.ClearLoginRedeemCodeID()
+	return _u
+}
+
 // SetStatus sets the "status" field.
 func (_u *UserDeviceUpdateOne) SetStatus(v string) *UserDeviceUpdateOne {
 	_u.mutation.SetStatus(v)
@@ -939,9 +948,6 @@ func (_u *UserDeviceUpdateOne) check() error {
 	}
 	if _u.mutation.UserCleared() && len(_u.mutation.UserIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "UserDevice.user"`)
-	}
-	if _u.mutation.LoginRedeemCodeCleared() && len(_u.mutation.LoginRedeemCodeIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "UserDevice.login_redeem_code"`)
 	}
 	return nil
 }

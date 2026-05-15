@@ -38,7 +38,7 @@ type UserDevice struct {
 	// ClaimRedeemCodeID holds the value of the "claim_redeem_code_id" field.
 	ClaimRedeemCodeID *int64 `json:"claim_redeem_code_id,omitempty"`
 	// LoginRedeemCodeID holds the value of the "login_redeem_code_id" field.
-	LoginRedeemCodeID int64 `json:"login_redeem_code_id,omitempty"`
+	LoginRedeemCodeID *int64 `json:"login_redeem_code_id,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// FirstClaimedAt holds the value of the "first_claimed_at" field.
@@ -197,7 +197,8 @@ func (_m *UserDevice) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field login_redeem_code_id", values[i])
 			} else if value.Valid {
-				_m.LoginRedeemCodeID = value.Int64
+				_m.LoginRedeemCodeID = new(int64)
+				*_m.LoginRedeemCodeID = value.Int64
 			}
 		case userdevice.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -323,8 +324,10 @@ func (_m *UserDevice) String() string {
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
-	builder.WriteString("login_redeem_code_id=")
-	builder.WriteString(fmt.Sprintf("%v", _m.LoginRedeemCodeID))
+	if v := _m.LoginRedeemCodeID; v != nil {
+		builder.WriteString("login_redeem_code_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)

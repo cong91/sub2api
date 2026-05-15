@@ -124,6 +124,14 @@ func (_c *UserDeviceCreate) SetLoginRedeemCodeID(v int64) *UserDeviceCreate {
 	return _c
 }
 
+// SetNillableLoginRedeemCodeID sets the "login_redeem_code_id" field if the given value is not nil.
+func (_c *UserDeviceCreate) SetNillableLoginRedeemCodeID(v *int64) *UserDeviceCreate {
+	if v != nil {
+		_c.SetLoginRedeemCodeID(*v)
+	}
+	return _c
+}
+
 // SetStatus sets the "status" field.
 func (_c *UserDeviceCreate) SetStatus(v string) *UserDeviceCreate {
 	_c.mutation.SetStatus(v)
@@ -327,9 +335,6 @@ func (_c *UserDeviceCreate) check() error {
 			return &ValidationError{Name: "app_version", err: fmt.Errorf(`ent: validator failed for field "UserDevice.app_version": %w`, err)}
 		}
 	}
-	if _, ok := _c.mutation.LoginRedeemCodeID(); !ok {
-		return &ValidationError{Name: "login_redeem_code_id", err: errors.New(`ent: missing required field "UserDevice.login_redeem_code_id"`)}
-	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "UserDevice.status"`)}
 	}
@@ -349,9 +354,6 @@ func (_c *UserDeviceCreate) check() error {
 	}
 	if len(_c.mutation.UserIDs()) == 0 {
 		return &ValidationError{Name: "user", err: errors.New(`ent: missing required edge "UserDevice.user"`)}
-	}
-	if len(_c.mutation.LoginRedeemCodeIDs()) == 0 {
-		return &ValidationError{Name: "login_redeem_code", err: errors.New(`ent: missing required edge "UserDevice.login_redeem_code"`)}
 	}
 	return nil
 }
@@ -480,7 +482,7 @@ func (_c *UserDeviceCreate) createSpec() (*UserDevice, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.LoginRedeemCodeID = nodes[0]
+		_node.LoginRedeemCodeID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -682,6 +684,12 @@ func (u *UserDeviceUpsert) SetLoginRedeemCodeID(v int64) *UserDeviceUpsert {
 // UpdateLoginRedeemCodeID sets the "login_redeem_code_id" field to the value that was provided on create.
 func (u *UserDeviceUpsert) UpdateLoginRedeemCodeID() *UserDeviceUpsert {
 	u.SetExcluded(userdevice.FieldLoginRedeemCodeID)
+	return u
+}
+
+// ClearLoginRedeemCodeID clears the value of the "login_redeem_code_id" field.
+func (u *UserDeviceUpsert) ClearLoginRedeemCodeID() *UserDeviceUpsert {
+	u.SetNull(userdevice.FieldLoginRedeemCodeID)
 	return u
 }
 
@@ -974,6 +982,13 @@ func (u *UserDeviceUpsertOne) SetLoginRedeemCodeID(v int64) *UserDeviceUpsertOne
 func (u *UserDeviceUpsertOne) UpdateLoginRedeemCodeID() *UserDeviceUpsertOne {
 	return u.Update(func(s *UserDeviceUpsert) {
 		s.UpdateLoginRedeemCodeID()
+	})
+}
+
+// ClearLoginRedeemCodeID clears the value of the "login_redeem_code_id" field.
+func (u *UserDeviceUpsertOne) ClearLoginRedeemCodeID() *UserDeviceUpsertOne {
+	return u.Update(func(s *UserDeviceUpsert) {
+		s.ClearLoginRedeemCodeID()
 	})
 }
 
@@ -1444,6 +1459,13 @@ func (u *UserDeviceUpsertBulk) SetLoginRedeemCodeID(v int64) *UserDeviceUpsertBu
 func (u *UserDeviceUpsertBulk) UpdateLoginRedeemCodeID() *UserDeviceUpsertBulk {
 	return u.Update(func(s *UserDeviceUpsert) {
 		s.UpdateLoginRedeemCodeID()
+	})
+}
+
+// ClearLoginRedeemCodeID clears the value of the "login_redeem_code_id" field.
+func (u *UserDeviceUpsertBulk) ClearLoginRedeemCodeID() *UserDeviceUpsertBulk {
+	return u.Update(func(s *UserDeviceUpsert) {
+		s.ClearLoginRedeemCodeID()
 	})
 }
 
