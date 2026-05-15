@@ -33,6 +33,9 @@
                 {{ t('admin.ops.errorLog.user') }}
               </th>
               <th class="border-b border-gray-200 px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:border-dark-700 dark:text-dark-400">
+                {{ t('admin.ops.errorLog.deviceCode') }}
+              </th>
+              <th class="border-b border-gray-200 px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:border-dark-700 dark:text-dark-400">
                 {{ t('admin.ops.errorLog.status') }}
               </th>
               <th class="border-b border-gray-200 px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:border-dark-700 dark:text-dark-400">
@@ -45,7 +48,7 @@
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
             <tr v-if="rows.length === 0">
-              <td colspan="10" class="py-12 text-center text-sm text-gray-400 dark:text-dark-500">
+              <td colspan="11" class="py-12 text-center text-sm text-gray-400 dark:text-dark-500">
                 {{ t('admin.ops.errorLog.noErrors') }}
               </td>
             </tr>
@@ -145,6 +148,12 @@
                   </el-tooltip>
                   <span v-else class="text-xs text-gray-400">-</span>
                 </template>
+              </td>
+
+              <!-- Device Code -->
+              <td class="whitespace-nowrap px-4 py-2">
+                <span v-if="log.device_code" class="text-xs font-mono text-gray-600 dark:text-gray-400">{{ log.device_code }}</span>
+                <span v-else class="text-xs text-gray-400">-</span>
               </td>
 
               <!-- Status -->
