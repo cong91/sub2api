@@ -147,6 +147,7 @@ export interface PaymentOrder {
     currency?: string
     schema_version?: number
   }
+  device_code?: string
 }
 
 // ==================== Plans & Channels ====================
