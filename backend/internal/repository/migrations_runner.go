@@ -284,16 +284,43 @@ func prepareNonTransactionalMigration(ctx context.Context, db *sql.DB, name stri
 // statements from migration SQL content. The runner already wraps each migration
 // in a transaction, so these are redundant and cause nested-transaction errors
 // in PostgreSQL ("unexpected transaction status idle").
-// Only strips standalone statements (not those inside DO $$ blocks).
+// Only strips standalone statements (not those inside dollar-quoted blocks).
 func stripRedundantTransactionControl(content string) string {
 	lines := strings.Split(content, "\n")
 	var result []string
+	dollarDepth := 0
 	for _, line := range lines {
-		trimmed := strings.TrimSpace(strings.ToUpper(line))
-		// Strip standalone BEGIN; / COMMIT; / ROLLBACK; at top level
-		if trimmed == "BEGIN;" || trimmed == "BEGIN" ||
-			trimmed == "COMMIT;" || trimmed == "COMMIT" ||
-			trimmed == "ROLLBACK;" || trimmed == "ROLLBACK" {
+		trimmed := strings.TrimSpace(line)
+		upper := strings.ToUpper(trimmed)
+
+		// Count dollar-quote opens/closes on this line.
+		// A $$ (or $tag$) toggles in/out of a dollar-quoted block.
+		// Simple approach: count occurrences of $$ on the line.
+		count := strings.Count(upper, "$$")
+		if count > 0 {
+			// Each pair of $$ on the same line opens+closes (net zero).
+			// Odd count means we toggle state.
+			if count%2 == 1 {
+				if dollarDepth == 0 {
+					dollarDepth++
+				} else {
+					dollarDepth--
+				}
+			}
+			result = append(result, line)
+			continue
+		}
+
+		// Inside a dollar-quoted block — preserve everything
+		if dollarDepth > 0 {
+			result = append(result, line)
+			continue
+		}
+
+		// Outside dollar blocks: strip standalone BEGIN/COMMIT/ROLLBACK
+		if upper == "BEGIN;" || upper == "BEGIN" ||
+			upper == "COMMIT;" || upper == "COMMIT" ||
+			upper == "ROLLBACK;" || upper == "ROLLBACK" {
 			continue
 		}
 		result = append(result, line)
