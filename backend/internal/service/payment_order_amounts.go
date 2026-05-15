@@ -61,7 +61,7 @@ func computeCreateOrderAmounts(req CreateOrderRequest, cfg *PaymentConfig, plan 
 			return createOrderAmounts{}, err
 		}
 		return createOrderAmounts{
-			LedgerAmount:      roundLedgerAmountForCredit(pkg.AmountLedger, snapshot.LedgerCurrency),
+			LedgerAmount:      roundLedgerAmountForCredit(pkg.CreditLedger, snapshot.LedgerCurrency),
 			PaymentAmount:     paymentAmount,
 			LimitLedgerAmount: ledgerBaseAmount,
 			BalancePackage:    pkg,
