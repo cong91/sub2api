@@ -248,7 +248,11 @@ func applyMigrationsPatternUnlocked(ctx context.Context, db *sql.DB, fsys fs.FS,
 		if err != nil {
 			return fmt.Errorf("begin migration %s: %w", name, err)
 		}
-		if _, err := tx.ExecContext(ctx, content); err != nil {
+		// Strip redundant BEGIN/COMMIT from migration content since the runner
+		// already wraps execution in a transaction. Nested transaction control
+		// statements cause "unexpected transaction status idle" errors in PostgreSQL.
+		execContent := stripRedundantTransactionControl(content)
+		if _, err := tx.ExecContext(ctx, execContent); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("apply migration %s: %w", name, err)
 		}
@@ -274,6 +278,27 @@ func prepareNonTransactionalMigration(ctx context.Context, db *sql.DB, name stri
 	default:
 		return nil
 	}
+}
+
+// stripRedundantTransactionControl removes top-level BEGIN/COMMIT/ROLLBACK
+// statements from migration SQL content. The runner already wraps each migration
+// in a transaction, so these are redundant and cause nested-transaction errors
+// in PostgreSQL ("unexpected transaction status idle").
+// Only strips standalone statements (not those inside DO $$ blocks).
+func stripRedundantTransactionControl(content string) string {
+	lines := strings.Split(content, "\n")
+	var result []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(strings.ToUpper(line))
+		// Strip standalone BEGIN; / COMMIT; / ROLLBACK; at top level
+		if trimmed == "BEGIN;" || trimmed == "BEGIN" ||
+			trimmed == "COMMIT;" || trimmed == "COMMIT" ||
+			trimmed == "ROLLBACK;" || trimmed == "ROLLBACK" {
+			continue
+		}
+		result = append(result, line)
+	}
+	return strings.Join(result, "\n")
 }
 
 func preparePaymentOrdersOutTradeNoUniqueMigration(ctx context.Context, db *sql.DB) error {
