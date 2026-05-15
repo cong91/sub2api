@@ -320,13 +320,6 @@ func (s *GatewayService) openKiroAnthropicStreamResponse(ctx context.Context, ac
 
 func (s *GatewayService) executeKiroUpstream(ctx context.Context, account *Account, anthropicBody []byte, mappedModel, requestModel, token string, headers http.Header) (*http.Response, kiropkg.KiroRequestContext, error) {
 	var requestCtx kiropkg.KiroRequestContext
-	if err := s.checkAndWaitKiroCooldown(ctx, buildKiroAccountKey(account)); err != nil {
-		if failoverErr := asKiroCooldownFailoverError(err); failoverErr != nil {
-			return nil, requestCtx, failoverErr
-		}
-		return nil, requestCtx, err
-	}
-
 	modelID := kiropkg.MapModel(mappedModel)
 	currentToken := token
 	buildResult, err := buildKiroPayloadForAccountWithRepo(ctx, s.accountRepo, account, anthropicBody, modelID, currentToken, requestModel, headers)
@@ -344,6 +337,13 @@ func (s *GatewayService) executeKiroUpstream(ctx context.Context, account *Accou
 
 	for idx, endpoint := range endpoints {
 		for attempt := 0; attempt <= maxRetries; attempt++ {
+			if err := s.checkAndWaitKiroCooldown(ctx, accountKey); err != nil {
+				if failoverErr := asKiroCooldownFailoverError(err); failoverErr != nil {
+					return nil, requestCtx, failoverErr
+				}
+				return nil, requestCtx, err
+			}
+
 			req, err := newKiroJSONRequest(ctx, endpoint.URL, payload, currentToken, accountKey, buildKiroMachineID(account), endpoint.AmzTarget, account)
 			if err != nil {
 				return nil, requestCtx, err
