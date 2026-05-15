@@ -173,6 +173,22 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	}
 	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 	if err != nil {
+		safeErr := sanitizeUpstreamErrorMessage(err.Error())
+		logger.FromContext(ctx).Warn("openai chat_completions raw: upstream request failed",
+			zap.Int64("account_id", account.ID),
+			zap.String("account_name", account.Name),
+			zap.String("platform", account.Platform),
+			zap.String("account_type", account.Type),
+			zap.String("upstream_url", safeUpstreamURL(targetURL)),
+			zap.Bool("proxy_enabled", proxyURL != ""),
+			zap.Int("concurrency", account.Concurrency),
+			zap.String("model", upstreamModel),
+			zap.String("request_path", c.Request.URL.Path),
+			zap.String("request_method", c.Request.Method),
+			zap.Bool("stream", clientStream),
+			zap.Duration("upstream_duration", time.Since(startTime)),
+			zap.String("error", safeErr),
+		)
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
 	}
 	defer func() { _ = resp.Body.Close() }()
