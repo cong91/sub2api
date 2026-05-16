@@ -71,10 +71,10 @@ func TestStripeRefundUsesStableAmountSpecificIdempotencyKey(t *testing.T) {
 	require.NotEqual(t, *backend.params[0].IdempotencyKey, *backend.params[2].IdempotencyKey)
 }
 
-func TestStripeCurrencyDefaultsToCNY(t *testing.T) {
+func TestStripeCurrencyDefaultsToUSD(t *testing.T) {
 	provider := &Stripe{config: map[string]string{}}
-	if got := provider.currency(); got != "CNY" {
-		t.Fatalf("Stripe.currency empty = %q, want CNY", got)
+	if got := provider.currency(); got != "USD" {
+		t.Fatalf("Stripe.currency empty = %q, want USD", got)
 	}
 	provider.config["currency"] = " vnd "
 	if got := provider.currency(); got != "VND" {
@@ -82,9 +82,9 @@ func TestStripeCurrencyDefaultsToCNY(t *testing.T) {
 	}
 }
 
-func TestStripeIntentCurrencyDefaultsToCNY(t *testing.T) {
-	if got := stripeIntentCurrency(stripe.Currency(""), ""); got != "CNY" {
-		t.Fatalf("stripeIntentCurrency empty = %q, want CNY", got)
+func TestStripeIntentCurrencyDefaultsToUSD(t *testing.T) {
+	if got := stripeIntentCurrency(stripe.Currency(""), ""); got != "USD" {
+		t.Fatalf("stripeIntentCurrency empty = %q, want USD", got)
 	}
 	if got := stripeIntentCurrency(stripe.Currency(" vnd "), ""); got != "VND" {
 		t.Fatalf("stripeIntentCurrency vnd = %q, want VND", got)
