@@ -133,10 +133,9 @@ func TestGatewayServiceCheckAndWaitKiroCooldownPropagatesReserveError(t *testing
 	require.ErrorIs(t, err, expected)
 }
 
-func TestGatewayServiceCheckAndWaitKiroCooldownRequiresStore(t *testing.T) {
+func TestGatewayServiceCheckAndWaitKiroCooldownFailsOpenWithoutStore(t *testing.T) {
 	svc := &GatewayService{}
-	err := svc.checkAndWaitKiroCooldown(context.Background(), "token1")
-	require.ErrorIs(t, err, errKiroCooldownStoreUnavailable)
+	require.NoError(t, svc.checkAndWaitKiroCooldown(context.Background(), "token1"))
 }
 
 func TestGatewayServiceCheckAndWaitKiroCooldownWaitsAndHonorsContext(t *testing.T) {
@@ -293,6 +292,96 @@ func TestExecuteKiroUpstreamCooldownReturnsFailoverError(t *testing.T) {
 	require.Equal(t, http.StatusTooManyRequests, failoverErr.StatusCode)
 	require.Equal(t, "kiro token is in cooldown for 33s (reason: rate_limit_exceeded)", string(failoverErr.ResponseBody))
 	require.False(t, failoverErr.RetryableOnSameAccount)
+}
+
+func TestExecuteKiroUpstreamCooldownStoreErrorFailsOpen(t *testing.T) {
+	account := &Account{
+		ID:          42,
+		Platform:    PlatformKiro,
+		Type:        AccountTypeOAuth,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+	}
+	store := &stubKiroCooldownStore{reserveErr: errors.New("redis unavailable")}
+	upstream := &queuedHTTPUpstream{
+		responses: []*http.Response{
+			newJSONResponse(http.StatusOK, `{"ok":true}`),
+		},
+	}
+	svc := &GatewayService{
+		httpUpstream:        upstream,
+		kiroCooldownStore:   store,
+		tlsFPProfileService: &TLSFingerprintProfileService{},
+	}
+
+	payload, err := createTestPayload("claude-sonnet-4-6")
+	require.NoError(t, err)
+	payloadBytes, err := json.Marshal(payload)
+	require.NoError(t, err)
+
+	resp, _, err := svc.executeKiroUpstream(context.Background(), account, payloadBytes, "claude-sonnet-4-6", "claude-sonnet-4-6", "test-token", nil)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Len(t, upstream.requests, 1)
+	require.Equal(t, []string{buildKiroAccountKey(account)}, store.reserveKeys)
+}
+
+func TestExecuteKiroUpstreamCooldownMarkFailuresPreserveUpstreamResponse(t *testing.T) {
+	account := &Account{
+		ID:          42,
+		Platform:    PlatformKiro,
+		Type:        AccountTypeOAuth,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+	}
+	tests := []struct {
+		name     string
+		store    *stubKiroCooldownStore
+		response *http.Response
+		wantCode int
+	}{
+		{
+			name:     "success mark failure preserves 200",
+			store:    &stubKiroCooldownStore{successErr: errors.New("redis unavailable")},
+			response: newJSONResponse(http.StatusOK, `{"ok":true}`),
+			wantCode: http.StatusOK,
+		},
+		{
+			name:     "429 mark failure preserves upstream 429",
+			store:    &stubKiroCooldownStore{mark429Err: errors.New("redis unavailable")},
+			response: newJSONResponse(http.StatusTooManyRequests, `{"message":"rate limited"}`),
+			wantCode: http.StatusTooManyRequests,
+		},
+		{
+			name:     "suspended mark failure preserves upstream 403",
+			store:    &stubKiroCooldownStore{suspendedErr: errors.New("redis unavailable")},
+			response: newJSONResponse(http.StatusForbidden, `{"reason":"SUSPENDED"}`),
+			wantCode: http.StatusForbidden,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			upstream := &queuedHTTPUpstream{responses: []*http.Response{tt.response}}
+			svc := &GatewayService{
+				httpUpstream:        upstream,
+				kiroCooldownStore:   tt.store,
+				tlsFPProfileService: &TLSFingerprintProfileService{},
+			}
+
+			payload, err := createTestPayload("claude-sonnet-4-6")
+			require.NoError(t, err)
+			payloadBytes, err := json.Marshal(payload)
+			require.NoError(t, err)
+
+			resp, _, err := svc.executeKiroUpstream(context.Background(), account, payloadBytes, "claude-sonnet-4-6", "claude-sonnet-4-6", "test-token", nil)
+			require.NoError(t, err)
+			require.Equal(t, tt.wantCode, resp.StatusCode)
+			require.Len(t, upstream.requests, 1)
+		})
+	}
 }
 
 func TestExecuteKiroUpstreamChecksCooldownBeforeEachRetry(t *testing.T) {
