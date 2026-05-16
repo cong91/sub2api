@@ -19,14 +19,17 @@ func paymentProviderConfigCurrency(providerKey string, cfg map[string]string) st
 }
 
 func PaymentOrderCurrency(order *dbent.PaymentOrder) string {
-	// Prefer the explicit payment_currency field on the order itself.
-	if order.PaymentCurrency != "" {
-		if currency, err := payment.NormalizePaymentCurrency(order.PaymentCurrency); err == nil {
+	// Try provider_snapshot first — it captures the currency at order-creation time
+	// and is authoritative for legacy orders that predate the payment_currency column.
+	if snapshot := psOrderProviderSnapshot(order); snapshot != nil {
+		if currency, err := payment.NormalizePaymentCurrency(snapshot.Currency); err == nil {
 			return currency
 		}
 	}
-	if snapshot := psOrderProviderSnapshot(order); snapshot != nil {
-		if currency, err := payment.NormalizePaymentCurrency(snapshot.Currency); err == nil {
+	// Fall back to the explicit payment_currency column (may be DB default "CNY"
+	// for legacy rows, but is correct for newer orders where snapshot lacks currency).
+	if order.PaymentCurrency != "" {
+		if currency, err := payment.NormalizePaymentCurrency(order.PaymentCurrency); err == nil {
 			return currency
 		}
 	}
