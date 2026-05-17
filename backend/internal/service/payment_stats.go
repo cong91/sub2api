@@ -54,28 +54,42 @@ func (s *PaymentService) GetDashboardStats(ctx context.Context, days int) (*Dash
 }
 
 func computeBasicStats(st *DashboardStats, orders []*dbent.PaymentOrder, todayStart time.Time) {
-	var totalAmount, todayAmount float64
 	var todayCount int
+	currencyMap := make(map[string]*CurrencyRevenue)
 	for _, o := range orders {
-		// Use LedgerAmount (USD) for consistent aggregation across currencies.
-		// Fall back to PayAmount only for legacy orders without LedgerAmount.
-		amt := o.LedgerAmount
-		if amt == 0 {
-			amt = o.PayAmount
+		// Use PayAmount + PaymentCurrency (actual gateway amount)
+		amt := o.PayAmount
+		cur := o.PaymentCurrency
+		if cur == "" {
+			cur = "USD"
 		}
-		totalAmount += amt
+		cr, ok := currencyMap[cur]
+		if !ok {
+			cr = &CurrencyRevenue{Currency: cur}
+			currencyMap[cur] = cr
+		}
+		cr.TotalAmount += amt
+		cr.TotalCount++
 		if o.PaidAt != nil && !o.PaidAt.Before(todayStart) {
-			todayAmount += amt
+			cr.TodayAmount += amt
+			cr.TodayCount++
 			todayCount++
 		}
 	}
-	st.TotalAmount = math.Round(totalAmount*100) / 100
-	st.TodayAmount = math.Round(todayAmount*100) / 100
 	st.TotalCount = len(orders)
 	st.TodayCount = todayCount
-	if st.TotalCount > 0 {
-		st.AvgAmount = math.Round(totalAmount/float64(st.TotalCount)*100) / 100
+
+	// Build sorted slice
+	revSlice := make([]CurrencyRevenue, 0, len(currencyMap))
+	for _, cr := range currencyMap {
+		cr.TotalAmount = math.Round(cr.TotalAmount*100) / 100
+		cr.TodayAmount = math.Round(cr.TodayAmount*100) / 100
+		revSlice = append(revSlice, *cr)
 	}
+	sort.Slice(revSlice, func(i, j int) bool {
+		return revSlice[i].TotalCount > revSlice[j].TotalCount
+	})
+	st.RevenueByCurrency = revSlice
 }
 
 func buildDailySeries(orders []*dbent.PaymentOrder, since time.Time, days int) []DailyStats {
@@ -111,18 +125,23 @@ func buildDailySeries(orders []*dbent.PaymentOrder, since time.Time, days int) [
 }
 
 func buildMethodDistribution(orders []*dbent.PaymentOrder) []PaymentMethodStat {
-	methodMap := make(map[string]*PaymentMethodStat)
+	type methodKey struct {
+		Type     string
+		Currency string
+	}
+	methodMap := make(map[methodKey]*PaymentMethodStat)
 	for _, o := range orders {
-		ms, ok := methodMap[o.PaymentType]
+		cur := o.PaymentCurrency
+		if cur == "" {
+			cur = "USD"
+		}
+		key := methodKey{Type: o.PaymentType, Currency: cur}
+		ms, ok := methodMap[key]
 		if !ok {
-			ms = &PaymentMethodStat{Type: o.PaymentType}
-			methodMap[o.PaymentType] = ms
+			ms = &PaymentMethodStat{Type: o.PaymentType, Currency: cur}
+			methodMap[key] = ms
 		}
-		amt := o.LedgerAmount
-		if amt == 0 {
-			amt = o.PayAmount
-		}
-		ms.Amount += amt
+		ms.Amount += o.PayAmount
 		ms.Count++
 	}
 	methods := make([]PaymentMethodStat, 0, len(methodMap))
@@ -130,6 +149,9 @@ func buildMethodDistribution(orders []*dbent.PaymentOrder) []PaymentMethodStat {
 		ms.Amount = math.Round(ms.Amount*100) / 100
 		methods = append(methods, *ms)
 	}
+	sort.Slice(methods, func(i, j int) bool {
+		return methods[i].Count > methods[j].Count
+	})
 	return methods
 }
 
