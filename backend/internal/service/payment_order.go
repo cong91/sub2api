@@ -820,7 +820,7 @@ func calculateCreateOrderPayAmount(limitAmount, feeRate float64, currency string
 }
 
 func calculateCreateOrderPayAmountForOrderType(limitAmount, feeRate float64, currency, orderType string, subscriptionUSDToCNYRate float64) (string, float64, error) {
-	if orderType == payment.OrderTypeSubscription && strings.EqualFold(strings.TrimSpace(currency), payment.DefaultPaymentCurrency) {
+	if orderType == payment.OrderTypeSubscription && strings.EqualFold(strings.TrimSpace(currency), "CNY") {
 		rate := normalizeSubscriptionUSDToCNYRate(subscriptionUSDToCNYRate)
 		if rate > 0 {
 			limitAmount = roundPaymentAmountForCollection(limitAmount*rate, currency)
