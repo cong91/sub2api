@@ -86,6 +86,12 @@ const (
 	FieldModelsListConfig = "models_list_config"
 	// FieldRpmLimit holds the string denoting the rpm_limit field in the database.
 	FieldRpmLimit = "rpm_limit"
+	// FieldTokenPricePerMillion holds the string denoting the token_price_per_million field in the database.
+	FieldTokenPricePerMillion = "token_price_per_million"
+	// FieldPricingReferenceModel holds the string denoting the pricing_reference_model field in the database.
+	FieldPricingReferenceModel = "pricing_reference_model"
+	// FieldInputOutputRatio holds the string denoting the input_output_ratio field in the database.
+	FieldInputOutputRatio = "input_output_ratio"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
 	EdgeAPIKeys = "api_keys"
 	// EdgeRedeemCodes holds the string denoting the redeem_codes edge name in mutations.
@@ -196,6 +202,9 @@ var Columns = []string{
 	FieldMessagesDispatchModelConfig,
 	FieldModelsListConfig,
 	FieldRpmLimit,
+	FieldTokenPricePerMillion,
+	FieldPricingReferenceModel,
+	FieldInputOutputRatio,
 }
 
 var (
@@ -283,6 +292,8 @@ var (
 	DefaultModelsListConfig domain.GroupModelsListConfig
 	// DefaultRpmLimit holds the default value on creation for the "rpm_limit" field.
 	DefaultRpmLimit int
+	// PricingReferenceModelValidator is a validator for the "pricing_reference_model" field. It is called by the builders before save.
+	PricingReferenceModelValidator func(string) error
 )
 
 // OrderOption defines the ordering options for the Group queries.
@@ -446,6 +457,21 @@ func ByDefaultMappedModel(opts ...sql.OrderTermOption) OrderOption {
 // ByRpmLimit orders the results by the rpm_limit field.
 func ByRpmLimit(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRpmLimit, opts...).ToFunc()
+}
+
+// ByTokenPricePerMillion orders the results by the token_price_per_million field.
+func ByTokenPricePerMillion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTokenPricePerMillion, opts...).ToFunc()
+}
+
+// ByPricingReferenceModel orders the results by the pricing_reference_model field.
+func ByPricingReferenceModel(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPricingReferenceModel, opts...).ToFunc()
+}
+
+// ByInputOutputRatio orders the results by the input_output_ratio field.
+func ByInputOutputRatio(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldInputOutputRatio, opts...).ToFunc()
 }
 
 // ByAPIKeysCount orders the results by api_keys count.
