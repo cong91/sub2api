@@ -309,6 +309,9 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		MessagesDispatchModelConfig:     normalizeOpenAIMessagesDispatchModelConfig(input.MessagesDispatchModelConfig),
 		ModelsListConfig:                normalizeGroupModelsListConfig(input.ModelsListConfig),
 		RPMLimit:                        input.RPMLimit,
+		TokenPricePerMillion:            input.TokenPricePerMillion,
+		PricingReferenceModel:           input.PricingReferenceModel,
+		InputOutputRatio:                input.InputOutputRatio,
 	}
 	sanitizeGroupMessagesDispatchFields(group)
 	if err := s.groupRepo.Create(ctx, group); err != nil {
@@ -624,6 +627,16 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	if input.RPMLimit != nil {
 		group.RPMLimit = *input.RPMLimit
+	}
+	// Token pricing fields — nil means "not provided, don't change".
+	if input.TokenPricePerMillion != nil {
+		group.TokenPricePerMillion = input.TokenPricePerMillion
+	}
+	if input.PricingReferenceModel != nil {
+		group.PricingReferenceModel = input.PricingReferenceModel
+	}
+	if input.InputOutputRatio != nil {
+		group.InputOutputRatio = input.InputOutputRatio
 	}
 	sanitizeGroupMessagesDispatchFields(group)
 
