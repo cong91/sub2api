@@ -162,7 +162,7 @@
                   <span v-if="selectedPlan.original_price" class="text-sm text-gray-400 line-through dark:text-gray-500">
                     {{ formatSelectedPaymentAmount(selectedPlan.original_price) }}
                   </span>
-                  <span :class="['text-3xl font-bold', planTextClass]">{{ formatSelectedPaymentAmount(selectedPlan.price) }}</span>
+                  <span :class="['text-3xl font-bold', planTextClass]">{{ formatSelectedPaymentAmount(resolvedPlanPaymentPrice) }}</span>
                   <span class="text-sm text-gray-500 dark:text-gray-400">/ {{ planValiditySuffix }}</span>
                 </div>
                 <!-- Description -->
@@ -216,7 +216,7 @@
                 <div class="space-y-2 text-sm">
                   <div class="flex justify-between">
                     <span class="text-gray-500 dark:text-gray-400">{{ t('payment.amountLabel') }}</span>
-                    <span class="text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(selectedPlan.price) }}</span>
+                    <span class="text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(resolvedPlanPaymentPrice) }}</span>
                   </div>
                   <div class="flex justify-between">
                     <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fee') }} ({{ feeRate }}%)</span>
@@ -233,7 +233,7 @@
                   <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                   {{ t('common.processing') }}
                 </span>
-                <span v-else>{{ t('payment.createOrder') }} {{ formatSelectedPaymentAmount(feeRate > 0 ? subTotalAmount : selectedPlan.price) }}</span>
+                <span v-else>{{ t('payment.createOrder') }} {{ formatSelectedPaymentAmount(feeRate > 0 ? subTotalAmount : resolvedPlanPaymentPrice) }}</span>
               </button>
               <button class="btn btn-secondary w-full" @click="selectedPlan = null">{{ t('common.cancel') }}</button>
             </template>
@@ -804,22 +804,37 @@ const subMethodOptions = computed<PaymentMethodOption[]>(() => {
 })
 
 const subFeeAmount = computed(() => {
-  const price = selectedPlan.value?.price ?? 0
+  const price = resolvedPlanPaymentPrice.value
   if (feeRate.value <= 0 || price <= 0) return 0
   return Math.ceil(((price * feeRate.value) / 100) * 100) / 100
 })
 
 const subTotalAmount = computed(() => {
-  const price = selectedPlan.value?.price ?? 0
+  const price = resolvedPlanPaymentPrice.value
   if (feeRate.value <= 0 || price <= 0) return price
   return Math.round((price + subFeeAmount.value) * 100) / 100
+})
+
+/** Resolve the display/payment price for the selected plan in the current payment currency.
+ *  Uses currency_overrides if set, otherwise falls back to FX conversion from ledger price. */
+const resolvedPlanPaymentPrice = computed(() => {
+  const plan = selectedPlan.value
+  if (!plan) return 0
+  const currency = paymentCurrency.value
+  // Check currency override first
+  if (plan.currency_overrides && plan.currency_overrides[currency] > 0) {
+    return plan.currency_overrides[currency]
+  }
+  // Fallback: convert ledger price via FX
+  if (currency === ledgerCurrency.value) return plan.price
+  return paymentAmountFromLedger(plan.price, paymentCurrency.value, ledgerCurrency.value, checkout.value.manual_fx_rates, checkout.value.currency_meta)
 })
 
 const canSubmitSubscription = computed(() => {
   if (selectedPlan.value === null) return false
   const ml = selectedLimit.value
   if (!ml || !methodSupportsCurrentSelection(selectedMethod.value)) return false
-  const price = selectedPlan.value.price
+  const price = resolvedPlanPaymentPrice.value
   if (ml.single_min > 0 && price < ml.single_min) return false
   if (ml.single_max > 0 && price > ml.single_max) return false
   return true
@@ -899,8 +914,19 @@ function selectBalancePackage(pkg: BalancePackage) {
     amount.value = null
   } else {
     selectedBalancePackage.value = pkg
-    amount.value = pkg.amount_ledger
+    amount.value = resolveBalancePackagePaymentAmount(pkg)
   }
+}
+
+/** Resolve the payment amount for a balance package in the current payment currency.
+ *  Uses currency_overrides if set, otherwise falls back to FX conversion from ledger amount. */
+function resolveBalancePackagePaymentAmount(pkg: BalancePackage): number {
+  const currency = paymentCurrency.value
+  if (pkg.currency_overrides && pkg.currency_overrides[currency] > 0) {
+    return pkg.currency_overrides[currency]
+  }
+  if (currency === ledgerCurrency.value) return pkg.amount_ledger
+  return paymentAmountFromLedger(pkg.amount_ledger, currency, ledgerCurrency.value, checkout.value.manual_fx_rates, checkout.value.currency_meta)
 }
 
 async function confirmSubscribe() {
