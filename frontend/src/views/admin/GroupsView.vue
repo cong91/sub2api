@@ -559,8 +559,8 @@
           <input
             v-model.number="createForm.rate_multiplier"
             type="number"
-            step="0.001"
-            min="0.001"
+            step="any"
+            min="0"
             required
             class="input"
             data-tour="group-form-multiplier"
@@ -2072,8 +2072,8 @@
           <input
             v-model.number="editForm.rate_multiplier"
             type="number"
-            step="0.001"
-            min="0.001"
+            step="any"
+            min="0"
             required
             class="input"
             data-tour="group-form-multiplier"
@@ -4814,6 +4814,16 @@ const normalizeRateMultiplier = (
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
 };
 
+const normalizeImageRateMultiplier = (
+  value: number | string | null | undefined,
+): number => {
+  if (value === null || value === undefined || value === "") {
+    return 1;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
+};
+
 const handleCreateGroup = async () => {
   if (!createForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
@@ -4857,10 +4867,13 @@ const handleCreateGroup = async () => {
     requestData.daily_limit_usd = emptyToNull(requestData.daily_limit_usd);
     requestData.weekly_limit_usd = emptyToNull(requestData.weekly_limit_usd);
     requestData.monthly_limit_usd = emptyToNull(requestData.monthly_limit_usd);
-    requestData.image_rate_multiplier = normalizeRateMultiplier(
+    requestData.image_rate_multiplier = normalizeImageRateMultiplier(
       requestData.image_rate_multiplier,
     );
     resetDisabledBatchImagePricing(requestData);
+    requestData.rate_multiplier = normalizeRateMultiplier(
+      requestData.rate_multiplier,
+    );
     requestData.batch_image_discount_multiplier = normalizeRateMultiplier(
       requestData.batch_image_discount_multiplier,
     );
@@ -5048,10 +5061,13 @@ const handleUpdateGroup = async () => {
     payload.daily_limit_usd = emptyToNull(payload.daily_limit_usd);
     payload.weekly_limit_usd = emptyToNull(payload.weekly_limit_usd);
     payload.monthly_limit_usd = emptyToNull(payload.monthly_limit_usd);
-    payload.image_rate_multiplier = normalizeRateMultiplier(
+    payload.image_rate_multiplier = normalizeImageRateMultiplier(
       payload.image_rate_multiplier,
     );
     resetDisabledBatchImagePricing(payload);
+    payload.rate_multiplier = normalizeRateMultiplier(
+      payload.rate_multiplier,
+    );
     payload.batch_image_discount_multiplier = normalizeRateMultiplier(
       payload.batch_image_discount_multiplier,
     );
