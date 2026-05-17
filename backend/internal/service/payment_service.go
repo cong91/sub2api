@@ -161,16 +161,25 @@ type RefundResult struct {
 }
 
 type DashboardStats struct {
-	TodayAmount   float64 `json:"today_amount"`
-	TotalAmount   float64 `json:"total_amount"`
-	TodayCount    int     `json:"today_count"`
-	TotalCount    int     `json:"total_count"`
-	AvgAmount     float64 `json:"avg_amount"`
-	PendingOrders int     `json:"pending_orders"`
+	TodayCount    int `json:"today_count"`
+	TotalCount    int `json:"total_count"`
+	PendingOrders int `json:"pending_orders"`
+
+	// Revenue grouped by payment currency (actual amount paid to gateway)
+	RevenueByCurrency []CurrencyRevenue `json:"revenue_by_currency"`
 
 	DailySeries    []DailyStats        `json:"daily_series"`
 	PaymentMethods []PaymentMethodStat `json:"payment_methods"`
 	TopUsers       []TopUserStat       `json:"top_users"`
+}
+
+// CurrencyRevenue holds revenue totals for a specific payment currency.
+type CurrencyRevenue struct {
+	Currency    string  `json:"currency"`
+	TodayAmount float64 `json:"today_amount"`
+	TotalAmount float64 `json:"total_amount"`
+	TodayCount  int     `json:"today_count"`
+	TotalCount  int     `json:"total_count"`
 }
 
 type DailyStats struct {
@@ -180,9 +189,10 @@ type DailyStats struct {
 }
 
 type PaymentMethodStat struct {
-	Type   string  `json:"type"`
-	Amount float64 `json:"amount"`
-	Count  int     `json:"count"`
+	Type     string  `json:"type"`
+	Currency string  `json:"currency"`
+	Amount   float64 `json:"amount"`
+	Count    int     `json:"count"`
 }
 
 type TopUserStat struct {
