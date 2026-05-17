@@ -322,12 +322,19 @@ export interface CreateOrderResult {
 }
 
 export interface DashboardStats {
+  today_count: number
+  total_count: number
+  pending_orders: number
+  revenue_by_currency: CurrencyRevenue[]
+  daily_series: { date: string; amount: number; count: number }[]
+  payment_methods: { type: string; currency: string; amount: number; count: number }[]
+  top_users: { user_id: number; email: string; amount: number }[]
+}
+
+export interface CurrencyRevenue {
+  currency: string
   today_amount: number
   total_amount: number
   today_count: number
   total_count: number
-  avg_amount: number
-  daily_series: { date: string; amount: number; count: number }[]
-  payment_methods: { type: string; amount: number; count: number }[]
-  top_users: { user_id: number; email: string; amount: number }[]
 }
