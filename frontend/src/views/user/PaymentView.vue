@@ -159,10 +159,10 @@
                 </div>
                 <!-- Price -->
                 <div class="flex items-baseline gap-2">
-                  <span v-if="selectedPlan.original_price" class="text-sm text-gray-400 line-through dark:text-gray-500">
-                    {{ formatSelectedSubscriptionPaymentAmount(selectedPlan.original_price) }}
+                  <span v-if="resolvedPlanOriginalPaymentPrice > 0" class="text-sm text-gray-400 line-through dark:text-gray-500">
+                    {{ formatSubscriptionPaymentAmount(resolvedPlanOriginalPaymentPrice) }}
                   </span>
-                  <span :class="['text-3xl font-bold', planTextClass]">{{ formatSelectedSubscriptionPaymentAmount(selectedPlan.price) }}</span>
+                  <span :class="['text-3xl font-bold', planTextClass]">{{ formatSubscriptionPaymentAmount(subPaymentAmount) }}</span>
                   <span class="text-sm text-gray-500 dark:text-gray-400">/ {{ planValiditySuffix }}</span>
                 </div>
                 <!-- Description -->
@@ -216,15 +216,15 @@
                 <div class="space-y-2 text-sm">
                   <div class="flex justify-between">
                     <span class="text-gray-500 dark:text-gray-400">{{ t('payment.amountLabel') }}</span>
-                    <span class="text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(subPaymentAmount) }}</span>
+                    <span class="text-gray-900 dark:text-white">{{ formatSubscriptionPaymentAmount(subPaymentAmount) }}</span>
                   </div>
                   <div class="flex justify-between">
                     <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fee') }} ({{ feeRate }}%)</span>
-                    <span class="text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(subFeeAmount) }}</span>
+                    <span class="text-gray-900 dark:text-white">{{ formatSubscriptionPaymentAmount(subFeeAmount) }}</span>
                   </div>
                   <div class="flex justify-between border-t border-gray-200 pt-2 dark:border-dark-600">
                     <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.actualPay') }}</span>
-                    <span class="text-lg font-bold text-primary-600 dark:text-primary-400">{{ formatSelectedPaymentAmount(subTotalAmount) }}</span>
+                    <span class="text-lg font-bold text-primary-600 dark:text-primary-400">{{ formatSubscriptionPaymentAmount(subTotalAmount) }}</span>
                   </div>
                 </div>
               </div>
@@ -233,7 +233,7 @@
                   <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                   {{ t('common.processing') }}
                 </span>
-                <span v-else>{{ t('payment.createOrder') }} {{ formatSelectedPaymentAmount(subTotalAmount) }}</span>
+                <span v-else>{{ t('payment.createOrder') }} {{ formatSubscriptionPaymentAmount(subTotalAmount) }}</span>
               </button>
               <button class="btn btn-secondary w-full" @click="selectedPlan = null">{{ t('common.cancel') }}</button>
             </template>
@@ -343,7 +343,7 @@ import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 import PaddleCheckoutInline from '@/components/payment/PaddleCheckoutInline.vue'
 import Icon from '@/components/icons/Icon.vue'
-import { formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
+import { normalizePaymentCurrency } from '@/components/payment/currency'
 import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSelector.vue'
 import { buildPaymentErrorToastMessage, describePaymentScenarioError } from './paymentUx'
 import { hasWechatResumeQuery, parseWechatResumeRoute, stripWechatResumeQuery } from './paymentWechatResume'
@@ -730,44 +730,9 @@ const globalMaxAmount = computed(() => localMaxAmount.value)
 // Selected method's limits (for validation and error messages)
 const selectedLimit = computed(() => visibleMethods.value[selectedMethod.value])
 const selectedCurrency = computed(() => normalizePaymentCurrency(selectedLimit.value?.currency))
-const localeCode = computed(() => {
-  const raw = i18n.locale as unknown
-  if (typeof raw === 'string') return raw
-  if (raw && typeof raw === 'object' && 'value' in raw) {
-    return String((raw as { value?: string }).value || '')
-  }
-  return undefined
-})
 
-function currencyFractionDigits(currency: string): number {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency,
-    }).resolvedOptions().maximumFractionDigits ?? 2
-  } catch {
-    return 2
-  }
-}
-
-function roundPaymentAmount(value: number, currency: string): number {
-  if (!Number.isFinite(value)) return 0
-  const factor = 10 ** currencyFractionDigits(currency)
-  return Math.round(value * factor) / factor
-}
-
-function ceilPaymentAmount(value: number, currency: string): number {
-  if (!Number.isFinite(value)) return 0
-  const factor = 10 ** currencyFractionDigits(currency)
-  return Math.ceil(value * factor) / factor
-}
-
-function formatSelectedPaymentAmount(value: number): string {
-  return formatPaymentAmount(value, selectedCurrency.value, localeCode.value)
-}
-
-function formatSelectedSubscriptionPaymentAmount(value: number): string {
-  return formatSelectedPaymentAmount(roundPaymentAmount(value, selectedCurrency.value))
+function formatSubscriptionPaymentAmount(value: number): string {
+  return formatMoney(value, paymentCurrency.value, checkout.value.currency_meta)
 }
 
 const methodOptions = computed<PaymentMethodOption[]>(() =>
@@ -814,53 +779,52 @@ const canSubmit = computed(() =>
     && amountFitsMethod(validAmount.value, selectedMethod.value)
 )
 
-const subPaymentAmount = computed(() => {
-  const price = selectedPlan.value?.price ?? 0
-  return roundPaymentAmount(price, selectedCurrency.value)
+function resolveSubscriptionPlanPaymentAmount(plan: SubscriptionPlan | null, basePrice?: number): number {
+  if (!plan) return 0
+  const price = basePrice ?? plan.price
+  const currency = paymentCurrency.value
+  if (basePrice == null && plan.currency_overrides && plan.currency_overrides[currency] > 0) {
+    return roundMoney(plan.currency_overrides[currency], currency, checkout.value.currency_meta)
+  }
+  if (currency === ledgerCurrency.value) return roundMoney(price, currency, checkout.value.currency_meta)
+  return paymentAmountFromLedger(price, currency, ledgerCurrency.value, checkout.value.manual_fx_rates, checkout.value.currency_meta)
+}
+
+const subPaymentAmount = computed(() => resolveSubscriptionPlanPaymentAmount(selectedPlan.value))
+
+const resolvedPlanOriginalPaymentPrice = computed(() => {
+  const plan = selectedPlan.value
+  if (!plan?.original_price) return 0
+  return resolveSubscriptionPlanPaymentAmount(plan, plan.original_price)
 })
 
 const subFeeAmount = computed(() => {
   if (feeRate.value <= 0 || subPaymentAmount.value <= 0) return 0
-  return ceilPaymentAmount((subPaymentAmount.value * feeRate.value) / 100, selectedCurrency.value)
+  return ceilMoney((subPaymentAmount.value * feeRate.value) / 100, paymentCurrency.value, checkout.value.currency_meta)
 })
 
 const subTotalAmount = computed(() => {
   if (feeRate.value <= 0 || subPaymentAmount.value <= 0) return subPaymentAmount.value
-  return roundPaymentAmount(subPaymentAmount.value + subFeeAmount.value, selectedCurrency.value)
+  return roundMoney(subPaymentAmount.value + subFeeAmount.value, paymentCurrency.value, checkout.value.currency_meta)
 })
 
-function subscriptionTotalAmountForCurrency(value: number, currency: string): number {
-  const paymentAmount = roundPaymentAmount(value, currency)
-  if (feeRate.value <= 0 || paymentAmount <= 0) return paymentAmount
-  const fee = ceilPaymentAmount((paymentAmount * feeRate.value) / 100, currency)
-  return roundPaymentAmount(paymentAmount + fee, currency)
-}
-
 // Subscription-specific: method options based on gateway pay amount
-const subMethodOptions = computed<PaymentMethodOption[]>(() => {
-  const planPrice = selectedPlan.value?.price ?? 0
-  return currencySelectableMethods.value.map((type) => {
+const subMethodOptions = computed<PaymentMethodOption[]>(() =>
+  currencySelectableMethods.value.map((type) => {
     const ml = visibleMethods.value[type]
-    const withinLimits = planPrice <= 0
-      || (((ml?.single_min ?? 0) <= 0 || planPrice >= (ml?.single_min ?? 0))
-        && ((ml?.single_max ?? 0) <= 0 || planPrice <= (ml?.single_max ?? 0)))
-    const payAmountForMethod = subscriptionTotalAmountForCurrency(planPrice, normalizePaymentCurrency(ml?.currency))
     return {
       type,
       fee_rate: ml?.fee_rate ?? 0,
-      available: ml?.available !== false && withinLimits && amountFitsMethod(payAmountForMethod, type),
+      available: ml?.available !== false && amountFitsMethod(subTotalAmount.value, type),
     }
   })
-})
+)
 
 const canSubmitSubscription = computed(() => {
   if (selectedPlan.value === null) return false
   const ml = selectedLimit.value
   if (!ml || !methodSupportsCurrentSelection(selectedMethod.value)) return false
-  const price = selectedPlan.value.price
-  if (ml.single_min > 0 && price < ml.single_min) return false
-  if (ml.single_max > 0 && price > ml.single_max) return false
-  return true
+  return amountFitsMethod(subTotalAmount.value, selectedMethod.value)
 })
 // Auto-switch to first available method when current selection can't handle the amount
 watch(() => [validAmount.value, selectedMethod.value] as const, ([amt, method]) => {
@@ -936,8 +900,19 @@ function selectBalancePackage(pkg: BalancePackage) {
     amount.value = null
   } else {
     selectedBalancePackage.value = pkg
-    amount.value = pkg.amount_ledger
+    amount.value = resolveBalancePackagePaymentAmount(pkg)
   }
+}
+
+/** Resolve the payment amount for a balance package in the current payment currency.
+ *  Uses currency_overrides if set, otherwise falls back to FX conversion from ledger amount. */
+function resolveBalancePackagePaymentAmount(pkg: BalancePackage): number {
+  const currency = paymentCurrency.value
+  if (pkg.currency_overrides && pkg.currency_overrides[currency] > 0) {
+    return pkg.currency_overrides[currency]
+  }
+  if (currency === ledgerCurrency.value) return pkg.amount_ledger
+  return paymentAmountFromLedger(pkg.amount_ledger, currency, ledgerCurrency.value, checkout.value.manual_fx_rates, checkout.value.currency_meta)
 }
 
 async function confirmSubscribe() {
