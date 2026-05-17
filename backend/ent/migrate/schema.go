@@ -432,6 +432,7 @@ var (
 		{Name: "actual_credits", Type: field.TypeInt64, Default: 0},
 		{Name: "credit_unit", Type: field.TypeString, Size: 32, Default: "tokens"},
 		{Name: "group_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "currency_overrides", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "badge", Type: field.TypeString, Size: 100, Default: ""},
 		{Name: "popular", Type: field.TypeBool, Default: false},
 		{Name: "for_sale", Type: field.TypeBool, Default: true},
@@ -453,7 +454,7 @@ var (
 			{
 				Name:    "balancepackage_for_sale",
 				Unique:  false,
-				Columns: []*schema.Column{BalancePackagesColumns[10]},
+				Columns: []*schema.Column{BalancePackagesColumns[11]},
 			},
 			{
 				Name:    "balancepackage_group_id",
@@ -463,7 +464,7 @@ var (
 			{
 				Name:    "balancepackage_sort_order",
 				Unique:  false,
-				Columns: []*schema.Column{BalancePackagesColumns[11]},
+				Columns: []*schema.Column{BalancePackagesColumns[12]},
 			},
 		},
 	}
@@ -1330,6 +1331,7 @@ var (
 		{Name: "validity_unit", Type: field.TypeString, Size: 10, Default: "day"},
 		{Name: "features", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
 		{Name: "product_name", Type: field.TypeString, Size: 100, Default: ""},
+		{Name: "currency_overrides", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "for_sale", Type: field.TypeBool, Default: true},
 		{Name: "sort_order", Type: field.TypeInt, Default: 0},
 		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
@@ -1349,7 +1351,7 @@ var (
 			{
 				Name:    "subscriptionplan_for_sale",
 				Unique:  false,
-				Columns: []*schema.Column{SubscriptionPlansColumns[10]},
+				Columns: []*schema.Column{SubscriptionPlansColumns[11]},
 			},
 		},
 	}
