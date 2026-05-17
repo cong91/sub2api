@@ -45,8 +45,7 @@ const (
 	topUsersLimit      = 10
 	amountToleranceCNY = 0.01
 
-	legacyOrderIDPrefix = "sub2_"
-	orderIDPrefix       = "vclaw_"
+	orderIDPrefix = "vclaw_"
 )
 
 const paymentResumeSigningKeyEnv = "PAYMENT_RESUME_SIGNING_KEY"
@@ -54,11 +53,11 @@ const paymentResumeSigningKeyEnv = "PAYMENT_RESUME_SIGNING_KEY"
 // --- Types ---
 
 // generateOutTradeNo creates a unique external order ID for payment providers.
-// Format: vclaw_20250409aB3kX9mQ (prefix + date + 8-char random)
+// Format: vclaw_aB3k9Q (prefix + 6-char alphanumeric random)
+// Charset: a-z A-Z 0-9 (62 chars) → 62^6 ≈ 56.8 billion combinations.
 func generateOutTradeNo() string {
-	date := time.Now().Format("20060102")
-	rnd := generateRandomString(8)
-	return orderIDPrefix + date + rnd
+	rnd := generateRandomString(6)
+	return orderIDPrefix + rnd
 }
 
 func generateRandomString(n int) string {
