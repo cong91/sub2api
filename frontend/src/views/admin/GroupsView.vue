@@ -489,8 +489,8 @@
           <input
             v-model.number="createForm.rate_multiplier"
             type="number"
-            step="0.001"
-            min="0.001"
+            step="any"
+            min="0"
             required
             class="input"
             data-tour="group-form-multiplier"
@@ -1776,8 +1776,8 @@
           <input
             v-model.number="editForm.rate_multiplier"
             type="number"
-            step="0.001"
-            min="0.001"
+            step="any"
+            min="0"
             required
             class="input"
             data-tour="group-form-multiplier"
@@ -3957,6 +3957,16 @@ const normalizeOptionalLimit = (
   return Number.isFinite(value) && value > 0 ? value : null;
 };
 
+const normalizeRateMultiplier = (
+  value: number | string | null | undefined,
+): number => {
+  if (value === null || value === undefined || value === "") {
+    return 1;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
+};
+
 const normalizeImageRateMultiplier = (
   value: number | string | null | undefined,
 ): number => {
@@ -4012,6 +4022,9 @@ const handleCreateGroup = async () => {
     requestData.monthly_limit_usd = emptyToNull(requestData.monthly_limit_usd);
     requestData.image_rate_multiplier = normalizeImageRateMultiplier(
       requestData.image_rate_multiplier,
+    );
+    requestData.rate_multiplier = normalizeRateMultiplier(
+      requestData.rate_multiplier,
     );
     await adminAPI.groups.create(requestData);
     appStore.showSuccess(t("admin.groups.groupCreated"));
@@ -4151,6 +4164,9 @@ const handleUpdateGroup = async () => {
     payload.monthly_limit_usd = emptyToNull(payload.monthly_limit_usd);
     payload.image_rate_multiplier = normalizeImageRateMultiplier(
       payload.image_rate_multiplier,
+    );
+    payload.rate_multiplier = normalizeRateMultiplier(
+      payload.rate_multiplier,
     );
     await adminAPI.groups.update(editingGroup.value.id, payload);
     appStore.showSuccess(t("admin.groups.groupUpdated"));
