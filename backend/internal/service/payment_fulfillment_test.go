@@ -310,28 +310,19 @@ func TestValidateProviderNotificationMetadataAllowsLegacyOrdersWithoutSnapshotFi
 	assert.NoError(t, err)
 }
 
-func TestPaymentOrderIDPrefixAndAliases(t *testing.T) {
+func TestPaymentOrderIDFormat(t *testing.T) {
 	t.Parallel()
 
 	outTradeNo := generateOutTradeNo()
-	assert.True(t, strings.HasPrefix(outTradeNo, "vclaw_"), "new payment order IDs should be branded for V-Claw")
-	assert.False(t, strings.HasPrefix(outTradeNo, "sub2_"), "new payment order IDs must not expose legacy sub2 prefix")
-	assert.Equal(t, []string{"sub2_20260429AbC123xY"}, alternatePaymentOrderIDs("vclaw_20260429AbC123xY"))
-	assert.Equal(t, []string{"vclaw_20260429AbC123xY"}, alternatePaymentOrderIDs("sub2_20260429AbC123xY"))
-}
-
-func TestParseLegacyPaymentOrderID(t *testing.T) {
-	t.Parallel()
-
-	oid, ok := parseLegacyPaymentOrderID("sub2_42", &dbent.NotFoundError{})
-	assert.True(t, ok)
-	assert.EqualValues(t, 42, oid)
-
-	_, ok = parseLegacyPaymentOrderID("42", &dbent.NotFoundError{})
-	assert.False(t, ok)
-
-	_, ok = parseLegacyPaymentOrderID("sub2_42", errors.New("db down"))
-	assert.False(t, ok)
+	assert.True(t, strings.HasPrefix(outTradeNo, "vclaw_"), "order IDs should have vclaw_ prefix")
+	// vclaw_ (6) + 6 random chars = 12 total
+	assert.Len(t, outTradeNo, 12, "order ID should be exactly 12 characters (vclaw_ + 6 random)")
+	suffix := outTradeNo[len("vclaw_"):]
+	for _, ch := range suffix {
+		assert.True(t,
+			(ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9'),
+			"suffix should only contain alphanumeric chars, got: %c", ch)
+	}
 }
 
 func TestIsValidProviderAmount(t *testing.T) {

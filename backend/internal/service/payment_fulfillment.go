@@ -45,16 +45,8 @@ func (s *PaymentService) HandlePaymentNotification(ctx context.Context, n *payme
 		return nil
 	}
 	// Look up order by out_trade_no (the external order ID we sent to the provider).
-	// New V-Claw orders use vclaw_*, but SePay's configured payment-code parser
-	// may only return the suffix/VC reference. During rollout, fall back between
-	// vclaw_* and legacy sub2_* aliases before treating the webhook as unknown.
 	order, err := s.findPaymentOrderForNotification(ctx, n.OrderID)
 	if err != nil {
-		// Fallback only for true legacy "sub2_N" DB-ID payloads when the
-		// current out_trade_no lookup genuinely did not find an order.
-		if oid, ok := parseLegacyPaymentOrderID(n.OrderID, err); ok {
-			return s.confirmPayment(ctx, oid, n.TradeNo, n.Amount, n.Currency, pk, n.Metadata)
-		}
 		if dbent.IsNotFound(err) {
 			return fmt.Errorf("%w: out_trade_no=%s", ErrOrderNotFound, n.OrderID)
 		}
@@ -65,52 +57,7 @@ func (s *PaymentService) HandlePaymentNotification(ctx context.Context, n *payme
 
 func (s *PaymentService) findPaymentOrderForNotification(ctx context.Context, orderID string) (*dbent.PaymentOrder, error) {
 	orderID = strings.TrimSpace(orderID)
-	order, err := s.entClient.PaymentOrder.Query().Where(paymentorder.OutTradeNo(orderID)).Only(ctx)
-	if err == nil || !dbent.IsNotFound(err) {
-		return order, err
-	}
-	for _, alias := range alternatePaymentOrderIDs(orderID) {
-		if strings.EqualFold(alias, orderID) {
-			continue
-		}
-		order, aliasErr := s.entClient.PaymentOrder.Query().Where(paymentorder.OutTradeNo(alias)).Only(ctx)
-		if aliasErr == nil || !dbent.IsNotFound(aliasErr) {
-			return order, aliasErr
-		}
-	}
-	return nil, err
-}
-
-func alternatePaymentOrderIDs(orderID string) []string {
-	orderID = strings.TrimSpace(orderID)
-	lower := strings.ToLower(orderID)
-	switch {
-	case strings.HasPrefix(lower, orderIDPrefix):
-		return []string{legacyOrderIDPrefix + orderID[len(orderIDPrefix):]}
-	case strings.HasPrefix(lower, legacyOrderIDPrefix):
-		return []string{orderIDPrefix + orderID[len(legacyOrderIDPrefix):]}
-	default:
-		return nil
-	}
-}
-
-func parseLegacyPaymentOrderID(orderID string, lookupErr error) (int64, bool) {
-	if !dbent.IsNotFound(lookupErr) {
-		return 0, false
-	}
-	orderID = strings.TrimSpace(orderID)
-	if !strings.HasPrefix(orderID, legacyOrderIDPrefix) {
-		return 0, false
-	}
-	trimmed := strings.TrimPrefix(orderID, legacyOrderIDPrefix)
-	if trimmed == "" || trimmed == orderID {
-		return 0, false
-	}
-	oid, err := strconv.ParseInt(trimmed, 10, 64)
-	if err != nil || oid <= 0 {
-		return 0, false
-	}
-	return oid, true
+	return s.entClient.PaymentOrder.Query().Where(paymentorder.OutTradeNo(orderID)).Only(ctx)
 }
 
 func (s *PaymentService) confirmPayment(ctx context.Context, oid int64, tradeNo string, paid float64, currency, pk string, metadata map[string]string) error {
