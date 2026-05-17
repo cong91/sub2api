@@ -29,13 +29,12 @@ const (
 
 const (
 	sepayCanonicalOrderPrefix = "vclaw_"
-	sepayLegacyOrderPrefix    = "sub2_"
 )
 
 var (
-	sepayOrderCodePattern   = regexp.MustCompile(`(?i)\b(?:vclaw|sub2)_[a-z0-9]+\b`)
-	sepayTransferRefPattern = regexp.MustCompile(`(?i)\b(?:VCLAW|VC)([0-9]{8}[a-z0-9]{8})\b`)
-	sepayOrderSuffixPattern = regexp.MustCompile(`(?i)^([0-9]{8}[a-z0-9]{8})$`)
+	sepayOrderCodePattern   = regexp.MustCompile(`(?i)\b(?:vclaw)_[a-zA-Z0-9]+\b`)
+	sepayTransferRefPattern = regexp.MustCompile(`(?i)\b(?:VC)([a-zA-Z0-9]{6})\b`)
+	sepayOrderSuffixPattern = regexp.MustCompile(`(?i)^([a-zA-Z0-9]{6})$`)
 )
 
 type Sepay struct {
@@ -371,11 +370,8 @@ func buildSepayTransferContent(orderID string) string {
 func buildSepayTransferReference(orderID string) string {
 	suffix := strings.TrimSpace(orderID)
 	lower := strings.ToLower(suffix)
-	for _, prefix := range []string{sepayCanonicalOrderPrefix, sepayLegacyOrderPrefix} {
-		if strings.HasPrefix(lower, prefix) {
-			suffix = suffix[len(prefix):]
-			break
-		}
+	if strings.HasPrefix(lower, sepayCanonicalOrderPrefix) {
+		suffix = suffix[len(sepayCanonicalOrderPrefix):]
 	}
 	if suffix == "" {
 		return ""
@@ -414,9 +410,6 @@ func ExtractSepayOrderIDFromContent(content string) string {
 func normalizePrefixedSepayOrderID(orderID string) string {
 	if strings.HasPrefix(strings.ToLower(orderID), sepayCanonicalOrderPrefix) {
 		return strings.ToLower(orderID[:len(sepayCanonicalOrderPrefix)]) + orderID[len(sepayCanonicalOrderPrefix):]
-	}
-	if strings.HasPrefix(strings.ToLower(orderID), sepayLegacyOrderPrefix) {
-		return strings.ToLower(orderID[:len(sepayLegacyOrderPrefix)]) + orderID[len(sepayLegacyOrderPrefix):]
 	}
 	return strings.TrimSpace(orderID)
 }
