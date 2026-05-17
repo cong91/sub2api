@@ -8749,30 +8749,31 @@ func (m *AuthIdentityChannelMutation) ResetEdge(name string) error {
 // BalancePackageMutation represents an operation that mutates the BalancePackage nodes in the graph.
 type BalancePackageMutation struct {
 	config
-	op                Op
-	typ               string
-	id                *int64
-	code              *string
-	label             *string
-	description       *string
-	amount_ledger     *float64
-	addamount_ledger  *float64
-	actual_credits    *int64
-	addactual_credits *int64
-	credit_unit       *string
-	group_id          *int64
-	addgroup_id       *int64
-	badge             *string
-	popular           *bool
-	for_sale          *bool
-	sort_order        *int
-	addsort_order     *int
-	created_at        *time.Time
-	updated_at        *time.Time
-	clearedFields     map[string]struct{}
-	done              bool
-	oldValue          func(context.Context) (*BalancePackage, error)
-	predicates        []predicate.BalancePackage
+	op                 Op
+	typ                string
+	id                 *int64
+	code               *string
+	label              *string
+	description        *string
+	amount_ledger      *float64
+	addamount_ledger   *float64
+	actual_credits     *int64
+	addactual_credits  *int64
+	credit_unit        *string
+	group_id           *int64
+	addgroup_id        *int64
+	currency_overrides *map[string]float64
+	badge              *string
+	popular            *bool
+	for_sale           *bool
+	sort_order         *int
+	addsort_order      *int
+	created_at         *time.Time
+	updated_at         *time.Time
+	clearedFields      map[string]struct{}
+	done               bool
+	oldValue           func(context.Context) (*BalancePackage, error)
+	predicates         []predicate.BalancePackage
 }
 
 var _ ent.Mutation = (*BalancePackageMutation)(nil)
@@ -9199,6 +9200,55 @@ func (m *BalancePackageMutation) ResetGroupID() {
 	delete(m.clearedFields, balancepackage.FieldGroupID)
 }
 
+// SetCurrencyOverrides sets the "currency_overrides" field.
+func (m *BalancePackageMutation) SetCurrencyOverrides(value map[string]float64) {
+	m.currency_overrides = &value
+}
+
+// CurrencyOverrides returns the value of the "currency_overrides" field in the mutation.
+func (m *BalancePackageMutation) CurrencyOverrides() (r map[string]float64, exists bool) {
+	v := m.currency_overrides
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCurrencyOverrides returns the old "currency_overrides" field's value of the BalancePackage entity.
+// If the BalancePackage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BalancePackageMutation) OldCurrencyOverrides(ctx context.Context) (v map[string]float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCurrencyOverrides is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCurrencyOverrides requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCurrencyOverrides: %w", err)
+	}
+	return oldValue.CurrencyOverrides, nil
+}
+
+// ClearCurrencyOverrides clears the value of the "currency_overrides" field.
+func (m *BalancePackageMutation) ClearCurrencyOverrides() {
+	m.currency_overrides = nil
+	m.clearedFields[balancepackage.FieldCurrencyOverrides] = struct{}{}
+}
+
+// CurrencyOverridesCleared returns if the "currency_overrides" field was cleared in this mutation.
+func (m *BalancePackageMutation) CurrencyOverridesCleared() bool {
+	_, ok := m.clearedFields[balancepackage.FieldCurrencyOverrides]
+	return ok
+}
+
+// ResetCurrencyOverrides resets all changes to the "currency_overrides" field.
+func (m *BalancePackageMutation) ResetCurrencyOverrides() {
+	m.currency_overrides = nil
+	delete(m.clearedFields, balancepackage.FieldCurrencyOverrides)
+}
+
 // SetBadge sets the "badge" field.
 func (m *BalancePackageMutation) SetBadge(s string) {
 	m.badge = &s
@@ -9469,7 +9519,7 @@ func (m *BalancePackageMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BalancePackageMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.code != nil {
 		fields = append(fields, balancepackage.FieldCode)
 	}
@@ -9490,6 +9540,9 @@ func (m *BalancePackageMutation) Fields() []string {
 	}
 	if m.group_id != nil {
 		fields = append(fields, balancepackage.FieldGroupID)
+	}
+	if m.currency_overrides != nil {
+		fields = append(fields, balancepackage.FieldCurrencyOverrides)
 	}
 	if m.badge != nil {
 		fields = append(fields, balancepackage.FieldBadge)
@@ -9531,6 +9584,8 @@ func (m *BalancePackageMutation) Field(name string) (ent.Value, bool) {
 		return m.CreditUnit()
 	case balancepackage.FieldGroupID:
 		return m.GroupID()
+	case balancepackage.FieldCurrencyOverrides:
+		return m.CurrencyOverrides()
 	case balancepackage.FieldBadge:
 		return m.Badge()
 	case balancepackage.FieldPopular:
@@ -9566,6 +9621,8 @@ func (m *BalancePackageMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldCreditUnit(ctx)
 	case balancepackage.FieldGroupID:
 		return m.OldGroupID(ctx)
+	case balancepackage.FieldCurrencyOverrides:
+		return m.OldCurrencyOverrides(ctx)
 	case balancepackage.FieldBadge:
 		return m.OldBadge(ctx)
 	case balancepackage.FieldPopular:
@@ -9635,6 +9692,13 @@ func (m *BalancePackageMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetGroupID(v)
+		return nil
+	case balancepackage.FieldCurrencyOverrides:
+		v, ok := value.(map[string]float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCurrencyOverrides(v)
 		return nil
 	case balancepackage.FieldBadge:
 		v, ok := value.(string)
@@ -9762,6 +9826,9 @@ func (m *BalancePackageMutation) ClearedFields() []string {
 	if m.FieldCleared(balancepackage.FieldGroupID) {
 		fields = append(fields, balancepackage.FieldGroupID)
 	}
+	if m.FieldCleared(balancepackage.FieldCurrencyOverrides) {
+		fields = append(fields, balancepackage.FieldCurrencyOverrides)
+	}
 	return fields
 }
 
@@ -9778,6 +9845,9 @@ func (m *BalancePackageMutation) ClearField(name string) error {
 	switch name {
 	case balancepackage.FieldGroupID:
 		m.ClearGroupID()
+		return nil
+	case balancepackage.FieldCurrencyOverrides:
+		m.ClearCurrencyOverrides()
 		return nil
 	}
 	return fmt.Errorf("unknown BalancePackage nullable field %s", name)
@@ -9807,6 +9877,9 @@ func (m *BalancePackageMutation) ResetField(name string) error {
 		return nil
 	case balancepackage.FieldGroupID:
 		m.ResetGroupID()
+		return nil
+	case balancepackage.FieldCurrencyOverrides:
+		m.ResetCurrencyOverrides()
 		return nil
 	case balancepackage.FieldBadge:
 		m.ResetBadge()
@@ -33170,31 +33243,32 @@ func (m *SettingMutation) ResetEdge(name string) error {
 // SubscriptionPlanMutation represents an operation that mutates the SubscriptionPlan nodes in the graph.
 type SubscriptionPlanMutation struct {
 	config
-	op                Op
-	typ               string
-	id                *int64
-	group_id          *int64
-	addgroup_id       *int64
-	name              *string
-	description       *string
-	price             *float64
-	addprice          *float64
-	original_price    *float64
-	addoriginal_price *float64
-	validity_days     *int
-	addvalidity_days  *int
-	validity_unit     *string
-	features          *string
-	product_name      *string
-	for_sale          *bool
-	sort_order        *int
-	addsort_order     *int
-	created_at        *time.Time
-	updated_at        *time.Time
-	clearedFields     map[string]struct{}
-	done              bool
-	oldValue          func(context.Context) (*SubscriptionPlan, error)
-	predicates        []predicate.SubscriptionPlan
+	op                 Op
+	typ                string
+	id                 *int64
+	group_id           *int64
+	addgroup_id        *int64
+	name               *string
+	description        *string
+	price              *float64
+	addprice           *float64
+	original_price     *float64
+	addoriginal_price  *float64
+	validity_days      *int
+	addvalidity_days   *int
+	validity_unit      *string
+	features           *string
+	product_name       *string
+	currency_overrides *map[string]float64
+	for_sale           *bool
+	sort_order         *int
+	addsort_order      *int
+	created_at         *time.Time
+	updated_at         *time.Time
+	clearedFields      map[string]struct{}
+	done               bool
+	oldValue           func(context.Context) (*SubscriptionPlan, error)
+	predicates         []predicate.SubscriptionPlan
 }
 
 var _ ent.Mutation = (*SubscriptionPlanMutation)(nil)
@@ -33713,6 +33787,55 @@ func (m *SubscriptionPlanMutation) ResetProductName() {
 	m.product_name = nil
 }
 
+// SetCurrencyOverrides sets the "currency_overrides" field.
+func (m *SubscriptionPlanMutation) SetCurrencyOverrides(value map[string]float64) {
+	m.currency_overrides = &value
+}
+
+// CurrencyOverrides returns the value of the "currency_overrides" field in the mutation.
+func (m *SubscriptionPlanMutation) CurrencyOverrides() (r map[string]float64, exists bool) {
+	v := m.currency_overrides
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCurrencyOverrides returns the old "currency_overrides" field's value of the SubscriptionPlan entity.
+// If the SubscriptionPlan object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubscriptionPlanMutation) OldCurrencyOverrides(ctx context.Context) (v map[string]float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCurrencyOverrides is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCurrencyOverrides requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCurrencyOverrides: %w", err)
+	}
+	return oldValue.CurrencyOverrides, nil
+}
+
+// ClearCurrencyOverrides clears the value of the "currency_overrides" field.
+func (m *SubscriptionPlanMutation) ClearCurrencyOverrides() {
+	m.currency_overrides = nil
+	m.clearedFields[subscriptionplan.FieldCurrencyOverrides] = struct{}{}
+}
+
+// CurrencyOverridesCleared returns if the "currency_overrides" field was cleared in this mutation.
+func (m *SubscriptionPlanMutation) CurrencyOverridesCleared() bool {
+	_, ok := m.clearedFields[subscriptionplan.FieldCurrencyOverrides]
+	return ok
+}
+
+// ResetCurrencyOverrides resets all changes to the "currency_overrides" field.
+func (m *SubscriptionPlanMutation) ResetCurrencyOverrides() {
+	m.currency_overrides = nil
+	delete(m.clearedFields, subscriptionplan.FieldCurrencyOverrides)
+}
+
 // SetForSale sets the "for_sale" field.
 func (m *SubscriptionPlanMutation) SetForSale(b bool) {
 	m.for_sale = &b
@@ -33911,7 +34034,7 @@ func (m *SubscriptionPlanMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SubscriptionPlanMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.group_id != nil {
 		fields = append(fields, subscriptionplan.FieldGroupID)
 	}
@@ -33938,6 +34061,9 @@ func (m *SubscriptionPlanMutation) Fields() []string {
 	}
 	if m.product_name != nil {
 		fields = append(fields, subscriptionplan.FieldProductName)
+	}
+	if m.currency_overrides != nil {
+		fields = append(fields, subscriptionplan.FieldCurrencyOverrides)
 	}
 	if m.for_sale != nil {
 		fields = append(fields, subscriptionplan.FieldForSale)
@@ -33977,6 +34103,8 @@ func (m *SubscriptionPlanMutation) Field(name string) (ent.Value, bool) {
 		return m.Features()
 	case subscriptionplan.FieldProductName:
 		return m.ProductName()
+	case subscriptionplan.FieldCurrencyOverrides:
+		return m.CurrencyOverrides()
 	case subscriptionplan.FieldForSale:
 		return m.ForSale()
 	case subscriptionplan.FieldSortOrder:
@@ -34012,6 +34140,8 @@ func (m *SubscriptionPlanMutation) OldField(ctx context.Context, name string) (e
 		return m.OldFeatures(ctx)
 	case subscriptionplan.FieldProductName:
 		return m.OldProductName(ctx)
+	case subscriptionplan.FieldCurrencyOverrides:
+		return m.OldCurrencyOverrides(ctx)
 	case subscriptionplan.FieldForSale:
 		return m.OldForSale(ctx)
 	case subscriptionplan.FieldSortOrder:
@@ -34091,6 +34221,13 @@ func (m *SubscriptionPlanMutation) SetField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetProductName(v)
+		return nil
+	case subscriptionplan.FieldCurrencyOverrides:
+		v, ok := value.(map[string]float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCurrencyOverrides(v)
 		return nil
 	case subscriptionplan.FieldForSale:
 		v, ok := value.(bool)
@@ -34216,6 +34353,9 @@ func (m *SubscriptionPlanMutation) ClearedFields() []string {
 	if m.FieldCleared(subscriptionplan.FieldOriginalPrice) {
 		fields = append(fields, subscriptionplan.FieldOriginalPrice)
 	}
+	if m.FieldCleared(subscriptionplan.FieldCurrencyOverrides) {
+		fields = append(fields, subscriptionplan.FieldCurrencyOverrides)
+	}
 	return fields
 }
 
@@ -34232,6 +34372,9 @@ func (m *SubscriptionPlanMutation) ClearField(name string) error {
 	switch name {
 	case subscriptionplan.FieldOriginalPrice:
 		m.ClearOriginalPrice()
+		return nil
+	case subscriptionplan.FieldCurrencyOverrides:
+		m.ClearCurrencyOverrides()
 		return nil
 	}
 	return fmt.Errorf("unknown SubscriptionPlan nullable field %s", name)
@@ -34267,6 +34410,9 @@ func (m *SubscriptionPlanMutation) ResetField(name string) error {
 		return nil
 	case subscriptionplan.FieldProductName:
 		m.ResetProductName()
+		return nil
+	case subscriptionplan.FieldCurrencyOverrides:
+		m.ResetCurrencyOverrides()
 		return nil
 	case subscriptionplan.FieldForSale:
 		m.ResetForSale()
