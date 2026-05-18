@@ -397,7 +397,7 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 		)
 		return nil, true, nil
 	}
-	result, acquireErr := s.service.tryAcquireAccountSlot(ctx, accountID, account.Concurrency)
+	result, acquireErr := s.service.tryAcquireAccountSlot(ctx, accountID, account.EffectiveConcurrencyLimit())
 	if acquireErr == nil && result != nil && result.Acquired {
 		_ = s.service.refreshStickySessionTTL(ctx, req.GroupID, sessionHash, s.service.openAIWSSessionStickyTTL())
 		return &AccountSelectionResult{
@@ -408,7 +408,7 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 	}
 
 	cfg := s.service.schedulingConfig()
-	// WaitPlan.MaxConcurrency 使用 Concurrency（非 EffectiveLoadFactor），因为 WaitPlan 控制的是 Redis 实际并发槽位等待。
+	// WaitPlan.MaxConcurrency 使用实际槽位并发上限。
 	if s.service.concurrencyService != nil {
 		if escapeCfg.enabled && acquireErr == nil && result != nil && !result.Acquired {
 			errorRate, ttft, _ := s.stats.snapshot(accountID)
@@ -424,7 +424,7 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 			Account: account,
 			WaitPlan: &AccountWaitPlan{
 				AccountID:      accountID,
-				MaxConcurrency: account.Concurrency,
+				MaxConcurrency: account.EffectiveConcurrencyLimit(),
 				Timeout:        cfg.StickySessionWaitTimeout,
 				MaxWaiting:     cfg.StickySessionMaxWaiting,
 			},
@@ -921,7 +921,7 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 			compactBlocked = true
 			continue
 		}
-		result, acquireErr := s.service.tryAcquireAccountSlot(ctx, fresh.ID, fresh.Concurrency)
+		result, acquireErr := s.service.tryAcquireAccountSlot(ctx, fresh.ID, fresh.EffectiveConcurrencyLimit())
 		if acquireErr != nil {
 			return nil, compactBlocked, acquireErr
 		}
@@ -1064,7 +1064,7 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 			Account: fresh,
 			WaitPlan: &AccountWaitPlan{
 				AccountID:      fresh.ID,
-				MaxConcurrency: fresh.Concurrency,
+				MaxConcurrency: fresh.EffectiveConcurrencyLimit(),
 				Timeout:        cfg.FallbackWaitTimeout,
 				MaxWaiting:     cfg.FallbackMaxWaiting,
 			},
