@@ -59,14 +59,18 @@ func (r schedulerTestOpenAIAccountRepo) ListSchedulableUngroupedByPlatform(ctx c
 
 type schedulerTestConcurrencyCache struct {
 	ConcurrencyCache
-	loadBatchErr    error
-	loadMap         map[int64]*AccountLoadInfo
-	acquireResults  map[int64]bool
-	waitCounts      map[int64]int
-	skipDefaultLoad bool
+	loadBatchErr          error
+	loadMap               map[int64]*AccountLoadInfo
+	acquireResults        map[int64]bool
+	acquireMaxConcurrency map[int64]int
+	waitCounts            map[int64]int
+	skipDefaultLoad       bool
 }
 
 func (c schedulerTestConcurrencyCache) AcquireAccountSlot(ctx context.Context, accountID int64, maxConcurrency int, requestID string) (bool, error) {
+	if c.acquireMaxConcurrency != nil {
+		c.acquireMaxConcurrency[accountID] = maxConcurrency
+	}
 	if c.acquireResults != nil {
 		if result, ok := c.acquireResults[accountID]; ok {
 			return result, nil
