@@ -1974,6 +1974,7 @@ export interface UserUsageTrendPoint {
   user_id: number
   email: string
   username: string
+  device_code?: string
   requests: number
   tokens: number
   cost: number // 标准计费
@@ -1984,6 +1985,7 @@ export interface UserSpendingRankingItem {
   user_id: number
   email: string
   username: string
+  device_code?: string
   actual_cost: number
   requests: number
   tokens: number
