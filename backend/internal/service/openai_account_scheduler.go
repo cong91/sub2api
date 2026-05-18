@@ -508,7 +508,7 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 		)
 		return nil, true, nil
 	}
-	result, acquireErr := s.service.tryAcquireAccountSlot(ctx, accountID, account.Concurrency)
+	result, acquireErr := s.service.tryAcquireAccountSlot(ctx, accountID, account.EffectiveConcurrencyLimit())
 	if acquireErr == nil && result != nil && result.Acquired {
 		_ = s.service.refreshStickySessionTTL(ctx, req.GroupID, sessionHash, s.service.openAIWSSessionStickyTTL())
 		return &AccountSelectionResult{
@@ -519,7 +519,7 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 	}
 
 	cfg := s.service.schedulingConfig()
-	// WaitPlan.MaxConcurrency 使用 Concurrency（非 EffectiveLoadFactor），因为 WaitPlan 控制的是 Redis 实际并发槽位等待。
+	// WaitPlan.MaxConcurrency 使用实际槽位并发上限。
 	if s.service.concurrencyService != nil {
 		if escapeCfg.enabled && acquireErr == nil && result != nil && !result.Acquired {
 			errorRate, ttft, _ := s.stats.snapshot(accountID)
@@ -535,7 +535,7 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 			Account: account,
 			WaitPlan: &AccountWaitPlan{
 				AccountID:      accountID,
-				MaxConcurrency: account.Concurrency,
+				MaxConcurrency: account.EffectiveConcurrencyLimit(),
 				Timeout:        cfg.StickySessionWaitTimeout,
 				MaxWaiting:     cfg.StickySessionMaxWaiting,
 			},
@@ -1117,12 +1117,13 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrderWithBudget
 		if candidate.account == nil {
 			continue
 		}
-		if candidate.loadKnown && candidate.account.Concurrency > 0 &&
-			candidate.loadInfo.CurrentConcurrency >= candidate.account.Concurrency {
+		candidateMaxConcurrency := candidate.account.EffectiveConcurrencyLimit()
+		if candidate.loadKnown && candidateMaxConcurrency > 0 &&
+			candidate.loadInfo.CurrentConcurrency >= candidateMaxConcurrency {
 			continue
 		}
 
-		result, attempted, acquireErr := s.tryAcquireOpenAIAccountSlot(ctx, candidate.account.ID, candidate.account.Concurrency, budget)
+		result, attempted, acquireErr := s.tryAcquireOpenAIAccountSlot(ctx, candidate.account.ID, candidateMaxConcurrency, budget)
 		if !attempted {
 			break
 		}
@@ -1152,10 +1153,9 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrderWithBudget
 			release(result)
 			continue
 		}
-
-		if fresh.Concurrency != candidate.account.Concurrency {
+		if fresh.EffectiveConcurrencyLimit() != candidateMaxConcurrency {
 			release(result)
-			result, attempted, acquireErr = s.tryAcquireOpenAIAccountSlot(ctx, fresh.ID, fresh.Concurrency, budget)
+			result, attempted, acquireErr = s.tryAcquireOpenAIAccountSlot(ctx, fresh.ID, fresh.EffectiveConcurrencyLimit(), budget)
 			if !attempted {
 				continue
 			}
@@ -1240,7 +1240,7 @@ func (s *defaultOpenAIAccountScheduler) tryFallbackToWeightedSticky(
 		if req.RequireCompact && openAICompactSupportTier(account) == 0 {
 			continue
 		}
-		result, acquireErr := s.service.tryAcquireAccountSlot(ctx, account.ID, account.Concurrency)
+		result, acquireErr := s.service.tryAcquireAccountSlot(ctx, account.ID, account.EffectiveConcurrencyLimit())
 		if acquireErr != nil {
 			return nil, acquireErr
 		}
@@ -1260,7 +1260,7 @@ func (s *defaultOpenAIAccountScheduler) tryFallbackToWeightedSticky(
 				Account: account,
 				WaitPlan: &AccountWaitPlan{
 					AccountID:      account.ID,
-					MaxConcurrency: account.Concurrency,
+					MaxConcurrency: account.EffectiveConcurrencyLimit(),
 					Timeout:        cfg.StickySessionWaitTimeout,
 					MaxWaiting:     cfg.StickySessionMaxWaiting,
 				},
@@ -1541,8 +1541,9 @@ func (s *defaultOpenAIAccountScheduler) finishLoadBalanceSelectionFallback(
 				continue
 			}
 			if budget != nil && budget.limited {
-				knownFull := candidate.loadKnown && candidate.account.Concurrency > 0 &&
-					candidate.loadInfo.CurrentConcurrency >= candidate.account.Concurrency
+				candidateMaxConcurrency := candidate.account.EffectiveConcurrencyLimit()
+				knownFull := candidate.loadKnown && candidateMaxConcurrency > 0 &&
+					candidate.loadInfo.CurrentConcurrency >= candidateMaxConcurrency
 				if budget.wasAttempted(candidate.account.ID) != wantAttempted || knownFull != wantKnownFull {
 					continue
 				}
@@ -1566,7 +1567,7 @@ func (s *defaultOpenAIAccountScheduler) finishLoadBalanceSelectionFallback(
 				Account: fresh,
 				WaitPlan: &AccountWaitPlan{
 					AccountID:      fresh.ID,
-					MaxConcurrency: fresh.Concurrency,
+					MaxConcurrency: fresh.EffectiveConcurrencyLimit(),
 					Timeout:        cfg.FallbackWaitTimeout,
 					MaxWaiting:     cfg.FallbackMaxWaiting,
 				},
