@@ -71,8 +71,8 @@ func respondAnthropicBillingMessage(c *gin.Context, message string) {
 				"text": message,
 			},
 		},
-		"model":        "system",
-		"stop_reason":  "end_turn",
+		"model":         "system",
+		"stop_reason":   "end_turn",
 		"stop_sequence": nil,
 		"usage": gin.H{
 			"input_tokens":  0,
