@@ -290,9 +290,12 @@ func stripRedundantTransactionControl(content string) string {
 		upper := strings.ToUpper(trimmed)
 
 		// Count dollar-quote opens/closes on this line.
-		// A $$ toggles in/out of a dollar-quoted block.
+		// A $$ (or $tag$) toggles in/out of a dollar-quoted block.
+		// Simple approach: count occurrences of $$ on the line.
 		count := strings.Count(upper, "$$")
 		if count > 0 {
+			// Each pair of $$ on the same line opens+closes (net zero).
+			// Odd count means we toggle state.
 			if count%2 == 1 {
 				if dollarDepth == 0 {
 					dollarDepth++
@@ -304,11 +307,13 @@ func stripRedundantTransactionControl(content string) string {
 			continue
 		}
 
+		// Inside a dollar-quoted block — preserve everything
 		if dollarDepth > 0 {
 			result = append(result, line)
 			continue
 		}
 
+		// Outside dollar blocks: strip standalone BEGIN/COMMIT/ROLLBACK
 		if upper == "BEGIN;" || upper == "BEGIN" ||
 			upper == "COMMIT;" || upper == "COMMIT" ||
 			upper == "ROLLBACK;" || upper == "ROLLBACK" {
