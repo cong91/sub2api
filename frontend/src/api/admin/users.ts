@@ -64,6 +64,7 @@ export async function list(
     include_subscriptions?: boolean
     sort_by?: string
     sort_order?: 'asc' | 'desc'
+    device_activation_status?: string
   },
   options?: {
     signal?: AbortSignal
@@ -79,7 +80,8 @@ export async function list(
     group_name: filters?.group_name,
     include_subscriptions: filters?.include_subscriptions,
     sort_by: filters?.sort_by,
-    sort_order: filters?.sort_order
+    sort_order: filters?.sort_order,
+    device_activation_status: filters?.device_activation_status
   }
 
   // Add attribute filters as attr[id]=value
@@ -376,6 +378,26 @@ export async function resetPlatformQuotaWindow(
   return data
 }
 
+/**
+ * Toggle user status between active and disabled
+ * @param id - User ID
+ * @param status - New status ('active' or 'disabled')
+ * @returns Updated user
+ */
+export async function toggleStatus(id: number, status: 'active' | 'disabled'): Promise<AdminUser> {
+  return update(id, { status })
+}
+
+/**
+ * Activate pending devices for a user
+ * @param userId - User ID
+ * @returns Number of activated devices
+ */
+export async function activateDevices(userId: number): Promise<{ activated: number }> {
+  const { data } = await apiClient.post<{ activated: number }>(`/admin/users/${userId}/activate-devices`)
+  return data
+}
+
 export const usersAPI = {
   list,
   getById,
@@ -385,6 +407,8 @@ export const usersAPI = {
   updateBalance,
   updateConcurrency,
   updateStatus,
+  toggleStatus,
+  activateDevices,
   getUserApiKeys,
   getUserUsageStats,
   getUserBalanceHistory,
