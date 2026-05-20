@@ -115,6 +115,8 @@ export type AdminUser = Omit<User, 'status'> & {
   group_rates?: Record<number, number>
   // 当前并发数（仅管理员列表接口返回）
   current_concurrency?: number
+  // 设备激活状态（仅管理员列表接口返回）
+  device_activation_status?: string | null
 }
 
 export interface LoginRequest {
