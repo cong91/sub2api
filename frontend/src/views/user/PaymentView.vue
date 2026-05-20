@@ -631,7 +631,7 @@ const tabs = computed(() => {
 })
 
 const availableBalancePackages = computed(() => {
-  return (checkout.value.balance_packages || []).filter(p => p.for_sale).sort((a, b) => a.sort_order - b.sort_order)
+  return (checkout.value.balance_packages || []).sort((a, b) => a.sort_order - b.sort_order)
 })
 
 const visibleMethods = computed(() => getVisibleMethods(checkout.value.methods))
@@ -1476,6 +1476,13 @@ onMounted(async () => {
   try {
     const res = await paymentAPI.getCheckoutInfo()
     checkout.value = res.data
+    // Normalize balance_packages: backend checkout returns `id` (string = code) without a separate `code` field
+    if (checkout.value.balance_packages) {
+      checkout.value.balance_packages = checkout.value.balance_packages.map(pkg => ({
+        ...pkg,
+        code: pkg.code || String(pkg.id || ''),
+      }))
+    }
     selectedPaymentCurrency.value = preferredPaymentCurrency()
     selectDefaultMethodForCurrency()
     if (typeof window !== 'undefined') {
