@@ -305,6 +305,7 @@ type PublicSettings struct {
 	TablePageSizeOptions             []int                    `json:"table_page_size_options"`
 	CustomMenuItems                  []CustomMenuItem         `json:"custom_menu_items"`
 	CustomEndpoints                  []CustomEndpoint         `json:"custom_endpoints"`
+	DingTalkOAuthEnabled             bool                     `json:"dingtalk_oauth_enabled"`
 	LinuxDoOAuthEnabled              bool                     `json:"linuxdo_oauth_enabled"`
 	WeChatOAuthEnabled               bool                     `json:"wechat_oauth_enabled"`
 	WeChatOAuthOpenEnabled           bool                     `json:"wechat_oauth_open_enabled"`
@@ -404,7 +405,7 @@ type OpenAIFastPolicySettings struct {
 	Rules []OpenAIFastPolicyRule `json:"rules"`
 }
 
-// EmailTemplateEventOption 描述可编辑的通知邮件事件。
+// EmailTemplateEventOption describes an editable notification email event.
 type EmailTemplateEventOption struct {
 	Value       string `json:"value"`
 	Label       string `json:"label,omitempty"`
