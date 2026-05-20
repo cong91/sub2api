@@ -83,6 +83,8 @@ func NewSettingHandler(settingService *service.SettingService, emailService *ser
 	return h
 }
 
+// SetNotificationEmailService attaches the notification template service without changing
+// the constructor signature used by existing unit tests.
 func (h *SettingHandler) SetNotificationEmailService(notificationEmailService *service.NotificationEmailService) {
 	h.notificationEmailService = notificationEmailService
 }
