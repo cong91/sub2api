@@ -36,6 +36,7 @@ type AdminService interface {
 	CreateUser(ctx context.Context, input *CreateUserInput) (*User, error)
 	UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error)
 	DeleteUser(ctx context.Context, id int64) error
+	ActivateUserDevices(ctx context.Context, userID int64) (*User, int64, error)
 	UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*User, error)
 	BatchUpdateConcurrency(ctx context.Context, userIDs []int64, value int, mode string) (int, error)
 	GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int, sortBy, sortOrder string) ([]APIKey, int64, error)
@@ -904,6 +905,27 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, id)
 	}
 	return nil
+}
+
+func (s *adminServiceImpl) ActivateUserDevices(ctx context.Context, userID int64) (*User, int64, error) {
+	if userID <= 0 {
+		return nil, 0, ErrUserNotFound
+	}
+	activator, ok := s.userRepo.(interface {
+		ActivatePendingDevicesByUserID(ctx context.Context, userID int64) (int64, error)
+	})
+	if !ok {
+		return nil, 0, ErrServiceUnavailable
+	}
+	updated, err := activator.ActivatePendingDevicesByUserID(ctx, userID)
+	if err != nil {
+		return nil, 0, err
+	}
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, updated, err
+	}
+	return user, updated, nil
 }
 
 func (s *adminServiceImpl) BatchUpdateConcurrency(ctx context.Context, userIDs []int64, value int, mode string) (int, error) {
