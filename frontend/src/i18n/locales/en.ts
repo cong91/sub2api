@@ -7422,6 +7422,13 @@ export default {
     renewNow: 'Renew',
     selectPlan: 'Select Plan',
     planFeatures: 'Features',
+    packageCard: {
+      credits: 'Credits',
+      group: 'Group',
+      select: 'Select',
+      selected: 'Selected',
+      noPackages: 'No packages available',
+    },
     planCard: {
       rate: 'Rate',
       dailyLimit: 'Daily',
