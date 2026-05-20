@@ -1,4 +1,4 @@
-export const DEFAULT_PAYMENT_CURRENCY = 'CNY'
+export const DEFAULT_PAYMENT_CURRENCY = 'VND'
 
 /** Map app locale to default payment currency.
  *  - vi → VND
