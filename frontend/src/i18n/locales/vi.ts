@@ -7240,6 +7240,13 @@ export default {
     renewNow: 'Gia hạn',
     selectPlan: 'Chọn gói',
     planFeatures: 'Tính năng gói',
+    packageCard: {
+      credits: 'Số dư',
+      group: 'Nhóm',
+      select: 'Chọn',
+      selected: 'Đã chọn',
+      noPackages: 'Không có gói nào',
+    },
     planCard: {
       rate: 'Hệ số',
       dailyLimit: 'Hạn mức ngày',
