@@ -547,6 +547,8 @@ export default {
       wechatBrowserOnly: 'Luồng đăng nhập WeChat hiện chỉ hỗ trợ tiếp tục trong trình duyệt tích hợp của WeChat.',
       wechatNotConfigured: 'Đăng nhập WeChat vẫn chưa được cấu hình.'
     },
+    dingtalkProviderName: 'DingTalk',
+    dingtalkCallbackPageTitle: 'Callback đăng nhập DingTalk',
     linuxdoCallbackPageTitle: 'Callback đăng nhập LinuxDo',
     oidcCallbackPageTitle: 'Callback đăng nhập OIDC',
     oauthCallbackPageTitle: 'Callback OAuth',
@@ -4654,6 +4656,7 @@ export default {
         group: 'Nhóm',
         user: 'Người dùng',
         userId: 'ID người dùng',
+        deviceCode: 'Mã thiết bị',
         account: 'Tài khoản',
         accountId: 'ID tài khoản',
         status: 'Mã trạng thái',
@@ -5582,6 +5585,11 @@ export default {
 
         anthropicCacheTTL1hInjection: 'Tiêm TTL Cache Anthropic',
         anthropicCacheTTL1hInjectionHint: 'Khi bật, các khối cache_control ephemeral hiện có trong request body Anthropic OAuth/Setup Token sẽ bị ép thành 1h; usage phản hồi mặc định sẽ được tính phí ngược lại là 5m, và cấu hình ghi đè tính phí TTL ở cấp tài khoản sẽ được ưu tiên.',
+        rewriteMessageCacheControl: 'Ghi đè cache control trong messages',
+        rewriteMessageCacheControlHint: 'Mặc định tắt, giữ nguyên cache_control trong các khối nội dung messages từ client. Khi bật sẽ xóa breakpoint của client và tiêm breakpoint proxy, phù hợp với client không tự quản lý chiến lược cache.',
+        antigravityUserAgentVersion: 'Phiên bản Antigravity UA',
+        antigravityUserAgentVersionPlaceholder: '1.23.2',
+        antigravityUserAgentVersionHint: 'Để trống sẽ dùng ANTIGRAVITY_USER_AGENT_VERSION hoặc giá trị mặc định 1.23.2; khi điền thì cài đặt backend được ưu tiên.',
     },
       webSearchEmulation: {
         title: 'Mô phỏng Web Search',
@@ -6499,6 +6507,7 @@ export default {
       rebatesDescription: 'Xem các đơn nạp tiền đã tạo hoa hồng affiliate',
       records: {
         affCode: 'Mã mời',
+        deviceCode: 'Mã thiết bị',
         availableQuotaAfter: 'Quota khả dụng sau đó',
         balanceAfter: 'Số dư sau đó',
         endAt: 'Ngày kết thúc',

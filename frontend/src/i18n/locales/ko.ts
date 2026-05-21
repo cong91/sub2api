@@ -547,6 +547,8 @@ export default {
       wechatBrowserOnly: '현재 WeChat 로그인 흐름은 WeChat 내장 브라우저에서만 계속할 수 있습니다.',
       wechatNotConfigured: 'WeChat 로그인이 아직 설정되지 않았습니다.'
     },
+    dingtalkProviderName: 'DingTalk (钉钉)',
+    dingtalkCallbackPageTitle: 'DingTalk 로그인 콜백',
     linuxdoCallbackPageTitle: 'LinuxDo 로그인 콜백',
     oidcCallbackPageTitle: 'OIDC 로그인 콜백',
     oauthCallbackPageTitle: 'OAuth 콜백',
@@ -5583,6 +5585,11 @@ export default {
 
         anthropicCacheTTL1hInjection: 'Anthropic Cache TTL Injection',
         anthropicCacheTTL1hInjectionHint: 'When enabled, existing ephemeral cache_control blocks in Anthropic OAuth/Setup Token request bodies are forced to 1h; response usage is billed back as 5m by default, with account-level TTL billing override taking priority.',
+        rewriteMessageCacheControl: '메시지 캐시 제어 재작성',
+        rewriteMessageCacheControlHint: '기본 꺼짐, 클라이언트의 messages 콘텐츠 블록 내 cache_control을 유지합니다. 켜면 클라이언트 브레이크포인트를 제거하고 프록시 브레이크포인트를 주입하며, 캐시 정책을 직접 관리하지 않는 클라이언트에 적합합니다.',
+        antigravityUserAgentVersion: 'Antigravity UA 버전',
+        antigravityUserAgentVersionPlaceholder: '1.23.2',
+        antigravityUserAgentVersionHint: '비워두면 ANTIGRAVITY_USER_AGENT_VERSION 또는 기본값 1.23.2를 사용합니다. 입력 시 백엔드 설정이 우선합니다.',
     },
       webSearchEmulation: {
         title: 'Web Search 에뮬레이션',
@@ -6500,6 +6507,7 @@ export default {
       rebatesDescription: 'View recharge orders that generated affiliate rebates',
       records: {
         affCode: 'Invite Code',
+        deviceCode: '디바이스 코드',
         availableQuotaAfter: 'Available After',
         balanceAfter: 'Balance After',
         endAt: 'End date',
