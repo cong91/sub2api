@@ -71,15 +71,32 @@ func (s *ProxyExpiryService) Stop() {
 }
 
 func (s *ProxyExpiryService) runOnce() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Step 1: Deactivate expired proxies (always runs regardless of Telegram config)
+	deactivated, err := s.proxyRepo.DeactivateExpired(ctx, time.Now())
+	if err != nil {
+		slog.Error("[ProxyExpiry] Failed to deactivate expired proxies", "error", err)
+	} else if len(deactivated) > 0 {
+		slog.Info("[ProxyExpiry] Deactivated expired proxies", "count", len(deactivated))
+		// Notify via Telegram if configured
+		if s.telegramNotifySvc != nil {
+			for _, p := range deactivated {
+				if p.ExpiresAt != nil {
+					go s.telegramNotifySvc.NotifyProxyExpired(context.Background(), p.Name, *p.ExpiresAt, true)
+				}
+			}
+		}
+	}
+
+	// Step 2: Warn about proxies nearing expiration (only if Telegram is configured)
 	if s.telegramNotifySvc == nil {
 		return
 	}
 	if !s.telegramNotifySvc.isEnabled(context.Background(), SettingTelegramNotifyProxyExpired) {
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
 	thresholdDays := s.getThresholdDays(ctx)
 	deadline := time.Now().Add(time.Duration(thresholdDays) * 24 * time.Hour)

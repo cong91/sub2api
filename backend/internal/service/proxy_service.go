@@ -31,6 +31,7 @@ type ProxyRepository interface {
 	CountAccountsByProxyID(ctx context.Context, proxyID int64) (int64, error)
 	ListAccountSummariesByProxyID(ctx context.Context, proxyID int64) ([]ProxyAccountSummary, error)
 	ListExpiringBefore(ctx context.Context, deadline time.Time) ([]Proxy, error)
+	DeactivateExpired(ctx context.Context, now time.Time) ([]Proxy, error)
 }
 
 // CreateProxyRequest 创建代理请求
