@@ -220,6 +220,7 @@ type PaymentService struct {
 	affiliateService         *AffiliateService
 	entitlementBinder        PaymentEntitlementBinder
 	notificationEmailService *NotificationEmailService
+	telegramNotifySvc        *TelegramNotifyService
 }
 
 type PaymentEntitlementBinder interface {
@@ -238,6 +239,10 @@ func (s *PaymentService) SetEntitlementBinder(binder PaymentEntitlementBinder) {
 
 func (s *PaymentService) SetNotificationEmailService(notificationEmailService *NotificationEmailService) {
 	s.notificationEmailService = notificationEmailService
+}
+
+func (s *PaymentService) SetTelegramNotifyService(svc *TelegramNotifyService) {
+	s.telegramNotifySvc = svc
 }
 
 // --- Provider Registry ---
