@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -26,23 +27,25 @@ func NewProxyHandler(adminService service.AdminService) *ProxyHandler {
 
 // CreateProxyRequest represents create proxy request
 type CreateProxyRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Protocol string `json:"protocol" binding:"required,oneof=http https socks5 socks5h"`
-	Host     string `json:"host" binding:"required"`
-	Port     int    `json:"port" binding:"required,min=1,max=65535"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Name      string `json:"name" binding:"required"`
+	Protocol  string `json:"protocol" binding:"required,oneof=http https socks5 socks5h"`
+	Host      string `json:"host" binding:"required"`
+	Port      int    `json:"port" binding:"required,min=1,max=65535"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	ExpiresAt *int64 `json:"expires_at"`
 }
 
 // UpdateProxyRequest represents update proxy request
 type UpdateProxyRequest struct {
-	Name     string `json:"name"`
-	Protocol string `json:"protocol" binding:"omitempty,oneof=http https socks5 socks5h"`
-	Host     string `json:"host"`
-	Port     int    `json:"port" binding:"omitempty,min=1,max=65535"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Status   string `json:"status" binding:"omitempty,oneof=active inactive"`
+	Name      string `json:"name"`
+	Protocol  string `json:"protocol" binding:"omitempty,oneof=http https socks5 socks5h"`
+	Host      string `json:"host"`
+	Port      int    `json:"port" binding:"omitempty,min=1,max=65535"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	Status    string `json:"status" binding:"omitempty,oneof=active inactive"`
+	ExpiresAt *int64 `json:"expires_at"`
 }
 
 // List handles listing all proxies with pagination
@@ -134,14 +137,19 @@ func (h *ProxyHandler) Create(c *gin.Context) {
 	}
 
 	executeAdminIdempotentJSON(c, "admin.proxies.create", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
-		proxy, err := h.adminService.CreateProxy(ctx, &service.CreateProxyInput{
+		input := &service.CreateProxyInput{
 			Name:     strings.TrimSpace(req.Name),
 			Protocol: strings.TrimSpace(req.Protocol),
 			Host:     strings.TrimSpace(req.Host),
 			Port:     req.Port,
 			Username: strings.TrimSpace(req.Username),
 			Password: strings.TrimSpace(req.Password),
-		})
+		}
+		if req.ExpiresAt != nil && *req.ExpiresAt > 0 {
+			t := time.Unix(*req.ExpiresAt, 0)
+			input.ExpiresAt = &t
+		}
+		proxy, err := h.adminService.CreateProxy(ctx, input)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +172,7 @@ func (h *ProxyHandler) Update(c *gin.Context) {
 		return
 	}
 
-	proxy, err := h.adminService.UpdateProxy(c.Request.Context(), proxyID, &service.UpdateProxyInput{
+	input := &service.UpdateProxyInput{
 		Name:     strings.TrimSpace(req.Name),
 		Protocol: strings.TrimSpace(req.Protocol),
 		Host:     strings.TrimSpace(req.Host),
@@ -172,7 +180,18 @@ func (h *ProxyHandler) Update(c *gin.Context) {
 		Username: strings.TrimSpace(req.Username),
 		Password: strings.TrimSpace(req.Password),
 		Status:   strings.TrimSpace(req.Status),
-	})
+	}
+	if req.ExpiresAt != nil {
+		if *req.ExpiresAt > 0 {
+			t := time.Unix(*req.ExpiresAt, 0)
+			input.ExpiresAt = &t
+		} else {
+			// ExpiresAt = 0 means clear expiration
+			nilTime := time.Time{}
+			input.ExpiresAt = &nilTime
+		}
+	}
+	proxy, err := h.adminService.UpdateProxy(c.Request.Context(), proxyID, input)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

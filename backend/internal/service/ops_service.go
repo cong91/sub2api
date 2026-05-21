@@ -459,7 +459,7 @@ func sanitizeAndTrimJSONPayload(raw []byte, maxBytes int) (jsonString string, tr
 	// This avoids downstream code that expects certain top-level keys from crashing.
 	if root, ok := decoded.(map[string]any); ok {
 		placeholder := shallowCopyMap(root)
-		placeholder["payload_truncated"] = true
+		placeholder["request_body_truncated"] = true
 
 		// Replace potentially huge arrays/strings, but keep the keys present.
 		for _, k := range []string{"messages", "contents", "input", "prompt"} {
@@ -482,7 +482,7 @@ func sanitizeAndTrimJSONPayload(raw []byte, maxBytes int) (jsonString string, tr
 	}
 
 	// Final fallback: minimal valid JSON.
-	encoded4, err4 := json.Marshal(map[string]any{"payload_truncated": true})
+	encoded4, err4 := json.Marshal(map[string]any{"request_body_truncated": true})
 	if err4 != nil {
 		return "", true, bytesLen
 	}
@@ -698,6 +698,7 @@ func shrinkToEssentials(root map[string]any) map[string]any {
 	}
 
 	// Keep only the last element of the conversation array.
+	out["request_body_truncated"] = true
 	if v, ok := root["messages"]; ok {
 		if arr, ok := v.([]any); ok && len(arr) > 0 {
 			out["messages"] = []any{arr[len(arr)-1]}
