@@ -721,6 +721,7 @@ export interface Proxy {
   quality_grade?: string
   quality_summary?: string
   quality_checked?: number
+  expires_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -1107,6 +1108,7 @@ export interface CreateProxyRequest {
   port: number
   username?: string | null
   password?: string | null
+  expires_at?: number | null
 }
 
 export interface UpdateProxyRequest {
@@ -1117,6 +1119,7 @@ export interface UpdateProxyRequest {
   username?: string | null
   password?: string | null
   status?: 'active' | 'inactive'
+  expires_at?: number | null
 }
 
 export interface AdminDataPayload {

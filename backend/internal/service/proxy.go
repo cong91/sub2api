@@ -16,6 +16,7 @@ type Proxy struct {
 	Username  string
 	Password  string
 	Status    string
+	ExpiresAt *time.Time
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
