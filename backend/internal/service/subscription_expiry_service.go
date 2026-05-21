@@ -15,6 +15,7 @@ import (
 type SubscriptionExpiryService struct {
 	userSubRepo              UserSubscriptionRepository
 	notificationEmailService *NotificationEmailService
+	telegramNotifySvc        *TelegramNotifyService
 	interval                 time.Duration
 	stopCh                   chan struct{}
 	stopOnce                 sync.Once
@@ -31,6 +32,10 @@ func NewSubscriptionExpiryService(userSubRepo UserSubscriptionRepository, interv
 
 func (s *SubscriptionExpiryService) SetNotificationEmailService(notificationEmailService *NotificationEmailService) {
 	s.notificationEmailService = notificationEmailService
+}
+
+func (s *SubscriptionExpiryService) SetTelegramNotifyService(svc *TelegramNotifyService) {
+	s.telegramNotifySvc = svc
 }
 
 func (s *SubscriptionExpiryService) Start() {
@@ -76,6 +81,9 @@ func (s *SubscriptionExpiryService) runOnce() {
 	}
 	if updated > 0 {
 		log.Printf("[SubscriptionExpiry] Updated %d expired subscriptions", updated)
+		if s.telegramNotifySvc != nil {
+			go s.telegramNotifySvc.NotifySubscriptionExpired(context.Background(), int64(updated))
+		}
 	}
 	s.sendExpiryReminders(ctx)
 }
