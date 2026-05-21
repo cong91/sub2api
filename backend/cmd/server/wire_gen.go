@@ -288,6 +288,8 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	accountExpiryService.SetTelegramNotifyService(telegramNotifyService)
 	subscriptionExpiryService := service.ProvideSubscriptionExpiryService(userSubscriptionRepository, notificationEmailService)
 	subscriptionExpiryService.SetTelegramNotifyService(telegramNotifyService)
+	proxyExpiryService := service.ProvideProxyExpiryService(proxyRepository, settingRepository)
+	proxyExpiryService.SetTelegramNotifyService(telegramNotifyService)
 	scheduledTestRunnerService := service.ProvideScheduledTestRunnerService(scheduledTestPlanRepository, scheduledTestService, accountTestService, rateLimitService, configConfig)
 	paymentOrderExpiryService := service.ProvidePaymentOrderExpiryService(paymentService)
 	channelMonitorRunner := service.ProvideChannelMonitorRunner(channelMonitorService, settingService)

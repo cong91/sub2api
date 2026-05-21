@@ -421,6 +421,40 @@ func (s *TelegramNotifyService) NotifyProxyExpired(ctx context.Context, proxyNam
 	}
 }
 
+// NotifyProxyExpiring sends a batch notification for proxies nearing expiration.
+func (s *TelegramNotifyService) NotifyProxyExpiring(ctx context.Context, proxies []Proxy, thresholdDays int) {
+	if !s.isEnabled(ctx, SettingTelegramNotifyProxyExpired) || len(proxies) == 0 {
+		return
+	}
+
+	var details string
+	for i, p := range proxies {
+		if i >= 10 {
+			details += fmt.Sprintf("\n... and %d more", len(proxies)-10)
+			break
+		}
+		remaining := ""
+		if p.ExpiresAt != nil {
+			remaining = fmt.Sprintf(" (expires %s)", p.ExpiresAt.Format("2006-01-02"))
+		}
+		details += fmt.Sprintf("\nâ¢ <b>%s</b> [%s:%d]%s", escapeHTML(p.Name), escapeHTML(p.Host), p.Port, remaining)
+	}
+
+	text := fmt.Sprintf(
+		"â ï¸ <b>Proxies Expiring Soon</b>\n\n"+
+			"ð¢ Count: <b>%d</b> proxy(ies) within %d days\n"+
+			"%s\n\n"+
+			"ð Time: %s",
+		len(proxies),
+		thresholdDays,
+		details,
+		time.Now().Format("2006-01-02 15:04:05"),
+	)
+	if err := s.sendMessage(ctx, text); err != nil {
+		slog.Error("telegram notify proxy expiring failed", "error", err, "count", len(proxies))
+	}
+}
+
 // --- Helpers ---
 
 // escapeHTML escapes HTML special characters for Telegram.

@@ -184,6 +184,13 @@ func ProvideAccountExpiryService(accountRepo AccountRepository) *AccountExpirySe
 	return svc
 }
 
+// ProvideProxyExpiryService creates and starts ProxyExpiryService.
+func ProvideProxyExpiryService(proxyRepo ProxyRepository, settingRepo SettingRepository) *ProxyExpiryService {
+	svc := NewProxyExpiryService(proxyRepo, settingRepo, 10*time.Minute)
+	svc.Start()
+	return svc
+}
+
 // ProvideSubscriptionExpiryService creates and starts SubscriptionExpiryService.
 func ProvideSubscriptionExpiryService(userSubRepo UserSubscriptionRepository, notificationEmailService *NotificationEmailService) *SubscriptionExpiryService {
 	svc := NewSubscriptionExpiryService(userSubRepo, time.Minute)

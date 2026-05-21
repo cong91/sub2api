@@ -52,6 +52,9 @@ func (Proxy) Fields() []ent.Field {
 		field.String("status").
 			MaxLen(20).
 			Default("active"),
+		field.Time("expires_at").
+			Optional().
+			Nillable(),
 	}
 }
 
