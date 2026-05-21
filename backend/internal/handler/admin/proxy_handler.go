@@ -27,13 +27,13 @@ func NewProxyHandler(adminService service.AdminService) *ProxyHandler {
 
 // CreateProxyRequest represents create proxy request
 type CreateProxyRequest struct {
-	Name      string  `json:"name" binding:"required"`
-	Protocol  string  `json:"protocol" binding:"required,oneof=http https socks5 socks5h"`
-	Host      string  `json:"host" binding:"required"`
-	Port      int     `json:"port" binding:"required,min=1,max=65535"`
-	Username  string  `json:"username"`
-	Password  string  `json:"password"`
-	ExpiresAt *int64  `json:"expires_at"`
+	Name      string `json:"name" binding:"required"`
+	Protocol  string `json:"protocol" binding:"required,oneof=http https socks5 socks5h"`
+	Host      string `json:"host" binding:"required"`
+	Port      int    `json:"port" binding:"required,min=1,max=65535"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	ExpiresAt *int64 `json:"expires_at"`
 }
 
 // UpdateProxyRequest represents update proxy request
