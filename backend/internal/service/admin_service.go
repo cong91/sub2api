@@ -395,22 +395,24 @@ type BulkUpdateAccountsResult struct {
 }
 
 type CreateProxyInput struct {
-	Name     string
-	Protocol string
-	Host     string
-	Port     int
-	Username string
-	Password string
+	Name      string
+	Protocol  string
+	Host      string
+	Port      int
+	Username  string
+	Password  string
+	ExpiresAt *time.Time
 }
 
 type UpdateProxyInput struct {
-	Name     string
-	Protocol string
-	Host     string
-	Port     int
-	Username string
-	Password string
-	Status   string
+	Name      string
+	Protocol  string
+	Host      string
+	Port      int
+	Username  string
+	Password  string
+	Status    string
+	ExpiresAt *time.Time
 }
 
 type GenerateRedeemCodesInput struct {
@@ -3149,13 +3151,14 @@ func (s *adminServiceImpl) GetProxiesByIDs(ctx context.Context, ids []int64) ([]
 
 func (s *adminServiceImpl) CreateProxy(ctx context.Context, input *CreateProxyInput) (*Proxy, error) {
 	proxy := &Proxy{
-		Name:     input.Name,
-		Protocol: input.Protocol,
-		Host:     input.Host,
-		Port:     input.Port,
-		Username: input.Username,
-		Password: input.Password,
-		Status:   StatusActive,
+		Name:      input.Name,
+		Protocol:  input.Protocol,
+		Host:      input.Host,
+		Port:      input.Port,
+		Username:  input.Username,
+		Password:  input.Password,
+		Status:    StatusActive,
+		ExpiresAt: input.ExpiresAt,
 	}
 	if err := s.proxyRepo.Create(ctx, proxy); err != nil {
 		return nil, err
@@ -3191,6 +3194,9 @@ func (s *adminServiceImpl) UpdateProxy(ctx context.Context, id int64, input *Upd
 	}
 	if input.Status != "" {
 		proxy.Status = input.Status
+	}
+	if input.ExpiresAt != nil {
+		proxy.ExpiresAt = input.ExpiresAt
 	}
 
 	if err := s.proxyRepo.Update(ctx, proxy); err != nil {
@@ -3882,7 +3888,7 @@ func (s *adminServiceImpl) EnsureOpenAIPrivacy(ctx context.Context, account *Acc
 
 	var proxyURL string
 	if account.ProxyID != nil {
-		if p, err := s.proxyRepo.GetByID(ctx, *account.ProxyID); err == nil && p != nil {
+		if p, err := s.proxyRepo.GetByID(ctx, *account.ProxyID); err == nil && p != nil && p.IsActive() {
 			proxyURL = p.URL()
 		}
 	}
@@ -3912,7 +3918,7 @@ func (s *adminServiceImpl) ForceOpenAIPrivacy(ctx context.Context, account *Acco
 
 	var proxyURL string
 	if account.ProxyID != nil {
-		if p, err := s.proxyRepo.GetByID(ctx, *account.ProxyID); err == nil && p != nil {
+		if p, err := s.proxyRepo.GetByID(ctx, *account.ProxyID); err == nil && p != nil && p.IsActive() {
 			proxyURL = p.URL()
 		}
 	}
