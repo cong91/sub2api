@@ -65,6 +65,7 @@ type SettingHandler struct {
 	paymentService           *service.PaymentService
 	userAttributeService     *service.UserAttributeService
 	notificationEmailService *service.NotificationEmailService
+	telegramNotifyService    *service.TelegramNotifyService
 }
 
 // NewSettingHandler 创建系统设置处理器
@@ -84,6 +85,11 @@ func NewSettingHandler(settingService *service.SettingService, emailService *ser
 // the constructor signature used by existing unit tests.
 func (h *SettingHandler) SetNotificationEmailService(notificationEmailService *service.NotificationEmailService) {
 	h.notificationEmailService = notificationEmailService
+}
+
+// SetTelegramNotifyService attaches the Telegram notification service for test endpoint.
+func (h *SettingHandler) SetTelegramNotifyService(telegramNotifyService *service.TelegramNotifyService) {
+	h.telegramNotifyService = telegramNotifyService
 }
 
 // GetSettings 获取所有系统设置
@@ -148,6 +154,22 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		LinuxDoConnectClientID:                 settings.LinuxDoConnectClientID,
 		LinuxDoConnectClientSecretConfigured:   settings.LinuxDoConnectClientSecretConfigured,
 		LinuxDoConnectRedirectURL:              settings.LinuxDoConnectRedirectURL,
+		DingTalkConnectEnabled:                 settings.DingTalkConnectEnabled,
+		DingTalkConnectClientID:                settings.DingTalkConnectClientID,
+		DingTalkConnectClientSecretConfigured:  settings.DingTalkConnectClientSecretConfigured,
+		DingTalkConnectRedirectURL:             settings.DingTalkConnectRedirectURL,
+		DingTalkConnectCorpRestrictionPolicy:   settings.DingTalkConnectCorpRestrictionPolicy,
+		DingTalkConnectInternalCorpID:          settings.DingTalkConnectInternalCorpID,
+		DingTalkConnectBypassRegistration:      settings.DingTalkConnectBypassRegistration,
+		DingTalkConnectSyncCorpEmail:           settings.DingTalkConnectSyncCorpEmail,
+		DingTalkConnectSyncDisplayName:         settings.DingTalkConnectSyncDisplayName,
+		DingTalkConnectSyncDept:                settings.DingTalkConnectSyncDept,
+		DingTalkConnectSyncCorpEmailAttrKey:    settings.DingTalkConnectSyncCorpEmailAttrKey,
+		DingTalkConnectSyncDisplayNameAttrKey:  settings.DingTalkConnectSyncDisplayNameAttrKey,
+		DingTalkConnectSyncDeptAttrKey:         settings.DingTalkConnectSyncDeptAttrKey,
+		DingTalkConnectSyncCorpEmailAttrName:   settings.DingTalkConnectSyncCorpEmailAttrName,
+		DingTalkConnectSyncDisplayNameAttrName: settings.DingTalkConnectSyncDisplayNameAttrName,
+		DingTalkConnectSyncDeptAttrName:        settings.DingTalkConnectSyncDeptAttrName,
 		WeChatConnectEnabled:                   settings.WeChatConnectEnabled,
 		WeChatConnectAppID:                     settings.WeChatConnectAppID,
 		WeChatConnectAppSecretConfigured:       settings.WeChatConnectAppSecretConfigured,
@@ -237,6 +259,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		MinClaudeCodeVersion:                   settings.MinClaudeCodeVersion,
 		MaxClaudeCodeVersion:                   settings.MaxClaudeCodeVersion,
 		AntigravityUserAgentVersion:            settings.AntigravityUserAgentVersion,
+		OpenAICodexUserAgent:                   settings.OpenAICodexUserAgent,
 		AllowUngroupedKeyScheduling:            settings.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:                     settings.BackendModeEnabled,
 		EnableFingerprintUnification:           settings.EnableFingerprintUnification,
@@ -261,6 +284,18 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		SubscriptionExpiryNotifyEnabled:        settings.SubscriptionExpiryNotifyEnabled,
 		AccountQuotaNotifyEnabled:              settings.AccountQuotaNotifyEnabled,
 		AccountQuotaNotifyEmails:               dto.NotifyEmailEntriesFromService(settings.AccountQuotaNotifyEmails),
+		TelegramBotTokenConfigured:             settings.TelegramBotTokenConfigured,
+		TelegramChatID:                         settings.TelegramChatID,
+		TelegramNotifyNewUser:                  settings.TelegramNotifyNewUser,
+		TelegramNotifyAccountError:             settings.TelegramNotifyAccountError,
+		TelegramNotifyAccountExpired:           settings.TelegramNotifyAccountExpired,
+		TelegramNotifyPaymentSuccess:           settings.TelegramNotifyPaymentSuccess,
+		TelegramNotifyPaymentFailed:            settings.TelegramNotifyPaymentFailed,
+		TelegramNotifyRefund:                   settings.TelegramNotifyRefund,
+		TelegramNotifySubExpired:               settings.TelegramNotifySubExpired,
+		TelegramNotifyBalanceLow:               settings.TelegramNotifyBalanceLow,
+		TelegramNotifyOpsAlert:                 settings.TelegramNotifyOpsAlert,
+		TelegramNotifyProxyExpired:             settings.TelegramNotifyProxyExpired,
 		PaymentEnabled:                         paymentCfg.Enabled,
 		PaymentMinAmount:                       paymentCfg.MinAmount,
 		PaymentMaxAmount:                       paymentCfg.MaxAmount,
@@ -413,6 +448,21 @@ type UpdateSettingsRequest struct {
 	LinuxDoConnectClientID     string `json:"linuxdo_connect_client_id"`
 	LinuxDoConnectClientSecret string `json:"linuxdo_connect_client_secret"`
 	LinuxDoConnectRedirectURL  string `json:"linuxdo_connect_redirect_url"`
+
+	// DingTalk Connect OAuth 登录
+	DingTalkConnectEnabled                bool   `json:"dingtalk_connect_enabled"`
+	DingTalkConnectClientID               string `json:"dingtalk_connect_client_id"`
+	DingTalkConnectClientSecret           string `json:"dingtalk_connect_client_secret"`
+	DingTalkConnectRedirectURL            string `json:"dingtalk_connect_redirect_url"`
+	DingTalkConnectCorpRestrictionPolicy  string `json:"dingtalk_connect_corp_restriction_policy"`
+	DingTalkConnectInternalCorpID         string `json:"dingtalk_connect_internal_corp_id"`
+	DingTalkConnectBypassRegistration     bool   `json:"dingtalk_connect_bypass_registration"`
+	DingTalkConnectSyncCorpEmail          bool   `json:"dingtalk_connect_sync_corp_email"`
+	DingTalkConnectSyncDisplayName        bool   `json:"dingtalk_connect_sync_display_name"`
+	DingTalkConnectSyncDept               bool   `json:"dingtalk_connect_sync_dept"`
+	DingTalkConnectSyncCorpEmailAttrKey   string `json:"dingtalk_connect_sync_corp_email_attr_key"`
+	DingTalkConnectSyncDisplayNameAttrKey string `json:"dingtalk_connect_sync_display_name_attr_key"`
+	DingTalkConnectSyncDeptAttrKey        string `json:"dingtalk_connect_sync_dept_attr_key"`
 
 	// WeChat Connect OAuth 登录
 	WeChatConnectEnabled             bool   `json:"wechat_connect_enabled"`
@@ -581,6 +631,20 @@ type UpdateSettingsRequest struct {
 	SubscriptionExpiryNotifyEnabled *bool                   `json:"subscription_expiry_notify_enabled"`
 	AccountQuotaNotifyEnabled       *bool                   `json:"account_quota_notify_enabled"`
 	AccountQuotaNotifyEmails        *[]dto.NotifyEmailEntry `json:"account_quota_notify_emails"`
+
+	// Telegram bot notifications
+	TelegramBotToken             *string `json:"telegram_bot_token"`
+	TelegramChatID               *string `json:"telegram_chat_id"`
+	TelegramNotifyNewUser        *bool   `json:"telegram_notify_new_user"`
+	TelegramNotifyAccountError   *bool   `json:"telegram_notify_account_error"`
+	TelegramNotifyAccountExpired *bool   `json:"telegram_notify_account_expired"`
+	TelegramNotifyPaymentSuccess *bool   `json:"telegram_notify_payment_success"`
+	TelegramNotifyPaymentFailed  *bool   `json:"telegram_notify_payment_failed"`
+	TelegramNotifyRefund         *bool   `json:"telegram_notify_refund"`
+	TelegramNotifySubExpired     *bool   `json:"telegram_notify_sub_expired"`
+	TelegramNotifyBalanceLow     *bool   `json:"telegram_notify_balance_low"`
+	TelegramNotifyOpsAlert       *bool   `json:"telegram_notify_ops_alert"`
+	TelegramNotifyProxyExpired   *bool   `json:"telegram_notify_proxy_expired"`
 
 	// Payment configuration (integrated into settings, full replace)
 	PaymentEnabled                   *bool    `json:"payment_enabled"`
@@ -1761,6 +1825,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
+	// Ensure DingTalk sync user attribute definitions exist after settings save.
+	h.ensureDingTalkSyncAttributes(c.Request.Context(), settings)
+
 	// Update OpenAI fast policy (stored under dedicated key, only when provided).
 	if req.OpenAIFastPolicySettings != nil {
 		if err := h.settingService.SetOpenAIFastPolicySettings(c.Request.Context(), openaiFastPolicySettingsFromDTO(req.OpenAIFastPolicySettings)); err != nil {
@@ -1868,6 +1935,22 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		LinuxDoConnectClientID:                 updatedSettings.LinuxDoConnectClientID,
 		LinuxDoConnectClientSecretConfigured:   updatedSettings.LinuxDoConnectClientSecretConfigured,
 		LinuxDoConnectRedirectURL:              updatedSettings.LinuxDoConnectRedirectURL,
+		DingTalkConnectEnabled:                 updatedSettings.DingTalkConnectEnabled,
+		DingTalkConnectClientID:                updatedSettings.DingTalkConnectClientID,
+		DingTalkConnectClientSecretConfigured:  updatedSettings.DingTalkConnectClientSecretConfigured,
+		DingTalkConnectRedirectURL:             updatedSettings.DingTalkConnectRedirectURL,
+		DingTalkConnectCorpRestrictionPolicy:   updatedSettings.DingTalkConnectCorpRestrictionPolicy,
+		DingTalkConnectInternalCorpID:          updatedSettings.DingTalkConnectInternalCorpID,
+		DingTalkConnectBypassRegistration:      updatedSettings.DingTalkConnectBypassRegistration,
+		DingTalkConnectSyncCorpEmail:           updatedSettings.DingTalkConnectSyncCorpEmail,
+		DingTalkConnectSyncDisplayName:         updatedSettings.DingTalkConnectSyncDisplayName,
+		DingTalkConnectSyncDept:                updatedSettings.DingTalkConnectSyncDept,
+		DingTalkConnectSyncCorpEmailAttrKey:    updatedSettings.DingTalkConnectSyncCorpEmailAttrKey,
+		DingTalkConnectSyncDisplayNameAttrKey:  updatedSettings.DingTalkConnectSyncDisplayNameAttrKey,
+		DingTalkConnectSyncDeptAttrKey:         updatedSettings.DingTalkConnectSyncDeptAttrKey,
+		DingTalkConnectSyncCorpEmailAttrName:   updatedSettings.DingTalkConnectSyncCorpEmailAttrName,
+		DingTalkConnectSyncDisplayNameAttrName: updatedSettings.DingTalkConnectSyncDisplayNameAttrName,
+		DingTalkConnectSyncDeptAttrName:        updatedSettings.DingTalkConnectSyncDeptAttrName,
 		WeChatConnectEnabled:                   updatedSettings.WeChatConnectEnabled,
 		WeChatConnectAppID:                     updatedSettings.WeChatConnectAppID,
 		WeChatConnectAppSecretConfigured:       updatedSettings.WeChatConnectAppSecretConfigured,
@@ -1954,6 +2037,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		MinClaudeCodeVersion:                   updatedSettings.MinClaudeCodeVersion,
 		MaxClaudeCodeVersion:                   updatedSettings.MaxClaudeCodeVersion,
 		AntigravityUserAgentVersion:            updatedSettings.AntigravityUserAgentVersion,
+		OpenAICodexUserAgent:                   updatedSettings.OpenAICodexUserAgent,
 		AllowUngroupedKeyScheduling:            updatedSettings.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:                     updatedSettings.BackendModeEnabled,
 		EnableFingerprintUnification:           updatedSettings.EnableFingerprintUnification,
@@ -2656,6 +2740,11 @@ func systemSettingsResponseData(settings dto.SystemSettings, authSourceDefaults 
 	data["auth_source_default_google_subscriptions"] = authSourceDefaults.Google.Subscriptions
 	data["auth_source_default_google_grant_on_signup"] = authSourceDefaults.Google.GrantOnSignup
 	data["auth_source_default_google_grant_on_first_bind"] = authSourceDefaults.Google.GrantOnFirstBind
+	data["auth_source_default_dingtalk_balance"] = authSourceDefaults.DingTalk.Balance
+	data["auth_source_default_dingtalk_concurrency"] = authSourceDefaults.DingTalk.Concurrency
+	data["auth_source_default_dingtalk_subscriptions"] = authSourceDefaults.DingTalk.Subscriptions
+	data["auth_source_default_dingtalk_grant_on_signup"] = authSourceDefaults.DingTalk.GrantOnSignup
+	data["auth_source_default_dingtalk_grant_on_first_bind"] = authSourceDefaults.DingTalk.GrantOnFirstBind
 	data["auth_source_default_email_platform_quotas"] = authSourceDefaults.Email.PlatformQuotas
 	data["auth_source_default_linuxdo_platform_quotas"] = authSourceDefaults.LinuxDo.PlatformQuotas
 	data["auth_source_default_oidc_platform_quotas"] = authSourceDefaults.OIDC.PlatformQuotas
@@ -3593,4 +3682,45 @@ func equalPlatformQuotaSettings(before, after map[string]*service.DefaultPlatfor
 		}
 	}
 	return true
+}
+
+// TestTelegramConnectionRequest optional override for testing with unsaved config.
+type TestTelegramConnectionRequest struct {
+	ChatID string `json:"telegram_chat_id"`
+}
+
+// TestTelegramConnection tests the Telegram bot configuration by sending a test message.
+// POST /api/v1/admin/settings/telegram/test
+// Uses saved bot token + chat_id from settings. Optionally overrides chat_id from request body.
+// Never returns or logs the bot token.
+func (h *SettingHandler) TestTelegramConnection(c *gin.Context) {
+	if h.telegramNotifyService == nil {
+		response.BadRequest(c, "Telegram notification service is not configured")
+		return
+	}
+
+	// Optional body — allows overriding chat_id for testing a different chat
+	var req TestTelegramConnectionRequest
+	_ = c.ShouldBindJSON(&req) // ignore error — body is optional
+
+	ctx := c.Request.Context()
+
+	if strings.TrimSpace(req.ChatID) != "" {
+		// Override chat_id: temporarily invalidate cache so sendMessage picks up fresh config,
+		// but we use SendTestMessageWithChatID for the override.
+		err := h.telegramNotifyService.SendTestMessageWithChatID(ctx, strings.TrimSpace(req.ChatID))
+		if err != nil {
+			response.BadRequest(c, "Telegram test failed: "+err.Error())
+			return
+		}
+	} else {
+		// Use current saved settings
+		err := h.telegramNotifyService.SendTestMessage(ctx)
+		if err != nil {
+			response.BadRequest(c, "Telegram test failed: "+err.Error())
+			return
+		}
+	}
+
+	response.Success(c, gin.H{"message": "Telegram test message sent successfully"})
 }
