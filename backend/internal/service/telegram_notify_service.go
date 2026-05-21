@@ -205,10 +205,10 @@ func (s *TelegramNotifyService) NotifyNewUser(ctx context.Context, email string,
 		sourceLabel = source
 	}
 	text := fmt.Sprintf(
-		"ð <b>New User Registered</b>\n\n"+
-			"ð§ Email: <code>%s</code>\n"+
-			"ð Source: %s\n"+
-			"ð Time: %s",
+		" <b>New User Registered</b>\n\n"+
+			" Email: <code>%s</code>\n"+
+			" Source: %s\n"+
+			" Time: %s",
 		escapeHTML(email),
 		escapeHTML(sourceLabel),
 		time.Now().Format("2006-01-02 15:04:05"),
@@ -224,12 +224,12 @@ func (s *TelegramNotifyService) NotifyAccountError(ctx context.Context, accountI
 		return
 	}
 	text := fmt.Sprintf(
-		"â ï¸ <b>Account Error</b>\n\n"+
-			"ð ID: <code>%d</code>\n"+
-			"ð Name: %s\n"+
-			"ð· Platform: %s\n"+
-			"â Error: <code>%s</code>\n"+
-			"ð Time: %s",
+		" <b>Account Error</b>\n\n"+
+			" ID: <code>%d</code>\n"+
+			" Name: %s\n"+
+			" Platform: %s\n"+
+			" Error: <code>%s</code>\n"+
+			" Time: %s",
 		accountID,
 		escapeHTML(accountName),
 		escapeHTML(platform),
@@ -247,9 +247,9 @@ func (s *TelegramNotifyService) NotifyAccountExpired(ctx context.Context, count 
 		return
 	}
 	text := fmt.Sprintf(
-		"â° <b>Accounts Expired</b>\n\n"+
-			"ð Count: <b>%d</b> account(s) auto-paused\n"+
-			"ð Time: %s",
+		" <b>Accounts Expired</b>\n\n"+
+			" Count: <b>%d</b> account(s) auto-paused\n"+
+			" Time: %s",
 		count,
 		time.Now().Format("2006-01-02 15:04:05"),
 	)
@@ -264,12 +264,12 @@ func (s *TelegramNotifyService) NotifyPaymentSuccess(ctx context.Context, userEm
 		return
 	}
 	text := fmt.Sprintf(
-		"ð° <b>Payment Success</b>\n\n"+
-			"ð§ User: <code>%s</code>\n"+
-			"ðµ Amount: <b>%.2f</b>\n"+
-			"ð Type: %s\n"+
-			"ð Order: <code>%s</code>\n"+
-			"ð Time: %s",
+		" <b>Payment Success</b>\n\n"+
+			" User: <code>%s</code>\n"+
+			" Amount: <b>%.2f</b>\n"+
+			" Type: %s\n"+
+			" Order: <code>%s</code>\n"+
+			" Time: %s",
 		escapeHTML(userEmail),
 		amount,
 		escapeHTML(orderType),
@@ -287,10 +287,10 @@ func (s *TelegramNotifyService) NotifyPaymentFailed(ctx context.Context, orderID
 		return
 	}
 	text := fmt.Sprintf(
-		"â <b>Payment Failed</b>\n\n"+
-			"ð Order: <code>%s</code>\n"+
-			"â Reason: <code>%s</code>\n"+
-			"ð Time: %s",
+		" <b>Payment Failed</b>\n\n"+
+			" Order: <code>%s</code>\n"+
+			" Reason: <code>%s</code>\n"+
+			" Time: %s",
 		escapeHTML(orderID),
 		escapeHTML(truncateTelegram(reason, 200)),
 		time.Now().Format("2006-01-02 15:04:05"),
@@ -305,16 +305,16 @@ func (s *TelegramNotifyService) NotifyRefund(ctx context.Context, orderID string
 	if !s.isEnabled(ctx, SettingTelegramNotifyRefund) {
 		return
 	}
-	status := "â Success"
+	status := " Success"
 	if !success {
-		status = "â Failed"
+		status = " Failed"
 	}
 	text := fmt.Sprintf(
-		"ð¸ <b>Refund %s</b>\n\n"+
-			"ð Order: <code>%s</code>\n"+
-			"ðµ Amount: <b>%.2f</b>\n"+
-			"ð Reason: %s\n"+
-			"ð Time: %s",
+		" <b>Refund %s</b>\n\n"+
+			" Order: <code>%s</code>\n"+
+			" Amount: <b>%.2f</b>\n"+
+			" Reason: %s\n"+
+			" Time: %s",
 		status,
 		escapeHTML(orderID),
 		amount,
@@ -332,9 +332,9 @@ func (s *TelegramNotifyService) NotifySubscriptionExpired(ctx context.Context, c
 		return
 	}
 	text := fmt.Sprintf(
-		"â³ <b>Subscriptions Expired</b>\n\n"+
-			"ð Count: <b>%d</b> subscription(s) expired\n"+
-			"ð Time: %s",
+		" <b>Subscriptions Expired</b>\n\n"+
+			" Count: <b>%d</b> subscription(s) expired\n"+
+			" Time: %s",
 		count,
 		time.Now().Format("2006-01-02 15:04:05"),
 	)
@@ -349,11 +349,11 @@ func (s *TelegramNotifyService) NotifyBalanceLow(ctx context.Context, userEmail 
 		return
 	}
 	text := fmt.Sprintf(
-		"ð <b>Balance Low</b>\n\n"+
-			"ð§ User: <code>%s</code>\n"+
-			"ð° Balance: <b>%.4f</b>\n"+
-			"ð¨ Threshold: %.4f\n"+
-			"ð Time: %s",
+		" <b>Balance Low</b>\n\n"+
+			" User: <code>%s</code>\n"+
+			" Balance: <b>%.4f</b>\n"+
+			" Threshold: %.4f\n"+
+			" Time: %s",
 		escapeHTML(userEmail),
 		balance,
 		threshold,
@@ -369,19 +369,19 @@ func (s *TelegramNotifyService) NotifyOpsAlert(ctx context.Context, ruleName, se
 	if !s.isEnabled(ctx, SettingTelegramNotifyOpsAlert) {
 		return
 	}
-	severityIcon := "â ï¸"
+	severityIcon := ""
 	switch severity {
 	case "critical":
-		severityIcon = "ð¨"
+		severityIcon = ""
 	case "info":
-		severityIcon = "â¹ï¸"
+		severityIcon = ""
 	}
 	text := fmt.Sprintf(
 		"%s <b>Ops Alert: %s</b>\n\n"+
-			"ð Severity: <b>%s</b>\n"+
-			"ð Metric: <b>%.2f</b>\n"+
-			"ð Description: %s\n"+
-			"ð Time: %s",
+			" Severity: <b>%s</b>\n"+
+			" Metric: <b>%.2f</b>\n"+
+			" Description: %s\n"+
+			" Time: %s",
 		severityIcon,
 		escapeHTML(ruleName),
 		escapeHTML(severity),
@@ -400,16 +400,16 @@ func (s *TelegramNotifyService) NotifyProxyExpired(ctx context.Context, proxyNam
 		return
 	}
 	status := "expiring soon"
-	icon := "â ï¸"
+	icon := ""
 	if isExpired {
 		status = "EXPIRED"
-		icon = "â"
+		icon = ""
 	}
 	text := fmt.Sprintf(
 		"%s <b>Proxy %s</b>\n\n"+
-			"ð Name: <b>%s</b>\n"+
-			"ð Expires: %s\n"+
-			"ð Time: %s",
+			" Name: <b>%s</b>\n"+
+			" Expires: %s\n"+
+			" Time: %s",
 		icon,
 		status,
 		escapeHTML(proxyName),
@@ -437,14 +437,14 @@ func (s *TelegramNotifyService) NotifyProxyExpiring(ctx context.Context, proxies
 		if p.ExpiresAt != nil {
 			remaining = fmt.Sprintf(" (expires %s)", p.ExpiresAt.Format("2006-01-02"))
 		}
-		details += fmt.Sprintf("\nâ¢ <b>%s</b> [%s:%d]%s", escapeHTML(p.Name), escapeHTML(p.Host), p.Port, remaining)
+		details += fmt.Sprintf("\n <b>%s</b> [%s:%d]%s", escapeHTML(p.Name), escapeHTML(p.Host), p.Port, remaining)
 	}
 
 	text := fmt.Sprintf(
-		"â ï¸ <b>Proxies Expiring Soon</b>\n\n"+
-			"ð¢ Count: <b>%d</b> proxy(ies) within %d days\n"+
+		"  <b>Proxies Expiring Soon</b>\n\n"+
+			" Count: <b>%d</b> proxy(ies) within %d days\n"+
 			"%s\n\n"+
-			"ð Time: %s",
+			" Time: %s",
 		len(proxies),
 		thresholdDays,
 		details,
