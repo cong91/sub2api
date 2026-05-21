@@ -1710,6 +1710,37 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	}
 
 	// DingTalk Connect OAuth 登录
+	settings.DingTalkConnectCorpRestrictionPolicy = CoerceDingTalkCorpPolicyForWrite(settings.DingTalkConnectCorpRestrictionPolicy)
+	if settings.DingTalkConnectCorpRestrictionPolicy != "internal_only" {
+		settings.DingTalkConnectBypassRegistration = false
+		settings.DingTalkConnectSyncCorpEmail = false
+		settings.DingTalkConnectSyncDisplayName = false
+		settings.DingTalkConnectSyncDept = false
+	}
+	settings.DingTalkConnectSyncCorpEmailAttrKey = strings.TrimSpace(settings.DingTalkConnectSyncCorpEmailAttrKey)
+	if settings.DingTalkConnectSyncCorpEmailAttrKey == "" {
+		settings.DingTalkConnectSyncCorpEmailAttrKey = "dingtalk_email"
+	}
+	settings.DingTalkConnectSyncDisplayNameAttrKey = strings.TrimSpace(settings.DingTalkConnectSyncDisplayNameAttrKey)
+	if settings.DingTalkConnectSyncDisplayNameAttrKey == "" {
+		settings.DingTalkConnectSyncDisplayNameAttrKey = "dingtalk_name"
+	}
+	settings.DingTalkConnectSyncDeptAttrKey = strings.TrimSpace(settings.DingTalkConnectSyncDeptAttrKey)
+	if settings.DingTalkConnectSyncDeptAttrKey == "" {
+		settings.DingTalkConnectSyncDeptAttrKey = "dingtalk_department"
+	}
+	settings.DingTalkConnectSyncCorpEmailAttrName = strings.TrimSpace(settings.DingTalkConnectSyncCorpEmailAttrName)
+	if settings.DingTalkConnectSyncCorpEmailAttrName == "" {
+		settings.DingTalkConnectSyncCorpEmailAttrName = "钉钉企业邮箱"
+	}
+	settings.DingTalkConnectSyncDisplayNameAttrName = strings.TrimSpace(settings.DingTalkConnectSyncDisplayNameAttrName)
+	if settings.DingTalkConnectSyncDisplayNameAttrName == "" {
+		settings.DingTalkConnectSyncDisplayNameAttrName = "钉钉姓名"
+	}
+	settings.DingTalkConnectSyncDeptAttrName = strings.TrimSpace(settings.DingTalkConnectSyncDeptAttrName)
+	if settings.DingTalkConnectSyncDeptAttrName == "" {
+		settings.DingTalkConnectSyncDeptAttrName = "钉钉部门"
+	}
 	updates[SettingKeyDingTalkConnectEnabled] = strconv.FormatBool(settings.DingTalkConnectEnabled)
 	updates[SettingKeyDingTalkConnectClientID] = settings.DingTalkConnectClientID
 	updates[SettingKeyDingTalkConnectRedirectURL] = settings.DingTalkConnectRedirectURL
@@ -1933,6 +1964,24 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 		}
 		updates[SettingKeyDefaultPlatformQuotas] = string(blob)
 	}
+
+	// Telegram bot notifications
+	if settings.TelegramBotToken != "" {
+		updates[SettingTelegramBotToken] = settings.TelegramBotToken
+	} else if !settings.TelegramBotTokenConfigured {
+		updates[SettingTelegramBotToken] = ""
+	}
+	updates[SettingTelegramChatID] = settings.TelegramChatID
+	updates[SettingTelegramNotifyNewUser] = strconv.FormatBool(settings.TelegramNotifyNewUser)
+	updates[SettingTelegramNotifyAccountError] = strconv.FormatBool(settings.TelegramNotifyAccountError)
+	updates[SettingTelegramNotifyAccountExpired] = strconv.FormatBool(settings.TelegramNotifyAccountExpired)
+	updates[SettingTelegramNotifyPaymentSuccess] = strconv.FormatBool(settings.TelegramNotifyPaymentSuccess)
+	updates[SettingTelegramNotifyPaymentFailed] = strconv.FormatBool(settings.TelegramNotifyPaymentFailed)
+	updates[SettingTelegramNotifyRefund] = strconv.FormatBool(settings.TelegramNotifyRefund)
+	updates[SettingTelegramNotifySubExpired] = strconv.FormatBool(settings.TelegramNotifySubExpired)
+	updates[SettingTelegramNotifyBalanceLow] = strconv.FormatBool(settings.TelegramNotifyBalanceLow)
+	updates[SettingTelegramNotifyOpsAlert] = strconv.FormatBool(settings.TelegramNotifyOpsAlert)
+	updates[SettingTelegramNotifyProxyExpired] = strconv.FormatBool(settings.TelegramNotifyProxyExpired)
 
 	return updates, nil
 }
@@ -3388,6 +3437,21 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 			result.DefaultPlatformQuotas = parsed
 		}
 	}
+
+	// Telegram bot notifications
+	result.TelegramBotToken = settings[SettingTelegramBotToken]
+	result.TelegramBotTokenConfigured = settings[SettingTelegramBotToken] != ""
+	result.TelegramChatID = settings[SettingTelegramChatID]
+	result.TelegramNotifyNewUser = settings[SettingTelegramNotifyNewUser] == "true"
+	result.TelegramNotifyAccountError = settings[SettingTelegramNotifyAccountError] == "true"
+	result.TelegramNotifyAccountExpired = settings[SettingTelegramNotifyAccountExpired] == "true"
+	result.TelegramNotifyPaymentSuccess = settings[SettingTelegramNotifyPaymentSuccess] == "true"
+	result.TelegramNotifyPaymentFailed = settings[SettingTelegramNotifyPaymentFailed] == "true"
+	result.TelegramNotifyRefund = settings[SettingTelegramNotifyRefund] == "true"
+	result.TelegramNotifySubExpired = settings[SettingTelegramNotifySubExpired] == "true"
+	result.TelegramNotifyBalanceLow = settings[SettingTelegramNotifyBalanceLow] == "true"
+	result.TelegramNotifyOpsAlert = settings[SettingTelegramNotifyOpsAlert] == "true"
+	result.TelegramNotifyProxyExpired = settings[SettingTelegramNotifyProxyExpired] == "true"
 
 	return result
 }
