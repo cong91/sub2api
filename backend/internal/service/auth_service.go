@@ -80,6 +80,7 @@ type AuthService struct {
 	inviteBootstrapAPIKeySvc InviteBootstrapAPIKeyService
 	inviteLoginDeviceRepo    InviteLoginDeviceResolver
 	groupRepo                GroupRepository
+	telegramNotifySvc        *TelegramNotifyService
 }
 
 type InviteBootstrapAPIKey struct {
@@ -163,6 +164,10 @@ func (s *AuthService) SetInviteBootstrapAPIKeyService(svc InviteBootstrapAPIKeyS
 
 func (s *AuthService) SetInviteLoginDeviceResolver(repo InviteLoginDeviceResolver) {
 	s.inviteLoginDeviceRepo = repo
+}
+
+func (s *AuthService) SetTelegramNotifyService(svc *TelegramNotifyService) {
+	s.telegramNotifySvc = svc
 }
 
 func (s *AuthService) SetInviteBootstrapGroupRepository(repo GroupRepository) {
@@ -277,6 +282,7 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 		return "", nil, ErrServiceUnavailable
 	}
 	s.postAuthUserBootstrap(ctx, user, "email", true)
+	s.notifyNewUserRegistered(ctx, user.Email, "Email")
 	s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
 	if s.affiliateService != nil {
 		if _, err := s.affiliateService.EnsureUserAffiliate(ctx, user.ID); err != nil {
@@ -713,6 +719,7 @@ func (s *AuthService) LoginOrRegisterOAuth(ctx context.Context, email, username 
 			} else {
 				user = newUser
 				s.postAuthUserBootstrap(ctx, user, signupSource, false)
+				s.notifyNewUserRegistered(ctx, user.Email, signupSource)
 				s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
 			}
 		} else {
@@ -863,6 +870,7 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 					}
 					user = newUser
 					s.postAuthUserBootstrap(ctx, user, signupSource, false)
+					s.notifyNewUserRegistered(ctx, user.Email, signupSource)
 					s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
 					s.bindOAuthAffiliate(ctx, user.ID, affiliateCode)
 				}
@@ -881,6 +889,7 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 				} else {
 					user = newUser
 					s.postAuthUserBootstrap(ctx, user, signupSource, false)
+					s.notifyNewUserRegistered(ctx, user.Email, signupSource)
 					s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
 					s.bindOAuthAffiliate(ctx, user.ID, affiliateCode)
 					if invitationRedeemCode != nil {
@@ -1012,6 +1021,14 @@ func (s *AuthService) postAuthUserBootstrap(ctx context.Context, user *User, sig
 	if touchLogin {
 		s.touchUserLogin(ctx, user.ID)
 	}
+}
+
+// notifyNewUserRegistered sends a Telegram notification for new user registration (async, non-blocking).
+func (s *AuthService) notifyNewUserRegistered(ctx context.Context, email, source string) {
+	if s.telegramNotifySvc == nil {
+		return
+	}
+	go s.telegramNotifySvc.NotifyNewUser(context.Background(), email, source)
 }
 
 func (s *AuthService) updateUserSignupSource(ctx context.Context, userID int64, signupSource string) {

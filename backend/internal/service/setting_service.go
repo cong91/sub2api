@@ -1794,6 +1794,24 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyAccountQuotaNotifyEnabled] = strconv.FormatBool(settings.AccountQuotaNotifyEnabled)
 	updates[SettingKeyAccountQuotaNotifyEmails] = MarshalNotifyEmails(settings.AccountQuotaNotifyEmails)
 
+	// Telegram bot notifications
+	if settings.TelegramBotToken != "" {
+		updates[SettingTelegramBotToken] = settings.TelegramBotToken
+	} else if !settings.TelegramBotTokenConfigured {
+		updates[SettingTelegramBotToken] = ""
+	}
+	updates[SettingTelegramChatID] = settings.TelegramChatID
+	updates[SettingTelegramNotifyNewUser] = strconv.FormatBool(settings.TelegramNotifyNewUser)
+	updates[SettingTelegramNotifyAccountError] = strconv.FormatBool(settings.TelegramNotifyAccountError)
+	updates[SettingTelegramNotifyAccountExpired] = strconv.FormatBool(settings.TelegramNotifyAccountExpired)
+	updates[SettingTelegramNotifyPaymentSuccess] = strconv.FormatBool(settings.TelegramNotifyPaymentSuccess)
+	updates[SettingTelegramNotifyPaymentFailed] = strconv.FormatBool(settings.TelegramNotifyPaymentFailed)
+	updates[SettingTelegramNotifyRefund] = strconv.FormatBool(settings.TelegramNotifyRefund)
+	updates[SettingTelegramNotifySubExpired] = strconv.FormatBool(settings.TelegramNotifySubExpired)
+	updates[SettingTelegramNotifyBalanceLow] = strconv.FormatBool(settings.TelegramNotifyBalanceLow)
+	updates[SettingTelegramNotifyOpsAlert] = strconv.FormatBool(settings.TelegramNotifyOpsAlert)
+	updates[SettingTelegramNotifyProxyExpired] = strconv.FormatBool(settings.TelegramNotifyProxyExpired)
+
 	return updates, nil
 }
 
@@ -3157,6 +3175,21 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	if result.AccountQuotaNotifyEmails == nil {
 		result.AccountQuotaNotifyEmails = []NotifyEmailEntry{}
 	}
+
+	// Telegram bot notifications
+	result.TelegramBotToken = settings[SettingTelegramBotToken]
+	result.TelegramBotTokenConfigured = settings[SettingTelegramBotToken] != ""
+	result.TelegramChatID = settings[SettingTelegramChatID]
+	result.TelegramNotifyNewUser = settings[SettingTelegramNotifyNewUser] == "true"
+	result.TelegramNotifyAccountError = settings[SettingTelegramNotifyAccountError] == "true"
+	result.TelegramNotifyAccountExpired = settings[SettingTelegramNotifyAccountExpired] == "true"
+	result.TelegramNotifyPaymentSuccess = settings[SettingTelegramNotifyPaymentSuccess] == "true"
+	result.TelegramNotifyPaymentFailed = settings[SettingTelegramNotifyPaymentFailed] == "true"
+	result.TelegramNotifyRefund = settings[SettingTelegramNotifyRefund] == "true"
+	result.TelegramNotifySubExpired = settings[SettingTelegramNotifySubExpired] == "true"
+	result.TelegramNotifyBalanceLow = settings[SettingTelegramNotifyBalanceLow] == "true"
+	result.TelegramNotifyOpsAlert = settings[SettingTelegramNotifyOpsAlert] == "true"
+	result.TelegramNotifyProxyExpired = settings[SettingTelegramNotifyProxyExpired] == "true"
 
 	return result
 }

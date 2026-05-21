@@ -252,6 +252,18 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		BalanceLowNotifyRechargeURL:            settings.BalanceLowNotifyRechargeURL,
 		AccountQuotaNotifyEnabled:              settings.AccountQuotaNotifyEnabled,
 		AccountQuotaNotifyEmails:               dto.NotifyEmailEntriesFromService(settings.AccountQuotaNotifyEmails),
+		TelegramBotTokenConfigured:             settings.TelegramBotTokenConfigured,
+		TelegramChatID:                         settings.TelegramChatID,
+		TelegramNotifyNewUser:                  settings.TelegramNotifyNewUser,
+		TelegramNotifyAccountError:             settings.TelegramNotifyAccountError,
+		TelegramNotifyAccountExpired:           settings.TelegramNotifyAccountExpired,
+		TelegramNotifyPaymentSuccess:           settings.TelegramNotifyPaymentSuccess,
+		TelegramNotifyPaymentFailed:            settings.TelegramNotifyPaymentFailed,
+		TelegramNotifyRefund:                   settings.TelegramNotifyRefund,
+		TelegramNotifySubExpired:               settings.TelegramNotifySubExpired,
+		TelegramNotifyBalanceLow:               settings.TelegramNotifyBalanceLow,
+		TelegramNotifyOpsAlert:                 settings.TelegramNotifyOpsAlert,
+		TelegramNotifyProxyExpired:             settings.TelegramNotifyProxyExpired,
 		PaymentEnabled:                         paymentCfg.Enabled,
 		PaymentMinAmount:                       paymentCfg.MinAmount,
 		PaymentMaxAmount:                       paymentCfg.MaxAmount,
@@ -554,6 +566,20 @@ type UpdateSettingsRequest struct {
 	BalanceLowNotifyRechargeURL *string                 `json:"balance_low_notify_recharge_url"`
 	AccountQuotaNotifyEnabled   *bool                   `json:"account_quota_notify_enabled"`
 	AccountQuotaNotifyEmails    *[]dto.NotifyEmailEntry `json:"account_quota_notify_emails"`
+
+	// Telegram bot notifications
+	TelegramBotToken            *string `json:"telegram_bot_token"`
+	TelegramChatID              *string `json:"telegram_chat_id"`
+	TelegramNotifyNewUser       *bool   `json:"telegram_notify_new_user"`
+	TelegramNotifyAccountError  *bool   `json:"telegram_notify_account_error"`
+	TelegramNotifyAccountExpired *bool  `json:"telegram_notify_account_expired"`
+	TelegramNotifyPaymentSuccess *bool  `json:"telegram_notify_payment_success"`
+	TelegramNotifyPaymentFailed  *bool  `json:"telegram_notify_payment_failed"`
+	TelegramNotifyRefund         *bool  `json:"telegram_notify_refund"`
+	TelegramNotifySubExpired     *bool  `json:"telegram_notify_sub_expired"`
+	TelegramNotifyBalanceLow     *bool  `json:"telegram_notify_balance_low"`
+	TelegramNotifyOpsAlert       *bool  `json:"telegram_notify_ops_alert"`
+	TelegramNotifyProxyExpired   *bool  `json:"telegram_notify_proxy_expired"`
 
 	// Payment configuration (integrated into settings, full replace)
 	PaymentEnabled                   *bool    `json:"payment_enabled"`

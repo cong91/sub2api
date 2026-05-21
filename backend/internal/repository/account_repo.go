@@ -49,6 +49,8 @@ type accountRepository struct {
 	// Used to proactively sync account snapshot to cache when status changes,
 	// ensuring sticky sessions can promptly detect unavailable accounts.
 	schedulerCache service.SchedulerCache
+	// onAccountError is an optional callback fired after SetError succeeds.
+	onAccountError func(ctx context.Context, id int64, errorMsg string)
 }
 
 var schedulerNeutralExtraKeyPrefixes = []string{
@@ -68,6 +70,14 @@ var schedulerNeutralExtraKeys = map[string]struct{}{
 // 这是对外暴露的构造函数，返回接口类型以便于依赖注入。
 func NewAccountRepository(client *dbent.Client, sqlDB *sql.DB, schedulerCache service.SchedulerCache) service.AccountRepository {
 	return newAccountRepositoryWithSQL(client, sqlDB, schedulerCache)
+}
+
+// SetOnAccountError sets an optional callback that fires after SetError succeeds.
+// This is used to wire Telegram notifications without circular dependencies.
+func SetAccountRepoOnErrorHook(repo service.AccountRepository, hook func(ctx context.Context, id int64, errorMsg string)) {
+	if r, ok := repo.(*accountRepository); ok {
+		r.onAccountError = hook
+	}
 }
 
 // newAccountRepositoryWithSQL 是内部构造函数，支持依赖注入 SQL 执行器。
@@ -724,6 +734,9 @@ func (r *accountRepository) SetError(ctx context.Context, id int64, errorMsg str
 		logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue set error failed: account=%d err=%v", id, err)
 	}
 	r.syncSchedulerAccountSnapshot(ctx, id)
+	if r.onAccountError != nil {
+		r.onAccountError(ctx, id, errorMsg)
+	}
 	return nil
 }
 

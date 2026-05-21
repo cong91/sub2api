@@ -219,6 +219,21 @@ type SystemSettings struct {
 	// Account quota notification
 	AccountQuotaNotifyEnabled bool
 	AccountQuotaNotifyEmails  []NotifyEmailEntry
+
+	// Telegram bot notifications
+	TelegramBotToken            string
+	TelegramBotTokenConfigured  bool
+	TelegramChatID              string
+	TelegramNotifyNewUser       bool
+	TelegramNotifyAccountError  bool
+	TelegramNotifyAccountExpired bool
+	TelegramNotifyPaymentSuccess bool
+	TelegramNotifyPaymentFailed  bool
+	TelegramNotifyRefund         bool
+	TelegramNotifySubExpired     bool
+	TelegramNotifyBalanceLow     bool
+	TelegramNotifyOpsAlert       bool
+	TelegramNotifyProxyExpired   bool
 }
 
 type DefaultSubscriptionSetting struct {

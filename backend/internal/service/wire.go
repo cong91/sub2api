@@ -488,6 +488,7 @@ func ProvideAuthService(
 	apiKeyService *APIKeyService,
 	userDeviceRepo UserDeviceRepository,
 	groupRepo GroupRepository,
+	telegramNotifySvc *TelegramNotifyService,
 ) *AuthService {
 	svc := NewAuthService(
 		entClient,
@@ -506,6 +507,7 @@ func ProvideAuthService(
 	svc.SetInviteBootstrapAPIKeyService(apiKeyService)
 	svc.SetInviteLoginDeviceResolver(userDeviceRepo)
 	svc.SetInviteBootstrapGroupRepository(groupRepo)
+	svc.SetTelegramNotifyService(telegramNotifySvc)
 	return svc
 }
 
@@ -617,6 +619,7 @@ var ProviderSet = wire.NewSet(
 	ProvidePaymentService,
 	ProvidePaymentOrderExpiryService,
 	ProvideBalanceNotifyService,
+	NewTelegramNotifyService,
 	ProvideChannelMonitorService,
 	ProvideChannelMonitorRunner,
 	ProvideVClawClaimService,
