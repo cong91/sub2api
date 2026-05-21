@@ -256,6 +256,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		MinClaudeCodeVersion:                   settings.MinClaudeCodeVersion,
 		MaxClaudeCodeVersion:                   settings.MaxClaudeCodeVersion,
 		AntigravityUserAgentVersion:            settings.AntigravityUserAgentVersion,
+		OpenAICodexUserAgent:                   settings.OpenAICodexUserAgent,
 		AllowUngroupedKeyScheduling:            settings.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:                     settings.BackendModeEnabled,
 		EnableFingerprintUnification:           settings.EnableFingerprintUnification,
@@ -1902,6 +1903,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		MinClaudeCodeVersion:                   updatedSettings.MinClaudeCodeVersion,
 		MaxClaudeCodeVersion:                   updatedSettings.MaxClaudeCodeVersion,
 		AntigravityUserAgentVersion:            updatedSettings.AntigravityUserAgentVersion,
+		OpenAICodexUserAgent:                   updatedSettings.OpenAICodexUserAgent,
 		AllowUngroupedKeyScheduling:            updatedSettings.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:                     updatedSettings.BackendModeEnabled,
 		EnableFingerprintUnification:           updatedSettings.EnableFingerprintUnification,
@@ -2542,6 +2544,11 @@ func systemSettingsResponseData(settings dto.SystemSettings, authSourceDefaults 
 	data["auth_source_default_google_subscriptions"] = authSourceDefaults.Google.Subscriptions
 	data["auth_source_default_google_grant_on_signup"] = authSourceDefaults.Google.GrantOnSignup
 	data["auth_source_default_google_grant_on_first_bind"] = authSourceDefaults.Google.GrantOnFirstBind
+	data["auth_source_default_dingtalk_balance"] = authSourceDefaults.DingTalk.Balance
+	data["auth_source_default_dingtalk_concurrency"] = authSourceDefaults.DingTalk.Concurrency
+	data["auth_source_default_dingtalk_subscriptions"] = authSourceDefaults.DingTalk.Subscriptions
+	data["auth_source_default_dingtalk_grant_on_signup"] = authSourceDefaults.DingTalk.GrantOnSignup
+	data["auth_source_default_dingtalk_grant_on_first_bind"] = authSourceDefaults.DingTalk.GrantOnFirstBind
 	data["force_email_on_third_party_signup"] = authSourceDefaults.ForceEmailOnThirdPartySignup
 
 	return data

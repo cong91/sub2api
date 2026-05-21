@@ -646,8 +646,6 @@ func ProvideBalanceNotifyService(emailService *EmailService, settingRepo Setting
 	return svc
 }
 
-
-
 // ProvidePaymentOrderExpiryService creates and starts PaymentOrderExpiryService.
 func ProvidePaymentOrderExpiryService(paymentSvc *PaymentService) *PaymentOrderExpiryService {
 	svc := NewPaymentOrderExpiryService(paymentSvc, 60*time.Second)

@@ -170,6 +170,7 @@ type SystemSettings struct {
 	MaxClaudeCodeVersion string `json:"max_claude_code_version"`
 
 	AntigravityUserAgentVersion string `json:"antigravity_user_agent_version"`
+	OpenAICodexUserAgent        string `json:"openai_codex_user_agent"`
 
 	// 分组隔离
 	AllowUngroupedKeyScheduling bool `json:"allow_ungrouped_key_scheduling"`

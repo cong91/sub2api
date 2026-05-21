@@ -1584,6 +1584,37 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	}
 
 	// DingTalk Connect OAuth 登录
+	settings.DingTalkConnectCorpRestrictionPolicy = CoerceDingTalkCorpPolicyForWrite(settings.DingTalkConnectCorpRestrictionPolicy)
+	if settings.DingTalkConnectCorpRestrictionPolicy != "internal_only" {
+		settings.DingTalkConnectBypassRegistration = false
+		settings.DingTalkConnectSyncCorpEmail = false
+		settings.DingTalkConnectSyncDisplayName = false
+		settings.DingTalkConnectSyncDept = false
+	}
+	settings.DingTalkConnectSyncCorpEmailAttrKey = strings.TrimSpace(settings.DingTalkConnectSyncCorpEmailAttrKey)
+	if settings.DingTalkConnectSyncCorpEmailAttrKey == "" {
+		settings.DingTalkConnectSyncCorpEmailAttrKey = "dingtalk_email"
+	}
+	settings.DingTalkConnectSyncDisplayNameAttrKey = strings.TrimSpace(settings.DingTalkConnectSyncDisplayNameAttrKey)
+	if settings.DingTalkConnectSyncDisplayNameAttrKey == "" {
+		settings.DingTalkConnectSyncDisplayNameAttrKey = "dingtalk_name"
+	}
+	settings.DingTalkConnectSyncDeptAttrKey = strings.TrimSpace(settings.DingTalkConnectSyncDeptAttrKey)
+	if settings.DingTalkConnectSyncDeptAttrKey == "" {
+		settings.DingTalkConnectSyncDeptAttrKey = "dingtalk_department"
+	}
+	settings.DingTalkConnectSyncCorpEmailAttrName = strings.TrimSpace(settings.DingTalkConnectSyncCorpEmailAttrName)
+	if settings.DingTalkConnectSyncCorpEmailAttrName == "" {
+		settings.DingTalkConnectSyncCorpEmailAttrName = "钉钉企业邮箱"
+	}
+	settings.DingTalkConnectSyncDisplayNameAttrName = strings.TrimSpace(settings.DingTalkConnectSyncDisplayNameAttrName)
+	if settings.DingTalkConnectSyncDisplayNameAttrName == "" {
+		settings.DingTalkConnectSyncDisplayNameAttrName = "钉钉姓名"
+	}
+	settings.DingTalkConnectSyncDeptAttrName = strings.TrimSpace(settings.DingTalkConnectSyncDeptAttrName)
+	if settings.DingTalkConnectSyncDeptAttrName == "" {
+		settings.DingTalkConnectSyncDeptAttrName = "钉钉部门"
+	}
 	updates[SettingKeyDingTalkConnectEnabled] = strconv.FormatBool(settings.DingTalkConnectEnabled)
 	updates[SettingKeyDingTalkConnectClientID] = settings.DingTalkConnectClientID
 	updates[SettingKeyDingTalkConnectRedirectURL] = settings.DingTalkConnectRedirectURL

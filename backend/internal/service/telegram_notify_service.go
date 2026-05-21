@@ -16,25 +16,25 @@ const (
 	telegramSendMethod = "/sendMessage"
 
 	// Setting keys for Telegram notifications
-	SettingTelegramBotToken              = "telegram_bot_token"
-	SettingTelegramChatID                = "telegram_chat_id"
-	SettingTelegramNotifyNewUser         = "telegram_notify_new_user"
-	SettingTelegramNotifyAccountError    = "telegram_notify_account_error"
-	SettingTelegramNotifyAccountExpired  = "telegram_notify_account_expired"
-	SettingTelegramNotifyPaymentSuccess  = "telegram_notify_payment_success"
-	SettingTelegramNotifyPaymentFailed   = "telegram_notify_payment_failed"
-	SettingTelegramNotifyRefund          = "telegram_notify_refund"
-	SettingTelegramNotifySubExpired      = "telegram_notify_sub_expired"
-	SettingTelegramNotifyBalanceLow      = "telegram_notify_balance_low"
-	SettingTelegramNotifyOpsAlert        = "telegram_notify_ops_alert"
-	SettingTelegramNotifyProxyExpired    = "telegram_notify_proxy_expired"
+	SettingTelegramBotToken             = "telegram_bot_token"
+	SettingTelegramChatID               = "telegram_chat_id"
+	SettingTelegramNotifyNewUser        = "telegram_notify_new_user"
+	SettingTelegramNotifyAccountError   = "telegram_notify_account_error"
+	SettingTelegramNotifyAccountExpired = "telegram_notify_account_expired"
+	SettingTelegramNotifyPaymentSuccess = "telegram_notify_payment_success"
+	SettingTelegramNotifyPaymentFailed  = "telegram_notify_payment_failed"
+	SettingTelegramNotifyRefund         = "telegram_notify_refund"
+	SettingTelegramNotifySubExpired     = "telegram_notify_sub_expired"
+	SettingTelegramNotifyBalanceLow     = "telegram_notify_balance_low"
+	SettingTelegramNotifyOpsAlert       = "telegram_notify_ops_alert"
+	SettingTelegramNotifyProxyExpired   = "telegram_notify_proxy_expired"
 )
 
 // TelegramNotifyService sends notifications via Telegram Bot API.
 type TelegramNotifyService struct {
-	settingRepo SettingRepository
-	httpClient  *http.Client
-	mu          sync.RWMutex
+	settingRepo  SettingRepository
+	httpClient   *http.Client
+	mu           sync.RWMutex
 	cachedToken  string
 	cachedChatID string
 	cacheExpiry  time.Time
