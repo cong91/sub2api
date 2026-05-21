@@ -192,24 +192,27 @@ func ProvideUsageCleanupService(repo UsageCleanupRepository, timingWheel *Timing
 }
 
 // ProvideAccountExpiryService creates and starts AccountExpiryService.
-func ProvideAccountExpiryService(accountRepo AccountRepository) *AccountExpiryService {
+func ProvideAccountExpiryService(accountRepo AccountRepository, telegramNotifySvc *TelegramNotifyService) *AccountExpiryService {
 	svc := NewAccountExpiryService(accountRepo, time.Minute)
+	svc.SetTelegramNotifyService(telegramNotifySvc)
 	svc.Start()
 	return svc
 }
 
 // ProvideProxyExpiryService creates and starts ProxyExpiryService.
-func ProvideProxyExpiryService(proxyRepo ProxyRepository) *ProxyExpiryService {
-	svc := NewProxyExpiryService(proxyRepo, time.Minute)
+func ProvideProxyExpiryService(proxyRepo ProxyRepository, settingRepo SettingRepository, telegramNotifySvc *TelegramNotifyService) *ProxyExpiryService {
+	svc := NewProxyExpiryService(proxyRepo, settingRepo, 10*time.Minute)
+	svc.SetTelegramNotifyService(telegramNotifySvc)
 	svc.Start()
 	return svc
 }
 
 // ProvideSubscriptionExpiryService creates and starts SubscriptionExpiryService.
-func ProvideSubscriptionExpiryService(userSubRepo UserSubscriptionRepository, settingRepo SettingRepository, notificationEmailService *NotificationEmailService, lockCache LeaderLockCache, db *sql.DB) *SubscriptionExpiryService {
+func ProvideSubscriptionExpiryService(userSubRepo UserSubscriptionRepository, settingRepo SettingRepository, notificationEmailService *NotificationEmailService, telegramNotifySvc *TelegramNotifyService, lockCache LeaderLockCache, db *sql.DB) *SubscriptionExpiryService {
 	svc := NewSubscriptionExpiryService(userSubRepo, time.Minute)
 	svc.SetSettingRepository(settingRepo)
 	svc.SetNotificationEmailService(notificationEmailService)
+	svc.SetTelegramNotifyService(telegramNotifySvc)
 	svc.SetLeaderLock(lockCache, db)
 	svc.Start()
 	return svc
@@ -323,8 +326,10 @@ func ProvideOpsAlertEvaluatorService(
 	redisClient *redis.Client,
 	cfg *config.Config,
 	proxyRepo ProxyRepository,
+	telegramNotifySvc *TelegramNotifyService,
 ) *OpsAlertEvaluatorService {
 	svc := NewOpsAlertEvaluatorService(opsService, opsRepo, emailService, redisClient, cfg, proxyRepo)
+	svc.SetTelegramNotifyService(telegramNotifySvc)
 	svc.Start()
 	return svc
 }
@@ -551,6 +556,7 @@ func ProvideAuthService(
 	apiKeyService *APIKeyService,
 	userDeviceRepo UserDeviceRepository,
 	groupRepo GroupRepository,
+	telegramNotifySvc *TelegramNotifyService,
 ) *AuthService {
 	svc := NewAuthService(
 		entClient,
@@ -570,6 +576,7 @@ func ProvideAuthService(
 	svc.SetInviteBootstrapAPIKeyService(apiKeyService)
 	svc.SetInviteLoginDeviceResolver(userDeviceRepo)
 	svc.SetInviteBootstrapGroupRepository(groupRepo)
+	svc.SetTelegramNotifyService(telegramNotifySvc)
 	return svc
 }
 
@@ -683,6 +690,7 @@ var ProviderSet = wire.NewSet(
 	ProvidePaymentService,
 	ProvidePaymentOrderExpiryService,
 	ProvideBalanceNotifyService,
+	NewTelegramNotifyService,
 	ProvideChannelMonitorService,
 	ProvideChannelMonitorRunner,
 	ProvideVClawClaimService,
@@ -704,17 +712,19 @@ func ProvidePaymentConfigService(entClient *dbent.Client, settingRepo SettingRep
 }
 
 // ProvideBalanceNotifyService creates BalanceNotifyService
-func ProvideBalanceNotifyService(emailService *EmailService, settingRepo SettingRepository, accountRepo AccountRepository, notificationEmailService *NotificationEmailService) *BalanceNotifyService {
+func ProvideBalanceNotifyService(emailService *EmailService, settingRepo SettingRepository, accountRepo AccountRepository, notificationEmailService *NotificationEmailService, telegramNotifySvc *TelegramNotifyService) *BalanceNotifyService {
 	svc := NewBalanceNotifyService(emailService, settingRepo, accountRepo)
 	svc.SetNotificationEmailService(notificationEmailService)
+	svc.SetTelegramNotifyService(telegramNotifySvc)
 	return svc
 }
 
-// ProvidePaymentService creates PaymentService and attaches entitlement binding plus notification email delivery.
-func ProvidePaymentService(entClient *dbent.Client, registry *payment.Registry, loadBalancer payment.LoadBalancer, redeemService *RedeemService, subscriptionSvc *SubscriptionService, configService *PaymentConfigService, userRepo UserRepository, groupRepo GroupRepository, affiliateService *AffiliateService, entitlementService *EntitlementService, notificationEmailService *NotificationEmailService) *PaymentService {
+// ProvidePaymentService creates PaymentService and attaches entitlement binding, notification email delivery, and Telegram notifications.
+func ProvidePaymentService(entClient *dbent.Client, registry *payment.Registry, loadBalancer payment.LoadBalancer, redeemService *RedeemService, subscriptionSvc *SubscriptionService, configService *PaymentConfigService, userRepo UserRepository, groupRepo GroupRepository, affiliateService *AffiliateService, entitlementService *EntitlementService, notificationEmailService *NotificationEmailService, telegramNotifyService *TelegramNotifyService) *PaymentService {
 	svc := NewPaymentService(entClient, registry, loadBalancer, redeemService, subscriptionSvc, configService, userRepo, groupRepo, affiliateService)
 	svc.SetEntitlementBinder(entitlementService)
 	svc.SetNotificationEmailService(notificationEmailService)
+	svc.SetTelegramNotifyService(telegramNotifyService)
 	return svc
 }
 
