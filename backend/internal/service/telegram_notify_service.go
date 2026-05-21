@@ -149,6 +149,50 @@ func (s *TelegramNotifyService) InvalidateCache() {
 	s.mu.Unlock()
 }
 
+// SendTestMessageWithChatID sends a test message using the saved bot token but overriding the chat ID.
+// This allows testing delivery to a different chat without changing saved settings.
+func (s *TelegramNotifyService) SendTestMessageWithChatID(ctx context.Context, chatID string) error {
+	cfg, err := s.getConfig(ctx)
+	if err != nil {
+		return err
+	}
+	if cfg == nil {
+		return fmt.Errorf("telegram bot token is not configured")
+	}
+
+	text := fmt.Sprintf(
+		"\xe2\x9c\x85 <b>Telegram Bot Connected</b>\n\n"+
+			"Bot is configured and working correctly.\n"+
+			"\xf0\x9f\x94\x94 Time: %s",
+		time.Now().Format("2006-01-02 15:04:05"),
+	)
+
+	apiURL := telegramAPIBase + cfg.Token + telegramSendMethod
+
+	form := url.Values{}
+	form.Set("chat_id", chatID)
+	form.Set("text", text)
+	form.Set("parse_mode", "HTML")
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return fmt.Errorf("failed to create telegram request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send telegram message: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("telegram API returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 // --- Notification Methods ---
 
 // NotifyNewUser sends a notification when a new user registers.
