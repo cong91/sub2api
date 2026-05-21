@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -29,6 +30,8 @@ type ProxyRepository interface {
 	ExistsByHostPortAuth(ctx context.Context, host string, port int, username, password string) (bool, error)
 	CountAccountsByProxyID(ctx context.Context, proxyID int64) (int64, error)
 	ListAccountSummariesByProxyID(ctx context.Context, proxyID int64) ([]ProxyAccountSummary, error)
+	ListExpiringBefore(ctx context.Context, deadline time.Time) ([]Proxy, error)
+	DeactivateExpired(ctx context.Context, now time.Time) ([]Proxy, error)
 }
 
 // CreateProxyRequest 创建代理请求
