@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/oauth"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -95,6 +96,14 @@ func (m *mockProxyRepoForOAuth) CountAccountsByProxyID(ctx context.Context, prox
 }
 func (m *mockProxyRepoForOAuth) ListAccountSummariesByProxyID(ctx context.Context, proxyID int64) ([]ProxyAccountSummary, error) {
 	panic("ListAccountSummariesByProxyID not implemented")
+}
+
+func (m *mockProxyRepoForOAuth) ListExpiringBefore(ctx context.Context, deadline time.Time) ([]Proxy, error) {
+	return nil, nil
+}
+
+func (m *mockProxyRepoForOAuth) DeactivateExpired(ctx context.Context, now time.Time) ([]Proxy, error) {
+	return nil, nil
 }
 
 // =====================

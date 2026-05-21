@@ -598,6 +598,20 @@ export interface SystemSettings {
   // Affiliate (邀请返利) feature switch
   affiliate_enabled: boolean;
 
+  // Telegram Bot Notifications
+  telegram_bot_token_configured: boolean;
+  telegram_chat_id: string;
+  telegram_notify_new_user: boolean;
+  telegram_notify_account_error: boolean;
+  telegram_notify_account_expired: boolean;
+  telegram_notify_payment_success: boolean;
+  telegram_notify_payment_failed: boolean;
+  telegram_notify_refund: boolean;
+  telegram_notify_sub_expired: boolean;
+  telegram_notify_balance_low: boolean;
+  telegram_notify_ops_alert: boolean;
+  telegram_notify_proxy_expired: boolean;
+
   // OpenAI fast/flex policy
   openai_fast_policy_settings?: OpenAIFastPolicySettings;
 }
@@ -813,6 +827,20 @@ export interface UpdateSettingsRequest {
   // Affiliate (邀请返利) feature switch
   affiliate_enabled?: boolean;
 
+  // Telegram Bot Notifications
+  telegram_bot_token?: string;
+  telegram_chat_id?: string;
+  telegram_notify_new_user?: boolean;
+  telegram_notify_account_error?: boolean;
+  telegram_notify_account_expired?: boolean;
+  telegram_notify_payment_success?: boolean;
+  telegram_notify_payment_failed?: boolean;
+  telegram_notify_refund?: boolean;
+  telegram_notify_sub_expired?: boolean;
+  telegram_notify_balance_low?: boolean;
+  telegram_notify_ops_alert?: boolean;
+  telegram_notify_proxy_expired?: boolean;
+
   // OpenAI fast/flex policy
   openai_fast_policy_settings?: OpenAIFastPolicySettings;
 }
@@ -993,6 +1021,28 @@ export async function previewEmailTemplate(
   const { data } = await apiClient.post<EmailTemplatePreviewResponse>(
     "/admin/settings/email-template-preview",
     request,
+  );
+  return data;
+}
+
+/**
+ * Test Telegram bot connection request
+ */
+export interface TestTelegramRequest {
+  telegram_chat_id?: string;
+}
+
+/**
+ * Test Telegram bot connection using saved config (optionally override chat_id)
+ * @param request - Optional chat_id override
+ * @returns Test result message
+ */
+export async function testTelegramConnection(
+  request?: TestTelegramRequest,
+): Promise<{ message: string }> {
+  const { data } = await apiClient.post<{ message: string }>(
+    "/admin/settings/telegram/test",
+    request || {},
   );
   return data;
 }
@@ -1401,6 +1451,7 @@ export const settingsAPI = {
   getSettings,
   updateSettings,
   testSmtpConnection,
+  testTelegramConnection,
   sendTestEmail,
   getAdminApiKey,
   regenerateAdminApiKey,

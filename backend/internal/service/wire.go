@@ -186,6 +186,13 @@ func ProvideAccountExpiryService(accountRepo AccountRepository) *AccountExpirySe
 	return svc
 }
 
+// ProvideProxyExpiryService creates and starts ProxyExpiryService.
+func ProvideProxyExpiryService(proxyRepo ProxyRepository, settingRepo SettingRepository) *ProxyExpiryService {
+	svc := NewProxyExpiryService(proxyRepo, settingRepo, 10*time.Minute)
+	svc.Start()
+	return svc
+}
+
 // ProvideSubscriptionExpiryService creates and starts SubscriptionExpiryService.
 func ProvideSubscriptionExpiryService(userSubRepo UserSubscriptionRepository, settingRepo SettingRepository, notificationEmailService *NotificationEmailService) *SubscriptionExpiryService {
 	svc := NewSubscriptionExpiryService(userSubRepo, time.Minute)
@@ -497,6 +504,7 @@ func ProvideAuthService(
 	apiKeyService *APIKeyService,
 	userDeviceRepo UserDeviceRepository,
 	groupRepo GroupRepository,
+	telegramNotifySvc *TelegramNotifyService,
 ) *AuthService {
 	svc := NewAuthService(
 		entClient,
@@ -516,6 +524,7 @@ func ProvideAuthService(
 	svc.SetInviteBootstrapAPIKeyService(apiKeyService)
 	svc.SetInviteLoginDeviceResolver(userDeviceRepo)
 	svc.SetInviteBootstrapGroupRepository(groupRepo)
+	svc.SetTelegramNotifyService(telegramNotifySvc)
 	return svc
 }
 
@@ -628,6 +637,7 @@ var ProviderSet = wire.NewSet(
 	ProvidePaymentService,
 	ProvidePaymentOrderExpiryService,
 	ProvideBalanceNotifyService,
+	NewTelegramNotifyService,
 	ProvideChannelMonitorService,
 	ProvideChannelMonitorRunner,
 	ProvideVClawClaimService,
@@ -646,8 +656,6 @@ func ProvideBalanceNotifyService(emailService *EmailService, settingRepo Setting
 	svc.SetNotificationEmailService(notificationEmailService)
 	return svc
 }
-
-
 
 // ProvidePaymentOrderExpiryService creates and starts PaymentOrderExpiryService.
 func ProvidePaymentOrderExpiryService(paymentSvc *PaymentService) *PaymentOrderExpiryService {
