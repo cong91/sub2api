@@ -581,6 +581,8 @@ export default {
       wechatBrowserOnly: '当前微信登录流程仅支持在微信内置浏览器中继续。',
       wechatNotConfigured: '微信登录尚未配置。'
     },
+    dingtalkProviderName: '钉钉',
+    dingtalkCallbackPageTitle: '钉钉登录回调',
     linuxdoCallbackPageTitle: 'LinuxDo 登录回调',
     oidcCallbackPageTitle: 'OIDC 登录回调',
     oauthCallbackPageTitle: 'OAuth 回调',
