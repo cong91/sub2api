@@ -121,14 +121,6 @@ type OpsInsertErrorLogInput struct {
 	ResponseLatencyMs  *int64
 	TimeToFirstTokenMs *int64
 
-	RequestBodyJSON      *string // sanitized json string (not raw bytes)
-	RequestBodyTruncated bool
-	RequestBodyBytes     *int
-	RequestHeadersJSON   *string // optional json string
-
-	IsRetryable bool
-	RetryCount  int
-
 	CreatedAt time.Time
 }
 

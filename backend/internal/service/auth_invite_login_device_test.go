@@ -225,6 +225,7 @@ func TestProvideAuthServiceWiresInviteLoginDependencies(t *testing.T) {
 		apiKeyService,
 		userDeviceRepo,
 		groupRepo,
+		nil,
 	)
 
 	require.Same(t, apiKeyService, authService.inviteBootstrapAPIKeySvc)

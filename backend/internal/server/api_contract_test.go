@@ -1901,7 +1901,15 @@ func (stubProxyRepo) CountAccountsByProxyID(ctx context.Context, proxyID int64) 
 }
 
 func (stubProxyRepo) ListAccountSummariesByProxyID(ctx context.Context, proxyID int64) ([]service.ProxyAccountSummary, error) {
-	return nil, errors.New("not implemented")
+	return nil, nil
+}
+
+func (stubProxyRepo) ListExpiringBefore(ctx context.Context, deadline time.Time) ([]service.Proxy, error) {
+	return nil, nil
+}
+
+func (stubProxyRepo) DeactivateExpired(ctx context.Context, now time.Time) ([]service.Proxy, error) {
+	return nil, nil
 }
 
 type stubRedeemCodeRepo struct {
