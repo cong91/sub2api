@@ -122,7 +122,7 @@ func (s *TelegramNotifyService) sendMessage(ctx context.Context, text string) er
 	if err != nil {
 		return fmt.Errorf("failed to send telegram message: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("telegram API returned status %d", resp.StatusCode)
@@ -184,7 +184,7 @@ func (s *TelegramNotifyService) SendTestMessageWithChatID(ctx context.Context, c
 	if err != nil {
 		return fmt.Errorf("failed to send telegram message: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("telegram API returned status %d", resp.StatusCode)
