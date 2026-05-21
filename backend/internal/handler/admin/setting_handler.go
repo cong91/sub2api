@@ -1691,6 +1691,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
+	// Ensure DingTalk sync user attribute definitions exist after settings save.
+	h.ensureDingTalkSyncAttributes(c.Request.Context(), settings)
+
 	// Update OpenAI fast policy (stored under dedicated key, only when provided).
 	if req.OpenAIFastPolicySettings != nil {
 		if err := h.settingService.SetOpenAIFastPolicySettings(c.Request.Context(), openaiFastPolicySettingsFromDTO(req.OpenAIFastPolicySettings)); err != nil {
