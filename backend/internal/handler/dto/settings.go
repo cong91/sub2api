@@ -54,10 +54,26 @@ type SystemSettings struct {
 	TurnstileSecretKeyConfigured bool   `json:"turnstile_secret_key_configured"`
 	APIKeyACLTrustForwardedIP    bool   `json:"api_key_acl_trust_forwarded_ip"`
 
-	LinuxDoConnectEnabled                bool   `json:"linuxdo_connect_enabled"`
-	LinuxDoConnectClientID               string `json:"linuxdo_connect_client_id"`
-	LinuxDoConnectClientSecretConfigured bool   `json:"linuxdo_connect_client_secret_configured"`
-	LinuxDoConnectRedirectURL            string `json:"linuxdo_connect_redirect_url"`
+	LinuxDoConnectEnabled                  bool   `json:"linuxdo_connect_enabled"`
+	LinuxDoConnectClientID                 string `json:"linuxdo_connect_client_id"`
+	LinuxDoConnectClientSecretConfigured   bool   `json:"linuxdo_connect_client_secret_configured"`
+	LinuxDoConnectRedirectURL              string `json:"linuxdo_connect_redirect_url"`
+	DingTalkConnectEnabled                 bool   `json:"dingtalk_connect_enabled"`
+	DingTalkConnectClientID                string `json:"dingtalk_connect_client_id"`
+	DingTalkConnectClientSecretConfigured  bool   `json:"dingtalk_connect_client_secret_configured"`
+	DingTalkConnectRedirectURL             string `json:"dingtalk_connect_redirect_url"`
+	DingTalkConnectCorpRestrictionPolicy   string `json:"dingtalk_connect_corp_restriction_policy"`
+	DingTalkConnectInternalCorpID          string `json:"dingtalk_connect_internal_corp_id"`
+	DingTalkConnectBypassRegistration      bool   `json:"dingtalk_connect_bypass_registration"`
+	DingTalkConnectSyncCorpEmail           bool   `json:"dingtalk_connect_sync_corp_email"`
+	DingTalkConnectSyncDisplayName         bool   `json:"dingtalk_connect_sync_display_name"`
+	DingTalkConnectSyncDept                bool   `json:"dingtalk_connect_sync_dept"`
+	DingTalkConnectSyncCorpEmailAttrKey    string `json:"dingtalk_connect_sync_corp_email_attr_key"`
+	DingTalkConnectSyncDisplayNameAttrKey  string `json:"dingtalk_connect_sync_display_name_attr_key"`
+	DingTalkConnectSyncDeptAttrKey         string `json:"dingtalk_connect_sync_dept_attr_key"`
+	DingTalkConnectSyncCorpEmailAttrName   string `json:"dingtalk_connect_sync_corp_email_attr_name"`
+	DingTalkConnectSyncDisplayNameAttrName string `json:"dingtalk_connect_sync_display_name_attr_name"`
+	DingTalkConnectSyncDeptAttrName        string `json:"dingtalk_connect_sync_dept_attr_name"`
 
 	WeChatConnectEnabled                   bool   `json:"wechat_connect_enabled"`
 	WeChatConnectAppID                     string `json:"wechat_connect_app_id"`
@@ -157,6 +173,7 @@ type SystemSettings struct {
 	MaxClaudeCodeVersion string `json:"max_claude_code_version"`
 
 	AntigravityUserAgentVersion string `json:"antigravity_user_agent_version"`
+	OpenAICodexUserAgent        string `json:"openai_codex_user_agent"`
 
 	// 分组隔离
 	AllowUngroupedKeyScheduling bool `json:"allow_ungrouped_key_scheduling"`
@@ -234,6 +251,20 @@ type SystemSettings struct {
 	SubscriptionExpiryNotifyEnabled bool               `json:"subscription_expiry_notify_enabled"`
 	AccountQuotaNotifyEnabled       bool               `json:"account_quota_notify_enabled"`
 	AccountQuotaNotifyEmails        []NotifyEmailEntry `json:"account_quota_notify_emails"`
+
+	// Telegram bot notifications
+	TelegramBotTokenConfigured   bool   `json:"telegram_bot_token_configured"`
+	TelegramChatID               string `json:"telegram_chat_id"`
+	TelegramNotifyNewUser        bool   `json:"telegram_notify_new_user"`
+	TelegramNotifyAccountError   bool   `json:"telegram_notify_account_error"`
+	TelegramNotifyAccountExpired bool   `json:"telegram_notify_account_expired"`
+	TelegramNotifyPaymentSuccess bool   `json:"telegram_notify_payment_success"`
+	TelegramNotifyPaymentFailed  bool   `json:"telegram_notify_payment_failed"`
+	TelegramNotifyRefund         bool   `json:"telegram_notify_refund"`
+	TelegramNotifySubExpired     bool   `json:"telegram_notify_sub_expired"`
+	TelegramNotifyBalanceLow     bool   `json:"telegram_notify_balance_low"`
+	TelegramNotifyOpsAlert       bool   `json:"telegram_notify_ops_alert"`
+	TelegramNotifyProxyExpired   bool   `json:"telegram_notify_proxy_expired"`
 
 	// Channel Monitor feature switch
 	ChannelMonitorEnabled                bool `json:"channel_monitor_enabled"`
