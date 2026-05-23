@@ -13,6 +13,7 @@ const {
   showError,
   showSuccess,
   updateUser,
+  toggleStatus,
   authState
 } = vi.hoisted(() => ({
   listUsers: vi.fn(),
@@ -23,6 +24,7 @@ const {
   showError: vi.fn(),
   showSuccess: vi.fn(),
   updateUser: vi.fn(),
+  toggleStatus: vi.fn(),
   authState: {
     isAdmin: true,
     isMarketing: false
@@ -34,7 +36,7 @@ vi.mock('@/api/admin', () => ({
     users: {
       list: listUsers,
       update: updateUser,
-      toggleStatus: vi.fn(),
+      toggleStatus,
       delete: vi.fn()
     },
     groups: {
@@ -127,6 +129,7 @@ describe('admin UsersView', () => {
     showError.mockReset()
     showSuccess.mockReset()
     updateUser.mockReset()
+    toggleStatus.mockReset()
     authState.isAdmin = true
     authState.isMarketing = false
 
@@ -418,7 +421,7 @@ describe('admin UsersView', () => {
     expect(showSuccess).toHaveBeenCalledWith('admin.users.identityCodeCopied')
   })
 
-  it('lets marketing edit and block managed users from user management', async () => {
+  it('lets marketing edit and disable managed users from user management', async () => {
     authState.isAdmin = false
     authState.isMarketing = true
     listUsers.mockResolvedValue({
@@ -454,7 +457,7 @@ describe('admin UsersView', () => {
           Select: {
             props: ['modelValue', 'options', 'disabled'],
             emits: ['update:modelValue'],
-            template: `<button data-test="status-select" :disabled="disabled" @click="$emit('update:modelValue', 'blocked')">status</button>`
+            template: `<button data-test="status-select" :disabled="disabled" @click="$emit('update:modelValue', 'disabled')">status</button>`
           },
           UserAttributesConfigModal: true,
           UserConcurrencyCell: true,
@@ -479,7 +482,7 @@ describe('admin UsersView', () => {
     await statusSelect.trigger('click')
     await flushPromises()
 
-    expect(updateUser).toHaveBeenCalledWith(42, { status: 'blocked' })
+    expect(updateUser).toHaveBeenCalledWith(42, { status: 'disabled' })
     expect(showSuccess).toHaveBeenCalledWith('admin.users.statusUpdated')
   })
 })
