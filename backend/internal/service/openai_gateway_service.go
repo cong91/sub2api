@@ -2083,9 +2083,6 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 				}
 			}
 		}
-				}
-			}
-		}
 	}
 
 	// ============ Layer 3: Fallback wait ============
