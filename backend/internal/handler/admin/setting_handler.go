@@ -455,19 +455,22 @@ type UpdateSettingsRequest struct {
 	LinuxDoConnectRedirectURL  string `json:"linuxdo_connect_redirect_url"`
 
 	// DingTalk Connect OAuth 登录
-	DingTalkConnectEnabled                bool   `json:"dingtalk_connect_enabled"`
-	DingTalkConnectClientID               string `json:"dingtalk_connect_client_id"`
-	DingTalkConnectClientSecret           string `json:"dingtalk_connect_client_secret"`
-	DingTalkConnectRedirectURL            string `json:"dingtalk_connect_redirect_url"`
-	DingTalkConnectCorpRestrictionPolicy  string `json:"dingtalk_connect_corp_restriction_policy"`
-	DingTalkConnectInternalCorpID         string `json:"dingtalk_connect_internal_corp_id"`
-	DingTalkConnectBypassRegistration     bool   `json:"dingtalk_connect_bypass_registration"`
-	DingTalkConnectSyncCorpEmail          bool   `json:"dingtalk_connect_sync_corp_email"`
-	DingTalkConnectSyncDisplayName        bool   `json:"dingtalk_connect_sync_display_name"`
-	DingTalkConnectSyncDept               bool   `json:"dingtalk_connect_sync_dept"`
-	DingTalkConnectSyncCorpEmailAttrKey   string `json:"dingtalk_connect_sync_corp_email_attr_key"`
-	DingTalkConnectSyncDisplayNameAttrKey string `json:"dingtalk_connect_sync_display_name_attr_key"`
-	DingTalkConnectSyncDeptAttrKey        string `json:"dingtalk_connect_sync_dept_attr_key"`
+	DingTalkConnectEnabled                 bool   `json:"dingtalk_connect_enabled"`
+	DingTalkConnectClientID                string `json:"dingtalk_connect_client_id"`
+	DingTalkConnectClientSecret            string `json:"dingtalk_connect_client_secret"`
+	DingTalkConnectRedirectURL             string `json:"dingtalk_connect_redirect_url"`
+	DingTalkConnectCorpRestrictionPolicy   string `json:"dingtalk_connect_corp_restriction_policy"`
+	DingTalkConnectInternalCorpID          string `json:"dingtalk_connect_internal_corp_id"`
+	DingTalkConnectBypassRegistration      bool   `json:"dingtalk_connect_bypass_registration"`
+	DingTalkConnectSyncCorpEmail           bool   `json:"dingtalk_connect_sync_corp_email"`
+	DingTalkConnectSyncDisplayName         bool   `json:"dingtalk_connect_sync_display_name"`
+	DingTalkConnectSyncDept                bool   `json:"dingtalk_connect_sync_dept"`
+	DingTalkConnectSyncCorpEmailAttrKey    string `json:"dingtalk_connect_sync_corp_email_attr_key"`
+	DingTalkConnectSyncDisplayNameAttrKey  string `json:"dingtalk_connect_sync_display_name_attr_key"`
+	DingTalkConnectSyncDeptAttrKey         string `json:"dingtalk_connect_sync_dept_attr_key"`
+	DingTalkConnectSyncCorpEmailAttrName   string `json:"dingtalk_connect_sync_corp_email_attr_name"`
+	DingTalkConnectSyncDisplayNameAttrName string `json:"dingtalk_connect_sync_display_name_attr_name"`
+	DingTalkConnectSyncDeptAttrName        string `json:"dingtalk_connect_sync_dept_attr_name"`
 
 	// WeChat Connect OAuth 登录
 	WeChatConnectEnabled             bool   `json:"wechat_connect_enabled"`

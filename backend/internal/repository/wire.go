@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 
@@ -67,7 +68,7 @@ var ProviderSet = wire.NewSet(
 	NewUserRepository,
 	NewAPIKeyRepository,
 	NewGroupRepository,
-	NewAccountRepository,
+	ProvideAccountRepository,
 	NewScheduledTestPlanRepository,   // 定时测试计划仓储
 	NewScheduledTestResultRepository, // 定时测试结果仓储
 	NewProxyRepository,
@@ -151,6 +152,23 @@ var ProviderSet = wire.NewSet(
 	ProvideSQLDB,
 	ProvideRedis,
 )
+
+// ProvideAccountRepository wires account error Telegram notifications without
+// creating a service/repository construction cycle.
+func ProvideAccountRepository(client *ent.Client, sqlDB *sql.DB, schedulerCache service.SchedulerCache, telegramNotifyService *service.TelegramNotifyService) service.AccountRepository {
+	repo := NewAccountRepository(client, sqlDB, schedulerCache)
+	SetAccountRepoOnErrorHook(repo, func(ctx context.Context, id int64, errorMsg string) {
+		if telegramNotifyService == nil {
+			return
+		}
+		account, err := repo.GetByID(ctx, id)
+		if err != nil {
+			return
+		}
+		go telegramNotifyService.NotifyAccountError(context.Background(), id, account.Name, account.Platform, errorMsg)
+	})
+	return repo
+}
 
 // ProvideEnt 为依赖注入提供 Ent 客户端。
 //
