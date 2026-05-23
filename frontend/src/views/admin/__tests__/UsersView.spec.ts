@@ -13,6 +13,7 @@ const {
   showError,
   showSuccess,
   updateUser,
+  toggleStatus,
   authState
 } = vi.hoisted(() => ({
   listUsers: vi.fn(),
@@ -23,6 +24,7 @@ const {
   showError: vi.fn(),
   showSuccess: vi.fn(),
   updateUser: vi.fn(),
+  toggleStatus: vi.fn(),
   authState: {
     isAdmin: true,
     isMarketing: false
@@ -34,7 +36,7 @@ vi.mock('@/api/admin', () => ({
     users: {
       list: listUsers,
       update: updateUser,
-      toggleStatus: vi.fn(),
+      toggleStatus,
       delete: vi.fn()
     },
     groups: {
@@ -122,6 +124,7 @@ describe('admin UsersView', () => {
     showError.mockReset()
     showSuccess.mockReset()
     updateUser.mockReset()
+    toggleStatus.mockReset()
     authState.isAdmin = true
     authState.isMarketing = false
 
@@ -260,7 +263,7 @@ describe('admin UsersView', () => {
     expect(showSuccess).toHaveBeenCalledWith('admin.users.identityCodeCopied')
   })
 
-  it('lets marketing edit and block managed users from user management', async () => {
+  it('lets marketing edit and disable managed users from user management', async () => {
     authState.isAdmin = false
     authState.isMarketing = true
     listUsers.mockResolvedValue({
@@ -316,11 +319,15 @@ describe('admin UsersView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('common.edit')
-    expect(wrapper.get('[data-test="status-select"]').attributes('disabled')).toBeUndefined()
-    await wrapper.get('[data-test="status-select"]').trigger('click')
+    const disableButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('admin.users.disable'))
+    if (!disableButton) throw new Error('Disable button not rendered')
+
+    await disableButton.trigger('click')
     await flushPromises()
 
-    expect(updateUser).toHaveBeenCalledWith(42, { status: 'blocked' })
-    expect(showSuccess).toHaveBeenCalledWith('admin.users.statusUpdated')
+    expect(toggleStatus).toHaveBeenCalledWith(42, 'disabled')
+    expect(showSuccess).toHaveBeenCalledWith('admin.users.userDisabled')
   })
 })
