@@ -120,17 +120,17 @@ type Translate = (key: string, params?: Record<string, unknown>) => string
 const defaultTranslate: Translate = (key, params = {}) => {
   const messages: Record<string, string> = {
     'admin.channels.intervalValidation.minTokensNonNegative':
-      'Interval #{index}: minimum token count ({value}) cannot be negative',
+      '区间 #{index}: 最小 token 数 ({value}) 不能为负数',
     'admin.channels.intervalValidation.maxTokensPositive':
-      'Interval #{index}: maximum token count ({value}) must be greater than 0',
+      '区间 #{index}: 最大 token 数 ({value}) 必须大于 0',
     'admin.channels.intervalValidation.maxTokensGreaterThanMin':
-      'Interval #{index}: maximum token count ({max}) must be greater than minimum token count ({min})',
+      '区间 #{index}: 最大 token 数 ({max}) 必须大于最小 token 数 ({min})',
     'admin.channels.intervalValidation.priceNonNegative':
-      'Interval #{index}: {name} cannot be negative',
+      '区间 #{index}: {name}不能为负数',
     'admin.channels.intervalValidation.unboundedLast':
-      'Interval #{index}: unbounded interval (empty max tokens) can only be the last interval',
+      '区间 #{index}: 无上限区间（最大 token 数为空）只能是最后一个',
     'admin.channels.intervalValidation.overlap':
-      'Intervals #{prevIndex} and #{index} overlap: previous upper bound ({prevMax}) is greater than current lower bound ({min})',
+      '区间 #{prevIndex} 和 #{index} 重叠：前一个上限 ({prevMax}) 大于当前下限 ({min})',
   }
   const template = messages[key] ?? key
   return template.replace(/\{(\w+)\}/g, (_, param: string) => String(params[param] ?? ''))
@@ -145,9 +145,11 @@ const defaultTranslate: Translate = (key, params = {}) => {
  */
 export function validateIntervals(
   intervals: IntervalFormEntry[],
-  translate: Translate = defaultTranslate,
+  translateOrMode: Translate | BillingMode = defaultTranslate,
   mode: BillingMode = 'token',
 ): string | null {
+  const translate = typeof translateOrMode === 'function' ? translateOrMode : defaultTranslate
+  const validationMode = typeof translateOrMode === 'function' ? mode : translateOrMode
   if (!intervals || intervals.length === 0) return null
 
   const sorted = [...intervals].sort((a, b) => a.min_tokens - b.min_tokens)
@@ -158,7 +160,7 @@ export function validateIntervals(
   }
 
   // per_request / image 模式按 tier_label 匹配，不做 token 区间重叠校验
-  if (mode !== 'token') return null
+  if (validationMode !== 'token') return null
   return checkIntervalOverlap(sorted, translate)
 }
 
