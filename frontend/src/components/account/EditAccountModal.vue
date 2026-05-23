@@ -1570,6 +1570,28 @@
             {{ formatDateTime(new Date(String(account.extra.openai_compact_checked_at))) }}
           </span>
         </div>
+        <div class="flex items-center justify-between">
+          <div>
+            <label class="input-label mb-0">{{ t('admin.accounts.openai.responsesMode') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.openai.responsesModeDesc') }}
+            </p>
+          </div>
+          <div class="w-52">
+            <select
+              v-model="openAIResponsesMode"
+              class="input"
+              data-testid="openai-responses-mode-select"
+            >
+              <option v-for="option in openAIResponsesModeOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </div>
+        </div>
+        <div class="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-dark-700 dark:text-gray-300">
+          <span class="font-medium">{{ t(openAIResponsesStatusKey) }}</span>
+        </div>
         <div>
           <label class="input-label">{{ t('admin.accounts.openai.compactModelMapping') }}</label>
           <p class="input-hint">{{ t('admin.accounts.openai.compactModelMappingDesc') }}</p>
@@ -2350,7 +2372,7 @@ import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
 import { useQuotaNotifyState } from '@/composables/useQuotaNotifyState'
-import type { Account, Proxy, AdminGroup, CheckMixedChannelResponse, OpenAICompactMode } from '@/types'
+import type { Account, Proxy, AdminGroup, CheckMixedChannelResponse, OpenAICompactMode, OpenAIResponsesMode } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
@@ -2378,8 +2400,10 @@ import {
   getPresetMappingsByPlatform,
   commonErrorCodes,
   buildModelMappingObject,
+  splitModelMappingObject,
   isValidWildcardPattern
 } from '@/composables/useModelWhitelist'
+import type { ModelRestrictionMode } from '@/composables/useModelWhitelist'
 
 interface Props {
   show: boolean
@@ -2519,6 +2543,7 @@ const customBaseUrl = ref('')
 // OpenAI 自动透传开关（OAuth/API Key）
 const openaiPassthroughEnabled = ref(false)
 const openAICompactMode = ref<OpenAICompactMode>('auto')
+const openAIResponsesMode = ref<OpenAIResponsesMode>('auto')
 const openaiOAuthResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
 const openaiAPIKeyResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
 const codexCLIOnlyEnabled = ref(false)
@@ -2620,6 +2645,11 @@ const openAICompactModeOptions = computed(() => [
   { value: 'force_on', label: t('admin.accounts.openai.compactModeForceOn') },
   { value: 'force_off', label: t('admin.accounts.openai.compactModeForceOff') }
 ])
+const openAIResponsesModeOptions = computed(() => [
+  { value: 'auto', label: t('admin.accounts.openai.responsesModeAuto') },
+  { value: 'force_responses', label: t('admin.accounts.openai.responsesModeForceResponses') },
+  { value: 'force_chat_completions', label: t('admin.accounts.openai.responsesModeForceChatCompletions') }
+])
 const isOpenAIModelRestrictionDisabled = computed(() =>
   props.account?.platform === 'openai' && openaiPassthroughEnabled.value
 )
@@ -2635,6 +2665,19 @@ const openAICompactStatusKey = computed(() => {
       : 'admin.accounts.openai.compactUnsupported'
   }
   return 'admin.accounts.openai.compactAuto'
+})
+const openAIResponsesStatusKey = computed(() => {
+  const extra = props.account?.extra as Record<string, unknown> | undefined
+  if (!props.account || props.account.platform !== 'openai') return ''
+  const mode = typeof extra?.openai_responses_mode === 'string' ? extra.openai_responses_mode : 'auto'
+  if (mode === 'force_responses') return 'admin.accounts.openai.responsesSupported'
+  if (mode === 'force_chat_completions') return 'admin.accounts.openai.responsesUnsupported'
+  if (typeof extra?.openai_responses_supported === 'boolean') {
+    return extra.openai_responses_supported
+      ? 'admin.accounts.openai.responsesSupported'
+      : 'admin.accounts.openai.responsesUnsupported'
+  }
+  return 'admin.accounts.openai.responsesAuto'
 })
 
 // Computed: current preset mappings based on platform
@@ -2770,6 +2813,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   // Load OpenAI passthrough toggle (OpenAI OAuth/API Key)
   openaiPassthroughEnabled.value = false
   openAICompactMode.value = 'auto'
+  openAIResponsesMode.value = 'auto'
   openAICompactModelMappings.value = []
   openaiOAuthResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
   openaiAPIKeyResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
@@ -2780,6 +2824,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   if (newAccount.platform === 'openai' && (newAccount.type === 'oauth' || newAccount.type === 'apikey')) {
     openaiPassthroughEnabled.value = extra?.openai_passthrough === true || extra?.openai_oauth_passthrough === true
     openAICompactMode.value = (extra?.openai_compact_mode as OpenAICompactMode) || 'auto'
+    openAIResponsesMode.value = (extra?.openai_responses_mode as OpenAIResponsesMode) || 'auto'
     const codexImageGenerationBridgeValue = typeof extra?.codex_image_generation_bridge === 'boolean'
       ? extra.codex_image_generation_bridge
       : extra?.codex_image_generation_bridge_enabled
@@ -2911,20 +2956,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
         modelMappings.value = entries.map(([from, to]) => ({ from, to }))
         allowedModels.value = []
       } else {
-        // Detect if this is whitelist mode (all from === to) or mapping mode
-        const isWhitelistMode = entries.length > 0 && entries.every(([from, to]) => from === to)
-
-        if (isWhitelistMode) {
-          // Whitelist mode: populate allowedModels
-          modelRestrictionMode.value = 'whitelist'
-          allowedModels.value = entries.map(([from]) => from)
-          modelMappings.value = []
-        } else {
-          // Mapping mode: populate modelMappings
-          modelRestrictionMode.value = 'mapping'
-          modelMappings.value = entries.map(([from, to]) => ({ from, to }))
-          allowedModels.value = []
-        }
+        const split = splitModelMappingObject(existingMappings)
+        allowedModels.value = split.allowedModels
+        modelMappings.value = split.modelMappings
+        modelRestrictionMode.value = split.allowedModels.length > 0 ? 'whitelist' : 'mapping'
       }
     } else if (newAccount.platform === 'kiro') {
       fetchKiroDefaultMappings().then(mappings => {
@@ -3055,17 +3090,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       const oauthCredentials = newAccount.credentials as Record<string, unknown>
       const existingMappings = oauthCredentials.model_mapping as Record<string, string> | undefined
       if (existingMappings && typeof existingMappings === 'object') {
-        const entries = Object.entries(existingMappings)
-        const isWhitelistMode = entries.length > 0 && entries.every(([from, to]) => from === to)
-        if (isWhitelistMode) {
-          modelRestrictionMode.value = 'whitelist'
-          allowedModels.value = entries.map(([from]) => from)
-          modelMappings.value = []
-        } else {
-          modelRestrictionMode.value = 'mapping'
-          modelMappings.value = entries.map(([from, to]) => ({ from, to }))
-          allowedModels.value = []
-        }
+        const split = splitModelMappingObject(existingMappings)
+        allowedModels.value = split.allowedModels
+        modelMappings.value = split.modelMappings
+        modelRestrictionMode.value = split.allowedModels.length > 0 ? 'whitelist' : 'mapping'
       } else {
         modelRestrictionMode.value = 'whitelist'
         modelMappings.value = []
@@ -3569,8 +3597,11 @@ const handleSubmit = async () => {
         // User provided a new API key
         newCredentials.api_key = editApiKey.value.trim()
       } else if (currentCredentials.api_key) {
-        // Preserve existing api_key
+        // Legacy backend returned the current API key; keep it unchanged.
         newCredentials.api_key = currentCredentials.api_key
+      } else if (props.account.credentials_status?.has_api_key) {
+        // New backend redacts credentials; omit api_key so backend preserves it.
+        delete newCredentials.api_key
       } else {
         appStore.showError(t('admin.accounts.apiKeyIsRequired'))
         return
@@ -3578,8 +3609,14 @@ const handleSubmit = async () => {
 
       // Add model mapping if configured（OpenAI 开启自动透传时保留现有映射，不再编辑）
       if (shouldApplyModelMapping) {
+        const effectiveModelRestrictionMode: ModelRestrictionMode =
+          props.account.platform === 'kiro'
+            ? 'mapping'
+            : modelRestrictionMode.value === 'whitelist' && modelMappings.value.length > 0
+              ? 'combined'
+              : modelRestrictionMode.value
         const modelMapping = buildModelMappingObject(
-          props.account.platform === 'kiro' ? 'mapping' : modelRestrictionMode.value,
+          effectiveModelRestrictionMode,
           props.account.platform === 'kiro' ? [] : allowedModels.value,
           modelMappings.value
         )
@@ -3660,7 +3697,7 @@ const handleSubmit = async () => {
         return
       }
 
-      if (!currentCredentials.service_account_json && !currentCredentials.service_account) {
+      if (!currentCredentials.service_account_json && !currentCredentials.service_account && !props.account.credentials_status?.has_service_account_json) {
         appStore.showError(t('admin.accounts.vertexSaJsonRequired'))
         return
       }
@@ -3754,7 +3791,11 @@ const handleSubmit = async () => {
       const shouldApplyModelMapping = !openaiPassthroughEnabled.value
 
       if (shouldApplyModelMapping) {
-        const modelMapping = buildModelMappingObject(modelRestrictionMode.value, allowedModels.value, modelMappings.value)
+        const effectiveModelRestrictionMode: ModelRestrictionMode =
+          modelRestrictionMode.value === 'whitelist' && modelMappings.value.length > 0
+            ? 'combined'
+            : modelRestrictionMode.value
+        const modelMapping = buildModelMappingObject(effectiveModelRestrictionMode, allowedModels.value, modelMappings.value)
         if (modelMapping) {
           newCredentials.model_mapping = modelMapping
         } else {
@@ -3963,6 +4004,11 @@ const handleSubmit = async () => {
         delete newExtra.openai_compact_mode
       } else {
         newExtra.openai_compact_mode = openAICompactMode.value
+      }
+      if (openAIResponsesMode.value === 'auto') {
+        delete newExtra.openai_responses_mode
+      } else {
+        newExtra.openai_responses_mode = openAIResponsesMode.value
       }
 
       delete newExtra.codex_image_generation_bridge_enabled
