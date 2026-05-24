@@ -1570,7 +1570,7 @@
             {{ formatDateTime(new Date(String(account.extra.openai_compact_checked_at))) }}
           </span>
         </div>
-        <div class="flex items-center justify-between">
+        <div v-if="account?.type === 'apikey'" class="flex items-center justify-between">
           <div>
             <label class="input-label mb-0">{{ t('admin.accounts.openai.responsesMode') }}</label>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -1589,7 +1589,7 @@
             </select>
           </div>
         </div>
-        <div class="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-dark-700 dark:text-gray-300">
+        <div v-if="account?.type === 'apikey'" class="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-dark-700 dark:text-gray-300">
           <span class="font-medium">{{ t(openAIResponsesStatusKey) }}</span>
         </div>
         <div>
@@ -2650,6 +2650,12 @@ const openAIResponsesModeOptions = computed(() => [
   { value: 'force_responses', label: t('admin.accounts.openai.responsesModeForceResponses') },
   { value: 'force_chat_completions', label: t('admin.accounts.openai.responsesModeForceChatCompletions') }
 ])
+const normalizeOpenAIResponsesMode = (mode: unknown): OpenAIResponsesMode => {
+  if (mode === 'force_responses' || mode === 'force_chat_completions') {
+    return mode
+  }
+  return 'auto'
+}
 const isOpenAIModelRestrictionDisabled = computed(() =>
   props.account?.platform === 'openai' && openaiPassthroughEnabled.value
 )
@@ -2667,17 +2673,20 @@ const openAICompactStatusKey = computed(() => {
   return 'admin.accounts.openai.compactAuto'
 })
 const openAIResponsesStatusKey = computed(() => {
-  const extra = props.account?.extra as Record<string, unknown> | undefined
   if (!props.account || props.account.platform !== 'openai') return ''
-  const mode = typeof extra?.openai_responses_mode === 'string' ? extra.openai_responses_mode : 'auto'
-  if (mode === 'force_responses') return 'admin.accounts.openai.responsesSupported'
-  if (mode === 'force_chat_completions') return 'admin.accounts.openai.responsesUnsupported'
+  if (openAIResponsesMode.value === 'force_responses') {
+    return 'admin.accounts.openai.responsesStatusForcedResponses'
+  }
+  if (openAIResponsesMode.value === 'force_chat_completions') {
+    return 'admin.accounts.openai.responsesStatusForcedChatCompletions'
+  }
+  const extra = props.account?.extra as Record<string, unknown> | undefined
   if (typeof extra?.openai_responses_supported === 'boolean') {
     return extra.openai_responses_supported
-      ? 'admin.accounts.openai.responsesSupported'
-      : 'admin.accounts.openai.responsesUnsupported'
+      ? 'admin.accounts.openai.responsesStatusAutoSupported'
+      : 'admin.accounts.openai.responsesStatusAutoUnsupported'
   }
-  return 'admin.accounts.openai.responsesAuto'
+  return 'admin.accounts.openai.responsesStatusAutoUnknown'
 })
 
 // Computed: current preset mappings based on platform
@@ -2824,7 +2833,9 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   if (newAccount.platform === 'openai' && (newAccount.type === 'oauth' || newAccount.type === 'apikey')) {
     openaiPassthroughEnabled.value = extra?.openai_passthrough === true || extra?.openai_oauth_passthrough === true
     openAICompactMode.value = (extra?.openai_compact_mode as OpenAICompactMode) || 'auto'
-    openAIResponsesMode.value = (extra?.openai_responses_mode as OpenAIResponsesMode) || 'auto'
+    if (newAccount.type === 'apikey') {
+      openAIResponsesMode.value = normalizeOpenAIResponsesMode(extra?.openai_responses_mode)
+    }
     const codexImageGenerationBridgeValue = typeof extra?.codex_image_generation_bridge === 'boolean'
       ? extra.codex_image_generation_bridge
       : extra?.codex_image_generation_bridge_enabled
@@ -3697,7 +3708,7 @@ const handleSubmit = async () => {
         return
       }
 
-      if (!currentCredentials.service_account_json && !currentCredentials.service_account && !props.account.credentials_status?.has_service_account_json) {
+      if (!currentCredentials.service_account_json && !currentCredentials.service_account && !props.account.credentials_status?.has_service_account_json && !props.account.credentials_status?.has_service_account) {
         appStore.showError(t('admin.accounts.vertexSaJsonRequired'))
         return
       }
@@ -4005,10 +4016,12 @@ const handleSubmit = async () => {
       } else {
         newExtra.openai_compact_mode = openAICompactMode.value
       }
-      if (openAIResponsesMode.value === 'auto') {
-        delete newExtra.openai_responses_mode
-      } else {
-        newExtra.openai_responses_mode = openAIResponsesMode.value
+      if (props.account.type === 'apikey') {
+        if (openAIResponsesMode.value === 'auto') {
+          delete newExtra.openai_responses_mode
+        } else {
+          newExtra.openai_responses_mode = openAIResponsesMode.value
+        }
       }
 
       delete newExtra.codex_image_generation_bridge_enabled

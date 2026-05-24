@@ -3186,6 +3186,17 @@ export default {
         compactModeAuto: '자동',
         compactModeForceOn: '강제 활성화',
         compactModeForceOff: '강제 비활성화',
+        responsesMode: 'Responses API 지원',
+        responsesModeDesc:
+          'OpenAI API Key 계정에만 적용됩니다. Auto는 호환성 탐지 결과를 따르며, 업스트림이 /v1/responses를 지원하거나 거부한다는 점을 알고 있을 때만 경로를 강제하세요.',
+        responsesModeAuto: '자동',
+        responsesModeForceResponses: 'Responses 강제',
+        responsesModeForceChatCompletions: 'Chat Completions 강제',
+        responsesStatusAutoSupported: '자동 탐지: Responses',
+        responsesStatusAutoUnsupported: '자동 탐지: Chat Completions',
+        responsesStatusAutoUnknown: '자동 탐지: 알 수 없음',
+        responsesStatusForcedResponses: 'Responses 강제됨',
+        responsesStatusForcedChatCompletions: 'Chat Completions 강제됨',
         compactModelMapping: 'Compact 전용 모델 매핑',
         compactModelMappingDesc:
           '오직 /responses/compact 요청에서만 적용됩니다. 업스트림 compact 엔드포인트에 특수 compact 모델이 필요할 때 사용합니다.',

@@ -3485,6 +3485,17 @@ export default {
         compactModeAuto: '自动',
         compactModeForceOn: '强制开启',
         compactModeForceOff: '强制关闭',
+        responsesMode: 'Responses API 支持',
+        responsesModeDesc:
+          '仅对 OpenAI API Key 账号生效。自动模式跟随兼容性探测；只有明确知道上游支持或不支持 /v1/responses 时才强制路由。',
+        responsesModeAuto: '自动',
+        responsesModeForceResponses: '强制 Responses',
+        responsesModeForceChatCompletions: '强制 Chat Completions',
+        responsesStatusAutoSupported: '自动探测：Responses',
+        responsesStatusAutoUnsupported: '自动探测：Chat Completions',
+        responsesStatusAutoUnknown: '自动探测：未探测',
+        responsesStatusForcedResponses: '已强制 Responses',
+        responsesStatusForcedChatCompletions: '已强制 Chat Completions',
         compactModelMapping: 'Compact 专属模型映射',
         compactModelMappingDesc:
           '仅在 /responses/compact 请求中生效。当上游 compact 端点需要特殊 compact 模型时使用。',

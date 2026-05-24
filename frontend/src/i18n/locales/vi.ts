@@ -3186,6 +3186,17 @@ export default {
         compactModeAuto: 'Tự động',
         compactModeForceOn: 'Buộc bật',
         compactModeForceOff: 'Buộc tắt',
+        responsesMode: 'Hỗ trợ Responses API',
+        responsesModeDesc:
+          'Chỉ áp dụng cho tài khoản OpenAI API Key. Auto bám theo kết quả dò tương thích; chỉ ép route khi chắc chắn upstream hỗ trợ hoặc không hỗ trợ /v1/responses.',
+        responsesModeAuto: 'Tự động',
+        responsesModeForceResponses: 'Buộc dùng Responses',
+        responsesModeForceChatCompletions: 'Buộc dùng Chat Completions',
+        responsesStatusAutoSupported: 'Dò tự động: Responses',
+        responsesStatusAutoUnsupported: 'Dò tự động: Chat Completions',
+        responsesStatusAutoUnknown: 'Dò tự động: chưa rõ',
+        responsesStatusForcedResponses: 'Đã buộc Responses',
+        responsesStatusForcedChatCompletions: 'Đã buộc Chat Completions',
         compactModelMapping: 'Ánh xạ model riêng cho Compact',
         compactModelMappingDesc:
           'Chỉ có hiệu lực với request /responses/compact. Dùng khi endpoint compact phía upstream yêu cầu compact model đặc biệt.',
