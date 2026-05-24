@@ -454,6 +454,13 @@ func (s *SubscriptionService) assignSubscriptionWithReuse(ctx context.Context, i
 		if getErr != nil {
 			return nil, false, getErr
 		}
+		if isExpiredSubscription(sub, time.Now()) {
+			renewed, renewErr := s.renewExpiredSubscription(ctx, sub, input)
+			if renewErr != nil {
+				return nil, false, renewErr
+			}
+			return renewed, true, nil
+		}
 		if conflictReason, conflict := detectAssignSemanticConflict(sub, input); conflict {
 			return nil, false, ErrSubscriptionAssignConflict.WithMetadata(map[string]string{
 				"conflict_reason": conflictReason,
@@ -479,6 +486,39 @@ func (s *SubscriptionService) assignSubscriptionWithReuse(ctx context.Context, i
 	}
 
 	return sub, false, nil
+}
+
+func (s *SubscriptionService) renewExpiredSubscription(ctx context.Context, existingSub *UserSubscription, input *AssignSubscriptionInput) (*UserSubscription, error) {
+	if existingSub == nil || input == nil {
+		return nil, ErrSubscriptionNilInput
+	}
+
+	startsAt := time.Now()
+	expiresAt := startsAt.AddDate(0, 0, normalizeAssignValidityDays(input.ValidityDays))
+	if expiresAt.After(MaxExpiresAt) {
+		expiresAt = MaxExpiresAt
+	}
+	if err := s.updateExistingSubscriptionTerm(ctx, existingSub, input.Notes, startsAt, expiresAt, true); err != nil {
+		return nil, err
+	}
+
+	s.InvalidateSubCache(input.UserID, input.GroupID)
+	if s.billingCacheService != nil {
+		userID, groupID := input.UserID, input.GroupID
+		go func() {
+			cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = s.billingCacheService.InvalidateSubscription(cacheCtx, userID, groupID)
+		}()
+	}
+	return s.userSubRepo.GetByID(ctx, existingSub.ID)
+}
+
+func isExpiredSubscription(sub *UserSubscription, now time.Time) bool {
+	if sub == nil {
+		return false
+	}
+	return sub.Status == SubscriptionStatusExpired || !sub.ExpiresAt.After(now)
 }
 
 func detectAssignSemanticConflict(existing *UserSubscription, input *AssignSubscriptionInput) (string, bool) {
