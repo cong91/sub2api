@@ -21,6 +21,12 @@ func APIKeyAuthGoogle(apiKeyService *service.APIKeyService, cfg *config.Config) 
 //
 // It is intended for Gemini native endpoints (/v1beta) to match Gemini SDK expectations.
 func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) gin.HandlerFunc {
+	return APIKeyAuthWithSubscriptionGoogleAndEntitlements(apiKeyService, subscriptionService, nil, cfg)
+}
+
+// APIKeyAuthWithSubscriptionGoogleAndEntitlements enables server-side entitlement auto-switch
+// for Gemini-native gateway traffic while preserving Google-style errors when no fallback exists.
+func APIKeyAuthWithSubscriptionGoogleAndEntitlements(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, entitlementService *service.EntitlementService, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if v := strings.TrimSpace(c.Query("api_key")); v != "" {
 			abortWithGoogleError(c, 400, "Query parameter api_key is deprecated. Use Authorization header or key instead.")
@@ -46,7 +52,9 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		// user/group/platform。
 		SetOpsFallbackAPIKey(c, apiKey)
 
-		if !apiKey.IsActive() {
+		if !apiKey.IsActive() &&
+			apiKey.Status != service.StatusAPIKeyExpired &&
+			apiKey.Status != service.StatusAPIKeyQuotaExhausted {
 			abortWithGoogleError(c, 401, "API key is disabled")
 			return
 		}
@@ -79,8 +87,31 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		}
 
 		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+		if apiKey.Status == service.StatusAPIKeyQuotaExhausted {
+			if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "api_key_quota_exhausted", "API_KEY_QUOTA_EXHAUSTED", true, false); ok {
+				apiKey = switchedKey
+				isSubscriptionType = apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+			} else {
+				abortWithGoogleBillingError(c, 429, "API_KEY_QUOTA_EXHAUSTED", "API key 额度已用完")
+				return
+			}
+		}
+		if apiKey.Status == service.StatusAPIKeyExpired || apiKey.IsExpired() {
+			abortWithGoogleError(c, 403, "API key 已过期")
+			return
+		}
+		if apiKey.IsQuotaExhausted() {
+			if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "api_key_quota_exhausted", "API_KEY_QUOTA_EXHAUSTED", true, false); ok {
+				apiKey = switchedKey
+				isSubscriptionType = apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+			} else {
+				abortWithGoogleBillingError(c, 429, "API_KEY_QUOTA_EXHAUSTED", "API key 额度已用完")
+				return
+			}
+		}
+		var subscription *service.UserSubscription
 		if isSubscriptionType && subscriptionService != nil {
-			subscription, err := subscriptionService.GetActiveSubscription(
+			subscription, err = subscriptionService.GetActiveSubscription(
 				c.Request.Context(),
 				apiKey.User.ID,
 				apiKey.Group.ID,
@@ -97,20 +128,32 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 					errors.Is(err, service.ErrWeeklyLimitExceeded) ||
 					errors.Is(err, service.ErrMonthlyLimitExceeded) {
 					status = 429
+					code := "USAGE_LIMIT_EXCEEDED"
+					if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "subscription_limit_exceeded", code, true, true); ok {
+						apiKey = switchedKey
+						subscription = nil
+					} else {
+						abortWithGoogleBillingError(c, status, code, err.Error())
+						return
+					}
+				} else {
+					abortWithGoogleError(c, status, err.Error())
+					return
 				}
-				abortWithGoogleError(c, status, err.Error())
-				return
 			}
 
-			c.Set(string(ContextKeySubscription), subscription)
+			if subscription != nil {
+				c.Set(string(ContextKeySubscription), subscription)
+			}
 
-			if needsMaintenance {
+			if subscription != nil && needsMaintenance {
 				maintenanceCopy := *subscription
 				subscriptionService.DoWindowMaintenance(&maintenanceCopy)
 			}
-		} else {
+		}
+		if subscription == nil {
 			if apiKey.User.Balance <= 0 {
-				abortWithGoogleError(c, 403, "Insufficient account balance")
+				abortWithGoogleBillingError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
 				return
 			}
 		}
@@ -173,6 +216,19 @@ func abortWithGoogleError(c *gin.Context, status int, message string) {
 			"message": message,
 			"status":  googleapi.HTTPStatusToGoogleStatus(status),
 		},
+	})
+	c.Abort()
+}
+
+func abortWithGoogleBillingError(c *gin.Context, status int, code, message string) {
+	setBillingErrorHeaders(c, code)
+	c.JSON(status, gin.H{
+		"error": gin.H{
+			"code":    status,
+			"message": message,
+			"status":  googleapi.HTTPStatusToGoogleStatus(status),
+		},
+		"metadata": billingErrorMetadata(code),
 	})
 	c.Abort()
 }
