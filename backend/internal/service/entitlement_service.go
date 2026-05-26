@@ -704,10 +704,6 @@ func selectAutoSwitchCurrentAPIKey(keys []APIKey, requested *int64) *APIKey {
 	return selectCurrentAPIKey(keys)
 }
 
-func autoSwitchUnavailable(reason string) error {
-	return autoSwitchUnavailableWithMetadata(reason, nil)
-}
-
 func autoSwitchUnavailableWithMetadata(reason string, metadata map[string]string) error {
 	md := map[string]string{
 		"reason": reason,
