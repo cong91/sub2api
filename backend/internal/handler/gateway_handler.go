@@ -261,6 +261,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
+		setBillingResponseHeaders(c, billingResponseMetadata(code))
 		h.handleStreamingAwareError(c, status, code, message, streamStarted)
 		return
 	}
@@ -847,6 +848,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 							if retryAfter > 0 {
 								c.Header("Retry-After", strconv.Itoa(retryAfter))
 							}
+							setBillingResponseHeaders(c, billingResponseMetadata(code))
 							h.handleStreamingAwareError(c, status, code, message, streamStarted)
 							return
 						}
@@ -1746,6 +1748,7 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
+		setBillingResponseHeaders(c, billingResponseMetadata(code))
 		h.errorResponse(c, status, code, message)
 		return
 	}
@@ -2026,6 +2029,20 @@ func billingErrorDetails(err error) (status int, code, message string, retryAfte
 			msg = "Billing service temporarily unavailable. Please retry later."
 		}
 		return http.StatusServiceUnavailable, "billing_service_error", msg, 0
+	}
+	if errors.Is(err, service.ErrDailyLimitExceeded) || errors.Is(err, service.ErrWeeklyLimitExceeded) || errors.Is(err, service.ErrMonthlyLimitExceeded) {
+		msg := pkgerrors.Message(err)
+		if msg == "" {
+			msg = "Subscription usage limit exceeded"
+		}
+		return http.StatusTooManyRequests, "subscription_limit_exceeded", msg, 0
+	}
+	if errors.Is(err, service.ErrInsufficientBalance) {
+		msg := pkgerrors.Message(err)
+		if msg == "" {
+			msg = "Insufficient account balance"
+		}
+		return http.StatusForbidden, "insufficient_balance", msg, 0
 	}
 	if errors.Is(err, service.ErrAPIKeyRateLimit5hExceeded) {
 		msg := pkgerrors.Message(err)
