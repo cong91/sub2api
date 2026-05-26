@@ -371,6 +371,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
+		setBillingResponseHeaders(c, billingResponseMetadata(code))
 		h.handleStreamingAwareError(c, status, code, message, streamStarted)
 		return
 	}
@@ -930,6 +931,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
+		setBillingResponseHeaders(c, billingResponseMetadata(code))
 		h.anthropicStreamingAwareError(c, status, code, message, streamStarted)
 		return
 	}
