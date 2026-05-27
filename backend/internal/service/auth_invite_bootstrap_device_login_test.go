@@ -41,29 +41,6 @@ func TestSelectInviteBootstrapGroupsForDevicePreferSubscription(t *testing.T) {
 	require.Equal(t, balanceOtherPlatform.ID, selected["anthropic"].ID)
 }
 
-func TestSelectInviteBootstrapGroupsForDevicePrefersBasicBalanceGroupByLargestMultiplier(t *testing.T) {
-	basic := Group{
-		ID:                 21,
-		Platform:           "openai",
-		Status:             StatusActive,
-		SubscriptionType:   SubscriptionTypeStandard,
-		RateMultiplier:     0.30,
-		ActiveAccountCount: 2,
-	}
-	discounted := Group{
-		ID:                 22,
-		Platform:           "openai",
-		Status:             StatusActive,
-		SubscriptionType:   SubscriptionTypeStandard,
-		RateMultiplier:     0.10,
-		ActiveAccountCount: 2,
-	}
-
-	selected := selectInviteBootstrapGroupsForDevice([]Group{discounted, basic})
-
-	require.Equal(t, basic.ID, selected["openai"].ID)
-}
-
 func TestIsDeviceBootstrapGroupBetterPrefsSubscription(t *testing.T) {
 	sub := Group{SubscriptionType: SubscriptionTypeSubscription, DefaultValidityDays: 30}
 	std := Group{SubscriptionType: SubscriptionTypeStandard, RateMultiplier: 0.5}

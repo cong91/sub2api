@@ -552,9 +552,7 @@ func (s *AuthService) provisionInviteBootstrapAPIKeysForDevice(ctx context.Conte
 		return nil, ErrBootstrapAPIKeyUnavailable
 	}
 
-	// Select basic balance group per platform. For V-Claw balance groups,
-	// larger rate_multiplier is the least-discounted/basic package; lower
-	// multipliers are higher-tier discounted packages.
+	// Select best group per platform (prefer subscription type, then lower rate)
 	selected := selectInviteBootstrapGroupsForDevice(groups)
 	if len(selected) == 0 {
 		return nil, ErrBootstrapAPIKeyUnavailable
@@ -592,9 +590,8 @@ func (s *AuthService) provisionInviteBootstrapAPIKeysForDevice(ctx context.Conte
 	return keys, nil
 }
 
-// selectInviteBootstrapGroupsForDevice selects the basic group per platform for device login.
-// Prefers subscription-type groups; among standard balance groups, chooses the
-// largest rate_multiplier because that is the basic/minimal package.
+// selectInviteBootstrapGroupsForDevice selects the best group per platform for device login.
+// Prefers subscription-type groups; among same type, prefers longer validity or lower rate.
 func selectInviteBootstrapGroupsForDevice(groups []Group) map[string]Group {
 	selected := make(map[string]Group)
 	for _, group := range groups {
@@ -620,7 +617,7 @@ func isDeviceBootstrapGroupBetter(a, b Group) bool {
 			return a.DefaultValidityDays > b.DefaultValidityDays
 		}
 	} else if a.RateMultiplier != b.RateMultiplier {
-		return a.RateMultiplier > b.RateMultiplier
+		return a.RateMultiplier < b.RateMultiplier
 	}
 	return a.ID < b.ID
 }
