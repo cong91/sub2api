@@ -1245,7 +1245,12 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	if err := h.billingCacheService.CheckBillingEligibility(ctx, apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
 		reqLog.Info("openai.websocket_billing_eligibility_check_failed", zap.Error(err))
-		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "billing check failed")
+		writeOpenAIWSBillingError(ctx, wsConn, err)
+		_, code, _, _ := billingErrorDetails(err)
+		if code == "" {
+			code = "billing_error"
+		}
+		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "billing check failed: "+code)
 		return
 	}
 
@@ -1789,6 +1794,18 @@ func closeOpenAIClientWS(conn *coderws.Conn, status coderws.StatusCode, reason s
 	}
 	_ = conn.Close(status, reason)
 	_ = conn.CloseNow()
+}
+
+func writeOpenAIWSBillingError(ctx context.Context, conn *coderws.Conn, err error) {
+	if conn == nil {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	writeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	_ = conn.Write(writeCtx, coderws.MessageText, openAIWSBillingErrorPayload(err))
 }
 
 func writeContentModerationWSError(ctx context.Context, conn *coderws.Conn, decision *service.ContentModerationDecision) {

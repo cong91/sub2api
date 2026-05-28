@@ -1577,6 +1577,9 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 	// 校验 billing eligibility（订阅/余额）
 	// 【注意】不计算并发，但需要校验订阅/余额
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+		if respondBillingAsAssistantMessage(c, err, billingProtocolAnthropicError, false) {
+			return
+		}
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))

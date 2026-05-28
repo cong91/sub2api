@@ -9,13 +9,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
 const (
 	billingProtocolAnthropic       = "anthropic"
+	billingProtocolAnthropicError  = "anthropic-error"
+	billingProtocolGemini          = "gemini"
+	billingProtocolGeminiError     = "gemini-error"
 	billingProtocolOpenAIChat      = "openai"
+	billingProtocolOpenAIImages    = "openai-images"
 	billingProtocolOpenAIResponses = "openai-responses"
 )
 
@@ -98,7 +103,11 @@ func billingFriendlyAction(code string, retryAfter int) string {
 //
 // protocol values:
 //   - "anthropic" for /v1/messages
+//   - "anthropic-error" for non-generation Anthropic endpoints such as /v1/messages/count_tokens
+//   - "gemini" for /v1beta/models/*:generateContent and *:streamGenerateContent
+//   - "gemini-error" for non-generation Gemini model actions such as countTokens
 //   - "openai" for /v1/chat/completions
+//   - "openai-images" for /v1/images/generations and /v1/images/edits
 //   - "openai-responses" for /v1/responses
 //
 // stream must match the inbound request stream flag; returning non-stream JSON to
@@ -121,12 +130,28 @@ func respondBillingAsAssistantMessage(c *gin.Context, err error, protocol string
 			return true
 		}
 		respondAnthropicBillingMessage(c, msg, metadata)
+	case billingProtocolAnthropicError:
+		respondAnthropicBillingError(c, msg, metadata, err)
+	case billingProtocolGemini:
+		if stream {
+			respondGeminiBillingStream(c, msg, metadata)
+			return true
+		}
+		respondGeminiBillingMessage(c, msg, metadata)
+	case billingProtocolGeminiError:
+		respondGeminiBillingError(c, msg, metadata, err)
 	case billingProtocolOpenAIChat:
 		if stream {
 			respondOpenAIChatBillingStream(c, msg, metadata)
 			return true
 		}
 		respondOpenAIChatBillingMessage(c, msg, metadata)
+	case billingProtocolOpenAIImages:
+		if stream {
+			respondOpenAIImagesBillingStream(c, msg, metadata)
+			return true
+		}
+		respondOpenAIImagesBillingError(c, msg, metadata, err)
 	case billingProtocolOpenAIResponses:
 		if stream {
 			respondOpenAIResponsesBillingStream(c, msg, metadata)
@@ -200,6 +225,90 @@ func respondAnthropicBillingMessage(c *gin.Context, message string, metadata bil
 			"output_tokens": 0,
 		},
 	})
+}
+
+func respondAnthropicBillingError(c *gin.Context, message string, metadata billingMetadata, err error) {
+	status, code, _, _ := billingErrorDetails(err)
+	c.JSON(status, gin.H{
+		"type": "error",
+		"error": gin.H{
+			"type":    code,
+			"message": message,
+		},
+		"metadata": billingResponseMetadataBody(metadata),
+	})
+}
+
+func respondGeminiBillingMessage(c *gin.Context, message string, metadata billingMetadata) {
+	c.JSON(http.StatusOK, geminiBillingGenerateContentPayload(message, metadata))
+}
+
+func respondGeminiBillingError(c *gin.Context, message string, metadata billingMetadata, err error) {
+	status, _, _, _ := billingErrorDetails(err)
+	c.JSON(status, gin.H{
+		"error": gin.H{
+			"code":    status,
+			"message": message,
+			"status":  googleapi.HTTPStatusToGoogleStatus(status),
+		},
+		"metadata": billingResponseMetadataBody(metadata),
+	})
+}
+
+func respondOpenAIImagesBillingError(c *gin.Context, message string, metadata billingMetadata, err error) {
+	status, code, _, _ := billingErrorDetails(err)
+	c.JSON(status, gin.H{
+		"error": gin.H{
+			"type":    code,
+			"code":    code,
+			"message": message,
+		},
+		"metadata": billingResponseMetadataBody(metadata),
+	})
+}
+
+func geminiBillingGenerateContentPayload(message string, metadata billingMetadata) gin.H {
+	return gin.H{
+		"candidates": []gin.H{
+			{
+				"index": 0,
+				"content": gin.H{
+					"role": "model",
+					"parts": []gin.H{
+						{"text": message},
+					},
+				},
+				"finishReason": "STOP",
+			},
+		},
+		"metadata": billingResponseMetadataBody(metadata),
+		"usageMetadata": gin.H{
+			"promptTokenCount":     0,
+			"candidatesTokenCount": 0,
+			"totalTokenCount":      0,
+		},
+	}
+}
+
+func openAIWSBillingErrorPayload(err error) []byte {
+	msg := billingFriendlyMessage(err)
+	_, code, _, retryAfter := billingErrorDetails(err)
+	metadata := billingResponseMetadata(code)
+	metadata.RetryAfter = retryAfter
+	payload, marshalErr := json.Marshal(gin.H{
+		"event_id": "evt_sub2api_billing_blocked",
+		"type":     "error",
+		"error": gin.H{
+			"type":    code,
+			"code":    code,
+			"message": msg,
+		},
+		"metadata": billingResponseMetadataBody(metadata),
+	})
+	if marshalErr != nil {
+		return []byte(`{"event_id":"evt_sub2api_billing_blocked","type":"error","error":{"type":"billing_error","code":"billing_error","message":"sub2api billing blocked this request"}}`)
+	}
+	return payload
 }
 
 // respondOpenAIChatBillingMessage writes a valid OpenAI Chat Completions API response
@@ -412,6 +521,24 @@ func respondOpenAIResponsesBillingStream(c *gin.Context, message string, metadat
 				"total_tokens":  0,
 			},
 		}),
+	})
+}
+
+func respondGeminiBillingStream(c *gin.Context, message string, metadata billingMetadata) {
+	prepareBillingEventStream(c)
+	writeSSEData(c, geminiBillingGenerateContentPayload(message, metadata))
+}
+
+func respondOpenAIImagesBillingStream(c *gin.Context, message string, metadata billingMetadata) {
+	prepareBillingEventStream(c)
+	writeSSEEvent(c, "error", gin.H{
+		"type": "error",
+		"error": gin.H{
+			"type":    metadata.Code,
+			"code":    metadata.Code,
+			"message": message,
+		},
+		"metadata": billingResponseMetadataBody(metadata),
 	})
 }
 
