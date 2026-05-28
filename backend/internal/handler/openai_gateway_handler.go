@@ -245,7 +245,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// 2. Re-check billing eligibility after wait
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
 		reqLog.Info("openai.billing_eligibility_check_failed", zap.Error(err))
-		if !streamStarted && respondBillingAsAssistantMessage(c, err, "openai") {
+		if !streamStarted && respondBillingAsAssistantMessage(c, err, billingProtocolOpenAIResponses, reqStream) {
 			return
 		}
 		status, code, message, retryAfter := billingErrorDetails(err)
@@ -654,7 +654,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
 		reqLog.Info("openai_messages.billing_eligibility_check_failed", zap.Error(err))
-		if !streamStarted && respondBillingAsAssistantMessage(c, err, "anthropic") {
+		if !streamStarted && respondBillingAsAssistantMessage(c, err, billingProtocolAnthropic, reqStream) {
 			return
 		}
 		status, code, message, retryAfter := billingErrorDetails(err)

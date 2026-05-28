@@ -252,7 +252,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	// 2. 【新增】Wait后二次检查余额/订阅
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
 		reqLog.Info("gateway.billing_eligibility_check_failed", zap.Error(err))
-		if !streamStarted && respondBillingAsAssistantMessage(c, err, "anthropic") {
+		if !streamStarted && respondBillingAsAssistantMessage(c, err, billingProtocolAnthropic, parsedReq.Stream) {
 			return
 		}
 		status, code, message, retryAfter := billingErrorDetails(err)
@@ -813,7 +813,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						}
 						fallbackAPIKey := cloneAPIKeyWithGroup(apiKey, fallbackGroup)
 						if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), fallbackAPIKey.User, fallbackAPIKey, fallbackGroup, nil); err != nil {
-							if !streamStarted && respondBillingAsAssistantMessage(c, err, "anthropic") {
+							if !streamStarted && respondBillingAsAssistantMessage(c, err, billingProtocolAnthropic, parsedReq.Stream) {
 								return
 							}
 							status, code, message, retryAfter := billingErrorDetails(err)
