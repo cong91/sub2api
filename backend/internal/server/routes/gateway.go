@@ -5,6 +5,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -311,9 +312,19 @@ func RegisterGatewayRoutes(
 
 // getGroupPlatform extracts the group platform from the API Key stored in context.
 func getGroupPlatform(c *gin.Context) string {
-	apiKey, ok := middleware.GetAPIKeyFromContext(c)
-	if !ok || apiKey.Group == nil {
+	group, ok := c.Request.Context().Value(ctxkey.Group).(*service.Group)
+	if !ok || group == nil {
 		return ""
 	}
-	return apiKey.Group.Platform
+	return group.Platform
+}
+
+func rejectGrokUnsupportedEndpoint(c *gin.Context, endpoint string) {
+	service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
+	c.JSON(http.StatusNotFound, gin.H{
+		"error": gin.H{
+			"type":    "not_found_error",
+			"message": endpoint + " is not supported for Grok",
+		},
+	})
 }
