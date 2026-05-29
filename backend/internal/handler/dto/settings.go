@@ -172,9 +172,6 @@ type SystemSettings struct {
 	MinClaudeCodeVersion string `json:"min_claude_code_version"`
 	MaxClaudeCodeVersion string `json:"max_claude_code_version"`
 
-	AntigravityUserAgentVersion string `json:"antigravity_user_agent_version"`
-	OpenAICodexUserAgent        string `json:"openai_codex_user_agent"`
-
 	// 分组隔离
 	AllowUngroupedKeyScheduling bool `json:"allow_ungrouped_key_scheduling"`
 
@@ -187,6 +184,7 @@ type SystemSettings struct {
 	EnableCCHSigning                   bool   `json:"enable_cch_signing"`
 	EnableAnthropicCacheTTL1hInjection bool   `json:"enable_anthropic_cache_ttl_1h_injection"`
 	RewriteMessageCacheControl         bool   `json:"rewrite_message_cache_control"`
+	AntigravityUserAgentVersion        string `json:"antigravity_user_agent_version"`
 	OpenAICodexUserAgent               string `json:"openai_codex_user_agent"`
 	OpenAIAllowClaudeCodeCodexPlugin   bool   `json:"openai_allow_claude_code_codex_plugin"`
 

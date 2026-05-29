@@ -91,6 +91,53 @@ const ModelWhitelistSelectorStub = defineComponent({
   `
 })
 
+const SelectStub = defineComponent({
+  name: 'UiSelectStub',
+  props: {
+    modelValue: {
+      type: [String, Number, Boolean, null],
+      default: null
+    },
+    options: {
+      type: Array,
+      default: () => []
+    },
+    disabled: {
+      type: Boolean,
+      default: false
+    }
+  },
+  emits: ['update:modelValue', 'change'],
+  methods: {
+    optionValue(option: any) {
+      return typeof option === 'object' && option !== null ? option.value : option
+    },
+    optionLabel(option: any) {
+      if (typeof option === 'object' && option !== null) {
+        return String(option.label ?? '')
+      }
+      return String(option ?? '')
+    },
+    onChange(event: Event) {
+      const value = (event.target as HTMLSelectElement).value
+      this.$emit('update:modelValue', value)
+      this.$emit('change', value, null)
+    }
+  },
+  template: `
+    <select :value="modelValue ?? ''" :disabled="disabled" @change="onChange">
+      <option
+        v-for="option in options"
+        :key="String(optionValue(option))"
+        :value="optionValue(option)"
+        :disabled="typeof option === 'object' && option !== null && !!option.disabled"
+      >
+        {{ optionLabel(option) }}
+      </option>
+    </select>
+  `
+})
+
 function buildAccount() {
   return {
     id: 1,
@@ -154,7 +201,7 @@ function mountModal(account = buildAccount()) {
     global: {
       stubs: {
         BaseDialog: BaseDialogStub,
-        Select: true,
+        Select: SelectStub,
         Icon: true,
         ProxySelector: true,
         GroupSelector: true,
