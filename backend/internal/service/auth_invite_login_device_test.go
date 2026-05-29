@@ -194,6 +194,7 @@ func newAuthServiceForInviteLoginTest(
 		nil,
 		nil,
 		nil,
+		nil,
 	)
 	authService.SetInviteLoginDeviceResolver(userDeviceRepo)
 	if bootstrapSvc != nil {
@@ -215,6 +216,7 @@ func TestProvideAuthServiceWiresInviteLoginDependencies(t *testing.T) {
 		&redeemCodeRepoStub{},
 		&refreshTokenCacheStub{},
 		&config.Config{},
+		nil,
 		nil,
 		nil,
 		nil,
