@@ -914,7 +914,7 @@ func TestAPIContracts(t *testing.T) {
 					"openai_fast_policy_settings": {
 						"rules": []
 					},
-					"custom_menu_items": null,
+					"custom_menu_items": [],
 					"custom_endpoints": [],
 					"payment_enabled": false,
 					"payment_min_amount": 0,
