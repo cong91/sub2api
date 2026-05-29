@@ -1287,9 +1287,9 @@ var (
 				Columns: []*schema.Column{RedeemCodesColumns[12]},
 			},
 			{
-				Name:    "redeemcode_created_by",
+				Name:    "redeemcode_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{RedeemCodesColumns[12]},
+				Columns: []*schema.Column{RedeemCodesColumns[8]},
 			},
 		},
 	}
