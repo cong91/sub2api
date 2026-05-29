@@ -230,6 +230,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		PurchaseSubscriptionURL:                settings.PurchaseSubscriptionURL,
 		TableDefaultPageSize:                   settings.TableDefaultPageSize,
 		TablePageSizeOptions:                   settings.TablePageSizeOptions,
+		CustomMenuItems:                        dto.ParseCustomMenuItems(settings.CustomMenuItems),
 		CustomEndpoints:                        dto.ParseCustomEndpoints(settings.CustomEndpoints),
 		DefaultConcurrency:                     settings.DefaultConcurrency,
 		DefaultBalance:                         settings.DefaultBalance,
@@ -259,7 +260,6 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		MinClaudeCodeVersion:                   settings.MinClaudeCodeVersion,
 		MaxClaudeCodeVersion:                   settings.MaxClaudeCodeVersion,
 		AntigravityUserAgentVersion:            settings.AntigravityUserAgentVersion,
-		OpenAICodexUserAgent:                   settings.OpenAICodexUserAgent,
 		AllowUngroupedKeyScheduling:            settings.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:                     settings.BackendModeEnabled,
 		EnableFingerprintUnification:           settings.EnableFingerprintUnification,
@@ -537,47 +537,52 @@ type UpdateSettingsRequest struct {
 	CustomEndpoints             *[]dto.CustomEndpoint `json:"custom_endpoints"`
 
 	// 默认配置
-	DefaultConcurrency                       int                               `json:"default_concurrency"`
-	DefaultBalance                           float64                           `json:"default_balance"`
-	DeviceClaimBonusBalance                  float64                           `json:"device_claim_bonus_balance"`
-	DeviceAutoActivationAffCodes             *string                           `json:"device_auto_activation_aff_codes"`
-	AffiliateRebateRate                      *float64                          `json:"affiliate_rebate_rate"`
-	AffiliateRebateFreezeHours               *int                              `json:"affiliate_rebate_freeze_hours"`
-	AffiliateRebateDurationDays              *int                              `json:"affiliate_rebate_duration_days"`
-	AffiliateRebatePerInviteeCap             *float64                          `json:"affiliate_rebate_per_invitee_cap"`
-	DefaultUserRPMLimit                      int                               `json:"default_user_rpm_limit"`
-	DefaultSubscriptions                     []dto.DefaultSubscriptionSetting  `json:"default_subscriptions"`
-	AuthSourceDefaultEmailBalance            *float64                          `json:"auth_source_default_email_balance"`
-	AuthSourceDefaultEmailConcurrency        *int                              `json:"auth_source_default_email_concurrency"`
-	AuthSourceDefaultEmailSubscriptions      *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_email_subscriptions"`
-	AuthSourceDefaultEmailGrantOnSignup      *bool                             `json:"auth_source_default_email_grant_on_signup"`
-	AuthSourceDefaultEmailGrantOnFirstBind   *bool                             `json:"auth_source_default_email_grant_on_first_bind"`
-	AuthSourceDefaultLinuxDoBalance          *float64                          `json:"auth_source_default_linuxdo_balance"`
-	AuthSourceDefaultLinuxDoConcurrency      *int                              `json:"auth_source_default_linuxdo_concurrency"`
-	AuthSourceDefaultLinuxDoSubscriptions    *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_linuxdo_subscriptions"`
-	AuthSourceDefaultLinuxDoGrantOnSignup    *bool                             `json:"auth_source_default_linuxdo_grant_on_signup"`
-	AuthSourceDefaultLinuxDoGrantOnFirstBind *bool                             `json:"auth_source_default_linuxdo_grant_on_first_bind"`
-	AuthSourceDefaultOIDCBalance             *float64                          `json:"auth_source_default_oidc_balance"`
-	AuthSourceDefaultOIDCConcurrency         *int                              `json:"auth_source_default_oidc_concurrency"`
-	AuthSourceDefaultOIDCSubscriptions       *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_oidc_subscriptions"`
-	AuthSourceDefaultOIDCGrantOnSignup       *bool                             `json:"auth_source_default_oidc_grant_on_signup"`
-	AuthSourceDefaultOIDCGrantOnFirstBind    *bool                             `json:"auth_source_default_oidc_grant_on_first_bind"`
-	AuthSourceDefaultWeChatBalance           *float64                          `json:"auth_source_default_wechat_balance"`
-	AuthSourceDefaultWeChatConcurrency       *int                              `json:"auth_source_default_wechat_concurrency"`
-	AuthSourceDefaultWeChatSubscriptions     *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_wechat_subscriptions"`
-	AuthSourceDefaultWeChatGrantOnSignup     *bool                             `json:"auth_source_default_wechat_grant_on_signup"`
-	AuthSourceDefaultWeChatGrantOnFirstBind  *bool                             `json:"auth_source_default_wechat_grant_on_first_bind"`
-	AuthSourceDefaultGitHubBalance           *float64                          `json:"auth_source_default_github_balance"`
-	AuthSourceDefaultGitHubConcurrency       *int                              `json:"auth_source_default_github_concurrency"`
-	AuthSourceDefaultGitHubSubscriptions     *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_github_subscriptions"`
-	AuthSourceDefaultGitHubGrantOnSignup     *bool                             `json:"auth_source_default_github_grant_on_signup"`
-	AuthSourceDefaultGitHubGrantOnFirstBind  *bool                             `json:"auth_source_default_github_grant_on_first_bind"`
-	AuthSourceDefaultGoogleBalance           *float64                          `json:"auth_source_default_google_balance"`
-	AuthSourceDefaultGoogleConcurrency       *int                              `json:"auth_source_default_google_concurrency"`
-	AuthSourceDefaultGoogleSubscriptions     *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_google_subscriptions"`
-	AuthSourceDefaultGoogleGrantOnSignup     *bool                             `json:"auth_source_default_google_grant_on_signup"`
-	AuthSourceDefaultGoogleGrantOnFirstBind  *bool                             `json:"auth_source_default_google_grant_on_first_bind"`
-	ForceEmailOnThirdPartySignup             *bool                             `json:"force_email_on_third_party_signup"`
+	DefaultConcurrency                        int                               `json:"default_concurrency"`
+	DefaultBalance                            float64                           `json:"default_balance"`
+	DeviceClaimBonusBalance                   float64                           `json:"device_claim_bonus_balance"`
+	DeviceAutoActivationAffCodes              *string                           `json:"device_auto_activation_aff_codes"`
+	AffiliateRebateRate                       *float64                          `json:"affiliate_rebate_rate"`
+	AffiliateRebateFreezeHours                *int                              `json:"affiliate_rebate_freeze_hours"`
+	AffiliateRebateDurationDays               *int                              `json:"affiliate_rebate_duration_days"`
+	AffiliateRebatePerInviteeCap              *float64                          `json:"affiliate_rebate_per_invitee_cap"`
+	DefaultUserRPMLimit                       int                               `json:"default_user_rpm_limit"`
+	DefaultSubscriptions                      []dto.DefaultSubscriptionSetting  `json:"default_subscriptions"`
+	AuthSourceDefaultEmailBalance             *float64                          `json:"auth_source_default_email_balance"`
+	AuthSourceDefaultEmailConcurrency         *int                              `json:"auth_source_default_email_concurrency"`
+	AuthSourceDefaultEmailSubscriptions       *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_email_subscriptions"`
+	AuthSourceDefaultEmailGrantOnSignup       *bool                             `json:"auth_source_default_email_grant_on_signup"`
+	AuthSourceDefaultEmailGrantOnFirstBind    *bool                             `json:"auth_source_default_email_grant_on_first_bind"`
+	AuthSourceDefaultLinuxDoBalance           *float64                          `json:"auth_source_default_linuxdo_balance"`
+	AuthSourceDefaultLinuxDoConcurrency       *int                              `json:"auth_source_default_linuxdo_concurrency"`
+	AuthSourceDefaultLinuxDoSubscriptions     *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_linuxdo_subscriptions"`
+	AuthSourceDefaultLinuxDoGrantOnSignup     *bool                             `json:"auth_source_default_linuxdo_grant_on_signup"`
+	AuthSourceDefaultLinuxDoGrantOnFirstBind  *bool                             `json:"auth_source_default_linuxdo_grant_on_first_bind"`
+	AuthSourceDefaultOIDCBalance              *float64                          `json:"auth_source_default_oidc_balance"`
+	AuthSourceDefaultOIDCConcurrency          *int                              `json:"auth_source_default_oidc_concurrency"`
+	AuthSourceDefaultOIDCSubscriptions        *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_oidc_subscriptions"`
+	AuthSourceDefaultOIDCGrantOnSignup        *bool                             `json:"auth_source_default_oidc_grant_on_signup"`
+	AuthSourceDefaultOIDCGrantOnFirstBind     *bool                             `json:"auth_source_default_oidc_grant_on_first_bind"`
+	AuthSourceDefaultWeChatBalance            *float64                          `json:"auth_source_default_wechat_balance"`
+	AuthSourceDefaultWeChatConcurrency        *int                              `json:"auth_source_default_wechat_concurrency"`
+	AuthSourceDefaultWeChatSubscriptions      *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_wechat_subscriptions"`
+	AuthSourceDefaultWeChatGrantOnSignup      *bool                             `json:"auth_source_default_wechat_grant_on_signup"`
+	AuthSourceDefaultWeChatGrantOnFirstBind   *bool                             `json:"auth_source_default_wechat_grant_on_first_bind"`
+	AuthSourceDefaultGitHubBalance            *float64                          `json:"auth_source_default_github_balance"`
+	AuthSourceDefaultGitHubConcurrency        *int                              `json:"auth_source_default_github_concurrency"`
+	AuthSourceDefaultGitHubSubscriptions      *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_github_subscriptions"`
+	AuthSourceDefaultGitHubGrantOnSignup      *bool                             `json:"auth_source_default_github_grant_on_signup"`
+	AuthSourceDefaultGitHubGrantOnFirstBind   *bool                             `json:"auth_source_default_github_grant_on_first_bind"`
+	AuthSourceDefaultGoogleBalance            *float64                          `json:"auth_source_default_google_balance"`
+	AuthSourceDefaultGoogleConcurrency        *int                              `json:"auth_source_default_google_concurrency"`
+	AuthSourceDefaultGoogleSubscriptions      *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_google_subscriptions"`
+	AuthSourceDefaultGoogleGrantOnSignup      *bool                             `json:"auth_source_default_google_grant_on_signup"`
+	AuthSourceDefaultGoogleGrantOnFirstBind   *bool                             `json:"auth_source_default_google_grant_on_first_bind"`
+	AuthSourceDefaultDingTalkBalance          *float64                          `json:"auth_source_default_dingtalk_balance"`
+	AuthSourceDefaultDingTalkConcurrency      *int                              `json:"auth_source_default_dingtalk_concurrency"`
+	AuthSourceDefaultDingTalkSubscriptions    *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_dingtalk_subscriptions"`
+	AuthSourceDefaultDingTalkGrantOnSignup    *bool                             `json:"auth_source_default_dingtalk_grant_on_signup"`
+	AuthSourceDefaultDingTalkGrantOnFirstBind *bool                             `json:"auth_source_default_dingtalk_grant_on_first_bind"`
+	ForceEmailOnThirdPartySignup              *bool                             `json:"force_email_on_third_party_signup"`
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
@@ -800,6 +805,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	req.AuthSourceDefaultLinuxDoSubscriptions = normalizeOptionalDefaultSubscriptions(req.AuthSourceDefaultLinuxDoSubscriptions)
 	req.AuthSourceDefaultOIDCSubscriptions = normalizeOptionalDefaultSubscriptions(req.AuthSourceDefaultOIDCSubscriptions)
 	req.AuthSourceDefaultWeChatSubscriptions = normalizeOptionalDefaultSubscriptions(req.AuthSourceDefaultWeChatSubscriptions)
+	req.AuthSourceDefaultGitHubSubscriptions = normalizeOptionalDefaultSubscriptions(req.AuthSourceDefaultGitHubSubscriptions)
+	req.AuthSourceDefaultGoogleSubscriptions = normalizeOptionalDefaultSubscriptions(req.AuthSourceDefaultGoogleSubscriptions)
+	req.AuthSourceDefaultDingTalkSubscriptions = normalizeOptionalDefaultSubscriptions(req.AuthSourceDefaultDingTalkSubscriptions)
 
 	// SMTP 配置保护：如果请求中 smtp_host 为空但数据库中已有配置，则保留已有 SMTP 配置
 	// 防止前端加载设置失败时空表单覆盖已保存的 SMTP 配置
@@ -2040,7 +2048,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		MinClaudeCodeVersion:                   updatedSettings.MinClaudeCodeVersion,
 		MaxClaudeCodeVersion:                   updatedSettings.MaxClaudeCodeVersion,
 		AntigravityUserAgentVersion:            updatedSettings.AntigravityUserAgentVersion,
-		OpenAICodexUserAgent:                   updatedSettings.OpenAICodexUserAgent,
 		AllowUngroupedKeyScheduling:            updatedSettings.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:                     updatedSettings.BackendModeEnabled,
 		EnableFingerprintUnification:           updatedSettings.EnableFingerprintUnification,
