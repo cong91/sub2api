@@ -397,7 +397,7 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 		if entry.InputCostPerToken != nil {
 			pricing.InputCostPerToken = *entry.InputCostPerToken
 		}
-		if entry.InputCostPerTokenFlex != nil {
+		if entry.InputCostPerToken == nil && entry.InputCostPerTokenFlex != nil {
 			pricing.InputCostPerToken = *entry.InputCostPerTokenFlex
 		}
 		if entry.InputCostPerTokenPriority != nil {
@@ -406,7 +406,7 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 		if entry.OutputCostPerToken != nil {
 			pricing.OutputCostPerToken = *entry.OutputCostPerToken
 		}
-		if entry.OutputCostPerTokenFlex != nil {
+		if entry.OutputCostPerToken == nil && entry.OutputCostPerTokenFlex != nil {
 			pricing.OutputCostPerToken = *entry.OutputCostPerTokenFlex
 		}
 		if entry.OutputCostPerTokenPriority != nil {
@@ -421,7 +421,7 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 		if entry.CacheReadInputTokenCost != nil {
 			pricing.CacheReadInputTokenCost = *entry.CacheReadInputTokenCost
 		}
-		if entry.CacheReadInputTokenCostFlex != nil {
+		if entry.CacheReadInputTokenCost == nil && entry.CacheReadInputTokenCostFlex != nil {
 			pricing.CacheReadInputTokenCost = *entry.CacheReadInputTokenCostFlex
 		}
 		if entry.CacheReadInputTokenCostPriority != nil {
