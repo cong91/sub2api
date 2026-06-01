@@ -6178,20 +6178,26 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageTokenCost(
 	tokens UsageTokens,
 	serviceTier string,
 ) (*CostBreakdown, error) {
+	tokenPricePerMillion := balanceTokenPricePerMillionForAPIKey(apiKey)
 	if s.resolver != nil && apiKey.Group != nil {
 		gid := apiKey.Group.ID
 		return s.billingService.CalculateCostUnified(CostInput{
-			Ctx:            ctx,
-			Model:          billingModel,
-			GroupID:        &gid,
-			Tokens:         tokens,
-			RequestCount:   1,
-			RateMultiplier: multiplier,
-			ServiceTier:    serviceTier,
-			Resolver:       s.resolver,
+			Ctx:                  ctx,
+			Model:                billingModel,
+			GroupID:              &gid,
+			Tokens:               tokens,
+			RequestCount:         1,
+			RateMultiplier:       multiplier,
+			TokenPricePerMillion: tokenPricePerMillion,
+			ServiceTier:          serviceTier,
+			Resolver:             s.resolver,
 		})
 	}
-	return s.billingService.CalculateCostWithServiceTier(billingModel, tokens, multiplier, serviceTier)
+	cost, err := s.billingService.CalculateCostWithServiceTier(billingModel, tokens, multiplier, serviceTier)
+	if err == nil {
+		applyTokenPricePerMillionActualCost(cost, tokens, multiplier, tokenPricePerMillion)
+	}
+	return cost, err
 }
 
 func (s *OpenAIGatewayService) calculateOpenAIImageCost(
