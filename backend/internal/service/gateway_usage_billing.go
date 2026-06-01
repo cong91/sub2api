@@ -1164,21 +1164,23 @@ func (s *GatewayService) calculateTokenCost(
 
 	var cost *CostBreakdown
 	var err error
+	tokenPricePerMillion := balanceTokenPricePerMillionForAPIKey(apiKey)
 
 	// Explicit group/channel pricing wins. Built-in pricing also uses the unified
 	// resolver so the group long-context toggle can veto model-native tiers.
 	if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil {
 		gid := apiKey.Group.ID
 		cost, err = s.billingService.CalculateCostUnified(CostInput{
-			Ctx:            ctx,
-			Model:          billingModel,
-			GroupID:        &gid,
-			Group:          apiKey.Group,
-			Tokens:         tokens,
-			RequestCount:   1,
-			RateMultiplier: multiplier,
-			Resolver:       s.resolver,
-			Resolved:       resolved,
+			Ctx:                  ctx,
+			Model:                billingModel,
+			GroupID:              &gid,
+			Group:                apiKey.Group,
+			Tokens:               tokens,
+			RequestCount:         1,
+			RateMultiplier:       multiplier,
+			TokenPricePerMillion: tokenPricePerMillion,
+			Resolver:             s.resolver,
+			Resolved:             resolved,
 		})
 	} else if opts.LongContextThreshold > 0 && (apiKey.Group == nil || apiKey.Group.LongContextPricingEnabled) {
 		// 长上下文双倍计费（如 Gemini 200K 阈值）
@@ -1197,12 +1199,21 @@ func (s *GatewayService) calculateTokenCost(
 		if shouldUseKiroConservativeBillingFallback(result, billingModel, opts) {
 			if fallback := s.calculateKiroConservativeTokenCost(tokens, multiplier); fallback != nil {
 				logger.LegacyPrintf("service.gateway", "Using conservative Kiro fallback pricing for model=%s", billingModel)
+				applyTokenPricePerMillionActualCost(fallback, tokens, multiplier, tokenPricePerMillion)
 				return fallback
 			}
 		}
 		return &CostBreakdown{ActualCost: 0}
 	}
+	applyTokenPricePerMillionActualCost(cost, tokens, multiplier, tokenPricePerMillion)
 	return cost
+}
+
+func balanceTokenPricePerMillionForAPIKey(apiKey *APIKey) *float64 {
+	if apiKey == nil || apiKey.Group == nil || !apiKey.Group.IsStandardType() || apiKey.Group.TokenPricePerMillion == nil || *apiKey.Group.TokenPricePerMillion <= 0 {
+		return nil
+	}
+	return apiKey.Group.TokenPricePerMillion
 }
 
 // buildRecordUsageLog 构建使用日志并设置计费模式。
