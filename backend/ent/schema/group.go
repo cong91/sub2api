@@ -43,7 +43,7 @@ func (Group) Fields() []ent.Field {
 			Nillable().
 			SchemaType(map[string]string{dialect.Postgres: "text"}),
 		field.Float("rate_multiplier").
-			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
 			Default(1.0),
 		field.Bool("is_exclusive").
 			Default(false),
