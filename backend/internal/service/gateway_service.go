@@ -6338,7 +6338,7 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 	if account.Type == AccountTypeAPIKey {
 		baseURL := account.GetBaseURL()
 		if baseURL == "" && account.Platform == PlatformKiro {
-			return nil, fmt.Errorf("kiro api key account requires base_url")
+			return nil, nil, fmt.Errorf("kiro api key account requires base_url")
 		}
 		if baseURL != "" {
 			validatedURL, err := s.validateUpstreamBaseURL(baseURL)
