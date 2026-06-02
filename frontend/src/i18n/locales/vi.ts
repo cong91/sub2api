@@ -477,7 +477,7 @@ export default {
     redeemCodeRequired: 'Vui lòng nhập mã đăng nhập',
     deviceCodeLoginSuccess: 'Đăng nhập bằng mã thiết bị thành công!',
     deviceCodeLoginFailed: 'Đăng nhập bằng mã thiết bị thất bại. Vui lòng kiểm tra mã và thử lại.',
-    
+
     loginAgreement: {
       readAndAgree: 'Tôi đã đọc và đồng ý với',
       pendingTitle: 'Bạn cần đồng ý với điều khoản mới nhất trước khi tiếp tục đăng nhập.',

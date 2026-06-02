@@ -481,7 +481,7 @@ export default {
     redeemCodeRequired: 'Login code is required',
     deviceCodeLoginSuccess: 'Device code login successful!',
     deviceCodeLoginFailed: 'Device code login failed. Please check your code and try again.',
-    
+
     loginAgreement: {
       readAndAgree: 'I have read and agree to',
       pendingTitle: 'You must agree to the latest terms before continuing to sign in.',

@@ -477,7 +477,7 @@ export default {
     redeemCodeRequired: '로그인 코드를 입력하세요',
     deviceCodeLoginSuccess: '디바이스 코드 로그인에 성공했습니다!',
     deviceCodeLoginFailed: '디바이스 코드 로그인에 실패했습니다. 코드를 확인한 후 다시 시도하세요.',
-    
+
     loginAgreement: {
       readAndAgree: '다음을 읽고 동의했습니다:',
       pendingTitle: '계속 로그인하려면 최신 약관에 동의해야 합니다.',
