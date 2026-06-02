@@ -110,6 +110,16 @@ func RegisterAdminRoutes(
 
 		// 邀请返利（专属用户管理）
 		registerAffiliateRoutes(admin, h)
+
+		// Bot-sales B2B fulfillment
+		registerBotSalesFulfillmentRoutes(admin, h)
+	}
+}
+
+func registerBotSalesFulfillmentRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	botSales := admin.Group("/bot-sales")
+	{
+		botSales.POST("/token-fulfillments", h.Admin.BotSalesFulfillment.Create)
 	}
 }
 
