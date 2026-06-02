@@ -8,10 +8,9 @@ import (
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/enttest"
-	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
-	"github.com/Wei-Shaw/sub2api/internal/repository"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/testsupport"
 	"github.com/stretchr/testify/require"
 
 	"entgo.io/ent/dialect"
@@ -151,14 +150,7 @@ func TestBotSalesFulfillmentMissingAffiliateIsNotRejected(t *testing.T) {
 }
 
 func newBotSalesFulfillmentServiceForTest(client *dbent.Client, db *sql.DB) *service.BotSalesFulfillmentService {
-	userRepo := repository.NewUserRepository(client, db)
-	groupRepo := repository.NewGroupRepository(client, db)
-	userSubRepo := repository.NewUserSubscriptionRepository(client)
-	apiKeyRepo := repository.NewAPIKeyRepository(client, nil)
-	userSvc := service.NewUserService(userRepo, nil, nil, nil)
-	apiKeySvc := service.NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, userSubRepo, nil, nil, &config.Config{Default: config.DefaultConfig{APIKeyPrefix: "sk-test-"}})
-	subscriptionSvc := service.NewSubscriptionService(groupRepo, userSubRepo, nil, client, nil)
-	return service.NewBotSalesFulfillmentService(client, userSvc, subscriptionSvc, apiKeySvc)
+	return testsupport.NewBotSalesFulfillmentService(client, db)
 }
 
 func newBotSalesFulfillmentEntClient(t *testing.T) (*dbent.Client, *sql.DB) {

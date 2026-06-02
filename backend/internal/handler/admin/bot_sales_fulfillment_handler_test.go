@@ -14,11 +14,10 @@ import (
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/enttest"
-	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
-	"github.com/Wei-Shaw/sub2api/internal/repository"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/testsupport"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 
@@ -98,8 +97,10 @@ func TestBotSalesFulfillmentHandlerFulfillsPayloadAndRejectsTargetGroupInput(t *
 	var data map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &data))
 	require.Equal(t, service.BotSalesEntitlementSubscription, data["entitlement_kind"])
-	delivery := data["delivery"].(map[string]any)
-	apiKey := delivery["api_key"].(map[string]any)
+	delivery, ok := data["delivery"].(map[string]any)
+	require.True(t, ok)
+	apiKey, ok := delivery["api_key"].(map[string]any)
+	require.True(t, ok)
 	require.NotEmpty(t, apiKey["key"])
 	require.EqualValues(t, group.ID, apiKey["group_id"])
 
@@ -164,14 +165,7 @@ func newBotSalesFulfillmentHandlerTestRouter(t *testing.T) (*gin.Engine, *dbent.
 
 func newBotSalesFulfillmentHandlerService(t *testing.T, client *dbent.Client, db *sql.DB) *service.BotSalesFulfillmentService {
 	t.Helper()
-	userRepo := repository.NewUserRepository(client, db)
-	groupRepo := repository.NewGroupRepository(client, db)
-	userSubRepo := repository.NewUserSubscriptionRepository(client)
-	apiKeyRepo := repository.NewAPIKeyRepository(client, db)
-	userSvc := service.NewUserService(userRepo, nil, nil, nil)
-	apiKeySvc := service.NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, userSubRepo, nil, nil, &config.Config{Default: config.DefaultConfig{APIKeyPrefix: "sk-test-"}})
-	subscriptionSvc := service.NewSubscriptionService(groupRepo, userSubRepo, nil, client, nil)
-	return service.NewBotSalesFulfillmentService(client, userSvc, subscriptionSvc, apiKeySvc)
+	return testsupport.NewBotSalesFulfillmentService(client, db)
 }
 
 func newBotSalesFulfillmentHandlerEntClient(t *testing.T) (*dbent.Client, *sql.DB) {
