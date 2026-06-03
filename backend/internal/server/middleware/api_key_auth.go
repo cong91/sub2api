@@ -227,10 +227,44 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				}
 			}
 			if subscription == nil {
-				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
+				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查。
+				// If the user's hidden V-Claw key is still bound to a balance group and the
+				// wallet is empty, try to bind the same key to an active subscription group
+				// before rejecting the request. Users do not manage these API keys directly,
+				// so this keeps manual/admin subscription grants from interrupting traffic.
 				if apiKey.User.Balance <= 0 {
-					AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
-					return
+					if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "balance_insufficient", "INSUFFICIENT_BALANCE", true, false); ok {
+						apiKey = switchedKey
+						subscription = nil
+						if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() && subscriptionService != nil {
+							sub, subErr := subscriptionService.GetActiveSubscription(c.Request.Context(), apiKey.User.ID, apiKey.Group.ID)
+							if subErr != nil {
+								AbortWithError(c, 403, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this group")
+								return
+							}
+							needsMaintenance, validateErr := subscriptionService.ValidateAndCheckLimits(sub, apiKey.Group)
+							if validateErr != nil {
+								code := "SUBSCRIPTION_INVALID"
+								status := 403
+								if errors.Is(validateErr, service.ErrDailyLimitExceeded) ||
+									errors.Is(validateErr, service.ErrWeeklyLimitExceeded) ||
+									errors.Is(validateErr, service.ErrMonthlyLimitExceeded) {
+									code = "USAGE_LIMIT_EXCEEDED"
+									status = 429
+								}
+								AbortWithError(c, status, code, validateErr.Error())
+								return
+							}
+							if needsMaintenance {
+								maintenanceCopy := *sub
+								subscriptionService.DoWindowMaintenance(&maintenanceCopy)
+							}
+							subscription = sub
+						}
+					} else {
+						AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
+						return
+					}
 				}
 			}
 		}
