@@ -1166,7 +1166,6 @@ func (s *GatewayService) calculateTokenCost(
 
 	var cost *CostBreakdown
 	var err error
-	tokenPricePerMillion := balanceTokenPricePerMillionForAPIKey(apiKey)
 
 	// Explicit group/channel pricing wins. Built-in pricing also uses the unified
 	// resolver so the group long-context toggle can veto model-native tiers.
@@ -1181,7 +1180,6 @@ func (s *GatewayService) calculateTokenCost(
 			RequestCount:         1,
 			RateMultiplier:       multiplier,
 			PricingAt:            pricingAt,
-			ServiceTier:          optionalStringValue(result.ServiceTier),
 			TokenPricePerMillion: tokenPricePerMillion,
 			Resolver:             s.resolver,
 			Resolved:             resolved,
@@ -1204,21 +1202,12 @@ func (s *GatewayService) calculateTokenCost(
 		if shouldUseKiroConservativeBillingFallback(result, billingModel, opts) {
 			if fallback := s.calculateKiroConservativeTokenCost(tokens, multiplier); fallback != nil {
 				logger.LegacyPrintf("service.gateway", "Using conservative Kiro fallback pricing for model=%s", billingModel)
-				applyTokenPricePerMillionActualCost(fallback, tokens, multiplier, tokenPricePerMillion)
 				return fallback
 			}
 		}
 		return &CostBreakdown{ActualCost: 0}
 	}
-	applyTokenPricePerMillionActualCost(cost, tokens, multiplier, tokenPricePerMillion)
 	return cost
-}
-
-func balanceTokenPricePerMillionForAPIKey(apiKey *APIKey) *float64 {
-	if apiKey == nil || apiKey.Group == nil || !apiKey.Group.IsStandardType() || apiKey.Group.TokenPricePerMillion == nil || *apiKey.Group.TokenPricePerMillion <= 0 {
-		return nil
-	}
-	return apiKey.Group.TokenPricePerMillion
 }
 
 // buildRecordUsageLog 构建使用日志并设置计费模式。
