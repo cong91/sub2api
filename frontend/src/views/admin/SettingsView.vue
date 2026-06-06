@@ -7071,7 +7071,7 @@
                   </label>
                   <input
                     v-model="form.telegram_bot_token"
-                    type="password"
+                    type="text"
                     class="input"
                     autocomplete="new-password"
                     autocapitalize="off"
@@ -10411,6 +10411,7 @@ async function testTelegramConnection() {
   testingTelegram.value = true;
   try {
     const result = await adminAPI.settings.testTelegramConnection({
+      telegram_bot_token: form.telegram_bot_token || undefined,
       telegram_chat_id: form.telegram_chat_id || undefined,
     });
     appStore.showSuccess(

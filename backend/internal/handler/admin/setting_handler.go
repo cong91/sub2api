@@ -3761,12 +3761,13 @@ func equalPlatformQuotaSettings(before, after map[string]*service.DefaultPlatfor
 
 // TestTelegramConnectionRequest optional override for testing with unsaved config.
 type TestTelegramConnectionRequest struct {
-	ChatID string `json:"telegram_chat_id"`
+	BotToken string `json:"telegram_bot_token"`
+	ChatID   string `json:"telegram_chat_id"`
 }
 
 // TestTelegramConnection tests the Telegram bot configuration by sending a test message.
 // POST /api/v1/admin/settings/telegram/test
-// Uses saved bot token + chat_id from settings. Optionally overrides chat_id from request body.
+// Uses saved bot token + chat_id from settings. Optionally overrides unsaved bot token/chat_id from request body.
 // Never returns or logs the bot token.
 func (h *SettingHandler) TestTelegramConnection(c *gin.Context) {
 	if h.telegramNotifyService == nil {
@@ -3774,16 +3775,16 @@ func (h *SettingHandler) TestTelegramConnection(c *gin.Context) {
 		return
 	}
 
-	// Optional body — allows overriding chat_id for testing a different chat
+	// Optional body — allows testing unsaved bot token/chat_id before saving.
 	var req TestTelegramConnectionRequest
 	_ = c.ShouldBindJSON(&req) // ignore error — body is optional
 
 	ctx := c.Request.Context()
+	botToken := strings.TrimSpace(req.BotToken)
+	chatID := strings.TrimSpace(req.ChatID)
 
-	if strings.TrimSpace(req.ChatID) != "" {
-		// Override chat_id: temporarily invalidate cache so sendMessage picks up fresh config,
-		// but we use SendTestMessageWithChatID for the override.
-		err := h.telegramNotifyService.SendTestMessageWithChatID(ctx, strings.TrimSpace(req.ChatID))
+	if botToken != "" || chatID != "" {
+		err := h.telegramNotifyService.SendTestMessageWithOverrides(ctx, botToken, chatID)
 		if err != nil {
 			response.BadRequest(c, "Telegram test failed: "+err.Error())
 			return
