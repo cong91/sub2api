@@ -9265,6 +9265,14 @@ async function saveSettings() {
       telegram_chat_id: form.telegram_chat_id,
       telegram_notify_new_user: form.telegram_notify_new_user,
       telegram_notify_account_error: form.telegram_notify_account_error,
+      telegram_notify_account_expired: form.telegram_notify_account_expired,
+      telegram_notify_payment_success: form.telegram_notify_payment_success,
+      telegram_notify_payment_failed: form.telegram_notify_payment_failed,
+      telegram_notify_refund: form.telegram_notify_refund,
+      telegram_notify_sub_expired: form.telegram_notify_sub_expired,
+      telegram_notify_balance_low: form.telegram_notify_balance_low,
+      telegram_notify_ops_alert: form.telegram_notify_ops_alert,
+      telegram_notify_proxy_expired: form.telegram_notify_proxy_expired,
     };
 
     // 仅当 openai_fast_policy_settings 已成功从后端加载时才回写，

@@ -1711,6 +1711,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			return previousSettings.RiskControlEnabled
 		}(),
 	}
+	applyTelegramSettingsFromRequest(settings, req, previousSettings)
 
 	// req.AuthSourceXxxPlatformQuotas 为 nil 表示本次请求未包含该 source 的 quota 配置（保留 previousAuthSourceDefaults 中的值）；
 	// non-nil（含 empty map）表示整体覆盖：empty map = 清空该 source 的所有 quota 配置。
@@ -2604,6 +2605,32 @@ func boolValueOrDefault(value *bool, fallback bool) bool {
 		return fallback
 	}
 	return *value
+}
+
+func stringValueOrDefault(value *string, fallback string) string {
+	if value == nil {
+		return fallback
+	}
+	return strings.TrimSpace(*value)
+}
+
+func applyTelegramSettingsFromRequest(settings *service.SystemSettings, req UpdateSettingsRequest, previous *service.SystemSettings) {
+	settings.TelegramBotToken = stringValueOrDefault(req.TelegramBotToken, previous.TelegramBotToken)
+	settings.TelegramBotTokenConfigured = previous.TelegramBotTokenConfigured
+	if req.TelegramBotToken != nil {
+		settings.TelegramBotTokenConfigured = strings.TrimSpace(*req.TelegramBotToken) != ""
+	}
+	settings.TelegramChatID = stringValueOrDefault(req.TelegramChatID, previous.TelegramChatID)
+	settings.TelegramNotifyNewUser = boolValueOrDefault(req.TelegramNotifyNewUser, previous.TelegramNotifyNewUser)
+	settings.TelegramNotifyAccountError = boolValueOrDefault(req.TelegramNotifyAccountError, previous.TelegramNotifyAccountError)
+	settings.TelegramNotifyAccountExpired = boolValueOrDefault(req.TelegramNotifyAccountExpired, previous.TelegramNotifyAccountExpired)
+	settings.TelegramNotifyPaymentSuccess = boolValueOrDefault(req.TelegramNotifyPaymentSuccess, previous.TelegramNotifyPaymentSuccess)
+	settings.TelegramNotifyPaymentFailed = boolValueOrDefault(req.TelegramNotifyPaymentFailed, previous.TelegramNotifyPaymentFailed)
+	settings.TelegramNotifyRefund = boolValueOrDefault(req.TelegramNotifyRefund, previous.TelegramNotifyRefund)
+	settings.TelegramNotifySubExpired = boolValueOrDefault(req.TelegramNotifySubExpired, previous.TelegramNotifySubExpired)
+	settings.TelegramNotifyBalanceLow = boolValueOrDefault(req.TelegramNotifyBalanceLow, previous.TelegramNotifyBalanceLow)
+	settings.TelegramNotifyOpsAlert = boolValueOrDefault(req.TelegramNotifyOpsAlert, previous.TelegramNotifyOpsAlert)
+	settings.TelegramNotifyProxyExpired = boolValueOrDefault(req.TelegramNotifyProxyExpired, previous.TelegramNotifyProxyExpired)
 }
 
 func defaultSubscriptionsValueOrDefault(input *[]dto.DefaultSubscriptionSetting, fallback []service.DefaultSubscriptionSetting) []service.DefaultSubscriptionSetting {
