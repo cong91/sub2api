@@ -1530,6 +1530,8 @@ export interface GroupStat {
 export interface UserBreakdownItem {
   user_id: number
   email: string
+  username?: string | null
+  device_code?: string | null
   requests: number
   total_tokens: number
   cost: number
