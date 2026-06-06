@@ -228,6 +228,86 @@ func TestBotSalesFulfillmentBalanceTopupWithoutDeviceCodeCreditsCanonicalBuyerAc
 	}
 }
 
+func TestBotSalesFulfillmentBalanceTopupWithoutDeviceCodeReusesLegacyBuyerAcrossProviders(t *testing.T) {
+	cases := []struct {
+		name           string
+		legacyEmail    string
+		externalUserID string
+		provider       string
+		providerUserID string
+		telegramID     string
+	}{
+		{
+			name:           "telegram",
+			legacyEmail:    "telegram-123456789@bot-sales.local",
+			externalUserID: "channel:telegram:user:123456789",
+			provider:       "telegram",
+			providerUserID: "123456789",
+			telegramID:     "123456789",
+		},
+		{
+			name:           "zalo",
+			legacyEmail:    "zalo-zalo-user-42@bot-sales.local",
+			externalUserID: "channel:zalo:user:zalo-user-42",
+			provider:       "zalo",
+			providerUserID: "zalo-user-42",
+		},
+		{
+			name:           "kakao",
+			legacyEmail:    "kakao-kakao-user-42@bot-sales.local",
+			externalUserID: "channel:kakao:user:kakao-user-42",
+			provider:       "kakao",
+			providerUserID: "kakao-user-42",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			client, db := newBotSalesFulfillmentEntClient(t)
+			group := createBotSalesGroup(t, client, "bot-balance-topup-legacy-buyer-"+tc.name, service.SubscriptionTypeNone)
+			pkg := client.BalancePackage.Create().
+				SetCode("standard_20_legacy_buyer_" + tc.name).
+				SetLabel("Standard 20 legacy buyer " + tc.name).
+				SetAmountLedger(20).
+				SetActualCredits(27000000).
+				SetCreditUnit("tokens").
+				SetGroupID(group.ID).
+				SetForSale(true).
+				SaveX(ctx)
+			legacyBuyer := client.User.Create().
+				SetEmail(tc.legacyEmail).
+				SetPasswordHash("test-password-hash").
+				SetRole(service.RoleUser).
+				SetStatus(service.StatusActive).
+				SetConcurrency(1).
+				SetBalance(15).
+				SaveX(ctx)
+
+			svc := newBotSalesFulfillmentServiceForTest(client, db)
+			topupResp, err := svc.Fulfill(ctx, service.BotSalesTokenFulfillmentRequest{
+				ExternalOrderID:    "bs-order-" + tc.name + "-legacy-topup",
+				Operation:          service.BotSalesFulfillmentOperationTopup,
+				EntitlementKind:    service.BotSalesEntitlementBalance,
+				BalancePackageCode: pkg.Code,
+				Buyer: service.BotSalesFulfillmentBuyer{
+					ExternalUserID: tc.externalUserID,
+					Provider:       tc.provider,
+					ProviderUserID: tc.providerUserID,
+					TelegramID:     tc.telegramID,
+				},
+				DeliveryPolicy: service.BotSalesDeliveryPolicy{IssueAPIKey: service.BotSalesIssueAPIKeyIfMissing},
+			})
+			require.NoError(t, err)
+			require.Equal(t, service.BotSalesFulfillmentOperationTopup, topupResp.Operation)
+			require.Equal(t, legacyBuyer.ID, topupResp.Buyer.UserID)
+			require.Empty(t, topupResp.Delivery.DeviceCode)
+			require.Equal(t, float64(35), client.User.GetX(ctx, legacyBuyer.ID).Balance)
+			require.Equal(t, 1, client.User.Query().CountX(ctx))
+		})
+	}
+}
+
 func TestBotSalesFulfillmentDoesNotAcceptTargetGroupInput(t *testing.T) {
 	ctx := context.Background()
 	client, db := newBotSalesFulfillmentEntClient(t)
