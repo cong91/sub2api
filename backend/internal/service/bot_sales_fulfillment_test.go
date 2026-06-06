@@ -159,6 +159,75 @@ func TestBotSalesFulfillmentBalanceNewIssuesDeviceCodeAndTopupCreditsExistingDev
 	require.Equal(t, float64(40), client.User.GetX(ctx, newResp.Buyer.UserID).Balance)
 }
 
+func TestBotSalesFulfillmentBalanceTopupWithoutDeviceCodeCreditsCanonicalBuyerAcrossProviders(t *testing.T) {
+	ctx := context.Background()
+	client, db := newBotSalesFulfillmentEntClient(t)
+	group := createBotSalesGroup(t, client, "bot-balance-topup-buyer", service.SubscriptionTypeNone)
+	pkg := client.BalancePackage.Create().
+		SetCode("standard_20_buyer").
+		SetLabel("Standard 20 buyer").
+		SetAmountLedger(20).
+		SetActualCredits(27000000).
+		SetCreditUnit("tokens").
+		SetGroupID(group.ID).
+		SetForSale(true).
+		SaveX(ctx)
+
+	svc := newBotSalesFulfillmentServiceForTest(client, db)
+	cases := []struct {
+		name           string
+		externalUserID string
+		provider       string
+		providerUserID string
+		telegramID     string
+	}{
+		{name: "telegram", externalUserID: "channel:telegram:user:123456789", provider: "telegram", providerUserID: "123456789", telegramID: "123456789"},
+		{name: "zalo", externalUserID: "channel:zalo:user:zalo-user-42", provider: "zalo", providerUserID: "zalo-user-42"},
+		{name: "kakao", externalUserID: "channel:kakao:user:kakao-user-42", provider: "kakao", providerUserID: "kakao-user-42"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			newResp, err := svc.Fulfill(ctx, service.BotSalesTokenFulfillmentRequest{
+				ExternalOrderID:    "bs-order-" + tc.name + "-new",
+				Operation:          service.BotSalesFulfillmentOperationNew,
+				EntitlementKind:    service.BotSalesEntitlementBalance,
+				BalancePackageCode: pkg.Code,
+				Buyer: service.BotSalesFulfillmentBuyer{
+					ExternalUserID: tc.externalUserID,
+					Provider:       tc.provider,
+					ProviderUserID: tc.providerUserID,
+					TelegramID:     tc.telegramID,
+				},
+				DeliveryPolicy: service.BotSalesDeliveryPolicy{IssueAPIKey: service.BotSalesIssueAPIKeyAlways, IssueDeviceCode: true},
+			})
+			require.NoError(t, err)
+			require.Equal(t, float64(20), client.User.GetX(ctx, newResp.Buyer.UserID).Balance)
+			require.NotEmpty(t, newResp.Delivery.DeviceCode)
+
+			topupResp, err := svc.Fulfill(ctx, service.BotSalesTokenFulfillmentRequest{
+				ExternalOrderID:    "bs-order-" + tc.name + "-topup",
+				Operation:          service.BotSalesFulfillmentOperationTopup,
+				EntitlementKind:    service.BotSalesEntitlementBalance,
+				BalancePackageCode: pkg.Code,
+				Buyer: service.BotSalesFulfillmentBuyer{
+					ExternalUserID: tc.externalUserID,
+					Provider:       tc.provider,
+					ProviderUserID: tc.providerUserID,
+					TelegramID:     tc.telegramID,
+				},
+				DeliveryPolicy: service.BotSalesDeliveryPolicy{IssueAPIKey: service.BotSalesIssueAPIKeyIfMissing},
+			})
+			require.NoError(t, err)
+			require.Equal(t, service.BotSalesFulfillmentOperationTopup, topupResp.Operation)
+			require.Equal(t, newResp.Buyer.UserID, topupResp.Buyer.UserID)
+			require.Equal(t, tc.externalUserID, topupResp.Buyer.ExternalUserID)
+			require.Empty(t, topupResp.Delivery.DeviceCode)
+			require.Equal(t, float64(40), client.User.GetX(ctx, newResp.Buyer.UserID).Balance)
+		})
+	}
+}
+
 func TestBotSalesFulfillmentDoesNotAcceptTargetGroupInput(t *testing.T) {
 	ctx := context.Background()
 	client, db := newBotSalesFulfillmentEntClient(t)

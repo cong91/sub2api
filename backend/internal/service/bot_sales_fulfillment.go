@@ -37,6 +37,8 @@ type BotSalesFulfillmentBuyer struct {
 	Email          string `json:"email"`
 	Username       string `json:"username"`
 	DisplayName    string `json:"display_name"`
+	Provider       string `json:"provider"`
+	ProviderUserID string `json:"provider_user_id"`
 	TelegramID     string `json:"telegram_id"`
 }
 
@@ -302,7 +304,7 @@ func (s *BotSalesFulfillmentService) fulfillBalance(ctx context.Context, buyer *
 
 	targetBuyer := buyer
 	var deviceCode string
-	if operation == BotSalesFulfillmentOperationTopup {
+	if operation == BotSalesFulfillmentOperationTopup && strings.TrimSpace(req.DeviceCode) != "" {
 		device, err := s.resolveBotSalesDevice(ctx, req.DeviceCode)
 		if err != nil {
 			return err
