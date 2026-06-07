@@ -1,4 +1,6 @@
-export default {
+import { adminLocalePatches, mergeLocalePatch } from './adminLocalePatches'
+
+const messages = {
   // 홈 페이지
   home: {
     viewOnGithub: 'GitHub에서 보기',
@@ -7723,3 +7725,7 @@ export default {
   },
 
 }
+
+mergeLocalePatch(messages, adminLocalePatches.ko)
+
+export default messages
