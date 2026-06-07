@@ -1,4 +1,6 @@
-export default {
+import { adminLocalePatches, mergeLocalePatch } from './adminLocalePatches'
+
+const messages = {
   // Home Page
   home: {
     viewOnGithub: '在 GitHub 上查看',
@@ -7845,3 +7847,7 @@ export default {
   },
 
 }
+
+mergeLocalePatch(messages, adminLocalePatches.zh)
+
+export default messages
