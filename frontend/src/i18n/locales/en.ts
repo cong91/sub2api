@@ -1,4 +1,6 @@
-export default {
+import { adminLocalePatches, mergeLocalePatch } from './adminLocalePatches'
+
+const messages = {
   // Home Page
   home: {
     viewOnGithub: 'View on GitHub',
@@ -7940,3 +7942,7 @@ retryRefund: 'Retry refund',
   },
 
 }
+
+mergeLocalePatch(messages, adminLocalePatches.en)
+
+export default messages
