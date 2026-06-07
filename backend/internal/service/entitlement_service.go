@@ -676,6 +676,7 @@ func buildSubscriptionCreditQuota(sub UserSubscription, group *Group) *Entitleme
 }
 
 func providerIDForPlatform(platform string) string {
+	platform = strings.ToLower(strings.TrimSpace(platform))
 	if platform == "" {
 		return ""
 	}
@@ -701,8 +702,8 @@ func (s *EntitlementService) buildSwitchTargets(ctx context.Context, user *User,
 
 	// Request-time continuity for hidden/bootstrap API keys is rebind-only. If the
 	// key that the client is actively using is not itself usable, the gateway must
-	// fail instead of selecting another API key: V-Claw/OpenClaw cannot swap the
-	// secret it sends on the next request.
+	// fail instead of selecting another API key: clients cannot silently swap the
+	// secret they send on the next request.
 	if req.PreferCurrentAPIKey {
 		if currentKey == nil || !isUsableAPIKeyForSwitch(*currentKey) || !isContinuitySwitchTrigger(req) {
 			return nil
@@ -869,7 +870,7 @@ func (s *EntitlementService) subscriptionSwitchTargets(ctx context.Context, keys
 		if err != nil || group == nil || !group.IsSubscriptionType() || !group.IsActive() {
 			continue
 		}
-		if req.ProviderID != "" && providerIDForPlatform(group.Platform) != req.ProviderID && !req.AllowProviderChange {
+		if !s.switchTargetPlatformCompatible(ctx, group, currentKey, items, req) {
 			continue
 		}
 		targets = append(targets, EntitlementSwitchTarget{
@@ -924,33 +925,56 @@ func (s *EntitlementService) defaultBalanceGroupSwitchTarget(ctx context.Context
 }
 
 func (s *EntitlementService) autoSwitchTargetPlatform(ctx context.Context, currentKey *APIKey, items []EntitlementItem, req AutoSwitchEntitlementRequest) string {
-	if providerPlatform := platformFromProviderID(req.ProviderID); providerPlatform != "" {
-		return providerPlatform
-	}
 	if req.CurrentGroupID != nil && *req.CurrentGroupID > 0 {
 		if group, err := s.groupRepo.GetByID(ctx, *req.CurrentGroupID); err == nil && group != nil && group.Platform != "" {
-			return group.Platform
+			return strings.ToLower(strings.TrimSpace(group.Platform))
 		}
 	}
 	if currentKey != nil && currentKey.GroupID != nil {
 		if group, err := s.groupRepo.GetByID(ctx, *currentKey.GroupID); err == nil && group != nil && group.Platform != "" {
-			return group.Platform
+			return strings.ToLower(strings.TrimSpace(group.Platform))
 		}
 	}
 	for _, item := range items {
 		if item.Current && item.GroupPlatform != "" {
-			return item.GroupPlatform
+			return strings.ToLower(strings.TrimSpace(item.GroupPlatform))
 		}
+	}
+	if providerPlatform := platformFromProviderID(req.ProviderID); providerPlatform != "" {
+		return providerPlatform
 	}
 	return ""
 }
 
 func platformFromProviderID(providerID string) string {
-	providerID = strings.TrimSpace(providerID)
+	providerID = strings.ToLower(strings.TrimSpace(providerID))
 	if providerID == "" {
 		return ""
 	}
-	return strings.TrimPrefix(providerID, "v-claw-")
+	for _, prefix := range []string{"v-claw-", "platform:", "provider:"} {
+		providerID = strings.TrimPrefix(providerID, prefix)
+	}
+	return providerID
+}
+
+func sameAutoSwitchPlatform(a, b string) bool {
+	a = strings.ToLower(strings.TrimSpace(a))
+	b = strings.ToLower(strings.TrimSpace(b))
+	return a != "" && b != "" && a == b
+}
+
+func (s *EntitlementService) switchTargetPlatformCompatible(ctx context.Context, group *Group, currentKey *APIKey, items []EntitlementItem, req AutoSwitchEntitlementRequest) bool {
+	if group == nil {
+		return false
+	}
+	targetPlatform := s.autoSwitchTargetPlatform(ctx, currentKey, items, req)
+	if targetPlatform != "" {
+		return sameAutoSwitchPlatform(group.Platform, targetPlatform)
+	}
+	if req.ProviderID == "" || req.AllowProviderChange {
+		return true
+	}
+	return sameAutoSwitchPlatform(group.Platform, platformFromProviderID(req.ProviderID)) || strings.EqualFold(providerIDForPlatform(group.Platform), strings.TrimSpace(req.ProviderID))
 }
 
 func isBasicBalanceGroupBetter(a, b Group) bool {
@@ -968,7 +992,7 @@ func (s *EntitlementService) switchTargetForGroup(ctx context.Context, user *Use
 	if err != nil || group == nil || group.IsSubscriptionType() || !group.IsActive() || !user.CanBindGroup(group.ID, group.IsExclusive) {
 		return EntitlementSwitchTarget{}, false
 	}
-	if req.ProviderID != "" && providerIDForPlatform(group.Platform) != req.ProviderID && !req.AllowProviderChange {
+	if !s.switchTargetPlatformCompatible(ctx, group, preferredKey, nil, req) {
 		return EntitlementSwitchTarget{}, false
 	}
 	key := preferredKey

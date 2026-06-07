@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestProviderIDForAutoSwitchPlatformUsesVClawCatalogMapping(t *testing.T) {
+func TestProviderIDForAutoSwitchPlatformKeepsProviderPlatformsDistinct(t *testing.T) {
 	tests := []struct {
 		platform string
 		want     string
@@ -27,8 +27,9 @@ func TestProviderIDForAutoSwitchPlatformUsesVClawCatalogMapping(t *testing.T) {
 		{platform: "", want: ""},
 		{platform: service.PlatformOpenAI, want: "v-claw-openai"},
 		{platform: service.PlatformAnthropic, want: "v-claw-anthropic"},
-		{platform: service.PlatformGemini, want: "v-claw-google"},
-		{platform: service.PlatformAntigravity, want: "v-claw-google"},
+		{platform: service.PlatformKiro, want: "v-claw-kiro"},
+		{platform: service.PlatformGemini, want: "v-claw-gemini"},
+		{platform: service.PlatformAntigravity, want: "v-claw-antigravity"},
 	}
 
 	for _, tt := range tests {
@@ -1090,6 +1091,191 @@ func TestAPIKeyAuthAutoSwitchesExpiredBootstrapSubscriptionKeyToBalanceGroup(t *
 	require.Equal(t, balanceGroup.Name, w.Header().Get("X-Sub2API-Auto-Switch-Target-Group"))
 	require.Contains(t, w.Body.String(), `"api_key_id":100`)
 	require.Contains(t, w.Body.String(), `"group_id":42`)
+}
+
+func TestAPIKeyAuthDoesNotRebindAcrossProviderPlatforms(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	monthlyLimit := 50.0
+	openAIGroup := &service.Group{ID: 41, Name: "openai-expired", Status: service.StatusActive, Platform: service.PlatformOpenAI, Hydrated: true, SubscriptionType: service.SubscriptionTypeSubscription, MonthlyLimitUSD: &monthlyLimit}
+	geminiSubscriptionGroup := &service.Group{ID: 42, Name: "gemini-subscription", Status: service.StatusActive, Platform: service.PlatformGemini, Hydrated: true, SubscriptionType: service.SubscriptionTypeSubscription, MonthlyLimitUSD: &monthlyLimit}
+	geminiBalanceGroup := &service.Group{ID: 43, Name: "gemini-credit", Status: service.StatusActive, Platform: service.PlatformGemini, Hydrated: true, SubscriptionType: service.SubscriptionTypeStandard}
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive, Balance: 10, Concurrency: 3}
+	currentKey := &service.APIKey{ID: 100, UserID: user.ID, Key: "openai-key", Status: service.StatusActive, User: user, GroupID: &openAIGroup.ID, Group: openAIGroup}
+
+	cloneStoredKey := func(key *service.APIKey) *service.APIKey {
+		if key == nil {
+			return nil
+		}
+		clone := *key
+		if key.GroupID != nil {
+			groupID := *key.GroupID
+			clone.GroupID = &groupID
+		}
+		return &clone
+	}
+	apiKeyRepo := &stubApiKeyRepo{
+		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
+			if key != currentKey.Key {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			return cloneStoredKey(currentKey), nil
+		},
+		getByID: func(ctx context.Context, id int64) (*service.APIKey, error) {
+			if id != currentKey.ID {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			return cloneStoredKey(currentKey), nil
+		},
+		listByUserID: func(ctx context.Context, userID int64, params pagination.PaginationParams, filters service.APIKeyListFilters) ([]service.APIKey, *pagination.PaginationResult, error) {
+			require.Equal(t, user.ID, userID)
+			clone := cloneStoredKey(currentKey)
+			return []service.APIKey{*clone}, &pagination.PaginationResult{Total: 1, Page: 1, PageSize: 1000}, nil
+		},
+	}
+	now := time.Now()
+	subscriptionRepo := &stubUserSubscriptionRepo{
+		getActive: func(ctx context.Context, userID, groupID int64) (*service.UserSubscription, error) {
+			return nil, service.ErrSubscriptionNotFound
+		},
+		listByUserID: func(ctx context.Context, userID int64) ([]service.UserSubscription, error) {
+			require.Equal(t, user.ID, userID)
+			return []service.UserSubscription{
+				{ID: 54, UserID: user.ID, GroupID: openAIGroup.ID, Status: service.SubscriptionStatusExpired, StartsAt: now.Add(-96 * time.Hour), ExpiresAt: now.Add(-24 * time.Hour)},
+				{ID: 55, UserID: user.ID, GroupID: geminiSubscriptionGroup.ID, Status: service.SubscriptionStatusActive, StartsAt: now.Add(-time.Hour), ExpiresAt: now.Add(30 * 24 * time.Hour)},
+			}, nil
+		},
+		updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
+		activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
+		resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
+		resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
+		resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
+	}
+	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeStandard})
+	subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, &config.Config{RunMode: config.RunModeStandard})
+	entitlementService := service.NewEntitlementService(
+		&stubEntitlementUserRepo{user: user},
+		&stubEntitlementGroupRepo{groups: map[int64]*service.Group{openAIGroup.ID: openAIGroup, geminiSubscriptionGroup.ID: geminiSubscriptionGroup, geminiBalanceGroup.ID: geminiBalanceGroup}},
+		&stubEntitlementAPIKeyUpdater{update: func(ctx context.Context, id, userID int64, req service.UpdateAPIKeyRequest) (*service.APIKey, error) {
+			t.Fatalf("OpenAI request key must not be rebound to Gemini subscription/balance groups")
+			return nil, nil
+		}},
+		apiKeyRepo,
+		subscriptionRepo,
+	)
+
+	router := gin.New()
+	reachedHandler := false
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddlewareWithEntitlements(apiKeyService, subscriptionService, entitlementService, &config.Config{RunMode: config.RunModeStandard})))
+	router.GET("/t", func(c *gin.Context) {
+		reachedHandler = true
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	req.Header.Set("x-api-key", currentKey.Key)
+	router.ServeHTTP(w, req)
+
+	require.False(t, reachedHandler)
+	require.Equal(t, http.StatusForbidden, w.Code)
+	require.Contains(t, w.Body.String(), "SUBSCRIPTION_NOT_FOUND")
+	require.Empty(t, w.Header().Get("X-Sub2API-Auto-Switched"))
+	require.Empty(t, w.Header().Get("X-Sub2API-Auto-Switch-Action"))
+}
+
+func TestAPIKeyAuthGoogleDoesNotRebindAcrossProviderPlatforms(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	monthlyLimit := 50.0
+	openAIGroup := &service.Group{ID: 51, Name: "openai-expired", Status: service.StatusActive, Platform: service.PlatformOpenAI, Hydrated: true, SubscriptionType: service.SubscriptionTypeSubscription, MonthlyLimitUSD: &monthlyLimit}
+	geminiSubscriptionGroup := &service.Group{ID: 52, Name: "gemini-subscription", Status: service.StatusActive, Platform: service.PlatformGemini, Hydrated: true, SubscriptionType: service.SubscriptionTypeSubscription, MonthlyLimitUSD: &monthlyLimit}
+	geminiBalanceGroup := &service.Group{ID: 53, Name: "gemini-credit", Status: service.StatusActive, Platform: service.PlatformGemini, Hydrated: true, SubscriptionType: service.SubscriptionTypeStandard}
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive, Balance: 10, Concurrency: 3}
+	currentKey := &service.APIKey{ID: 110, UserID: user.ID, Key: "openai-google-style-key", Status: service.StatusActive, User: user, GroupID: &openAIGroup.ID, Group: openAIGroup}
+
+	cloneStoredKey := func(key *service.APIKey) *service.APIKey {
+		if key == nil {
+			return nil
+		}
+		clone := *key
+		if key.GroupID != nil {
+			groupID := *key.GroupID
+			clone.GroupID = &groupID
+		}
+		return &clone
+	}
+	apiKeyRepo := &stubApiKeyRepo{
+		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
+			if key != currentKey.Key {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			return cloneStoredKey(currentKey), nil
+		},
+		getByID: func(ctx context.Context, id int64) (*service.APIKey, error) {
+			if id != currentKey.ID {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			return cloneStoredKey(currentKey), nil
+		},
+		listByUserID: func(ctx context.Context, userID int64, params pagination.PaginationParams, filters service.APIKeyListFilters) ([]service.APIKey, *pagination.PaginationResult, error) {
+			require.Equal(t, user.ID, userID)
+			clone := cloneStoredKey(currentKey)
+			return []service.APIKey{*clone}, &pagination.PaginationResult{Total: 1, Page: 1, PageSize: 1000}, nil
+		},
+	}
+	now := time.Now()
+	subscriptionRepo := &stubUserSubscriptionRepo{
+		getActive: func(ctx context.Context, userID, groupID int64) (*service.UserSubscription, error) {
+			return nil, service.ErrSubscriptionNotFound
+		},
+		listByUserID: func(ctx context.Context, userID int64) ([]service.UserSubscription, error) {
+			require.Equal(t, user.ID, userID)
+			return []service.UserSubscription{
+				{ID: 64, UserID: user.ID, GroupID: openAIGroup.ID, Status: service.SubscriptionStatusExpired, StartsAt: now.Add(-96 * time.Hour), ExpiresAt: now.Add(-24 * time.Hour)},
+				{ID: 65, UserID: user.ID, GroupID: geminiSubscriptionGroup.ID, Status: service.SubscriptionStatusActive, StartsAt: now.Add(-time.Hour), ExpiresAt: now.Add(30 * 24 * time.Hour)},
+			}, nil
+		},
+		updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
+		activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
+		resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
+		resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
+		resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
+	}
+	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeStandard})
+	subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, &config.Config{RunMode: config.RunModeStandard})
+	entitlementService := service.NewEntitlementService(
+		&stubEntitlementUserRepo{user: user},
+		&stubEntitlementGroupRepo{groups: map[int64]*service.Group{openAIGroup.ID: openAIGroup, geminiSubscriptionGroup.ID: geminiSubscriptionGroup, geminiBalanceGroup.ID: geminiBalanceGroup}},
+		&stubEntitlementAPIKeyUpdater{update: func(ctx context.Context, id, userID int64, req service.UpdateAPIKeyRequest) (*service.APIKey, error) {
+			t.Fatalf("OpenAI request key from Google-style auth must not be rebound to Gemini subscription/balance groups")
+			return nil, nil
+		}},
+		apiKeyRepo,
+		subscriptionRepo,
+	)
+
+	router := gin.New()
+	reachedHandler := false
+	router.Use(APIKeyAuthWithSubscriptionGoogleAndEntitlements(apiKeyService, subscriptionService, entitlementService, &config.Config{RunMode: config.RunModeStandard}))
+	router.GET("/v1beta/test", func(c *gin.Context) {
+		reachedHandler = true
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1beta/test", nil)
+	req.Header.Set("x-goog-api-key", currentKey.Key)
+	router.ServeHTTP(w, req)
+
+	require.False(t, reachedHandler)
+	require.Equal(t, http.StatusForbidden, w.Code)
+	var resp googleErrorResponse
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	require.Equal(t, "No active subscription found for this group", resp.Error.Message)
+	require.Equal(t, "PERMISSION_DENIED", resp.Error.Status)
+	require.Empty(t, w.Header().Get("X-Sub2API-Auto-Switched"))
+	require.Empty(t, w.Header().Get("X-Sub2API-Auto-Switch-Action"))
 }
 
 func TestAPIKeyAuthDoesNotSwitchToAlternateAPIKeyForGatewayHiddenKey(t *testing.T) {

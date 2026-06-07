@@ -20,7 +20,7 @@ func NewAPIKeyAuthMiddleware(apiKeyService *service.APIKeyService, subscriptionS
 
 // NewAPIKeyAuthMiddlewareWithEntitlements creates the gateway API-key middleware with
 // server-side entitlement auto-switch enabled for quota/limit failures. This is the
-// real OpenClaw/provider traffic surface; renderer/titlebar hooks do not see these calls.
+// real provider traffic surface; renderer/titlebar hooks do not see these calls.
 func NewAPIKeyAuthMiddlewareWithEntitlements(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, entitlementService *service.EntitlementService, cfg *config.Config) APIKeyAuthMiddleware {
 	return APIKeyAuthMiddleware(apiKeyAuthWithSubscription(apiKeyService, subscriptionService, entitlementService, cfg))
 }
@@ -60,7 +60,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			apiKeyString = c.GetHeader("x-api-key")
 		}
 
-		// 如果x-api-key header中没有，尝试从x-goog-api-key header中提取（Gemini CLI兼容）
+		// 如果x-api-key header中没有，尝试从x-goog-api-key header中提取（Google/Gemini CLI兼容）
 		if apiKeyString == "" {
 			apiKeyString = c.GetHeader("x-goog-api-key")
 		}
@@ -246,7 +246,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			}
 			if subscription == nil {
 				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查。
-				// If the user's hidden V-Claw key is still bound to a balance group and the
+				// If the user's hidden provider key is still bound to a balance group and the
 				// wallet is empty, try to bind the same key to an active subscription group
 				// before rejecting the request. Users do not manage these API keys directly,
 				// so this keeps manual/admin subscription grants from interrupting traffic.
@@ -350,14 +350,10 @@ func tryAutoSwitchAPIKey(c *gin.Context, apiKeyService *service.APIKeyService, e
 
 func providerIDForAutoSwitchPlatform(platform string) string {
 	platform = strings.ToLower(strings.TrimSpace(platform))
-	switch platform {
-	case "":
+	if platform == "" {
 		return ""
-	case service.PlatformGemini, service.PlatformAntigravity:
-		return "v-claw-google"
-	default:
-		return "v-claw-" + platform
 	}
+	return "v-claw-" + platform
 }
 
 // GetAPIKeyFromContext 从上下文中获取API key
