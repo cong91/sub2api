@@ -171,6 +171,7 @@ type AutoSwitchEntitlementRequest struct {
 	ModelID             string `json:"model_id,omitempty"`
 	AllowAPIKeyChange   bool   `json:"allow_api_key_change"`
 	AllowProviderChange bool   `json:"allow_provider_change"`
+	PreferCurrentAPIKey bool   `json:"prefer_current_api_key"`
 }
 
 type EntitlementRuntimeAction struct {
@@ -698,6 +699,22 @@ func (s *EntitlementService) buildSwitchTargets(ctx context.Context, user *User,
 	}
 	var targets []EntitlementSwitchTarget
 
+	// Request-time continuity for hidden/bootstrap API keys is sticky: if the key
+	// that the client is actively using is still usable, rebind that SAME key to the
+	// best currently available entitlement instead of silently routing through some
+	// other API key. V-Claw users cannot discover or swap hidden keys themselves.
+	if shouldPreferCurrentAPIKeyForContinuity(currentKey, req) {
+		if shouldTrySubscriptionSwitch(user, req) {
+			if subscriptionTargets := s.subscriptionSwitchTargets(ctx, keys, currentKey, items, req); len(subscriptionTargets) > 0 {
+				return sortSwitchTargets(subscriptionTargets)
+			}
+		}
+		if user.Balance > 0 {
+			targets = append(targets, s.stickyBalanceSwitchTargets(ctx, user, keys, currentKey, items, req)...)
+		}
+		return sortSwitchTargets(targets)
+	}
+
 	// When the current key is on balance/credit mode and the wallet is empty, keep the
 	// same hidden API key alive by binding it to an active subscription group for the
 	// same provider/platform. V-Claw users do not manage API keys directly, so this is
@@ -742,12 +759,70 @@ func (s *EntitlementService) buildSwitchTargets(ctx context.Context, user *User,
 			}
 		}
 	}
+	return sortSwitchTargets(targets)
+}
+
+func sortSwitchTargets(targets []EntitlementSwitchTarget) []EntitlementSwitchTarget {
 	sort.SliceStable(targets, func(i, j int) bool {
 		if targets[i].Priority != targets[j].Priority {
 			return targets[i].Priority > targets[j].Priority
 		}
 		return targets[i].APIKeyID < targets[j].APIKeyID
 	})
+	return targets
+}
+
+func shouldPreferCurrentAPIKeyForContinuity(currentKey *APIKey, req AutoSwitchEntitlementRequest) bool {
+	return req.PreferCurrentAPIKey && currentKey != nil && isUsableAPIKeyForSwitch(*currentKey) && isContinuitySwitchTrigger(req)
+}
+
+func isContinuitySwitchTrigger(req AutoSwitchEntitlementRequest) bool {
+	if isSubscriptionSwitchTrigger(req) {
+		return true
+	}
+	reason := strings.ToLower(strings.TrimSpace(req.Reason))
+	code := strings.ToUpper(strings.TrimSpace(req.ErrorCode))
+	return reason == "subscription_limit_exceeded" || code == "USAGE_LIMIT_EXCEEDED"
+}
+
+func (s *EntitlementService) stickyBalanceSwitchTargets(ctx context.Context, user *User, keys []APIKey, currentKey *APIKey, items []EntitlementItem, req AutoSwitchEntitlementRequest) []EntitlementSwitchTarget {
+	if currentKey == nil || !isUsableAPIKeyForSwitch(*currentKey) {
+		return nil
+	}
+	var targets []EntitlementSwitchTarget
+	seen := make(map[int64]struct{})
+	addTarget := func(groupID int64, reason string, priority int) {
+		if groupID <= 0 {
+			return
+		}
+		if _, ok := seen[groupID]; ok {
+			return
+		}
+		if target, ok := s.switchTargetForGroup(ctx, user, keys, currentKey, groupID, req, reason, priority); ok {
+			target.EstimatedBalanceUSD = user.Balance
+			targets = append(targets, target)
+			seen[groupID] = struct{}{}
+		}
+	}
+	if currentKey.GroupID != nil {
+		for _, item := range items {
+			if item.GroupID == *currentKey.GroupID && item.FallbackGroupID != nil {
+				addTarget(*item.FallbackGroupID, "subscription_fallback_group", 100)
+			}
+		}
+	}
+	for _, key := range keys {
+		if key.GroupID == nil {
+			continue
+		}
+		addTarget(*key.GroupID, "active_balance_group_rebind", 60)
+	}
+	if len(targets) == 0 {
+		if target, ok := s.defaultBalanceGroupSwitchTarget(ctx, user, keys, currentKey, items, req); ok {
+			target.EstimatedBalanceUSD = user.Balance
+			targets = append(targets, target)
+		}
+	}
 	return targets
 }
 

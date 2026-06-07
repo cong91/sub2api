@@ -327,6 +327,7 @@ func tryAutoSwitchAPIKey(c *gin.Context, apiKeyService *service.APIKeyService, e
 		ProviderID:          providerID,
 		AllowAPIKeyChange:   allowAPIKeyChange,
 		AllowProviderChange: allowProviderChange,
+		PreferCurrentAPIKey: true,
 	})
 	if err != nil || result == nil || !result.Switched || result.Target == nil {
 		return nil, false
