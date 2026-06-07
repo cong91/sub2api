@@ -1,4 +1,6 @@
-export default {
+import { adminLocalePatches, mergeLocalePatch } from './adminLocalePatches'
+
+const messages = {
   // Home Page
   home: {
     viewOnGithub: 'Xem trên GitHub',
@@ -7724,3 +7726,7 @@ export default {
   },
 
 }
+
+mergeLocalePatch(messages, adminLocalePatches.vi)
+
+export default messages
