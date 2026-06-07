@@ -158,8 +158,22 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			)
 			if subErr != nil {
 				if !skipBilling {
-					AbortWithError(c, 403, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this group")
-					return
+					if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "subscription_not_found", "SUBSCRIPTION_NOT_FOUND", true, false); ok {
+						apiKey = switchedKey
+						subscription = nil
+						isSubscriptionType = apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+						if isSubscriptionType && subscriptionService != nil {
+							sub, subErr = subscriptionService.GetActiveSubscription(c.Request.Context(), apiKey.User.ID, apiKey.Group.ID)
+							if subErr != nil {
+								AbortWithError(c, 403, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this group")
+								return
+							}
+							subscription = sub
+						}
+					} else {
+						AbortWithError(c, 403, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this group")
+						return
+					}
 				}
 				// skipBilling: 订阅不存在也放行，handler 会返回可用的数据
 			} else {

@@ -702,7 +702,7 @@ func (s *EntitlementService) buildSwitchTargets(ctx context.Context, user *User,
 	// same hidden API key alive by binding it to an active subscription group for the
 	// same provider/platform. V-Claw users do not manage API keys directly, so this is
 	// the server-side continuity path for manual/admin subscription grants.
-	if user.Balance <= 0 || strings.EqualFold(req.Reason, "balance_insufficient") || strings.EqualFold(req.ErrorCode, "INSUFFICIENT_BALANCE") {
+	if shouldTrySubscriptionSwitch(user, req) {
 		if subscriptionTargets := s.subscriptionSwitchTargets(ctx, keys, currentKey, items, req); len(subscriptionTargets) > 0 {
 			targets = append(targets, subscriptionTargets...)
 		}
@@ -751,6 +751,26 @@ func (s *EntitlementService) buildSwitchTargets(ctx context.Context, user *User,
 	return targets
 }
 
+func shouldTrySubscriptionSwitch(user *User, req AutoSwitchEntitlementRequest) bool {
+	if user != nil && user.Balance <= 0 {
+		return true
+	}
+	return isSubscriptionSwitchTrigger(req)
+}
+
+func isSubscriptionSwitchTrigger(req AutoSwitchEntitlementRequest) bool {
+	reason := strings.ToLower(strings.TrimSpace(req.Reason))
+	code := strings.ToUpper(strings.TrimSpace(req.ErrorCode))
+	return reason == "balance_insufficient" ||
+		code == "INSUFFICIENT_BALANCE" ||
+		reason == "subscription_not_found" ||
+		reason == "subscription_invalid" ||
+		reason == "subscription_expired" ||
+		code == "SUBSCRIPTION_NOT_FOUND" ||
+		code == "SUBSCRIPTION_INVALID" ||
+		code == "SUBSCRIPTION_EXPIRED"
+}
+
 func (s *EntitlementService) subscriptionSwitchTargets(ctx context.Context, keys []APIKey, currentKey *APIKey, items []EntitlementItem, req AutoSwitchEntitlementRequest) []EntitlementSwitchTarget {
 	key := currentKey
 	if key == nil || !isUsableAPIKeyForSwitch(*key) {
@@ -762,7 +782,7 @@ func (s *EntitlementService) subscriptionSwitchTargets(ctx context.Context, keys
 	if key == nil || key.GroupID == nil {
 		return nil
 	}
-	if currentGroup, err := s.groupRepo.GetByID(ctx, *key.GroupID); err == nil && currentGroup != nil && currentGroup.IsSubscriptionType() {
+	if currentGroup, err := s.groupRepo.GetByID(ctx, *key.GroupID); err == nil && currentGroup != nil && currentGroup.IsSubscriptionType() && !isSubscriptionSwitchTrigger(req) {
 		return nil
 	}
 

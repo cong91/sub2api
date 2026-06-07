@@ -541,6 +541,44 @@ func TestEntitlementService_AutoSwitchEntitlement_UsesActiveSubscriptionWhenBala
 	require.Equal(t, subscriptionGroupID, *result.State.Current.GroupID)
 }
 
+func TestEntitlementService_AutoSwitchEntitlement_RebindsExpiredBootstrapSubscriptionKeyToNewActiveSubscription(t *testing.T) {
+	now := time.Now()
+	oldGroupID := int64(8)
+	newGroupID := int64(9)
+	monthlyLimit := 30.0
+	keyRepo := &entitlementAPIKeyRepoStub{keys: []APIKey{{ID: 100, UserID: 42, Key: "sk-bootstrap", Name: "bootstrap-openai", Status: StatusActive, GroupID: &oldGroupID}}}
+	updater := &entitlementAPIKeyUpdaterStub{keys: keyRepo}
+	svc := NewEntitlementService(
+		&entitlementUserRepoStub{users: map[int64]*User{42: {ID: 42, Balance: 10}}},
+		&entitlementGroupRepoStub{groups: map[int64]*Group{
+			oldGroupID: {ID: oldGroupID, Name: "OpenAI Free Trial", Platform: PlatformOpenAI, Status: StatusActive, SubscriptionType: SubscriptionTypeSubscription, MonthlyLimitUSD: &monthlyLimit, SupportedModelScopes: []string{"openai"}},
+			newGroupID: {ID: newGroupID, Name: "V-Claw Basic Pass", Platform: PlatformOpenAI, Status: StatusActive, SubscriptionType: SubscriptionTypeSubscription, MonthlyLimitUSD: &monthlyLimit, SupportedModelScopes: []string{"openai"}},
+		}},
+		updater,
+		keyRepo,
+		&entitlementUserSubRepoStub{subs: []UserSubscription{
+			{ID: 7, UserID: 42, GroupID: oldGroupID, Status: SubscriptionStatusExpired, StartsAt: now.Add(-96 * time.Hour), ExpiresAt: now.Add(-24 * time.Hour)},
+			{ID: 8, UserID: 42, GroupID: newGroupID, Status: SubscriptionStatusActive, StartsAt: now.Add(-time.Hour), ExpiresAt: now.Add(90 * 24 * time.Hour), MonthlyUsageUSD: 1.5},
+		}},
+	)
+
+	result, err := svc.AutoSwitchEntitlement(context.Background(), 42, AutoSwitchEntitlementRequest{Reason: "subscription_not_found", ErrorCode: "SUBSCRIPTION_NOT_FOUND", CurrentAPIKeyID: &[]int64{100}[0], CurrentGroupID: &[]int64{oldGroupID}[0], ProviderID: "v-claw-openai", AllowAPIKeyChange: true})
+
+	require.NoError(t, err)
+	require.True(t, result.Switched)
+	require.Equal(t, EntitlementSwitchActionGroup, result.Action)
+	require.NotNil(t, result.Target)
+	require.Equal(t, EntitlementModeSubscription, result.Target.Mode)
+	require.Equal(t, newGroupID, result.Target.GroupID)
+	require.Equal(t, int64(100), result.Target.APIKeyID)
+	require.Equal(t, "active_subscription_group", result.Target.Reason)
+	require.Equal(t, newGroupID, *updater.updatedGroup)
+	require.NotNil(t, result.State)
+	require.NotNil(t, result.State.Current)
+	require.Equal(t, EntitlementModeSubscription, result.State.Current.Mode)
+	require.Equal(t, newGroupID, *result.State.Current.GroupID)
+}
+
 func TestEntitlementService_AutoSwitchEntitlement_SkipsExhaustedSubscriptionTarget(t *testing.T) {
 	now := time.Now()
 	later := now.Add(30 * 24 * time.Hour)

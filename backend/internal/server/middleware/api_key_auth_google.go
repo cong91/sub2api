@@ -117,38 +117,52 @@ func APIKeyAuthWithSubscriptionGoogleAndEntitlements(apiKeyService *service.APIK
 				apiKey.Group.ID,
 			)
 			if err != nil {
-				abortWithGoogleError(c, 403, "No active subscription found for this group")
-				return
-			}
-
-			needsMaintenance, err := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
-			if err != nil {
-				status := 403
-				if errors.Is(err, service.ErrDailyLimitExceeded) ||
-					errors.Is(err, service.ErrWeeklyLimitExceeded) ||
-					errors.Is(err, service.ErrMonthlyLimitExceeded) {
-					status = 429
-					code := "USAGE_LIMIT_EXCEEDED"
-					if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "subscription_limit_exceeded", code, true, true); ok {
-						apiKey = switchedKey
-						subscription = nil
-					} else {
-						abortWithGoogleBillingError(c, status, code, err.Error())
-						return
+				if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "subscription_not_found", "SUBSCRIPTION_NOT_FOUND", true, false); ok {
+					apiKey = switchedKey
+					isSubscriptionType = apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+					if isSubscriptionType && subscriptionService != nil {
+						subscription, err = subscriptionService.GetActiveSubscription(c.Request.Context(), apiKey.User.ID, apiKey.Group.ID)
+						if err != nil {
+							abortWithGoogleError(c, 403, "No active subscription found for this group")
+							return
+						}
 					}
 				} else {
-					abortWithGoogleError(c, status, err.Error())
+					abortWithGoogleError(c, 403, "No active subscription found for this group")
 					return
 				}
 			}
 
 			if subscription != nil {
-				c.Set(string(ContextKeySubscription), subscription)
-			}
+				needsMaintenance, err := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
+				if err != nil {
+					status := 403
+					if errors.Is(err, service.ErrDailyLimitExceeded) ||
+						errors.Is(err, service.ErrWeeklyLimitExceeded) ||
+						errors.Is(err, service.ErrMonthlyLimitExceeded) {
+						status = 429
+						code := "USAGE_LIMIT_EXCEEDED"
+						if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "subscription_limit_exceeded", code, true, true); ok {
+							apiKey = switchedKey
+							subscription = nil
+						} else {
+							abortWithGoogleBillingError(c, status, code, err.Error())
+							return
+						}
+					} else {
+						abortWithGoogleError(c, status, err.Error())
+						return
+					}
+				}
 
-			if subscription != nil && needsMaintenance {
-				maintenanceCopy := *subscription
-				subscriptionService.DoWindowMaintenance(&maintenanceCopy)
+				if subscription != nil {
+					c.Set(string(ContextKeySubscription), subscription)
+				}
+
+				if subscription != nil && needsMaintenance {
+					maintenanceCopy := *subscription
+					subscriptionService.DoWindowMaintenance(&maintenanceCopy)
+				}
 			}
 		}
 		if subscription == nil {
