@@ -2,7 +2,7 @@
   <BaseDialog
     :show="show"
     :title="t('admin.accounts.dataImportTitle')"
-    width="normal"
+    width="wide"
     close-on-click-outside
     @close="handleClose"
   >
@@ -39,6 +39,90 @@
           multiple
           @change="handleFileChange"
         />
+      </div>
+
+      <div class="rounded-xl border border-gray-200 p-4 dark:border-dark-700">
+        <div class="mb-2 flex items-center justify-between gap-3">
+          <label class="input-label mb-0">{{ t('admin.accounts.dataImportGroup') }}</label>
+          <button
+            v-if="selectedGroupId !== null"
+            type="button"
+            class="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
+            @click="selectedGroupId = null"
+          >
+            {{ t('admin.accounts.dataImportClearGroup') }}
+          </button>
+        </div>
+        <div class="grid max-h-40 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+          <button
+            v-for="group in activeGroups"
+            :key="group.id"
+            type="button"
+            :class="[
+              'flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors',
+              selectedGroupId === group.id
+                ? 'border-primary-400 bg-primary-50 dark:border-primary-700 dark:bg-primary-900/20'
+                : 'border-gray-200 bg-white hover:border-gray-300 dark:border-dark-600 dark:bg-dark-800 dark:hover:border-dark-500'
+            ]"
+            @click="selectedGroupId = group.id"
+          >
+            <GroupBadge
+              :name="group.name"
+              :platform="group.platform"
+              :subscription-type="group.subscription_type"
+              :rate-multiplier="group.rate_multiplier"
+              class="min-w-0 flex-1"
+            />
+            <span v-if="selectedGroupId === group.id" class="shrink-0 text-xs text-primary-600 dark:text-primary-400">✓</span>
+          </button>
+          <div
+            v-if="activeGroups.length === 0"
+            class="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-sm text-gray-500 dark:border-dark-600 dark:text-dark-400 sm:col-span-2"
+          >
+            {{ t('common.noGroupsAvailable') }}
+          </div>
+        </div>
+        <p class="mt-2 text-xs text-gray-500 dark:text-dark-400">
+          {{ t('admin.accounts.dataImportGroupHint') }}
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-gray-200 p-4 dark:border-dark-700">
+        <label class="input-label">{{ t('admin.accounts.dataImportProxyAssignment') }}</label>
+        <div class="grid gap-2 sm:grid-cols-2">
+          <label
+            v-for="option in proxyAssignmentOptions"
+            :key="option.value"
+            :class="[
+              'cursor-pointer rounded-lg border p-3 transition-colors',
+              proxyAssignmentMode === option.value
+                ? 'border-primary-400 bg-primary-50 dark:border-primary-700 dark:bg-primary-900/20'
+                : 'border-gray-200 bg-white hover:border-gray-300 dark:border-dark-600 dark:bg-dark-800 dark:hover:border-dark-500'
+            ]"
+            @click="proxyAssignmentMode = option.value"
+          >
+            <div class="flex items-start gap-2">
+              <input
+                v-model="proxyAssignmentMode"
+                type="radio"
+                name="data-import-proxy-assignment"
+                class="mt-0.5 h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500"
+                :value="option.value"
+              />
+              <div class="min-w-0">
+                <div class="text-sm font-medium text-gray-900 dark:text-white">{{ option.label }}</div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ option.description }}</div>
+              </div>
+            </div>
+          </label>
+        </div>
+        <div v-if="proxyAssignmentMode === 'default_live'" class="mt-3">
+          <label class="input-label">{{ t('admin.accounts.dataImportDefaultProxy') }}</label>
+          <ProxySelector v-model="defaultProxyId" :proxies="activeProxies" />
+        </div>
+        <p class="mt-2 text-xs text-gray-500 dark:text-dark-400">
+          {{ t('admin.accounts.dataImportProxyAssignmentHint') }}
+        </p>
       </div>
 
       <div
@@ -89,11 +173,20 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import GroupBadge from '@/components/common/GroupBadge.vue'
+import ProxySelector from '@/components/common/ProxySelector.vue'
 import { adminAPI } from '@/api/admin'
 import { useAppStore } from '@/stores/app'
-import type { AdminDataImportResult, AdminDataPayload } from '@/types'
+import type {
+  AdminDataImportProxyAssignment,
+  AdminDataImportResult,
+  AdminDataPayload,
+  AdminGroup,
+  Proxy
+} from '@/types'
 
 type AdminImportData = AdminDataPayload
+type ProxyAssignmentMode = AdminDataImportProxyAssignment['mode']
 
 const IMPORT_FORMAT_FILE_PREFIX = 'sub2api-account'
 const STRUCTURED_EXPORT_ONLY_ERROR = 'Structured export file must be imported alone'
@@ -210,10 +303,20 @@ const buildSelectedFilesLabel = (files: File[]): string => {
   return `${files.length} JSON files selected`
 }
 
+const buildProxyAssignmentPayload = (): AdminDataImportProxyAssignment => ({
+  mode: proxyAssignmentMode.value,
+  default_proxy_id: proxyAssignmentMode.value === 'default_live' ? defaultProxyId.value : null
+})
+
 const importDataPayloads = async (payloads: AdminImportData[]): Promise<ImportAggregateResult> => {
+  const importOptions = {
+    skip_default_group_bind: true,
+    group_id: selectedGroupId.value,
+    proxy_assignment: buildProxyAssignmentPayload()
+  }
   const responses = await Promise.all(payloads.map((data) => adminAPI.accounts.importData({
     data,
-    skip_default_group_bind: true
+    ...importOptions
   })))
 
   return mergeImportResults(responses)
@@ -229,6 +332,12 @@ const clearSelection = () => {
   files.value = []
   result.value = null
   resetInputValue(fileInput.value)
+}
+
+const resetImportOptions = () => {
+  selectedGroupId.value = null
+  proxyAssignmentMode.value = 'keep_file'
+  defaultProxyId.value = null
 }
 
 const isStructuredExportFilename = (fileName: string) => {
@@ -300,7 +409,22 @@ const ensureFilesSelected = (selectedFiles: File[], showError: (message: string)
   }
 }
 
-const shouldStopImporting = (error: unknown) => error instanceof Error && error.message === 'No files selected'
+const ensureProxyAssignmentReady = (showError: (message: string) => void, t: (key: string) => string) => {
+  if (proxyAssignmentMode.value === 'random_live' && activeProxies.value.length === 0) {
+    showError(t('admin.accounts.dataImportNoActiveProxy'))
+    throw new Error('No active proxy')
+  }
+  if (proxyAssignmentMode.value === 'default_live' && defaultProxyId.value === null) {
+    showError(t('admin.accounts.dataImportSelectDefaultProxy'))
+    throw new Error('No default proxy selected')
+  }
+}
+
+const shouldStopImporting = (error: unknown) => error instanceof Error && (
+  error.message === 'No files selected'
+  || error.message === 'No active proxy'
+  || error.message === 'No default proxy selected'
+)
 
 const finalizeImportState = (flag: typeof importing) => {
   flag.value = false
@@ -318,6 +442,8 @@ const selectedFilesLabel = computed(() => buildSelectedFilesLabel(files.value))
 
 interface Props {
   show: boolean
+  proxies: Proxy[]
+  groups: AdminGroup[]
 }
 
 interface Emits {
@@ -325,7 +451,10 @@ interface Emits {
   (e: 'imported'): void
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  proxies: () => [],
+  groups: () => []
+})
 const emit = defineEmits<Emits>()
 
 const { t } = useI18n()
@@ -334,9 +463,36 @@ const appStore = useAppStore()
 const importing = ref(false)
 const files = ref<File[]>([])
 const result = ref<AdminDataImportResult | null>(null)
+const selectedGroupId = ref<number | null>(null)
+const proxyAssignmentMode = ref<ProxyAssignmentMode>('keep_file')
+const defaultProxyId = ref<number | null>(null)
 
 const fileInput = ref<HTMLInputElement | null>(null)
 
+const activeGroups = computed(() => props.groups.filter((group) => group.status === 'active'))
+const activeProxies = computed(() => props.proxies.filter((proxy) => proxy.status === 'active'))
+const proxyAssignmentOptions = computed(() => [
+  {
+    value: 'keep_file' as const,
+    label: t('admin.accounts.dataImportProxyKeepFile'),
+    description: t('admin.accounts.dataImportProxyKeepFileDesc')
+  },
+  {
+    value: 'none' as const,
+    label: t('admin.accounts.dataImportProxyNone'),
+    description: t('admin.accounts.dataImportProxyNoneDesc')
+  },
+  {
+    value: 'random_live' as const,
+    label: t('admin.accounts.dataImportProxyRandomLive'),
+    description: t('admin.accounts.dataImportProxyRandomLiveDesc')
+  },
+  {
+    value: 'default_live' as const,
+    label: t('admin.accounts.dataImportProxyDefaultLive'),
+    description: t('admin.accounts.dataImportProxyDefaultLiveDesc')
+  }
+])
 const errorItems = computed(() => result.value?.errors || [])
 
 watch(
@@ -344,9 +500,28 @@ watch(
   (open) => {
     if (open) {
       clearSelection()
+      resetImportOptions()
     }
   }
 )
+
+watch(activeGroups, (groups) => {
+  if (selectedGroupId.value !== null && !groups.some((group) => group.id === selectedGroupId.value)) {
+    selectedGroupId.value = null
+  }
+})
+
+watch(activeProxies, (proxies) => {
+  if (defaultProxyId.value !== null && !proxies.some((proxy) => proxy.id === defaultProxyId.value)) {
+    defaultProxyId.value = null
+  }
+})
+
+watch(proxyAssignmentMode, (mode) => {
+  if (mode !== 'default_live') {
+    defaultProxyId.value = null
+  }
+})
 
 const openFilePicker = () => {
   fileInput.value?.click()
@@ -392,6 +567,7 @@ const readFileAsText = async (sourceFile: File): Promise<string> => {
 const handleImport = async () => {
   try {
     ensureFilesSelected(files.value, appStore.showError, t)
+    ensureProxyAssignmentReady(appStore.showError, t)
   } catch (error) {
     if (!shouldStopImporting(error)) {
       appStore.showError(getImportErrorMessage(error, t))
