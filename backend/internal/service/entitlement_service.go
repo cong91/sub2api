@@ -699,11 +699,14 @@ func (s *EntitlementService) buildSwitchTargets(ctx context.Context, user *User,
 	}
 	var targets []EntitlementSwitchTarget
 
-	// Request-time continuity for hidden/bootstrap API keys is sticky: if the key
-	// that the client is actively using is still usable, rebind that SAME key to the
-	// best currently available entitlement instead of silently routing through some
-	// other API key. V-Claw users cannot discover or swap hidden keys themselves.
-	if shouldPreferCurrentAPIKeyForContinuity(currentKey, req) {
+	// Request-time continuity for hidden/bootstrap API keys is rebind-only. If the
+	// key that the client is actively using is not itself usable, the gateway must
+	// fail instead of selecting another API key: V-Claw/OpenClaw cannot swap the
+	// secret it sends on the next request.
+	if req.PreferCurrentAPIKey {
+		if currentKey == nil || !isUsableAPIKeyForSwitch(*currentKey) || !isContinuitySwitchTrigger(req) {
+			return nil
+		}
 		if shouldTrySubscriptionSwitch(user, req) {
 			if subscriptionTargets := s.subscriptionSwitchTargets(ctx, keys, currentKey, items, req); len(subscriptionTargets) > 0 {
 				return sortSwitchTargets(subscriptionTargets)
@@ -770,10 +773,6 @@ func sortSwitchTargets(targets []EntitlementSwitchTarget) []EntitlementSwitchTar
 		return targets[i].APIKeyID < targets[j].APIKeyID
 	})
 	return targets
-}
-
-func shouldPreferCurrentAPIKeyForContinuity(currentKey *APIKey, req AutoSwitchEntitlementRequest) bool {
-	return req.PreferCurrentAPIKey && currentKey != nil && isUsableAPIKeyForSwitch(*currentKey) && isContinuitySwitchTrigger(req)
 }
 
 func isContinuitySwitchTrigger(req AutoSwitchEntitlementRequest) bool {

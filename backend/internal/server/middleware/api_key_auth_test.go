@@ -1092,6 +1092,84 @@ func TestAPIKeyAuthAutoSwitchesExpiredBootstrapSubscriptionKeyToBalanceGroup(t *
 	require.Contains(t, w.Body.String(), `"group_id":42`)
 }
 
+func TestAPIKeyAuthDoesNotSwitchToAlternateAPIKeyForGatewayHiddenKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	balanceGroup := &service.Group{ID: 42, Name: "balance-credit", Status: service.StatusActive, Platform: service.PlatformOpenAI, Hydrated: true, SubscriptionType: service.SubscriptionTypeStandard}
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive, Balance: 10, Concurrency: 3}
+	keyStore := map[int64]*service.APIKey{}
+	currentKey := &service.APIKey{ID: 100, UserID: user.ID, Key: "bootstrap-key", Status: service.StatusAPIKeyQuotaExhausted, User: user, GroupID: &balanceGroup.ID, Group: balanceGroup, Quota: 1, QuotaUsed: 1}
+	otherKey := &service.APIKey{ID: 101, UserID: user.ID, Key: "other-balance-key", Status: service.StatusActive, User: user, GroupID: &balanceGroup.ID, Group: balanceGroup}
+	keyStore[currentKey.ID] = currentKey
+	keyStore[otherKey.ID] = otherKey
+
+	cloneStoredKey := func(key *service.APIKey) *service.APIKey {
+		if key == nil {
+			return nil
+		}
+		clone := *key
+		if key.GroupID != nil {
+			groupID := *key.GroupID
+			clone.GroupID = &groupID
+		}
+		return &clone
+	}
+	apiKeyRepo := &stubApiKeyRepo{
+		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
+			if key != currentKey.Key {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			return cloneStoredKey(keyStore[currentKey.ID]), nil
+		},
+		getByID: func(ctx context.Context, id int64) (*service.APIKey, error) {
+			key := keyStore[id]
+			if key == nil {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			return cloneStoredKey(key), nil
+		},
+		listByUserID: func(ctx context.Context, userID int64, params pagination.PaginationParams, filters service.APIKeyListFilters) ([]service.APIKey, *pagination.PaginationResult, error) {
+			require.Equal(t, user.ID, userID)
+			current := cloneStoredKey(keyStore[currentKey.ID])
+			other := cloneStoredKey(keyStore[otherKey.ID])
+			return []service.APIKey{*current, *other}, &pagination.PaginationResult{Total: 2, Page: 1, PageSize: 1000}, nil
+		},
+	}
+	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeStandard})
+	entitlementService := service.NewEntitlementService(
+		&stubEntitlementUserRepo{user: user},
+		&stubEntitlementGroupRepo{groups: map[int64]*service.Group{balanceGroup.ID: balanceGroup}},
+		&stubEntitlementAPIKeyUpdater{update: func(ctx context.Context, id, userID int64, req service.UpdateAPIKeyRequest) (*service.APIKey, error) {
+			t.Fatalf("gateway continuity must not update or switch a different API key; client can only keep using the original bootstrap key")
+			return nil, nil
+		}},
+		apiKeyRepo,
+		&stubUserSubscriptionRepo{listByUserID: func(ctx context.Context, userID int64) ([]service.UserSubscription, error) {
+			require.Equal(t, user.ID, userID)
+			return nil, nil
+		}},
+	)
+
+	router := gin.New()
+	reachedHandler := false
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddlewareWithEntitlements(apiKeyService, nil, entitlementService, &config.Config{RunMode: config.RunModeStandard})))
+	router.GET("/t", func(c *gin.Context) {
+		reachedHandler = true
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	req.Header.Set("x-api-key", currentKey.Key)
+	router.ServeHTTP(w, req)
+
+	require.False(t, reachedHandler)
+	require.Equal(t, http.StatusTooManyRequests, w.Code)
+	require.Contains(t, w.Body.String(), "API_KEY_QUOTA_EXHAUSTED")
+	require.Empty(t, w.Header().Get("X-Sub2API-Auto-Switched"))
+	require.Empty(t, w.Header().Get("X-Sub2API-Auto-Switch-Action"))
+}
+
 func TestAPIKeyAuthAutoSwitchesBalanceKeyToActiveSubscriptionWhenBalanceEmpty(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

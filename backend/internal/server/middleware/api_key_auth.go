@@ -158,7 +158,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			)
 			if subErr != nil {
 				if !skipBilling {
-					if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "subscription_not_found", "SUBSCRIPTION_NOT_FOUND", true, false); ok {
+					if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "subscription_not_found", "SUBSCRIPTION_NOT_FOUND", false); ok {
 						apiKey = switchedKey
 						subscription = nil
 						isSubscriptionType = apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
@@ -187,7 +187,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			// Key 状态检查
 			switch apiKey.Status {
 			case service.StatusAPIKeyQuotaExhausted:
-				if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "api_key_quota_exhausted", "API_KEY_QUOTA_EXHAUSTED", true, false); ok {
+				if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "api_key_quota_exhausted", "API_KEY_QUOTA_EXHAUSTED", false); ok {
 					apiKey = switchedKey
 					subscription = nil
 					break
@@ -205,7 +205,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				return
 			}
 			if apiKey.IsQuotaExhausted() {
-				if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "api_key_quota_exhausted", "API_KEY_QUOTA_EXHAUSTED", true, false); ok {
+				if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "api_key_quota_exhausted", "API_KEY_QUOTA_EXHAUSTED", false); ok {
 					apiKey = switchedKey
 					subscription = nil
 				} else {
@@ -225,7 +225,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 						errors.Is(validateErr, service.ErrMonthlyLimitExceeded) {
 						code = "USAGE_LIMIT_EXCEEDED"
 						status = 429
-						if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "subscription_limit_exceeded", code, true, true); ok {
+						if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "subscription_limit_exceeded", code, true); ok {
 							apiKey = switchedKey
 							subscription = nil
 						} else {
@@ -251,7 +251,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				// before rejecting the request. Users do not manage these API keys directly,
 				// so this keeps manual/admin subscription grants from interrupting traffic.
 				if apiKey.User.Balance <= 0 {
-					if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "balance_insufficient", "INSUFFICIENT_BALANCE", true, false); ok {
+					if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "balance_insufficient", "INSUFFICIENT_BALANCE", false); ok {
 						apiKey = switchedKey
 						subscription = nil
 						if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() && subscriptionService != nil {
@@ -305,7 +305,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 	}
 }
 
-func tryAutoSwitchAPIKey(c *gin.Context, apiKeyService *service.APIKeyService, entitlementService *service.EntitlementService, apiKey *service.APIKey, reason, errorCode string, allowAPIKeyChange, allowProviderChange bool) (*service.APIKey, bool) {
+func tryAutoSwitchAPIKey(c *gin.Context, apiKeyService *service.APIKeyService, entitlementService *service.EntitlementService, apiKey *service.APIKey, reason, errorCode string, allowProviderChange bool) (*service.APIKey, bool) {
 	if c == nil || apiKeyService == nil || entitlementService == nil || apiKey == nil || apiKey.User == nil {
 		return nil, false
 	}
@@ -325,7 +325,7 @@ func tryAutoSwitchAPIKey(c *gin.Context, apiKeyService *service.APIKeyService, e
 		CurrentAPIKeyID:     &currentAPIKeyID,
 		CurrentGroupID:      currentGroupID,
 		ProviderID:          providerID,
-		AllowAPIKeyChange:   allowAPIKeyChange,
+		AllowAPIKeyChange:   false,
 		AllowProviderChange: allowProviderChange,
 		PreferCurrentAPIKey: true,
 	})

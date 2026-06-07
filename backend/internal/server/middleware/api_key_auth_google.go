@@ -88,7 +88,7 @@ func APIKeyAuthWithSubscriptionGoogleAndEntitlements(apiKeyService *service.APIK
 
 		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
 		if apiKey.Status == service.StatusAPIKeyQuotaExhausted {
-			if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "api_key_quota_exhausted", "API_KEY_QUOTA_EXHAUSTED", true, false); ok {
+			if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "api_key_quota_exhausted", "API_KEY_QUOTA_EXHAUSTED", false); ok {
 				apiKey = switchedKey
 				isSubscriptionType = apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
 			} else {
@@ -101,7 +101,7 @@ func APIKeyAuthWithSubscriptionGoogleAndEntitlements(apiKeyService *service.APIK
 			return
 		}
 		if apiKey.IsQuotaExhausted() {
-			if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "api_key_quota_exhausted", "API_KEY_QUOTA_EXHAUSTED", true, false); ok {
+			if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "api_key_quota_exhausted", "API_KEY_QUOTA_EXHAUSTED", false); ok {
 				apiKey = switchedKey
 				isSubscriptionType = apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
 			} else {
@@ -117,7 +117,7 @@ func APIKeyAuthWithSubscriptionGoogleAndEntitlements(apiKeyService *service.APIK
 				apiKey.Group.ID,
 			)
 			if err != nil {
-				if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "subscription_not_found", "SUBSCRIPTION_NOT_FOUND", true, false); ok {
+				if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "subscription_not_found", "SUBSCRIPTION_NOT_FOUND", false); ok {
 					apiKey = switchedKey
 					isSubscriptionType = apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
 					if isSubscriptionType && subscriptionService != nil {
@@ -142,7 +142,7 @@ func APIKeyAuthWithSubscriptionGoogleAndEntitlements(apiKeyService *service.APIK
 						errors.Is(err, service.ErrMonthlyLimitExceeded) {
 						status = 429
 						code := "USAGE_LIMIT_EXCEEDED"
-						if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "subscription_limit_exceeded", code, true, true); ok {
+						if switchedKey, ok := tryAutoSwitchAPIKey(c, apiKeyService, entitlementService, apiKey, "subscription_limit_exceeded", code, true); ok {
 							apiKey = switchedKey
 							subscription = nil
 						} else {
