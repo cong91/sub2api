@@ -552,7 +552,7 @@ func TestOpenAIGatewayService_OAuthPassthrough_CodexMissingInstructionsRejectedB
 	require.Contains(t, rec.Body.String(), "requires a non-empty instructions field")
 	require.Nil(t, upstream.lastReq)
 
-	require.True(t, logSink.ContainsMessage("OpenAI passthrough 本地拦截：Codex 请求缺少有效 instructions"))
+	require.True(t, logSink.ContainsMessage("OpenAI passthrough blocked locally: Codex request is missing valid instructions"))
 	require.True(t, logSink.ContainsFieldValue("request_user_agent", "codex_cli_rs/0.98.0 (Windows 10.0.19045; x86_64) unknown"))
 	require.True(t, logSink.ContainsFieldValue("reject_reason", "instructions_missing"))
 }
