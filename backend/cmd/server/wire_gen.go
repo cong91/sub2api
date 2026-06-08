@@ -252,7 +252,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	paymentHandler := admin.NewPaymentHandler(paymentService, paymentConfigService, adminService)
 	affiliateHandler := admin.NewAffiliateHandler(affiliateService, adminService, client)
 	complianceHandler := admin.NewComplianceHandler(settingService)
-	botSalesFulfillmentService := service.NewBotSalesFulfillmentService(client, userService, subscriptionService, apiKeyService, userDeviceRepository)
+	botSalesFulfillmentService := service.NewBotSalesFulfillmentService(client, userService, settingService, subscriptionService, apiKeyService, userDeviceRepository)
 	botSalesFulfillmentHandler := admin.NewBotSalesFulfillmentHandler(botSalesFulfillmentService)
 	adminHandlers := handler.ProvideAdminHandlers(dashboardHandler, adminUserHandler, groupHandler, accountHandler, adminAnnouncementHandler, dataManagementHandler, backupHandler, oAuthHandler, openAIOAuthHandler, geminiOAuthHandler, antigravityOAuthHandler, kiroOAuthHandler, proxyHandler, adminRedeemHandler, promoHandler, settingHandler, opsHandler, systemHandler, adminSubscriptionHandler, adminUsageHandler, userAttributeHandler, errorPassthroughHandler, tlsFingerprintProfileHandler, adminAPIKeyHandler, scheduledTestHandler, channelHandler, channelMonitorHandler, channelMonitorRequestTemplateHandler, contentModerationHandler, paymentHandler, affiliateHandler, complianceHandler, botSalesFulfillmentHandler)
 	usageRecordWorkerPool := service.NewUsageRecordWorkerPool(configConfig)
