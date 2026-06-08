@@ -14,7 +14,13 @@ const (
 )
 
 func (s *OpsService) listAllAccountsForOps(ctx context.Context, platformFilter string) ([]Account, error) {
-	if s == nil || s.accountRepo == nil {
+	if s == nil {
+		return []Account{}, nil
+	}
+	if s.listAccountsForOpsHook != nil {
+		return s.listAccountsForOpsHook(ctx, platformFilter)
+	}
+	if s.accountRepo == nil {
 		return []Account{}, nil
 	}
 
