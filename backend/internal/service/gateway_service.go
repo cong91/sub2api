@@ -5336,7 +5336,7 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 		proxyURL = account.Proxy.URL()
 	}
 
-	logger.LegacyPrintf("service.gateway", "[Anthropic 自动透传] 命中 API Key 透传分支: account=%d name=%s model=%s stream=%v",
+	logger.LegacyPrintf("service.gateway", "[Anthropic passthrough] API Key passthrough branch matched: account=%d name=%s model=%s stream=%v",
 		account.ID, account.Name, input.RequestModel, input.RequestStream)
 
 	if c != nil {
@@ -6058,7 +6058,7 @@ func (s *GatewayService) forwardBedrock(
 		proxyURL = account.Proxy.URL()
 	}
 
-	logger.LegacyPrintf("service.gateway", "[Bedrock] 命中 Bedrock 分支: account=%d name=%s model=%s->%s stream=%v",
+	logger.LegacyPrintf("service.gateway", "[Bedrock] Bedrock branch matched: account=%d name=%s model=%s->%s stream=%v",
 		account.ID, account.Name, reqModel, mappedModel, reqStream)
 
 	// 根据账号类型选择认证方式
