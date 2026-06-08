@@ -732,6 +732,8 @@ export type MetricType =
   | 'success_rate'
   | 'error_rate'
   | 'upstream_error_rate'
+  | 'p95_latency_ms'
+  | 'p99_latency_ms'
   | 'cpu_usage_percent'
   | 'memory_usage_percent'
   | 'concurrency_queue_depth'
@@ -742,6 +744,10 @@ export type MetricType =
   | 'account_error_count'
   | 'account_error_ratio'
   | 'overload_account_count'
+  | 'account_available_count'
+  | 'account_available_ratio'
+  | 'account_quota_usage_ratio'
+  | 'account_quota_exhausted_count'
 export type Operator = '>' | '>=' | '<' | '<=' | '==' | '!='
 
 export interface AlertRule {
