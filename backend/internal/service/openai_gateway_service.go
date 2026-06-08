@@ -981,10 +981,9 @@ func logCodexCLIOnlyDetection(ctx context.Context, c *gin.Context, account *Acco
 	}
 	log := logger.FromContext(ctx).With(fields...)
 	if result.Matched {
-		log.Info("OpenAI codex_cli_only 放行请求")
 		return
 	}
-	log.Warn("OpenAI codex_cli_only 拒绝非官方客户端请求")
+	log.Warn("OpenAI codex_cli_only rejected non-official-client request")
 }
 
 func appendCodexCLIOnlyRejectedRequestFields(fields []zap.Field, c *gin.Context, body []byte) []zap.Field {
@@ -1086,7 +1085,7 @@ func logOpenAIInstructionsRequiredDebug(
 	}
 	fields = appendCodexCLIOnlyRejectedRequestFields(fields, c, requestBody)
 
-	logger.FromContext(ctx).With(fields...).Warn("OpenAI 上游返回 Instructions are required，已记录请求详情用于排查")
+	logger.FromContext(ctx).With(fields...).Warn("OpenAI upstream returned Instructions are required; request details recorded for troubleshooting")
 }
 
 func isOpenAIInstructionsRequiredError(upstreamStatusCode int, upstreamMsg string, upstreamBody []byte) bool {
@@ -3380,7 +3379,7 @@ func logOpenAIPassthroughInstructionsRejected(
 		zap.String("reject_reason", strings.TrimSpace(rejectReason)),
 	}
 	fields = appendCodexCLIOnlyRejectedRequestFields(fields, c, body)
-	logger.FromContext(ctx).With(fields...).Warn("OpenAI passthrough 本地拦截：Codex 请求缺少有效 instructions")
+	logger.FromContext(ctx).With(fields...).Warn("OpenAI passthrough blocked locally: Codex request is missing valid instructions")
 }
 
 func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
