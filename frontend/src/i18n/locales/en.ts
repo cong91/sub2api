@@ -925,6 +925,9 @@ const messages = {
     imageSizeUnknown: 'unknown',
     cacheRead: 'Read',
     cacheWrite: 'Write',
+    cacheHit: 'Cache hit',
+    cacheCreate: 'Cache write',
+    cacheHitRate: 'Cache hit rate',
     serviceTier: 'Service tier',
     serviceTierPriority: 'Fast',
     serviceTierFlex: 'Flex',
@@ -1318,6 +1321,7 @@ const messages = {
       providers: {
         email: 'Email',
         linuxdo: 'LinuxDo',
+        dingtalk: 'DingTalk',
         oidc: '{providerName}',
         wechat: 'WeChat',
       },

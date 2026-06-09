@@ -928,6 +928,9 @@ const messages = {
     imageSizeUnknown: '알 수 없음',
     cacheRead: '읽기',
     cacheWrite: '쓰기',
+    cacheHit: '캐시 적중',
+    cacheCreate: '캐시 쓰기',
+    cacheHitRate: '캐시 적중률',
     serviceTier: '서비스 티어',
     serviceTierPriority: 'Fast',
     serviceTierFlex: 'Flex',
@@ -1324,6 +1327,7 @@ const messages = {
       providers: {
         email: '이메일',
         linuxdo: 'LinuxDo',
+        dingtalk: 'DingTalk',
         oidc: '{providerName}',
         wechat: 'WeChat',
       },

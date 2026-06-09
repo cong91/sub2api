@@ -929,6 +929,9 @@ const messages = {
     imageSizeUnknown: '未知',
     cacheRead: '读取',
     cacheWrite: '写入',
+    cacheHit: '缓存命中',
+    cacheCreate: '缓存写入',
+    cacheHitRate: '缓存命中率',
     serviceTier: '服务档位',
     serviceTierPriority: 'Fast',
     serviceTierFlex: 'Flex',
@@ -1322,6 +1325,7 @@ const messages = {
       providers: {
         email: '邮箱',
         linuxdo: 'LinuxDo',
+        dingtalk: '钉钉',
         oidc: '{providerName}',
         wechat: '微信',
       },
