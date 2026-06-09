@@ -479,7 +479,7 @@ const messages = {
     redeemCodeRequired: '로그인 코드를 입력하세요',
     deviceCodeLoginSuccess: '디바이스 코드 로그인에 성공했습니다!',
     deviceCodeLoginFailed: '디바이스 코드 로그인에 실패했습니다. 코드를 확인한 후 다시 시도하세요.',
-    
+
     loginAgreement: {
       readAndAgree: '다음을 읽고 동의했습니다:',
       pendingTitle: '계속 로그인하려면 최신 약관에 동의해야 합니다.',
@@ -928,6 +928,9 @@ const messages = {
     imageSizeUnknown: '알 수 없음',
     cacheRead: '읽기',
     cacheWrite: '쓰기',
+    cacheHit: '캐시 적중',
+    cacheCreate: '캐시 쓰기',
+    cacheHitRate: '캐시 적중률',
     serviceTier: '서비스 티어',
     serviceTierPriority: 'Fast',
     serviceTierFlex: 'Flex',
@@ -1324,6 +1327,7 @@ const messages = {
       providers: {
         email: '이메일',
         linuxdo: 'LinuxDo',
+        dingtalk: 'DingTalk',
         oidc: '{providerName}',
         wechat: 'WeChat',
       },

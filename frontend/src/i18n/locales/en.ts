@@ -511,7 +511,7 @@ const messages = {
     redeemCodeRequired: 'Login code is required',
     deviceCodeLoginSuccess: 'Device code login successful!',
     deviceCodeLoginFailed: 'Device code login failed. Please check your code and try again.',
-    
+
     loginAgreement: {
       readAndAgree: 'I have read and agree to',
       pendingTitle: 'You must agree to the latest terms before continuing to sign in.',
@@ -963,6 +963,9 @@ const messages = {
     imageSizeUnknown: 'unknown',
     cacheRead: 'Read',
     cacheWrite: 'Write',
+    cacheHit: 'Cache hit',
+    cacheCreate: 'Cache write',
+    cacheHitRate: 'Cache hit rate',
     serviceTier: 'Service tier',
     serviceTierPriority: 'Fast',
     serviceTierFlex: 'Flex',
@@ -1356,6 +1359,7 @@ const messages = {
       providers: {
         email: 'Email',
         linuxdo: 'LinuxDo',
+        dingtalk: 'DingTalk',
         oidc: '{providerName}',
         wechat: 'WeChat',
       },

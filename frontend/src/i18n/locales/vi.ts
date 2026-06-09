@@ -479,7 +479,7 @@ const messages = {
     redeemCodeRequired: 'Vui lòng nhập mã đăng nhập',
     deviceCodeLoginSuccess: 'Đăng nhập bằng mã thiết bị thành công!',
     deviceCodeLoginFailed: 'Đăng nhập bằng mã thiết bị thất bại. Vui lòng kiểm tra mã và thử lại.',
-    
+
     loginAgreement: {
       readAndAgree: 'Tôi đã đọc và đồng ý với',
       pendingTitle: 'Bạn cần đồng ý với điều khoản mới nhất trước khi tiếp tục đăng nhập.',
@@ -928,6 +928,9 @@ const messages = {
     imageSizeUnknown: 'Không xác định',
     cacheRead: 'Đọc cache',
     cacheWrite: 'Ghi cache',
+    cacheHit: 'Cache hit',
+    cacheCreate: 'Tạo cache',
+    cacheHitRate: 'Tỷ lệ cache hit',
     serviceTier: 'Cấp dịch vụ',
     serviceTierPriority: 'Fast',
     serviceTierFlex: 'Flex',
@@ -1323,6 +1326,7 @@ const messages = {
       providers: {
         email: 'Email',
         linuxdo: 'LinuxDo',
+        dingtalk: 'DingTalk',
         oidc: '{providerName}',
         wechat: 'WeChat',
       },
