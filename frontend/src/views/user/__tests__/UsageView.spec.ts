@@ -30,6 +30,19 @@ const messages: Record<string, string> = {
   'usage.rate': 'Rate',
   'usage.original': 'Original',
   'usage.billed': 'Billed',
+  'usage.totalRequests': 'Total requests',
+  'usage.inSelectedRange': 'in selected range',
+  'usage.totalTokens': 'Total tokens',
+  'usage.in': 'Input',
+  'usage.out': 'Output',
+  'usage.cacheHit': 'Cache hit',
+  'usage.cacheCreate': 'Cache write',
+  'usage.cacheHitRate': 'Cache hit rate',
+  'usage.totalCost': 'Total cost',
+  'usage.actualCost': 'actual',
+  'usage.standardCost': 'standard',
+  'usage.avgDuration': 'Average duration',
+  'usage.perRequest': 'per request',
   'usage.allApiKeys': 'All API Keys',
   'usage.apiKeyFilter': 'API Key',
   'usage.model': 'Model',
@@ -130,6 +143,52 @@ describe('user UsageView tooltip', () => {
       observe() {}
       disconnect() {}
     }
+  })
+
+  it('renders non-zero cache hit stats from split usage stat fields without raw i18n keys', async () => {
+    query.mockResolvedValue({ items: [], total: 0, pages: 0 })
+    getStatsByDateRange.mockResolvedValue({
+      total_requests: 1,
+      total_input_tokens: 4057,
+      total_output_tokens: 101,
+      total_cache_creation_tokens: 4,
+      total_cache_read_tokens: 278272,
+      total_cache_tokens: 278276,
+      total_tokens: 282434,
+      total_cost: 0.1,
+      total_actual_cost: 0.1,
+      average_duration_ms: 1,
+    })
+    list.mockResolvedValue({ items: [] })
+
+    const wrapper = mount(UsageView, {
+      global: {
+        stubs: {
+          AppLayout: AppLayoutStub,
+          TablePageLayout: TablePageLayoutStub,
+          Pagination: true,
+          EmptyState: true,
+          Select: true,
+          DateRangePicker: true,
+          DataTable: DataTableStub,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    await flushPromises()
+    await nextTick()
+
+    const text = wrapper.text().replace(/\s+/g, ' ')
+    expect(text).toContain('Total tokens')
+    expect(text).toContain('282.43K')
+    expect(text).toContain('Cache hit 278.27K')
+    expect(text).toContain('Cache write 4')
+    expect(text).toMatch(/Cache hit rate: 278\.27K\/282\.33K\s*98\.6%/)
+    expect(text).not.toContain('usage.cacheHit')
+    expect(text).not.toContain('usage.cacheCreate')
+    expect(text).not.toContain('usage.cacheHitRate')
   })
 
   it('shows fast service tier and unit prices in user tooltip', async () => {
