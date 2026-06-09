@@ -38,6 +38,7 @@ type stubAdminService struct {
 	updatedProxies       []*service.UpdateProxyInput
 	activatedUserIDs     []int64
 	testedProxyIDs       []int64
+	activatedUserIDs     []int64
 	getUserErr           error
 	createAccountErr     error
 	createSparkShadowErr error
