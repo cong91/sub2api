@@ -66,7 +66,6 @@ export async function list(
     include_subscriptions?: boolean
     sort_by?: string
     sort_order?: 'asc' | 'desc'
-    device_activation_status?: string
   },
   options?: {
     signal?: AbortSignal
@@ -84,8 +83,7 @@ export async function list(
     device_activation_status: filters?.device_activation_status,
     include_subscriptions: filters?.include_subscriptions,
     sort_by: filters?.sort_by,
-    sort_order: filters?.sort_order,
-    device_activation_status: filters?.device_activation_status
+    sort_order: filters?.sort_order
   }
 
   // Add attribute filters as attr[id]=value
