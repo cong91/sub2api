@@ -510,7 +510,7 @@ const messages = {
     redeemCodeRequired: '请输入登录代码',
     deviceCodeLoginSuccess: '设备码登录成功！',
     deviceCodeLoginFailed: '设备码登录失败，请检查代码后重试。',
-    
+
     loginAgreement: {
       readAndAgree: '我已阅读并同意',
       pendingTitle: '继续登录前需要先同意最新条款。',
@@ -969,6 +969,9 @@ const messages = {
     imageSizeUnknown: '未知',
     cacheRead: '读取',
     cacheWrite: '写入',
+    cacheHit: '缓存命中',
+    cacheCreate: '缓存写入',
+    cacheHitRate: '缓存命中率',
     serviceTier: '服务档位',
     serviceTierPriority: 'Fast',
     serviceTierFlex: 'Flex',
@@ -1362,6 +1365,7 @@ const messages = {
       providers: {
         email: '邮箱',
         linuxdo: 'LinuxDo',
+        dingtalk: '钉钉',
         oidc: '{providerName}',
         wechat: '微信',
       },
