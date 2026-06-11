@@ -33,6 +33,7 @@ RUN pnpm install --frozen-lockfile
 # in the image (WORKDIR /app/frontend -> resolves to /app/docs/legal/*.md).
 # Copy only that subtree to keep the build dependency minimal.
 COPY frontend/ ./
+# Frontend imports raw legal markdown from ../../../../docs/legal/*.md.
 COPY docs/legal/ /app/docs/legal/
 RUN pnpm run build
 
