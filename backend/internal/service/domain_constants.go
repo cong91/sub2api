@@ -150,6 +150,12 @@ const (
 	RedeemTypeAffiliateBalance = "affiliate_balance"
 )
 
+// Redeem usage policy constants
+const (
+	RedeemUsagePolicySingleUse   = domain.RedeemUsagePolicySingleUse
+	RedeemUsagePolicyOncePerUser = domain.RedeemUsagePolicyOncePerUser
+)
+
 // PromoCode status constants
 const (
 	PromoCodeStatusActive   = domain.PromoCodeStatusActive
