@@ -435,6 +435,11 @@ type GenerateRedeemCodesInput struct {
 	ValidityDays int    // 订阅类型专用：有效天数
 	ExpiresAt    *time.Time
 	CreatedBy    *int64 // 后台创建人，用于审计 marketing/admin 批量生成
+
+	UsagePolicy    string
+	UsageScope     string
+	MaxTotalUses   *int
+	MaxUsesPerUser *int
 }
 
 type ProxyBatchDeleteResult struct {
@@ -3355,8 +3360,36 @@ func (s *adminServiceImpl) GetRedeemCode(ctx context.Context, id int64) (*Redeem
 }
 
 func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error) {
+	if input == nil {
+		return nil, errors.New("input is required")
+	}
 	if input.ExpiresAt != nil && !input.ExpiresAt.After(time.Now()) {
 		return nil, ErrRedeemCodeExpired
+	}
+	usagePolicy := NormalizeRedeemUsagePolicy(input.UsagePolicy)
+	if usagePolicy != RedeemUsagePolicySingleUse && usagePolicy != RedeemUsagePolicyOncePerUser {
+		return nil, errors.New("usage_policy must be single_use or once_per_user")
+	}
+	usageScope := NormalizeRedeemUsageScope(input.UsageScope)
+	maxTotalUses := input.MaxTotalUses
+	if maxTotalUses == nil {
+		defaultMaxTotalUses := 1
+		if usagePolicy == RedeemUsagePolicyOncePerUser {
+			defaultMaxTotalUses = 0
+		}
+		maxTotalUses = &defaultMaxTotalUses
+	} else if *maxTotalUses < 0 {
+		return nil, errors.New("max_total_uses must be greater than or equal to 0")
+	}
+	maxUsesPerUser := input.MaxUsesPerUser
+	if usagePolicy == RedeemUsagePolicyOncePerUser {
+		if maxUsesPerUser != nil && *maxUsesPerUser != 1 {
+			return nil, errors.New("max_uses_per_user must be 1 for once_per_user policy")
+		}
+		one := 1
+		maxUsesPerUser = &one
+	} else if maxUsesPerUser != nil && *maxUsesPerUser <= 0 {
+		return nil, errors.New("max_uses_per_user must be greater than 0")
 	}
 
 	// 如果是订阅类型，验证必须有 GroupID
@@ -3380,13 +3413,22 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 		if err != nil {
 			return nil, err
 		}
+		usageScopeForCode := usageScope
+		if usageScopeForCode == "" {
+			usageScopeForCode = NormalizeRedeemCode(codeValue)
+		}
 		code := RedeemCode{
-			Code:      codeValue,
-			Type:      input.Type,
-			Value:     input.Value,
-			Status:    StatusUnused,
-			ExpiresAt: input.ExpiresAt,
-			CreatedBy: input.CreatedBy,
+			Code:           codeValue,
+			Type:           input.Type,
+			Value:          input.Value,
+			Status:         StatusUnused,
+			ExpiresAt:      input.ExpiresAt,
+			CreatedBy:      input.CreatedBy,
+			UsagePolicy:    usagePolicy,
+			UsageScope:     usageScopeForCode,
+			MaxTotalUses:   maxTotalUses,
+			MaxUsesPerUser: maxUsesPerUser,
+			UsedCount:      0,
 		}
 		// 订阅类型专用字段
 		if input.Type == RedeemTypeSubscription {
