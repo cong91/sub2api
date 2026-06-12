@@ -44,6 +44,12 @@ const (
 	RedeemTypeInvitation   = "invitation"
 )
 
+// Redeem usage policy constants
+const (
+	RedeemUsagePolicySingleUse   = "single_use"
+	RedeemUsagePolicyOncePerUser = "once_per_user"
+)
+
 // PromoCode status constants
 const (
 	PromoCodeStatusActive   = "active"
