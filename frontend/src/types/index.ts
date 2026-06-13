@@ -1215,6 +1215,7 @@ export interface AdminDataImportProxyAssignment {
 export interface AdminDataImportRequest {
   data: AdminDataPayload
   skip_default_group_bind?: boolean
+  group_ids?: number[]
   group_id?: number | null
   proxy_assignment?: AdminDataImportProxyAssignment
 }
