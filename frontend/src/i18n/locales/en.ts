@@ -12,6 +12,10 @@ const messages = {
     login: 'Login',
     getStarted: 'Get Started',
     goToDashboard: 'Go to Dashboard',
+    legal: {
+      title: 'Legal documents',
+      description: 'Review the service terms, usage policy, supported regions, and service-specific terms before you sign in.'
+    },
     // User-focused value proposition
     heroSubtitle: 'One Key, All AI Models',
     heroDescription: 'No need to manage multiple subscriptions. Access Claude, GPT, Gemini and more with a single API key',
@@ -5914,7 +5918,9 @@ const messages = {
         documentTitle: 'Document title',
         documentTitlePlaceholder: 'For example, Terms of Service',
         routeSlug: 'Route slug',
-        markdownContent: 'Markdown content',
+        markdownContent: 'Markdown content (fallback)',
+        localizedTitles: 'Localized titles',
+        localizedMarkdownContent: 'Localized Markdown content',
         markdownContentPlaceholder: 'Enter the document content in Markdown. Leave empty to show an empty-state message on the public legal page.',
         documentRequiredError: 'Add at least one agreement document before enabling login agreement.',
         documentTitleRequiredError: 'Every agreement document must have a title.',
