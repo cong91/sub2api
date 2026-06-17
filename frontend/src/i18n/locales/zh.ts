@@ -12,6 +12,10 @@ const messages = {
     login: '登录',
     getStarted: '立即开始',
     goToDashboard: '进入控制台',
+    legal: {
+      title: '法律文档',
+      description: '登录前可先查看服务条款、使用政策、支持地区和服务特定条款。'
+    },
     // 新增：面向用户的价值主张
     heroSubtitle: '一个密钥，畅用多个 AI 模型',
     heroDescription: '无需管理多个订阅账号，一站式接入 Claude、GPT、Gemini 等主流 AI 服务',
@@ -5869,7 +5873,9 @@ const messages = {
         documentTitle: '文档标题',
         documentTitlePlaceholder: '例如：服务条款',
         routeSlug: '路由标识',
-        markdownContent: 'Markdown 内容',
+        markdownContent: 'Markdown 内容（兜底）',
+        localizedTitles: '多语言标题',
+        localizedMarkdownContent: '多语言 Markdown 内容',
         markdownContentPlaceholder: '使用 Markdown 输入文档内容。留空时，公开法律页面会展示暂无内容。',
         documentRequiredError: '启用登录条款前，请至少添加一个条款文档。',
         documentTitleRequiredError: '每个条款文档都必须填写标题。',
