@@ -93,6 +93,7 @@ import Icon from '@/components/icons/Icon.vue'
 import { getPublicSettings } from '@/api/auth'
 import { getLocale } from '@/i18n'
 import { sanitizeUrl } from '@/utils/url'
+import { resolveLoginAgreementDocument } from '@/utils/loginAgreement'
 import type { LoginAgreementDocument, PublicSettings } from '@/types'
 import zhAdminCompliance from '../../../../docs/legal/admin-compliance.zh.md?raw'
 import enAdminCompliance from '../../../../docs/legal/admin-compliance.en.md?raw'
@@ -100,7 +101,7 @@ import enAdminCompliance from '../../../../docs/legal/admin-compliance.en.md?raw
 type LegalDocumentIcon = 'document' | 'shield' | 'globe' | 'cog'
 
 const route = useRoute()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const settings = ref<PublicSettings | null>(null)
 const loading = ref(true)
 const loadError = ref(false)
@@ -137,7 +138,8 @@ const currentDocument = computed<LoginAgreementDocument | null>(() => {
   if (!id) {
     return null
   }
-  return documents.value.find((doc) => doc.id === id) ?? null
+  const doc = documents.value.find((item) => item.id === id) ?? null
+  return doc ? resolveLoginAgreementDocument(doc, locale.value) : null
 })
 
 const hasContent = computed(() => Boolean(currentDocument.value?.content_md?.trim()))
