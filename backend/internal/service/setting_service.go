@@ -1020,6 +1020,15 @@ func (s *SettingService) GetCyberSessionBlockRuntime(ctx context.Context) (bool,
 // GetPublicSettings 获取公开设置（无需登录）
 func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings, error) {
 	keys := []string{
+		SettingKeyRegistrationEnabled,
+		SettingKeyEmailVerifyEnabled,
+		SettingKeyForceEmailOnThirdPartySignup,
+		SettingKeyRegistrationEmailSuffixWhitelist,
+		SettingKeyPromoCodeEnabled,
+		SettingKeyPasswordResetEnabled,
+		SettingKeyInvitationCodeEnabled,
+		SettingKeyTotpEnabled,
+		SettingKeyLoginAgreementEnabled,
 		SettingKeyLoginAgreementMode,
 		SettingKeyLoginAgreementUpdatedAt,
 		SettingKeyLoginAgreementDocuments,
