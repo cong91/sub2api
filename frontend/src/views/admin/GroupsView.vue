@@ -683,8 +683,10 @@
               class="flex items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 text-xs dark:border-dark-600 dark:bg-dark-800"
             >
               <span class="text-gray-500 dark:text-gray-400">
-                已选 {{ createModelsListSelectedCount }} /
-                {{ createModelsListState.items.length }}
+                {{ t("admin.groups.modelsList.selectedTotal", {
+                  selected: createModelsListSelectedCount,
+                  total: createModelsListState.items.length,
+                }) }}
               </span>
               <div class="flex items-center gap-1.5">
                 <button
@@ -692,14 +694,14 @@
                   class="rounded px-2 py-1 font-medium text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
                   @click="selectAllModelsListItems(createModelsListState)"
                 >
-                  全选
+                  {{ t("common.selectAll") }}
                 </button>
                 <button
                   type="button"
                   class="rounded px-2 py-1 font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
                   @click="invertModelsListSelection(createModelsListState)"
                 >
-                  反选
+                  {{ t("admin.groups.modelsList.invertSelection") }}
                 </button>
               </div>
             </div>
@@ -1971,8 +1973,10 @@
               class="flex items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 text-xs dark:border-dark-600 dark:bg-dark-800"
             >
               <span class="text-gray-500 dark:text-gray-400">
-                已选 {{ editModelsListSelectedCount }} /
-                {{ editModelsListState.items.length }}
+                {{ t("admin.groups.modelsList.selectedTotal", {
+                  selected: editModelsListSelectedCount,
+                  total: editModelsListState.items.length,
+                }) }}
               </span>
               <div class="flex items-center gap-1.5">
                 <button
@@ -1980,14 +1984,14 @@
                   class="rounded px-2 py-1 font-medium text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
                   @click="selectAllModelsListItems(editModelsListState)"
                 >
-                  全选
+                  {{ t("common.selectAll") }}
                 </button>
                 <button
                   type="button"
                   class="rounded px-2 py-1 font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
                   @click="invertModelsListSelection(editModelsListState)"
                 >
-                  反选
+                  {{ t("admin.groups.modelsList.invertSelection") }}
                 </button>
               </div>
             </div>
