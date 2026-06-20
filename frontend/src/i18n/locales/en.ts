@@ -5934,6 +5934,7 @@ const messages = {
           usagePolicy: 'Usage Policy',
           supportedRegions: 'Supported Regions',
           serviceSpecificTerms: 'Service-Specific Terms',
+          privacyDataProcessing: 'Privacy & Data Processing Notice',
         },
       },
       features: {
