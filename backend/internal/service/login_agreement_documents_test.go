@@ -28,7 +28,9 @@ func TestDefaultLoginAgreementDocumentsIncludeLocalizedContent(t *testing.T) {
 
 	usagePolicy := byID["usage-policy"]
 	require.NotEmpty(t, usagePolicy.ContentMDI18n["zh"])
-	require.Contains(t, usagePolicy.ContentMDI18n["zh"], "严禁非法使用")
+	require.Contains(t, usagePolicy.ContentMDI18n["zh"], "共享 AI API 访问")
+	require.Contains(t, usagePolicy.ContentMDI18n["en"], "shared AI API access")
+	require.NotContains(t, usagePolicy.ContentMDI18n["en"], "OPENCLAW")
 }
 
 func TestLoginAgreementDocumentsPreserveLocalizedFields(t *testing.T) {
