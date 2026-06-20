@@ -5588,6 +5588,7 @@ const messages = {
           usagePolicy: '이용 정책',
           supportedRegions: '지원 지역',
           serviceSpecificTerms: '서비스별 약관',
+          privacyDataProcessing: '개인정보 보호 및 데이터 처리 고지',
         },
       },
       features: {
