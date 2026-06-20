@@ -5588,6 +5588,7 @@ const messages = {
           usagePolicy: 'Chính sách sử dụng',
           supportedRegions: 'Khu vực hỗ trợ',
           serviceSpecificTerms: 'Điều khoản riêng theo dịch vụ',
+          privacyDataProcessing: 'Thông báo Quyền riêng tư & Xử lý dữ liệu',
         },
       },
       features: {
