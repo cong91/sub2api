@@ -5967,7 +5967,8 @@ const messages = {
           terms: '服务条款',
           usagePolicy: '使用政策',
           supportedRegions: '支持地区',
-          serviceSpecificTerms: '特定服务条款',
+          serviceSpecificTerms: '服务特定条款',
+          privacyDataProcessing: '隐私与数据处理说明',
         },
       },
       features: {
