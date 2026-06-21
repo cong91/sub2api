@@ -434,7 +434,9 @@ func TestApiKeyAuthWithSubscriptionGoogle_MarksUnavailableGroupBusinessLimited(t
 	require.Equal(t, http.StatusForbidden, rec.Code)
 	var resp googleErrorResponse
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
-	require.Equal(t, "API Key 所属分组已删除", resp.Error.Message)
+	require.Equal(t, "API key group has been deleted", resp.Error.Message)
+	require.NotContains(t, rec.Body.String(), "所属")
+	require.NotContains(t, rec.Body.String(), "删除")
 	require.True(t, markedBusinessLimited)
 	require.Equal(t, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable, businessLimitedReason)
 }
@@ -569,7 +571,9 @@ func TestApiKeyAuthWithSubscriptionGoogle_APIKeyQuotaExhaustedIsSwitchable(t *te
 	var resp googleErrorResponse
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	require.Equal(t, http.StatusTooManyRequests, resp.Error.Code)
+	require.Equal(t, "API key quota exhausted", resp.Error.Message)
 	require.Equal(t, "RESOURCE_EXHAUSTED", resp.Error.Status)
+	require.NotContains(t, rec.Body.String(), "额度")
 	require.Equal(t, "api_key_quota_exhausted", rec.Header().Get("X-Sub2API-Billing-Code"))
 	require.Equal(t, "true", rec.Header().Get("X-Sub2API-Auto-Switchable"))
 	require.Equal(t, "api_key_quota_exhausted", resp.Metadata["billing_code"])

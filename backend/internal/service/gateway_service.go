@@ -27,6 +27,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/clienterror"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/kirocooldown"
@@ -7943,7 +7944,8 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 
 	switch resp.StatusCode {
 	case 400:
-		c.Data(http.StatusBadRequest, "application/json", body)
+		clientBody := clienterror.JSONBody(http.StatusBadRequest, body, "invalid_request_error", upstreamMsg)
+		c.Data(http.StatusBadRequest, "application/json; charset=utf-8", clientBody)
 		summary := upstreamMsg
 		if summary == "" {
 			summary = truncateForLog(body, 512)
@@ -10484,8 +10486,8 @@ func (s *GatewayService) countTokensError(c *gin.Context, status int, errType, m
 	c.JSON(status, gin.H{
 		"type": "error",
 		"error": gin.H{
-			"type":    errType,
-			"message": message,
+			"type":    clienterror.TypeForHTTPStatus(status, errType),
+			"message": clienterror.UpstreamMessage(status, message),
 		},
 	})
 }
