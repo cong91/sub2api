@@ -42,6 +42,44 @@ func MessageWithFallback(status int, message string, fallback string) string {
 	return msg
 }
 
+// MessageWithCode is like MessageWithFallback, but prefers a stable machine
+// code when one is available.
+func MessageWithCode(status int, code string, message string, fallback string) string {
+	if translated := translateKnownCode(code, false); translated != "" {
+		return translated
+	}
+	msg := strings.TrimSpace(message)
+	if msg == "" {
+		return fallbackOrDefault(status, fallback)
+	}
+	if translated := translateKnownMessage(msg); translated != "" {
+		return translated
+	}
+	if ContainsCJK(msg) {
+		return fallbackOrDefault(status, fallback)
+	}
+	return msg
+}
+
+// UpstreamMessageWithCode is like MessageWithCode, but prefers upstream-oriented
+// fallback text when the code is unknown.
+func UpstreamMessageWithCode(status int, code string, message string) string {
+	if translated := translateKnownCode(code, true); translated != "" {
+		return translated
+	}
+	msg := strings.TrimSpace(message)
+	if msg == "" {
+		return DefaultUpstreamMessage(status)
+	}
+	if translated := translateKnownMessage(msg); translated != "" {
+		return translated
+	}
+	if ContainsCJK(msg) {
+		return DefaultUpstreamMessage(status)
+	}
+	return msg
+}
+
 // DefaultMessage returns a generic local-application English message for the
 // HTTP status.
 func DefaultMessage(status int) string {
@@ -213,6 +251,140 @@ func translateKnownMessage(msg string) string {
 		}
 	}
 	return ""
+}
+
+func translateKnownCode(code string, upstream bool) string {
+	normalized := normalizeErrorCode(code)
+	if normalized == "" {
+		return ""
+	}
+	if upstream {
+		if msg := knownUpstreamCodeTranslations[normalized]; msg != "" {
+			return msg
+		}
+	}
+	return knownCodeTranslations[normalized]
+}
+
+func normalizeErrorCode(code string) string {
+	normalized := strings.ToUpper(strings.TrimSpace(code))
+	if normalized == "" {
+		return ""
+	}
+	normalized = errorCodeReplacer.Replace(normalized)
+	for strings.Contains(normalized, "__") {
+		normalized = strings.ReplaceAll(normalized, "__", "_")
+	}
+	return strings.Trim(normalized, "_")
+}
+
+var errorCodeReplacer = strings.NewReplacer("-", "_", " ", "_", ".", "_")
+
+var knownCodeTranslations = map[string]string{
+	"ACCESS_TOKEN_EXPIRED":                     "Access token has expired",
+	"API_KEY_DISABLED":                         "API key is disabled",
+	"API_KEY_EXPIRED":                          "API key has expired",
+	"API_KEY_INACTIVE":                         "API key is inactive",
+	"API_KEY_NOT_FOUND":                        "API key not found",
+	"API_KEY_QUOTA_EXHAUSTED":                  "API key quota exhausted",
+	"API_KEY_RATE_1D_EXCEEDED":                 "API key daily rate limit exceeded",
+	"API_KEY_RATE_5H_EXCEEDED":                 "API key 5-hour rate limit exceeded",
+	"API_KEY_RATE_7D_EXCEEDED":                 "API key 7-day rate limit exceeded",
+	"API_KEY_RATE_LIMITED":                     "API key is rate limited",
+	"API_KEY_REQUIRED":                         "API key is required",
+	"AUTH_IDENTITY_CHANNEL_OWNERSHIP_CONFLICT": "Auth identity channel already belongs to another user",
+	"AUTH_IDENTITY_EMAIL_MISMATCH":             "OAuth identity belongs to a different email",
+	"AUTH_IDENTITY_OWNERSHIP_CONFLICT":         "Auth identity already belongs to another user",
+	"BACKEND_MODE_ADMIN_ONLY":                  "Backend mode is active. Only admin login is allowed.",
+	"BAD_REQUEST":                              "Invalid request",
+	"BALANCE_NOT_ENOUGH":                       "Balance is not enough",
+	"BALANCE_PAYMENT_DISABLED":                 "Balance recharge has been disabled",
+	"BILLING_MODE_MISSING_PRICE":               "Per-request price or intervals are required for per-request/image billing mode",
+	"BILLING_SERVICE_ERROR":                    "Billing service temporarily unavailable. Please retry later.",
+	"CONFIG_NOT_READY":                         "Config is not loaded",
+	"CONFLICT":                                 "Conflict",
+	"CONTEXT_LENGTH_EXCEEDED":                  "Context length exceeded",
+	"DAILY_LIMIT_EXCEEDED":                     "Daily usage limit exceeded",
+	"FORBIDDEN":                                "Access forbidden",
+	"GATEWAY_TIMEOUT":                          "Request timed out",
+	"GROUP_DELETED":                            "API key group has been deleted",
+	"GROUP_DISABLED":                           "API key group has been disabled",
+	"GROUP_NOT_ALLOWED":                        "API key group is no longer available for this user",
+	"INSUFFICIENT_BALANCE":                     "Insufficient balance or quota",
+	"INTERNAL_SERVER_ERROR":                    "Internal server error",
+	"INVALID_API_KEY":                          "Invalid API key",
+	"INVALID_CONTENT_MODERATION_BASE_URL":      "Invalid content moderation base URL",
+	"INVALID_CONTENT_MODERATION_BLOCK_STATUS":  "Blocked HTTP status must be between 400 and 599",
+	"INVALID_CONTENT_MODERATION_CONFIG":        "Invalid content moderation config",
+	"INVALID_CONTENT_MODERATION_HASH":          "Invalid content moderation hash",
+	"INVALID_CONTENT_MODERATION_MODE":          "Invalid content moderation mode",
+	"INVALID_CONTENT_MODERATION_MODEL_FILTER":  "At least one model is required when specifying include/exclude models",
+	"INVALID_INPUT":                            "Invalid input",
+	"INVALID_MODERATION_TEST_IMAGE":            "Invalid moderation test image",
+	"INVALID_ORDER_TYPE":                       "Only balance orders can request refund",
+	"INVALID_PAYMENT_QUOTE":                    "Payment quote amount is invalid",
+	"INVALID_PROXY_ASSIGNMENT":                 "Default live proxy assignment requires an active proxy",
+	"INVALID_RESET_TOKEN":                      "Invalid or expired password reset token",
+	"INVALID_RETURN_URL":                       "Return_url must be a valid absolute URL",
+	"INVALID_STATUS":                           "Invalid status",
+	"INVALID_TOKEN":                            "Invalid token",
+	"INVALID_USER":                             "Invalid user",
+	"INVALID_USER_ID":                          "Invalid user ID",
+	"INVALID_VERIFY_CODE":                      "Invalid or expired verification code",
+	"INVITATION_CODE_REQUIRED":                 "Invitation code is required",
+	"MODERATION_TEST_IMAGE_TOO_LARGE":          "Test image must not exceed 8MB",
+	"MONTHLY_LIMIT_EXCEEDED":                   "Monthly usage limit exceeded",
+	"NOT_FOUND":                                "Not found",
+	"OAUTH_DISABLED":                           "OAuth login is disabled",
+	"OAUTH_INVITATION_REQUIRED":                "Invitation code required to complete OAuth registration",
+	"PASSWORD_REQUIRED":                        "Password is required",
+	"PAYMENT_CURRENCY_REQUIRED":                "Payment currency is required",
+	"PAYMENT_DISABLED":                         "Payment system is disabled",
+	"PAYMENT_FRONTEND_URL_INVALID":             "Payment frontend_url must be an absolute https URL",
+	"PENDING_AUTH_CODE_EXPIRED":                "Pending auth completion code has expired",
+	"PENDING_AUTH_CODE_INVALID":                "Pending auth completion code is invalid",
+	"PENDING_AUTH_SESSION_CONSUMED":            "Pending auth session has already been used",
+	"PENDING_AUTH_SESSION_EXPIRED":             "Pending auth session has expired",
+	"PENDING_AUTH_SESSION_INVALID":             "Pending auth registration context is invalid",
+	"PENDING_AUTH_SESSION_NOT_FOUND":           "Pending auth session not found",
+	"RATE_LIMIT_EXCEEDED":                      "Rate limit exceeded, please retry later",
+	"REFRESH_TOKEN_EXPIRED":                    "Refresh token has expired",
+	"REFRESH_TOKEN_INVALID":                    "Invalid refresh token",
+	"REFRESH_TOKEN_REUSED":                     "Refresh token has been reused",
+	"REQUEST_ENTITY_TOO_LARGE":                 "Request body is too large",
+	"REQUEST_TIMEOUT":                          "Request timed out",
+	"SERVICE_UNAVAILABLE":                      "Service temporarily unavailable",
+	"SUBSCRIPTION_EXPIRED":                     "Subscription has expired",
+	"SUBSCRIPTION_INVALID":                     "Subscription is invalid or expired",
+	"SUBSCRIPTION_NOT_FOUND":                   "No active subscription found",
+	"SYSTEM_OPERATION_ID_REQUIRED":             "Operation id is required",
+	"TOKEN_EXPIRED":                            "Token has expired",
+	"TOKEN_REVOKED":                            "Token has been revoked",
+	"TOKEN_TOO_LARGE":                          "Token is too large",
+	"TOO_MANY_REQUESTS":                        "Rate limit exceeded, please retry later",
+	"TURNSTILE_INVALID_SECRET_KEY":             "Invalid Turnstile secret key",
+	"TURNSTILE_VERIFICATION_FAILED":            "Turnstile verification failed",
+	"UNAUTHORIZED":                             "Authentication required",
+	"UNPROCESSABLE_ENTITY":                     "Invalid request",
+	"UNSUPPORTED_FIELD":                        "TargetGroupId is not accepted; send plan_id or balance_package_code",
+	"USAGE_LIMIT_EXCEEDED":                     "Usage limit exceeded",
+	"USER_PLATFORM_DAILY_QUOTA_EXHAUSTED":      "Daily usage quota exhausted for this platform.",
+	"USER_PLATFORM_MONTHLY_QUOTA_EXHAUSTED":    "Monthly usage quota exhausted for this platform.",
+	"USER_PLATFORM_WEEKLY_QUOTA_EXHAUSTED":     "Weekly usage quota exhausted for this platform.",
+	"USER_RPM_EXCEEDED":                        "User requests-per-minute limit exceeded",
+	"VALIDATION_ERROR":                         "Validation error",
+	"WEEKLY_LIMIT_EXCEEDED":                    "Weekly usage limit exceeded",
+}
+
+var knownUpstreamCodeTranslations = map[string]string{
+	"INSUFFICIENT_QUOTA":      "Upstream quota exhausted",
+	"PERMISSION_DENIED":       "Upstream access forbidden, please contact administrator",
+	"QUOTA_EXCEEDED":          "Upstream quota exhausted",
+	"RATE_LIMIT_EXCEEDED":     "Upstream rate limit exceeded, please retry later",
+	"RESOURCE_EXHAUSTED":      "Upstream rate limit exceeded, please retry later",
+	"UNAUTHENTICATED":         "Upstream authentication failed, please contact administrator",
+	"UNAVAILABLE":             "Upstream service temporarily unavailable",
+	"UPSTREAM_AUTHENTICATION": "Upstream authentication failed, please contact administrator",
 }
 
 var knownTranslations = []struct {

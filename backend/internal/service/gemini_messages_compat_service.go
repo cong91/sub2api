@@ -1862,7 +1862,7 @@ func (s *GeminiMessagesCompatService) writeGeminiMappedError(c *gin.Context, acc
 
 	c.JSON(statusCode, gin.H{
 		"type":  "error",
-		"error": gin.H{"type": clienterror.TypeForHTTPStatus(statusCode, errType), "message": clienterror.UpstreamMessage(statusCode, errMsg)},
+		"error": gin.H{"type": clienterror.TypeForHTTPStatus(statusCode, errType), "message": clienterror.UpstreamMessageWithCode(statusCode, errType, errMsg)},
 	})
 	if upstreamMsg == "" {
 		return fmt.Errorf("upstream error: %d", upstreamStatus)
@@ -2252,9 +2252,9 @@ func randomHex(nBytes int) string {
 }
 
 func (s *GeminiMessagesCompatService) writeClaudeError(c *gin.Context, status int, errType, message string) error {
-	clientMessage := clienterror.Message(status, message)
+	clientMessage := clienterror.MessageWithCode(status, errType, message, "")
 	if strings.EqualFold(strings.TrimSpace(errType), "upstream_error") {
-		clientMessage = clienterror.UpstreamMessage(status, message)
+		clientMessage = clienterror.UpstreamMessageWithCode(status, errType, message)
 	}
 	MarkResponseCommitted(c)
 	c.JSON(status, gin.H{

@@ -76,8 +76,8 @@ func NewErrorResponse(code, message string) ErrorResponse {
 	}
 }
 
-func newBillingErrorResponse(code, message string) ErrorResponse {
-	resp := NewErrorResponse(code, clienterror.Message(http.StatusBadRequest, message))
+func newBillingErrorResponse(statusCode int, code, message string) ErrorResponse {
+	resp := NewErrorResponse(code, clienterror.MessageWithCode(statusCode, code, message, ""))
 	if metadata := billingErrorMetadata(code); metadata != nil {
 		resp.Metadata = metadata
 	}
@@ -118,8 +118,7 @@ func setBillingErrorHeaders(c *gin.Context, code string) {
 // AbortWithError 中断请求并返回JSON错误
 func AbortWithError(c *gin.Context, statusCode int, code, message string) {
 	setBillingErrorHeaders(c, code)
-	resp := newBillingErrorResponse(code, message)
-	resp.Message = clienterror.Message(statusCode, message)
+	resp := newBillingErrorResponse(statusCode, code, message)
 	c.JSON(statusCode, resp)
 	c.Abort()
 }

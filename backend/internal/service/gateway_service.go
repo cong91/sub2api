@@ -10487,7 +10487,7 @@ func (s *GatewayService) countTokensError(c *gin.Context, status int, errType, m
 		"type": "error",
 		"error": gin.H{
 			"type":    clienterror.TypeForHTTPStatus(status, errType),
-			"message": clienterror.UpstreamMessage(status, message),
+			"message": clienterror.UpstreamMessageWithCode(status, errType, message),
 		},
 	})
 }

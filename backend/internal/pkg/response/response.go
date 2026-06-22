@@ -71,7 +71,7 @@ func Error(c *gin.Context, statusCode int, message string) {
 // ErrorWithDetails returns an error response compatible with the existing envelope while
 // optionally providing structured error fields (reason/metadata).
 func ErrorWithDetails(c *gin.Context, statusCode int, message, reason string, metadata map[string]string) {
-	message = clienterror.Message(statusCode, message)
+	message = clienterror.MessageWithCode(statusCode, reason, message, "")
 	c.JSON(statusCode, Response{
 		Code:     statusCode,
 		Message:  message,

@@ -261,7 +261,7 @@ func abortWithGoogleError(c *gin.Context, status int, message string) {
 
 func abortWithGoogleBillingError(c *gin.Context, status int, code, message string) {
 	setBillingErrorHeaders(c, code)
-	message = clienterror.Message(status, message)
+	message = clienterror.MessageWithCode(status, code, message, "")
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"code":    status,

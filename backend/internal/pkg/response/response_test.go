@@ -89,7 +89,7 @@ func TestErrorWithDetails(t *testing.T) {
 			metadata:   map[string]string{"k": "v"},
 			want: Response{
 				Code:     http.StatusForbidden,
-				Message:  "no access",
+				Message:  "Access forbidden",
 				Reason:   "FORBIDDEN",
 				Metadata: map[string]string{"k": "v"},
 			},
@@ -134,7 +134,7 @@ func TestErrorFrom(t *testing.T) {
 			wantHTTPCode: http.StatusForbidden,
 			wantBody: Response{
 				Code:     http.StatusForbidden,
-				Message:  "no access",
+				Message:  "Access forbidden",
 				Reason:   "FORBIDDEN",
 				Metadata: map[string]string{"scope": "admin"},
 			},
@@ -157,7 +157,7 @@ func TestErrorFrom(t *testing.T) {
 			wantHTTPCode: http.StatusUnauthorized,
 			wantBody: Response{
 				Code:    http.StatusUnauthorized,
-				Message: "unauthorized",
+				Message: "Authentication required",
 				Reason:  "UNAUTHORIZED",
 			},
 		},
@@ -168,7 +168,7 @@ func TestErrorFrom(t *testing.T) {
 			wantHTTPCode: http.StatusNotFound,
 			wantBody: Response{
 				Code:    http.StatusNotFound,
-				Message: "not found",
+				Message: "Not found",
 				Reason:  "NOT_FOUND",
 			},
 		},
@@ -179,7 +179,7 @@ func TestErrorFrom(t *testing.T) {
 			wantHTTPCode: http.StatusConflict,
 			wantBody: Response{
 				Code:    http.StatusConflict,
-				Message: "conflict",
+				Message: "Conflict",
 				Reason:  "CONFLICT",
 			},
 		},

@@ -529,7 +529,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_InsufficientBalance(t *testing.T) {
 	var resp googleErrorResponse
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	require.Equal(t, http.StatusForbidden, resp.Error.Code)
-	require.Equal(t, "Insufficient account balance", resp.Error.Message)
+	require.Equal(t, "Insufficient balance or quota", resp.Error.Message)
 	require.Equal(t, "PERMISSION_DENIED", resp.Error.Status)
 	require.Equal(t, "insufficient_balance", rec.Header().Get("X-Sub2API-Billing-Code"))
 	require.Equal(t, "false", rec.Header().Get("X-Sub2API-Auto-Switchable"))
@@ -800,7 +800,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_SubscriptionLimitExceededReturns429(t 
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	require.Equal(t, http.StatusTooManyRequests, resp.Error.Code)
 	require.Equal(t, "RESOURCE_EXHAUSTED", resp.Error.Status)
-	require.Contains(t, resp.Error.Message, "daily usage limit exceeded")
+	require.Equal(t, "Usage limit exceeded", resp.Error.Message)
 	require.Equal(t, "subscription_limit_exceeded", rec.Header().Get("X-Sub2API-Billing-Code"))
 	require.Equal(t, "true", rec.Header().Get("X-Sub2API-Auto-Switchable"))
 	require.Equal(t, "subscription_limit_exceeded", resp.Metadata["billing_code"])
