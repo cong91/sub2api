@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/clienterror"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
@@ -926,8 +927,8 @@ func writeChatCompletionsError(c *gin.Context, statusCode int, errType, message 
 	MarkResponseCommitted(c)
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
-			"type":    errType,
-			"message": message,
+			"type":    clienterror.TypeForHTTPStatus(statusCode, errType),
+			"message": clienterror.UpstreamMessageWithCode(statusCode, errType, message),
 		},
 	})
 }

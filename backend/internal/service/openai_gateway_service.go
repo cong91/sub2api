@@ -22,6 +22,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/clienterror"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
@@ -3754,7 +3755,8 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 	if contentType == "" {
 		contentType = "application/json"
 	}
-	c.Data(resp.StatusCode, contentType, body)
+	clientBody := clienterror.JSONBody(resp.StatusCode, body, "upstream_error", upstreamMsg)
+	c.Data(resp.StatusCode, contentType, clientBody)
 
 	if upstreamMsg == "" {
 		return fmt.Errorf("upstream error: %d", resp.StatusCode)
@@ -4457,7 +4459,8 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		if contentType == "" {
 			contentType = "application/json"
 		}
-		c.Data(resp.StatusCode, contentType, body)
+		clientBody := clienterror.JSONBody(resp.StatusCode, body, "invalid_request_error", cyberMsg)
+		c.Data(resp.StatusCode, contentType, clientBody)
 		if cyberMsg == "" {
 			return nil, fmt.Errorf("openai cyber_policy: %d", resp.StatusCode)
 		}
@@ -4645,6 +4648,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		if clientMsg == "" {
 			clientMsg = "Request blocked by upstream cyber-security policy"
 		}
+		clientMsg = clienterror.UpstreamMessage(resp.StatusCode, clientMsg)
 		writeError(c, resp.StatusCode, "invalid_request_error", clientMsg)
 		if cyberMsg == "" {
 			return nil, fmt.Errorf("openai cyber_policy: %d", resp.StatusCode)
@@ -4750,7 +4754,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		errType = "api_error"
 	}
 
-	writeError(c, resp.StatusCode, errType, upstreamMsg)
+	writeError(c, resp.StatusCode, errType, clienterror.UpstreamMessage(resp.StatusCode, upstreamMsg))
 	return nil, fmt.Errorf("upstream error: %d %s", resp.StatusCode, upstreamMsg)
 }
 
