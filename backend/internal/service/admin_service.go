@@ -83,6 +83,7 @@ type AdminService interface {
 	GetAccountsByIDs(ctx context.Context, ids []int64) ([]*Account, error)
 	CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error)
 	UpdateAccount(ctx context.Context, id int64, input *UpdateAccountInput) (*Account, error)
+	AddAccountCredit(ctx context.Context, id int64, amount float64) (*Account, error)
 	// UpdateAccountExtra 仅对 Extra 做 JSONB 增量合并（key 级覆盖），不会影响其它字段或运行态键。
 	// 用于刷新流程持久化 account_uuid / org_uuid 等少量键，避免被全量快照覆盖。
 	UpdateAccountExtra(ctx context.Context, id int64, updates map[string]any) error
@@ -129,6 +130,12 @@ type AdminService interface {
 	BatchDeleteRedeemCodes(ctx context.Context, ids []int64) (int64, error)
 	ExpireRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
 	ResetAccountQuota(ctx context.Context, id int64) error
+}
+
+var ErrAccountCreditAmountInvalid = infraerrors.BadRequest("ACCOUNT_CREDIT_AMOUNT_INVALID", "account credit amount must be > 0")
+
+type accountQuotaLimitAdder interface {
+	AddQuotaLimit(ctx context.Context, id int64, amount float64) error
 }
 
 // CreateUserInput represents input for creating a new user via admin operations.
@@ -4000,6 +4007,27 @@ type MixedChannelError struct {
 func (e *MixedChannelError) Error() string {
 	return fmt.Sprintf("mixed_channel_warning: Group '%s' contains both %s and %s accounts. Using mixed channels in the same context may cause thinking block signature validation issues, which will fallback to non-thinking mode for historical messages.",
 		e.GroupName, e.CurrentPlatform, e.OtherPlatform)
+}
+
+func (s *adminServiceImpl) AddAccountCredit(ctx context.Context, id int64, amount float64) (*Account, error) {
+	if amount <= 0 {
+		return nil, ErrAccountCreditAmountInvalid
+	}
+	account, err := s.accountRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if !account.IsAPIKeyOrBedrock() {
+		return nil, infraerrors.BadRequest("ACCOUNT_CREDIT_UNSUPPORTED_TYPE", "account credit tracking is only supported for API key or Bedrock accounts")
+	}
+	adder, ok := s.accountRepo.(accountQuotaLimitAdder)
+	if !ok || adder == nil {
+		return nil, infraerrors.InternalServer("ACCOUNT_CREDIT_UNAVAILABLE", "account credit update is unavailable")
+	}
+	if err := adder.AddQuotaLimit(ctx, id, amount); err != nil {
+		return nil, err
+	}
+	return s.accountRepo.GetByID(ctx, id)
 }
 
 func (s *adminServiceImpl) ResetAccountQuota(ctx context.Context, id int64) error {

@@ -1872,6 +1872,60 @@
         />
       </div>
 
+      <div
+        v-if="account?.type === 'apikey' || account?.type === 'bedrock'"
+        class="rounded-lg border border-emerald-100 bg-emerald-50/60 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+      >
+        <div class="mb-3">
+          <h4 class="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+            {{ t('admin.accounts.accountCredit.title') }}
+          </h4>
+          <p class="mt-1 text-xs text-emerald-700 dark:text-emerald-300/80">
+            {{ t('admin.accounts.accountCredit.hint') }}
+          </p>
+        </div>
+        <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <div>
+            <label class="input-label">{{ t('admin.accounts.accountCredit.amount') }}</label>
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-500 dark:text-gray-400">$</span>
+              <input
+                v-model.number="accountCreditAmount"
+                type="number"
+                min="0"
+                step="0.01"
+                class="input flex-1"
+                data-testid="account-credit-amount-input"
+                :placeholder="t('admin.accounts.accountCredit.amountPlaceholder')"
+              />
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn btn-primary whitespace-nowrap"
+            data-testid="account-credit-add-button"
+            :disabled="!canAddAccountCredit"
+            @click="handleAddAccountCredit"
+          >
+            {{ addingAccountCredit ? t('admin.accounts.accountCredit.adding') : t('admin.accounts.accountCredit.add') }}
+          </button>
+        </div>
+        <div class="mt-3 grid gap-2 text-xs text-gray-600 dark:text-gray-300 sm:grid-cols-3">
+          <div>
+            <span class="text-gray-400 dark:text-gray-500">{{ t('admin.accounts.accountCredit.currentLimit') }}:</span>
+            <span class="ml-1 font-medium">{{ formatQuotaUSD(accountQuotaLimitForDisplay) }}</span>
+          </div>
+          <div>
+            <span class="text-gray-400 dark:text-gray-500">{{ t('admin.accounts.accountCredit.used') }}:</span>
+            <span class="ml-1 font-medium">{{ formatQuotaUSD(accountQuotaUsedForDisplay) }}</span>
+          </div>
+          <div>
+            <span class="text-gray-400 dark:text-gray-500">{{ t('admin.accounts.accountCredit.remaining') }}:</span>
+            <span class="ml-1 font-medium">{{ formatQuotaUSD(accountQuotaRemainingForDisplay) }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- OpenAI OAuth Codex 官方客户端限制开关 -->
       <div
         v-if="account?.platform === 'openai' && account?.type === 'oauth'"
@@ -2801,6 +2855,8 @@ loadQuotaNotifyGlobal()
 const editQuotaLimit = ref<number | null>(null)
 const editQuotaDailyLimit = ref<number | null>(null)
 const editQuotaWeeklyLimit = ref<number | null>(null)
+const accountCreditAmount = ref<number | null>(null)
+const addingAccountCredit = ref(false)
 const editDailyResetMode = ref<'rolling' | 'fixed' | null>(null)
 const editDailyResetHour = ref<number | null>(null)
 const editWeeklyResetMode = ref<'rolling' | 'fixed' | null>(null)
@@ -3077,6 +3133,43 @@ const expiresAtInput = computed({
   }
 })
 
+const readAccountNumber = (account: Account | null | undefined, key: string) => {
+  if (!account) return undefined
+  const accountRecord = account as unknown as Record<string, unknown>
+  if (typeof accountRecord[key] === 'number') return accountRecord[key] as number
+  const extra = account.extra as Record<string, unknown> | undefined
+  return typeof extra?.[key] === 'number' ? extra[key] as number : undefined
+}
+
+const readQuotaLimit = (account: Account | null | undefined) => {
+  const limit = readAccountNumber(account, 'quota_limit')
+  return limit != null && limit > 0 ? limit : null
+}
+
+const readQuotaUsed = (account: Account | null | undefined) => readAccountNumber(account, 'quota_used') ?? 0
+
+const accountQuotaLimitForDisplay = computed(() => editQuotaLimit.value ?? readQuotaLimit(props.account))
+const accountQuotaUsedForDisplay = computed(() => readQuotaUsed(props.account))
+const accountQuotaRemainingForDisplay = computed(() => {
+  const limit = accountQuotaLimitForDisplay.value
+  if (limit == null || limit <= 0) return null
+  return Math.max(0, limit - accountQuotaUsedForDisplay.value)
+})
+const canAddAccountCredit = computed(() => {
+  const amount = accountCreditAmount.value
+  return !!props.account
+    && (props.account.type === 'apikey' || props.account.type === 'bedrock')
+    && amount != null
+    && Number.isFinite(amount)
+    && amount > 0
+    && !addingAccountCredit.value
+})
+
+const formatQuotaUSD = (value: number | null | undefined) => {
+  if (value == null || !Number.isFinite(value)) return '—'
+  return `$${value.toFixed(value >= 100 ? 2 : 4)}`
+}
+
 // Watchers
 const normalizePoolModeRetryCount = (value: number) => {
   if (!Number.isFinite(value)) {
@@ -3113,6 +3206,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     : 'active'
   form.group_ids = newAccount.group_ids || []
   form.expires_at = newAccount.expires_at ?? null
+  accountCreditAmount.value = null
+  addingAccountCredit.value = false
 
   // Load intercept warmup requests setting (applies to all account types)
   const credentials = newAccount.credentials as Record<string, unknown> | undefined
@@ -3893,6 +3988,28 @@ const submitUpdateAccount = async (accountID: number, updatePayload: Record<stri
     appStore.showError(error.message || t('admin.accounts.failedToUpdate'))
   } finally {
     submitting.value = false
+  }
+}
+
+const handleAddAccountCredit = async () => {
+  if (!props.account) return
+  const amount = accountCreditAmount.value
+  if (amount == null || !Number.isFinite(amount) || amount <= 0) {
+    appStore.showError(t('admin.accounts.accountCredit.invalidAmount'))
+    return
+  }
+
+  addingAccountCredit.value = true
+  try {
+    const updatedAccount = await adminAPI.accounts.addCredit(props.account.id, { amount })
+    editQuotaLimit.value = readQuotaLimit(updatedAccount)
+    accountCreditAmount.value = null
+    appStore.showSuccess(t('admin.accounts.accountCredit.added'))
+    emit('updated', updatedAccount)
+  } catch (error: any) {
+    appStore.showError(error.message || t('admin.accounts.accountCredit.failed'))
+  } finally {
+    addingAccountCredit.value = false
   }
 }
 
