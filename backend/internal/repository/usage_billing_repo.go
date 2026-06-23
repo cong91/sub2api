@@ -140,6 +140,7 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 			return err
 		}
 		result.QuotaState = quotaState
+		result.AccountQuotaCost = cmd.AccountQuotaCost
 	}
 
 	return nil

@@ -20,7 +20,8 @@ import type {
   CodexSessionImportRequest,
   CodexSessionImportResult,
   CheckMixedChannelRequest,
-  CheckMixedChannelResponse
+  CheckMixedChannelResponse,
+  AddAccountCreditRequest
 } from '@/types'
 
 /**
@@ -144,6 +145,14 @@ export async function create(accountData: CreateAccountRequest): Promise<Account
  */
 export async function update(id: number, updates: UpdateAccountRequest): Promise<Account> {
   const { data } = await apiClient.put<Account>(`/admin/accounts/${id}`, updates)
+  return data
+}
+
+/**
+ * Add prepaid credit to an API Key/Bedrock account by increasing quota_limit.
+ */
+export async function addCredit(id: number, payload: AddAccountCreditRequest): Promise<Account> {
+  const { data } = await apiClient.post<Account>(`/admin/accounts/${id}/add-credit`, payload)
   return data
 }
 
@@ -783,6 +792,7 @@ export const accountsAPI = {
   getById,
   create,
   update,
+  addCredit,
   checkMixedChannelRisk,
   delete: deleteAccount,
   toggleStatus,
