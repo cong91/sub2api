@@ -97,6 +97,7 @@ export interface User {
   balance_notify_enabled: boolean
   balance_notify_threshold: number | null
   balance_notify_extra_emails: NotifyEmailEntry[]
+  balance_notify_telegram_chat_id: string
   subscriptions?: UserSubscription[] // User's active subscriptions
   last_active_at?: string | null
   created_at: string
@@ -925,6 +926,10 @@ export interface UpstreamBillingProbeResult {
   account_id: number
   snapshot?: UpstreamBillingProbeSnapshot
   error?: string
+}
+
+export interface AddAccountCreditRequest {
+  amount: number
 }
 
 export interface Account {
