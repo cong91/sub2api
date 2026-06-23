@@ -156,6 +156,7 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 		SetBalance(userIn.Balance).
 		SetConcurrency(userIn.Concurrency).
 		SetStatus(userIn.Status).
+		SetBalanceNotifyTelegramChatID(userIn.BalanceNotifyTelegramChatID).
 		SetSignupSource(userSignupSourceOrDefault(userIn.SignupSource)).
 		SetNillableLastLoginAt(userIn.LastLoginAt).
 		SetNillableLastActiveAt(userIn.LastActiveAt).
