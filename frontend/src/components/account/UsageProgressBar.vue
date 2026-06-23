@@ -42,9 +42,16 @@
         ></div>
       </div>
 
-      <!-- Percentage -->
-      <span :class="['w-[32px] shrink-0 text-right text-[10px] font-medium', textClass]">
-        {{ displayPercent }}
+      <!-- Usage percentage by default; prepaid quota rows may override with remaining credit. -->
+      <span
+        :class="[
+          valueText ? 'min-w-[52px]' : 'w-[32px]',
+          'shrink-0 text-right text-[10px] font-medium',
+          textClass
+        ]"
+        :title="valueTitle"
+      >
+        {{ displayValue }}
       </span>
 
       <!-- Reset time -->
@@ -69,6 +76,8 @@ const props = defineProps<{
   color: 'indigo' | 'emerald' | 'purple' | 'amber'
   windowStats?: WindowStats | null
   showNowWhenIdle?: boolean
+  valueText?: string
+  valueTitle?: string
 }>()
 
 const { t } = useI18n()
@@ -139,6 +148,8 @@ const displayPercent = computed(() => {
   const percent = Math.round(props.utilization)
   return percent > 999 ? '>999%' : `${percent}%`
 })
+
+const displayValue = computed(() => props.valueText || displayPercent.value)
 
 const shouldShowResetTime = computed(() => {
   if (props.resetsAt) return true
