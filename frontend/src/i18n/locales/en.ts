@@ -1218,6 +1218,7 @@ const messages = {
     rpmLimit: 'RPM Limit',
     rpmUnlimited: 'Unlimited',
     memberSince: 'Member Since',
+    serialNumber: 'Serial Number',
     overviewTitle: 'Account Overview',
     overviewDescription: 'Check account status, profile sources, and common actions at a glance.',
     basicsTitle: 'Profile & Avatar',
