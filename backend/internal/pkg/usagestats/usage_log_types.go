@@ -205,13 +205,13 @@ type APIKeyUsageTrendPoint struct {
 
 // PlatformUsage represents per-platform usage stats in dashboard summaries.
 type PlatformUsage struct {
-	Platform         string  `json:"platform"`
-	TotalRequests    int64   `json:"total_requests"`
-	TotalTokens      int64   `json:"total_tokens"`
-	TotalActualCost  float64 `json:"total_actual_cost"`
-	TodayRequests    int64   `json:"today_requests"`
-	TodayTokens      int64   `json:"today_tokens"`
-	TodayActualCost  float64 `json:"today_actual_cost"`
+	Platform        string  `json:"platform"`
+	TotalRequests   int64   `json:"total_requests"`
+	TotalTokens     int64   `json:"total_tokens"`
+	TotalActualCost float64 `json:"total_actual_cost"`
+	TodayRequests   int64   `json:"today_requests"`
+	TodayTokens     int64   `json:"today_tokens"`
+	TodayActualCost float64 `json:"today_actual_cost"`
 }
 
 // UserDashboardStats 用户仪表盘统计

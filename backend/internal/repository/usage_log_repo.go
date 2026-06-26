@@ -238,7 +238,6 @@ func (r *usageLogRepository) loadDashboardPlatformUsage(ctx context.Context, sco
 	return out, nil
 }
 
-
 const (
 	usageLogCreateBatchMaxSize  = 64
 	usageLogCreateBatchWindow   = 3 * time.Millisecond
