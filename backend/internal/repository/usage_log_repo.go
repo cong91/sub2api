@@ -169,6 +169,75 @@ type usageLogRepository struct {
 	bestEffortRecent    *gocache.Cache
 }
 
+type dashboardPlatformUsageRow struct {
+	Platform        string
+	TotalRequests   int64
+	TotalTokens     int64
+	TotalActualCost float64
+	TodayRequests   int64
+	TodayTokens     int64
+	TodayActualCost float64
+}
+
+func (r *usageLogRepository) loadDashboardPlatformUsage(ctx context.Context, scopeColumn string, scopeID int64) ([]*usagestats.PlatformUsage, error) {
+	query := fmt.Sprintf(`
+		WITH scoped AS (
+			SELECT
+				COALESCE(NULLIF(g.platform, ''), NULLIF(a.platform, '')) AS platform,
+				ul.created_at,
+				input_tokens,
+				output_tokens,
+				cache_creation_tokens,
+				cache_read_tokens,
+				actual_cost
+			FROM usage_logs ul
+			LEFT JOIN groups g ON g.id = ul.group_id
+			LEFT JOIN accounts a ON a.id = ul.account_id
+			WHERE ul.%s = $1
+			  AND COALESCE(NULLIF(g.platform, ''), NULLIF(a.platform, '')) IS NOT NULL
+			  AND COALESCE(NULLIF(g.platform, ''), NULLIF(a.platform, '')) <> ''
+		)
+		SELECT
+			platform,
+			COUNT(*) AS total_requests,
+			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) AS total_tokens,
+			COALESCE(SUM(actual_cost), 0) AS total_actual_cost,
+			COUNT(*) FILTER (WHERE created_at >= $2) AS today_requests,
+			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens) FILTER (WHERE created_at >= $2), 0) AS today_tokens,
+			COALESCE(SUM(actual_cost) FILTER (WHERE created_at >= $2), 0) AS today_actual_cost
+		FROM scoped
+		GROUP BY platform
+		ORDER BY total_actual_cost DESC, platform ASC
+	`, scopeColumn)
+	today := timezone.Today()
+	rows, err := r.sql.QueryContext(ctx, query, scopeID, today)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []*usagestats.PlatformUsage
+	for rows.Next() {
+		var row dashboardPlatformUsageRow
+		if err := rows.Scan(&row.Platform, &row.TotalRequests, &row.TotalTokens, &row.TotalActualCost, &row.TodayRequests, &row.TodayTokens, &row.TodayActualCost); err != nil {
+			return nil, err
+		}
+		out = append(out, &usagestats.PlatformUsage{
+			Platform:        row.Platform,
+			TotalRequests:   row.TotalRequests,
+			TotalTokens:     row.TotalTokens,
+			TotalActualCost: row.TotalActualCost,
+			TodayRequests:   row.TodayRequests,
+			TodayTokens:     row.TodayTokens,
+			TodayActualCost: row.TodayActualCost,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 const (
 	usageLogCreateBatchMaxSize  = 64
 	usageLogCreateBatchWindow   = 3 * time.Millisecond
@@ -2622,6 +2691,12 @@ func (r *usageLogRepository) GetUserDashboardStats(ctx context.Context, userID i
 	}
 	stats.TotalTokens = stats.TotalInputTokens + stats.TotalOutputTokens + stats.TotalCacheCreationTokens + stats.TotalCacheReadTokens
 
+	byPlatform, err := r.loadDashboardPlatformUsage(ctx, "user_id", userID)
+	if err != nil {
+		return nil, err
+	}
+	stats.ByPlatform = byPlatform
+
 	// 今日 Token 统计
 	todayStatsQuery := `
 		SELECT
@@ -2752,6 +2827,12 @@ func (r *usageLogRepository) GetAPIKeyDashboardStats(ctx context.Context, apiKey
 		return nil, err
 	}
 	stats.TodayTokens = stats.TodayInputTokens + stats.TodayOutputTokens + stats.TodayCacheCreationTokens + stats.TodayCacheReadTokens
+
+	byPlatform, err := r.loadDashboardPlatformUsage(ctx, "api_key_id", apiKeyID)
+	if err != nil {
+		return nil, err
+	}
+	stats.ByPlatform = byPlatform
 
 	// 性能指标：RPM 和 TPM（最近5分钟，按 API Key 过滤）
 	rpm, tpm, err := r.getPerformanceStatsByAPIKey(ctx, apiKeyID)
