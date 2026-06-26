@@ -203,6 +203,17 @@ type APIKeyUsageTrendPoint struct {
 	Tokens   int64  `json:"tokens"`
 }
 
+// PlatformUsage represents per-platform usage stats in dashboard summaries.
+type PlatformUsage struct {
+	Platform         string  `json:"platform"`
+	TotalRequests    int64   `json:"total_requests"`
+	TotalTokens      int64   `json:"total_tokens"`
+	TotalActualCost  float64 `json:"total_actual_cost"`
+	TodayRequests    int64   `json:"today_requests"`
+	TodayTokens      int64   `json:"today_tokens"`
+	TodayActualCost  float64 `json:"today_actual_cost"`
+}
+
 // UserDashboardStats 用户仪表盘统计
 type UserDashboardStats struct {
 	// API Key 统计
@@ -228,6 +239,9 @@ type UserDashboardStats struct {
 	TodayTokens              int64   `json:"today_tokens"`
 	TodayCost                float64 `json:"today_cost"`        // 今日标准计费
 	TodayActualCost          float64 `json:"today_actual_cost"` // 今日实际扣除
+
+	// 平台拆分
+	ByPlatform []*PlatformUsage `json:"by_platform,omitempty"`
 
 	// 性能统计
 	AverageDurationMs float64 `json:"average_duration_ms"`
