@@ -2124,6 +2124,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyDocURL,
 		SettingKeyHomeContent,
 		SettingKeyHideCcsImportButton,
+		SettingKeyPlatformProfileRegistry,
 		SettingKeyPurchaseSubscriptionEnabled,
 		SettingKeyPurchaseSubscriptionURL,
 		SettingKeyTableDefaultPageSize,
@@ -2250,6 +2251,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		DocURL:                           settings[SettingKeyDocURL],
 		HomeContent:                      settings[SettingKeyHomeContent],
 		HideCcsImportButton:              settings[SettingKeyHideCcsImportButton] == "true",
+		PlatformProfileRegistry:          EffectivePlatformProfileRegistryJSON(settings[SettingKeyPlatformProfileRegistry]),
 		PurchaseSubscriptionEnabled:      settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
 		PurchaseSubscriptionURL:          strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
 		TableDefaultPageSize:             tableDefaultPageSize,
@@ -2285,6 +2287,18 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 
 		AllowUserViewErrorRequests: settings[SettingKeyAllowUserViewErrorRequests] == "true",
 	}, nil
+}
+
+// GetPlatformProfileRegistryJSON returns the effective provider/platform guide registry JSON.
+func (s *SettingService) GetPlatformProfileRegistryJSON(ctx context.Context) string {
+	if s == nil || s.settingRepo == nil {
+		return DefaultPlatformProfileRegistryJSON()
+	}
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyPlatformProfileRegistry)
+	if err != nil {
+		return DefaultPlatformProfileRegistryJSON()
+	}
+	return EffectivePlatformProfileRegistryJSON(value)
 }
 
 // channelMonitorIntervalMin / channelMonitorIntervalMax bound the default interval
@@ -2565,6 +2579,7 @@ type PublicSettingsInjectionPayload struct {
 	DocURL                           string                   `json:"doc_url"`
 	HomeContent                      string                   `json:"home_content"`
 	HideCcsImportButton              bool                     `json:"hide_ccs_import_button"`
+	PlatformProfileRegistry          string                   `json:"platform_profile_registry"`
 	PurchaseSubscriptionEnabled      bool                     `json:"purchase_subscription_enabled"`
 	PurchaseSubscriptionURL          string                   `json:"purchase_subscription_url"`
 	TableDefaultPageSize             int                      `json:"table_default_page_size"`
@@ -2632,6 +2647,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		DocURL:                           settings.DocURL,
 		HomeContent:                      settings.HomeContent,
 		HideCcsImportButton:              settings.HideCcsImportButton,
+		PlatformProfileRegistry:          settings.PlatformProfileRegistry,
 		PurchaseSubscriptionEnabled:      settings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:          settings.PurchaseSubscriptionURL,
 		TableDefaultPageSize:             settings.TableDefaultPageSize,
@@ -3366,6 +3382,11 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 		return nil, err
 	}
 	updates[SettingKeyClaudeOAuthSystemPromptBlocks] = settings.ClaudeOAuthSystemPromptBlocks
+	platformProfileRegistry, err := NormalizePlatformProfileRegistryJSON(settings.PlatformProfileRegistry)
+	if err != nil {
+		return nil, err
+	}
+	updates[SettingKeyPlatformProfileRegistry] = platformProfileRegistry
 	updates[SettingKeyEnableAnthropicCacheTTL1hInjection] = strconv.FormatBool(settings.EnableAnthropicCacheTTL1hInjection)
 	updates[SettingKeyRewriteMessageCacheControl] = strconv.FormatBool(settings.RewriteMessageCacheControl)
 	updates[SettingKeyAntigravityUserAgentVersion] = antigravity.NormalizeUserAgentVersion(settings.AntigravityUserAgentVersion)
@@ -4164,8 +4185,8 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 	// 检查是否已有设置
 	_, err := s.settingRepo.GetValue(ctx, SettingKeyRegistrationEnabled)
 	if err == nil {
-		// 已有设置，不需要初始化
-		return nil
+		// 已有设置：不重写整套默认值，但要补齐新增的 DB-backed registry 默认值。
+		return s.ensurePlatformProfileRegistryDefault(ctx)
 	}
 	if !errors.Is(err, ErrSettingNotFound) {
 		return fmt.Errorf("check existing settings: %w", err)
@@ -4342,6 +4363,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyAllowUngroupedKeyScheduling:        "false",
 		SettingKeyEnableAnthropicCacheTTL1hInjection: "false",
 		SettingKeyRewriteMessageCacheControl:         strconv.FormatBool(s.defaultRewriteMessageCacheControl()),
+		SettingKeyPlatformProfileRegistry:            DefaultPlatformProfileRegistryJSON(),
 		SettingKeyOpenAICodexUserAgent:               "",
 		SettingPaymentVisibleMethodAlipaySource:      "",
 		SettingPaymentVisibleMethodWxpaySource:       "",
@@ -4353,6 +4375,22 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 	}
 
 	return s.settingRepo.SetMultiple(ctx, defaults)
+}
+
+func (s *SettingService) ensurePlatformProfileRegistryDefault(ctx context.Context) error {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyPlatformProfileRegistry)
+	if err == nil && strings.TrimSpace(value) != "" {
+		// Normalize malformed/legacy whitespace only when the value is valid; invalid
+		// operator edits are left untouched on read paths and rejected on save.
+		if normalized, normalizeErr := NormalizePlatformProfileRegistryJSON(value); normalizeErr == nil && normalized != value {
+			return s.settingRepo.Set(ctx, SettingKeyPlatformProfileRegistry, normalized)
+		}
+		return nil
+	}
+	if err != nil && !errors.Is(err, ErrSettingNotFound) {
+		return fmt.Errorf("check platform profile registry setting: %w", err)
+	}
+	return s.settingRepo.Set(ctx, SettingKeyPlatformProfileRegistry, DefaultPlatformProfileRegistryJSON())
 }
 
 // parseSettings 解析设置到结构体
@@ -4400,6 +4438,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		DocURL:                           settings[SettingKeyDocURL],
 		HomeContent:                      settings[SettingKeyHomeContent],
 		HideCcsImportButton:              settings[SettingKeyHideCcsImportButton] == "true",
+		PlatformProfileRegistry:          EffectivePlatformProfileRegistryJSON(settings[SettingKeyPlatformProfileRegistry]),
 		PurchaseSubscriptionEnabled:      settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
 		PurchaseSubscriptionURL:          strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
 		CustomMenuItems:                  settings[SettingKeyCustomMenuItems],
@@ -4877,6 +4916,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	}
 	result.ClaudeOAuthSystemPrompt = settings[SettingKeyClaudeOAuthSystemPrompt]
 	result.ClaudeOAuthSystemPromptBlocks = settings[SettingKeyClaudeOAuthSystemPromptBlocks]
+	result.PlatformProfileRegistry = EffectivePlatformProfileRegistryJSON(settings[SettingKeyPlatformProfileRegistry])
 	result.EnableAnthropicCacheTTL1hInjection = settings[SettingKeyEnableAnthropicCacheTTL1hInjection] == "true"
 	if v, ok := settings[SettingKeyRewriteMessageCacheControl]; ok && v != "" {
 		result.RewriteMessageCacheControl = v == "true"
