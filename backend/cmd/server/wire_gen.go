@@ -281,7 +281,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	batchImageHandler := handler.NewBatchImageHandler(batchImagePublicService, batchImageDownloadService, batchImageCleanupService)
 	providerCatalogService := service.NewProviderCatalogService(channelService, settingService)
 	providerCatalogHandler := handler.NewProviderCatalogHandler(providerCatalogService)
-	modelMarketplaceService := service.NewModelMarketplaceService(pricingService, billingService, apiKeyService)
+	modelMarketplaceService := service.NewModelMarketplaceService(pricingService, billingService, apiKeyService, gatewayService)
 	modelMarketplaceHandler := handler.NewModelMarketplaceHandler(modelMarketplaceService)
 	idempotencyCoordinator := service.ProvideIdempotencyCoordinator(idempotencyRepository, configConfig)
 	idempotencyCleanupService := service.ProvideIdempotencyCleanupService(idempotencyRepository, configConfig)
