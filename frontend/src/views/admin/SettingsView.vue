@@ -3725,6 +3725,11 @@
                 </p>
               </div>
 
+              <PlatformProfileRegistryEditor
+                v-model="form.platform_profile_registry"
+                :disabled="saving || loading"
+              />
+
               <!-- Anthropic Cache TTL 1h Injection -->
               <div class="flex items-center justify-between">
                 <div>
@@ -7320,6 +7325,7 @@ import ProxySelector from "@/components/common/ProxySelector.vue";
 import ImageUpload from "@/components/common/ImageUpload.vue";
 import BackupSettings from "@/views/admin/BackupView.vue";
 import EmailTemplateEditor from "@/views/admin/settings/EmailTemplateEditor.vue";
+import PlatformProfileRegistryEditor from "@/views/admin/settings/PlatformProfileRegistryEditor.vue";
 import { useClipboard } from "@/composables/useClipboard";
 import { affiliatesAPI, type AffiliateAdminEntry, type AffiliateCode, type SimpleUser as AffiliateSimpleUser } from "@/api/admin/affiliates";
 import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiError";
@@ -8252,6 +8258,7 @@ const form = reactive<SettingsForm>({
   enable_claude_oauth_system_prompt_injection: true,
   claude_oauth_system_prompt: "",
   claude_oauth_system_prompt_blocks: defaultClaudeOAuthSystemPromptBlocks,
+  platform_profile_registry: "",
   enable_anthropic_cache_ttl_1h_injection: false,
   rewrite_message_cache_control: false,
   openai_codex_user_agent: "",
@@ -10061,6 +10068,7 @@ async function saveSettings() {
         ? form.claude_oauth_system_prompt
         : "",
       claude_oauth_system_prompt_blocks: claudeOAuthSystemPromptBlocksJSON,
+      platform_profile_registry: form.platform_profile_registry?.trim() || "",
       enable_anthropic_cache_ttl_1h_injection:
         form.enable_anthropic_cache_ttl_1h_injection,
       rewrite_message_cache_control: form.rewrite_message_cache_control,
