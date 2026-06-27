@@ -4315,6 +4315,7 @@ const handleSubmit = async () => {
         : (updatePayload.credentials as Record<string, unknown>) ||
           ((props.account.credentials as Record<string, unknown>) || {})
       const newCredentials: Record<string, unknown> = { ...currentCredentials }
+
       applyOpenAIModelMappingCredentials(newCredentials)
 
       updatePayload.credentials = newCredentials
