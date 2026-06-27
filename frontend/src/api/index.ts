@@ -21,6 +21,25 @@ export * as batchImageAPI from './batchImage'
 export { totpAPI } from './totp'
 export { default as announcementsAPI } from './announcements'
 export { channelMonitorUserAPI } from './channelMonitor'
+export { modelMarketplaceAPI } from './modelMarketplace'
+export type {
+  GetModelPricingParams,
+  ModelMarketplaceBillingMode,
+  ModelMarketplaceCatalogState,
+  ModelMarketplaceContext,
+  ModelMarketplaceFacetOption,
+  ModelMarketplaceFacets,
+  ModelMarketplaceFeatures,
+  ModelMarketplaceGroupFacet,
+  ModelMarketplaceItem,
+  ModelMarketplacePagination,
+  ModelMarketplacePerRequestPrice,
+  ModelMarketplacePricePart,
+  ModelMarketplacePricing,
+  ModelMarketplaceResponse,
+  ModelMarketplaceServiceTier,
+  ModelMarketplaceUnit,
+} from './modelMarketplace'
 
 // Admin APIs
 export { adminAPI } from './admin'
