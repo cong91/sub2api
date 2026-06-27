@@ -607,7 +607,7 @@ describe('AccountUsageCell', () => {
 
     await flushPromises()
 
-    expect(getUsage).toHaveBeenCalledWith(3001, 'passive')
+    expect(getUsage).toHaveBeenCalledWith(3001, 'passive', undefined)
     expect(wrapper.emitted('kiroUsageMeta')?.[0]).toEqual([
       {
         plan_type: 'KIRO PRO+',
