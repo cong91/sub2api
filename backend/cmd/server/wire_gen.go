@@ -279,7 +279,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	batchImageDownloadService := service.NewBatchImageDownloadService(batchImageRepository, accountRepository, batchImageDownloadLimiter, configConfig)
 	batchImageCleanupService := service.ProvideBatchImageCleanupService(batchImageRepository, accountRepository, configConfig)
 	batchImageHandler := handler.NewBatchImageHandler(batchImagePublicService, batchImageDownloadService, batchImageCleanupService)
-	providerCatalogService := service.NewProviderCatalogService(channelService)
+	providerCatalogService := service.NewProviderCatalogService(channelService, settingService)
 	providerCatalogHandler := handler.NewProviderCatalogHandler(providerCatalogService)
 	modelMarketplaceService := service.NewModelMarketplaceService(pricingService, billingService, apiKeyService)
 	modelMarketplaceHandler := handler.NewModelMarketplaceHandler(modelMarketplaceService)
