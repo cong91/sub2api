@@ -4572,6 +4572,7 @@ const handleSubmit = async () => {
         : (updatePayload.credentials as Record<string, unknown>) ||
           ((props.account.credentials as Record<string, unknown>) || {})
       const newCredentials: Record<string, unknown> = { ...currentCredentials }
+
       if (props.account.platform === 'openai') {
         applyOpenAIModelMappingCredentials(newCredentials)
       } else {
