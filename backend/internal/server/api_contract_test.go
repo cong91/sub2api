@@ -952,6 +952,7 @@ func TestAPIContracts(t *testing.T) {
 					"grok_default_text_model": "grok-4.5",
 					"grok_default_base_url_mode": "cli",
 					"grok_cross_client_model_map_enabled": true,
+					"platform_profile_registry": __DEFAULT_PLATFORM_PROFILE_REGISTRY__,
 					"purchase_subscription_enabled": false,
 					"purchase_subscription_url": "",
 					"table_default_page_size": 20,
@@ -1253,6 +1254,7 @@ func TestAPIContracts(t *testing.T) {
 					"grok_default_text_model": "grok-4.5",
 					"grok_default_base_url_mode": "cli",
 					"grok_cross_client_model_map_enabled": true,
+					"platform_profile_registry": __DEFAULT_PLATFORM_PROFILE_REGISTRY__,
 					"purchase_subscription_enabled": false,
 					"purchase_subscription_url": "",
 					"table_default_page_size": 20,
@@ -1513,12 +1515,18 @@ func TestAPIContracts(t *testing.T) {
 
 func expandContractJSONPlaceholders(t *testing.T, raw string) string {
 	t.Helper()
-	if !strings.Contains(raw, "__DEFAULT_LOGIN_AGREEMENT_DOCUMENTS__") {
-		return raw
+	expanded := raw
+	if strings.Contains(expanded, "__DEFAULT_LOGIN_AGREEMENT_DOCUMENTS__") {
+		docsJSON, err := json.Marshal(service.DefaultLoginAgreementDocuments())
+		require.NoError(t, err)
+		expanded = strings.ReplaceAll(expanded, "__DEFAULT_LOGIN_AGREEMENT_DOCUMENTS__", string(docsJSON))
 	}
-	docsJSON, err := json.Marshal(service.DefaultLoginAgreementDocuments())
-	require.NoError(t, err)
-	return strings.ReplaceAll(raw, "__DEFAULT_LOGIN_AGREEMENT_DOCUMENTS__", string(docsJSON))
+	if strings.Contains(expanded, "__DEFAULT_PLATFORM_PROFILE_REGISTRY__") {
+		registryJSON, err := json.Marshal(service.DefaultPlatformProfileRegistryJSON())
+		require.NoError(t, err)
+		expanded = strings.ReplaceAll(expanded, "__DEFAULT_PLATFORM_PROFILE_REGISTRY__", string(registryJSON))
+	}
+	return expanded
 }
 
 type contractDeps struct {
