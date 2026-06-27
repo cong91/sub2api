@@ -1148,7 +1148,7 @@ const messages = {
     filters: {
       title: 'Bộ lọc',
       provider: 'Nhà cung cấp',
-      group: 'Multiplier nhóm',
+      group: 'Nhóm giá',
       billingMode: 'Chế độ tính phí',
       endpoint: 'Endpoint',
       mode: 'Mode',
@@ -1159,7 +1159,7 @@ const messages = {
       allBillingModes: 'Tất cả chế độ tính phí',
       allEndpoints: 'Tất cả endpoint',
       basePricing: 'Giá gốc · 1x',
-      hint: 'Chọn nhóm sẽ giới hạn danh sách theo model group đó và áp multiplier hiển thị; quản lý model ẩn/hiện trong Admin > Nhóm > Danh sách model tuỳ chỉnh.',
+      hint: 'Chọn nhóm để xem đúng danh sách model và mức giá áp dụng cho nhóm đó. Không chọn nhóm sẽ hiển thị giá gốc.',
       rate: 'Rate {rate}'
     },
     serviceTier: {
@@ -2558,8 +2558,8 @@ const messages = {
         tooltip: 'Khi bật, với các model Claude không có usage cache-write từ upstream, hệ thống sẽ ánh xạ token một cách xác định sang một input nhỏ cộng với tạo cache 1h, đồng thời giữ nguyên tổng số token.',
       },
       modelsList: {
-        title: 'Ẩn/hiện model của group',
-        hint: 'Điều khiển model hiển thị cho /v1/models và trang Giá mô hình khi chọn group này; không thay đổi quyền gọi API hay điều phối tài khoản.',
+        title: 'Model hiển thị theo nhóm',
+        hint: 'Chọn các model khách hàng sẽ thấy khi xem danh sách model hoặc bảng giá theo nhóm này; không thay đổi quyền gọi API hay điều phối tài khoản.',
         loading: 'Đang tải danh sách mô hình...',
         empty: 'Chưa có mô hình nào để hiển thị',
       },
