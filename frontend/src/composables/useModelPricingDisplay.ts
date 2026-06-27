@@ -16,7 +16,10 @@ export function formatRateMultiplier(value: number | null | undefined): string {
 
 export function formatContextTokens(value: number | null | undefined): string {
   if (!value || value <= 0) return '—'
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000_000) {
+    const millions = value / 1_000_000
+    return `${Number.isInteger(millions) ? millions.toFixed(0) : millions.toFixed(1)}M`
+  }
   if (value >= 1_000) return `${Math.round(value / 1_000)}K`
   return String(value)
 }

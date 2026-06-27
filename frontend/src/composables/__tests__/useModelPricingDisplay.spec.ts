@@ -28,6 +28,7 @@ describe('useModelPricingDisplay', () => {
     expect(formatContextTokens(999)).toBe('999')
     expect(formatContextTokens(1_500)).toBe('2K')
     expect(formatContextTokens(1_500_000)).toBe('1.5M')
+    expect(formatContextTokens(87_000_000)).toBe('87M')
   })
 
   it('detects visible price parts', () => {

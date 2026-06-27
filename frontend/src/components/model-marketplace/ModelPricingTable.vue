@@ -67,6 +67,8 @@ function priceRows(item: ModelMarketplaceItem): Array<{ key: string; label: stri
     { key: 'output', label: t('modelMarketplace.price.output'), part: item.pricing.output },
     { key: 'cache_read', label: t('modelMarketplace.price.cacheRead'), part: item.pricing.cache_read },
     { key: 'cache_write', label: t('modelMarketplace.price.cacheWrite'), part: item.pricing.cache_write },
+    { key: 'cache_write_5m', label: t('modelMarketplace.price.cacheWrite5m'), part: item.pricing.cache_write_5m },
+    { key: 'cache_write_1h', label: t('modelMarketplace.price.cacheWrite1h'), part: item.pricing.cache_write_1h },
     { key: 'image_output', label: t('modelMarketplace.price.imageOutput'), part: item.pricing.image_output },
   ].filter((row) => pricePartVisible(row.part))
 }
