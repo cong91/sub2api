@@ -1159,7 +1159,7 @@ const messages = {
       allBillingModes: 'Tất cả chế độ tính phí',
       allEndpoints: 'Tất cả endpoint',
       basePricing: 'Giá gốc · 1x',
-      hint: 'Bộ lọc truy vấn endpoint catalog model; chọn nhóm chỉ điều chỉnh giá hiển thị.',
+      hint: 'Chọn nhóm sẽ giới hạn danh sách theo model group đó và áp multiplier hiển thị; quản lý model ẩn/hiện trong Admin > Nhóm > Danh sách model tuỳ chỉnh.',
       rate: 'Rate {rate}'
     },
     serviceTier: {
@@ -2558,8 +2558,8 @@ const messages = {
         tooltip: 'Khi bật, với các model Claude không có usage cache-write từ upstream, hệ thống sẽ ánh xạ token một cách xác định sang một input nhỏ cộng với tạo cache 1h, đồng thời giữ nguyên tổng số token.',
       },
       modelsList: {
-        title: 'Danh sách mô hình /v1/models tùy chỉnh',
-        hint: 'Chỉ ảnh hưởng kết quả hiển thị của /v1/models, không ảnh hưởng whitelist model gọi API và điều phối tài khoản.',
+        title: 'Ẩn/hiện model của group',
+        hint: 'Điều khiển model hiển thị cho /v1/models và trang Giá mô hình khi chọn group này; không thay đổi quyền gọi API hay điều phối tài khoản.',
         loading: 'Đang tải danh sách mô hình...',
         empty: 'Chưa có mô hình nào để hiển thị',
       },

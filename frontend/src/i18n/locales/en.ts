@@ -1155,7 +1155,7 @@ const messages = {
       allBillingModes: 'All billing modes',
       allEndpoints: 'All endpoints',
       basePricing: 'Base pricing · 1x',
-      hint: 'Filters query the model catalog endpoint; group selection only adjusts displayed prices.',
+      hint: 'Selecting a group limits the list to that group’s models and applies its display multiplier; manage hidden/visible models in Admin > Groups > Custom model list.',
       rate: 'Rate {rate}'
     },
     serviceTier: {
@@ -2492,8 +2492,8 @@ const messages = {
         notConfigured: 'Not configured'
       },
       modelsList: {
-        title: 'Custom /v1/models Model List',
-        hint: 'Only changes the /v1/models response. Whitelist model calls and account routing are unchanged.',
+        title: 'Group visible models',
+        hint: 'Controls which models appear in /v1/models and on the Model Pricing page when this group is selected. API-call whitelist and account routing are unchanged.',
         loading: 'Loading model list...',
         empty: 'No displayable models'
       },
