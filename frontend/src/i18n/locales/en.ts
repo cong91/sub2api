@@ -1144,7 +1144,7 @@ const messages = {
     filters: {
       title: 'Filters',
       provider: 'Provider',
-      group: 'Group multiplier',
+      group: 'Pricing group',
       billingMode: 'Billing mode',
       endpoint: 'Endpoint',
       mode: 'Mode',
@@ -1155,7 +1155,7 @@ const messages = {
       allBillingModes: 'All billing modes',
       allEndpoints: 'All endpoints',
       basePricing: 'Base pricing · 1x',
-      hint: 'Filters query the model catalog endpoint; group selection only adjusts displayed prices.',
+      hint: 'Select a group to see the model list and prices that apply to that group. Leave it empty to view base pricing.',
       rate: 'Rate {rate}'
     },
     serviceTier: {
@@ -2493,8 +2493,8 @@ const messages = {
         notConfigured: 'Not configured'
       },
       modelsList: {
-        title: 'Custom /v1/models Model List',
-        hint: 'Only changes the /v1/models response. Whitelist model calls and account routing are unchanged.',
+        title: 'Models shown by group',
+        hint: 'Choose which models customers see in the model list and pricing table for this group. API-call whitelist and account routing are unchanged.',
         loading: 'Loading model list...',
         empty: 'No displayable models'
       },
