@@ -2510,6 +2510,10 @@ const messages = {
         antigravity: 'Antigravity',
         grok: 'Grok',
         kiro: 'Kiro',
+        deepseek: 'DeepSeek',
+        glm: 'GLM',
+        zai: 'Z.ai',
+        minimax: 'MiniMax',
       },
       deleteConfirm:
         "Are you sure you want to delete '{name}'? All associated API keys will no longer belong to any group.",
@@ -3469,6 +3473,10 @@ const messages = {
         antigravity: 'Antigravity',
         grok: 'Grok',
         kiro: 'Kiro',
+        deepseek: 'DeepSeek',
+        glm: 'GLM',
+        zai: 'Z.ai',
+        minimax: 'MiniMax',
       },
       types: {
         oauth: 'OAuth',
