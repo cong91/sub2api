@@ -73,7 +73,7 @@
         <div class="mt-2 flex flex-wrap rounded-lg bg-gray-100 p-1 dark:bg-dark-700" data-tour="account-form-platform">
           <button
             type="button"
-            @click="form.platform = 'anthropic'"
+            @click="form.platform = 'anthropic'; accountCategory = 'oauth-based'"
             :class="[
               'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
               form.platform === 'anthropic'
@@ -86,7 +86,7 @@
           </button>
           <button
             type="button"
-            @click="form.platform = 'openai'"
+            @click="form.platform = 'openai'; accountCategory = 'oauth-based'"
             :class="[
               'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
               form.platform === 'openai'
@@ -111,7 +111,7 @@
           </button>
           <button
             type="button"
-            @click="form.platform = 'gemini'"
+            @click="form.platform = 'gemini'; accountCategory = 'oauth-based'"
             :class="[
               'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
               form.platform === 'gemini'
@@ -136,7 +136,7 @@
           </button>
           <button
             type="button"
-            @click="form.platform = 'antigravity'"
+            @click="form.platform = 'antigravity'; accountCategory = 'oauth-based'"
             :class="[
               'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
               form.platform === 'antigravity'
@@ -149,7 +149,7 @@
           </button>
           <button
             type="button"
-            @click="form.platform = 'grok'"
+            @click="form.platform = 'grok'; accountCategory = 'oauth-based'"
             :class="[
               'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
               form.platform === 'grok'
@@ -162,7 +162,7 @@
           </button>
           <button
             type="button"
-            @click="form.platform = 'kiro'"
+            @click="form.platform = 'kiro'; accountCategory = 'oauth-based'"
             :class="[
               'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
               form.platform === 'kiro'
@@ -170,8 +170,73 @@
                 : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
             ]"
           >
-            <Icon name="sparkles" size="sm" />
+            <PlatformIcon platform="kiro" size="sm" />
             Kiro
+          </button>
+          <button
+            type="button"
+            @click="form.platform = 'deepseek'; accountCategory = 'apikey'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'deepseek'
+                ? 'bg-white text-cyan-600 shadow-sm dark:bg-dark-600 dark:text-cyan-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="deepseek" size="sm" />
+            DeepSeek
+          </button>
+          <button
+            type="button"
+            @click="form.platform = 'glm'; accountCategory = 'apikey'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'glm'
+                ? 'bg-white text-fuchsia-600 shadow-sm dark:bg-dark-600 dark:text-fuchsia-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="deepseek" size="sm" />
+            GLM
+          </button>
+          <button
+            type="button"
+            @click="form.platform = 'zai'; accountCategory = 'apikey'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'zai'
+                ? 'bg-white text-violet-600 shadow-sm dark:bg-dark-600 dark:text-violet-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="deepseek" size="sm" />
+            Z.ai
+          </button>
+          <button
+            type="button"
+            @click="form.platform = 'minimax'; accountCategory = 'apikey'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'minimax'
+                ? 'bg-white text-rose-600 shadow-sm dark:bg-dark-600 dark:text-rose-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="minimax" size="sm" />
+            MiniMax
+          </button>
+          <button
+            type="button"
+            @click="form.platform = 'opencode'; accountCategory = 'apikey'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'opencode'
+                ? 'bg-white text-indigo-600 shadow-sm dark:bg-dark-600 dark:text-indigo-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="opencode" size="sm" />
+            OpenCode
           </button>
         </div>
       </div>
@@ -1540,13 +1605,7 @@
             v-model="apiKeyBaseUrl"
             type="text"
             class="input"
-            :placeholder="
-              form.platform === 'openai'
-                ? 'https://api.openai.com'
-                : form.platform === 'gemini'
-                  ? 'https://generativelanguage.googleapis.com'
-                  : 'https://api.anthropic.com'
-            "
+            :placeholder="apiKeyCompatibleBaseUrl(form.platform)"
           />
           <p class="input-hint">{{ baseUrlHint }}</p>
         </div>
@@ -1562,7 +1621,9 @@
                 ? 'sk-proj-...'
                 : form.platform === 'gemini'
                   ? 'AIza...'
-                  : 'sk-ant-...'
+                  : form.platform === 'grok'
+                    ? 'sk-...'
+                    : 'sk-...'
             "
           />
           <p class="input-hint">{{ apiKeyHint }}</p>
@@ -3843,12 +3904,40 @@ const oauthStepTitle = computed(() => {
   return t('admin.accounts.oauth.title')
 })
 
+const apiKeyCompatibleBaseUrl = (platform: AccountPlatform) => {
+  switch (platform) {
+    case 'openai':
+      return 'https://api.openai.com'
+    case 'gemini':
+      return 'https://generativelanguage.googleapis.com'
+    case 'grok':
+      return 'https://api.x.ai/v1'
+    case 'kiro':
+      return ''
+    case 'antigravity':
+      return 'https://cloudcode-pa.googleapis.com'
+    case 'deepseek':
+      return 'https://api.deepseek.com'
+    case 'glm':
+      return 'https://api.z.ai/api/paas/v4'
+    case 'zai':
+      return 'https://chat.z.ai/api'
+    case 'minimax':
+      return 'https://api.minimax.io/v1'
+    case 'opencode':
+      return 'https://opencode.ai/zen/go/v1'
+    default:
+      return 'https://api.anthropic.com'
+  }
+}
+
 // Platform-specific hints for API Key type
 const baseUrlHint = computed(() => {
   if (form.platform === 'openai') return t('admin.accounts.openai.baseUrlHint')
   if (form.platform === 'gemini') return t('admin.accounts.gemini.baseUrlHint')
   if (form.platform === 'grok') return t('admin.accounts.grok.baseUrlHint')
   if (form.platform === 'kiro') return t('admin.accounts.kiro.baseUrlHint')
+  if (form.platform === 'opencode') return t('admin.accounts.openai.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
 
@@ -3857,6 +3946,7 @@ const apiKeyHint = computed(() => {
   if (form.platform === 'gemini') return t('admin.accounts.gemini.apiKeyHint')
   if (form.platform === 'grok') return t('admin.accounts.grok.apiKeyHint')
   if (form.platform === 'kiro') return t('admin.accounts.kiro.apiKeyHint')
+  if (form.platform === 'opencode') return t('admin.accounts.openai.apiKeyHint')
   return t('admin.accounts.apiKeyHint')
 })
 
@@ -4401,16 +4491,7 @@ watch(
   () => form.platform,
   (newPlatform) => {
     // Reset base URL based on platform
-    apiKeyBaseUrl.value =
-      (newPlatform === 'openai')
-        ? 'https://api.openai.com'
-        : newPlatform === 'gemini'
-          ? 'https://generativelanguage.googleapis.com'
-          : newPlatform === 'grok'
-            ? 'https://api.x.ai/v1'
-            : newPlatform === 'kiro'
-              ? ''
-              : 'https://api.anthropic.com'
+    apiKeyBaseUrl.value = apiKeyCompatibleBaseUrl(newPlatform)
     // Clear model-related settings
     allowedModels.value = []
     modelMappings.value = []
@@ -5312,12 +5393,7 @@ const handleSubmit = async () => {
   }
 
   // Determine default base URL based on platform
-  const defaultBaseUrl =
-    form.platform === 'openai'
-      ? 'https://api.openai.com'
-      : form.platform === 'gemini'
-        ? 'https://generativelanguage.googleapis.com'
-        : 'https://api.anthropic.com'
+  const defaultBaseUrl = apiKeyCompatibleBaseUrl(form.platform)
 
   // Build credentials with optional model mapping
   const credentials: Record<string, unknown> = {
