@@ -10,7 +10,6 @@ import (
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -343,8 +342,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 // served directly via /v1/chat/completions (the raw chat path) regardless of
 // the inbound endpoint; everything else goes through the Responses API.
 func resolveOpenAIUpstreamEndpoint(c *gin.Context, account *service.Account) string {
-	if account != nil && account.Type == service.AccountTypeAPIKey &&
-		!openai_compat.ShouldUseResponsesAPI(account.Extra) {
+	if service.ShouldUseOpenAICompatibleChatCompletions(account) {
 		return "/v1/chat/completions"
 	}
 	return GetUpstreamEndpoint(c, account.Platform)

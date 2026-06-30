@@ -25,6 +25,11 @@ const (
 	PlatformAntigravity = "antigravity"
 	PlatformGrok        = "grok"
 	PlatformKiro        = "kiro"
+	PlatformDeepSeek    = "deepseek"
+	PlatformGLM         = "glm"
+	PlatformZAI         = "zai"
+	PlatformMiniMax     = "minimax"
+	PlatformOpenCode    = "opencode"
 )
 
 // Account type constants

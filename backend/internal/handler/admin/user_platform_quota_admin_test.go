@@ -112,9 +112,9 @@ func TestUpdateUserPlatformQuotas_Success(t *testing.T) {
 	if repo.upsertCalls[0].userID != 42 || len(repo.upsertCalls[0].records) != 2 {
 		t.Errorf("unexpected upsert call: %+v", repo.upsertCalls[0])
 	}
-	// 缓存失效：请求中 2 个 platform + 软删除的 3 个 platform（gemini, antigravity, grok）= 5 次
-	if len(cache.deleteCalls) != 5 {
-		t.Errorf("expected 5 cache delete calls, got %d: %+v", len(cache.deleteCalls), cache.deleteCalls)
+	// 缓存失效：全量 invalidates all allowed quota platforms to cover soft-delete paths.
+	if len(cache.deleteCalls) != len(service.AllowedQuotaPlatforms) {
+		t.Errorf("expected %d cache delete calls, got %d: %+v", len(service.AllowedQuotaPlatforms), len(cache.deleteCalls), cache.deleteCalls)
 	}
 }
 
@@ -153,10 +153,16 @@ func TestUpdateUserPlatformQuotas_RejectsNegativeLimit(t *testing.T) {
 
 func TestUpdateUserPlatformQuotas_RejectsTooManyEntries(t *testing.T) {
 	h := buildTestHandler(&upsertCapturingQuotaRepo{}, &billingCacheStub{})
-	body := `{"quotas":[
-		{"platform":"anthropic"},{"platform":"openai"},{"platform":"gemini"},{"platform":"antigravity"},{"platform":"anthropic"}
-	]}`
-	c, w := putReq(t, body)
+	var quotas []map[string]string
+	for _, p := range service.AllowedQuotaPlatforms {
+		quotas = append(quotas, map[string]string{"platform": p})
+	}
+	quotas = append(quotas, map[string]string{"platform": "overflow"})
+	bodyBytes, err := json.Marshal(map[string]any{"quotas": quotas})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, w := putReq(t, string(bodyBytes))
 	h.UpdateUserPlatformQuotas(c)
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d: %s", w.Code, w.Body.String())
