@@ -932,6 +932,11 @@ export default {
         gemini: 'Gemini',
         antigravity: 'Antigravity',
         grok: 'Grok',
+        deepseek: 'DeepSeek',
+        glm: 'GLM',
+        zai: 'Z.ai',
+        minimax: 'MiniMax',
+        opencode: 'OpenCode',
         kiro: 'Kiro',
       },
       deleteConfirm:
