@@ -254,6 +254,11 @@ export default {
         antigravity: 'Antigravity',
         kiro: 'Kiro',
         grok: 'Grok',
+        deepseek: 'DeepSeek',
+        glm: 'GLM',
+        zai: 'Z.ai',
+        minimax: 'MiniMax',
+        opencode: 'OpenCode',
       },
       types: {
         oauth: 'OAuth',
