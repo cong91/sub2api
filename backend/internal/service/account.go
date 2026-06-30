@@ -278,7 +278,7 @@ func (a *Account) IsKiro() bool {
 }
 
 func (a *Account) IsOpenAICompatible() bool {
-	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok)
+	return a != nil && IsOpenAICompatiblePlatform(a.Platform)
 }
 
 func (a *Account) GeminiOAuthType() string {
@@ -1259,7 +1259,7 @@ func (a *Account) IsAnthropic() bool {
 }
 
 func (a *Account) IsOpenAIOAuth() bool {
-	return a.IsOpenAI() && a.Type == AccountTypeOAuth
+	return a != nil && IsOpenAICompatiblePlatform(a.Platform) && a.Type == AccountTypeOAuth
 }
 
 func (a *Account) IsOpenAIChatGPTSubscription() bool {
@@ -1283,11 +1283,11 @@ func (a *Account) IsOpenAIPersonalAccessToken() bool {
 }
 
 func (a *Account) IsOpenAIApiKey() bool {
-	return a.IsOpenAI() && a.Type == AccountTypeAPIKey
+	return a != nil && IsOpenAICompatiblePlatform(a.Platform) && a.Type == AccountTypeAPIKey
 }
 
 func (a *Account) GetOpenAIBaseURL() string {
-	if !a.IsOpenAI() {
+	if a == nil || !IsOpenAICompatiblePlatform(a.Platform) {
 		return ""
 	}
 	if a.Type == AccountTypeAPIKey {
@@ -1296,11 +1296,11 @@ func (a *Account) GetOpenAIBaseURL() string {
 			return baseURL
 		}
 	}
-	return "https://api.openai.com"
+	return DefaultOpenAICompatibleBaseURL(a.Platform)
 }
 
 func (a *Account) GetOpenAIAccessToken() string {
-	if !a.IsOpenAI() {
+	if a == nil || !IsOpenAICompatiblePlatform(a.Platform) {
 		return ""
 	}
 	return a.GetCredential("access_token")
@@ -1388,7 +1388,7 @@ func (a *Account) GetOpenAIApiKey() string {
 }
 
 func (a *Account) GetOpenAIUserAgent() string {
-	if !a.IsOpenAI() {
+	if a == nil || !IsOpenAICompatiblePlatform(a.Platform) {
 		return ""
 	}
 	return a.GetCredential("user_agent")
