@@ -287,30 +287,28 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		return nil
 	}
 
-	// Route to platform-specific test method
+	// Route to platform-specific test method. CN provider protocols are explicit:
+	// Chat Completions is direct, Responses uses the OpenAI probe, and Anthropic
+	// intentionally falls through to the Claude probe below.
 	if account.IsCNProvider() {
 		switch account.GetAPIProtocol() {
-		case APIProtocolAdaptive:
-			return s.testCNProviderAdaptiveConnection(c, account, modelID, prompt)
 		case APIProtocolChatCompletions:
 			return s.testCNProviderChatCompletionsConnection(c, account, modelID, prompt)
+		case APIProtocolResponses:
+			return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
 		}
-	}
-
-	if account.IsOpenAI() ||
-		(account.IsCNProvider() && account.GetAPIProtocol() == APIProtocolResponses) ||
-		(!account.IsCNProvider() && account.Platform != PlatformGrok && account.IsOpenAICompatible()) {
-		return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
+	} else {
+		if account.Platform == PlatformGrok {
+			return s.testGrokAccountConnection(c, account, modelID, prompt, mode, testOpts)
+		}
+		if account.IsOpenAICompatible() {
+			return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
+		}
 	}
 
 	if account.IsGemini() {
 		return s.testGeminiAccountConnection(c, account, modelID, prompt)
 	}
-
-	if account.Platform == PlatformGrok {
-		return s.testGrokAccountConnection(c, account, modelID, prompt, mode, testOpts)
-	}
-
 	if account.Platform == PlatformAntigravity {
 		return s.routeAntigravityTest(c, account, modelID, prompt)
 	}
