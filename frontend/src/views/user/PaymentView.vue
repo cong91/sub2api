@@ -335,7 +335,7 @@ import { usePaymentStore } from '@/stores/payment'
 import { useSubscriptionStore } from '@/stores/subscriptions'
 import { useAppStore } from '@/stores'
 import { paymentAPI } from '@/api/payment'
-import type { PublicOrderVerifyResult } from '@/api/payment'
+import type { PublicOrderResult, PublicOrderVerifyResult } from '@/api/payment'
 import { extractApiErrorMessage, extractI18nErrorMessage } from '@/utils/apiError'
 import { isMobileDevice } from '@/utils/device'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel, type PeakRateFields } from '@/utils/peak-rate'
@@ -1268,7 +1268,42 @@ function buildPaddleOrderFromCreateResult(
   }
 }
 
-function publicOrderToPaymentOrder(result: PublicOrderVerifyResult): PaymentOrder {
+function mapPublicOrderToPaymentOrder(order: PublicOrderResult): PaymentOrder {
+  return {
+    id: Number(order.id || 0),
+    user_id: Number(order.user_id || 0),
+    amount: Number(order.amount || 0),
+    pay_amount: Number(order.pay_amount || order.amount || 0),
+    currency: order.currency,
+    payment_amount: order.payment_amount,
+    ledger_amount: order.ledger_amount,
+    payment_currency: order.payment_currency || order.currency,
+    ledger_currency: order.ledger_currency,
+    fx_rate_payment_to_ledger: order.fx_rate_payment_to_ledger,
+    fx_source: order.fx_source,
+    fx_timestamp: order.fx_timestamp,
+    fee_rate: Number(order.fee_rate || 0),
+    payment_type: order.payment_type || 'paddle',
+    out_trade_no: order.out_trade_no || '',
+    status: order.status,
+    order_type: order.order_type,
+    created_at: order.created_at || new Date().toISOString(),
+    expires_at: order.expires_at || '',
+    paid_at: order.paid_at,
+    completed_at: order.completed_at,
+    refund_amount: Number(order.refund_amount || 0),
+    refund_reason: order.refund_reason,
+    refund_requested_at: order.refund_requested_at,
+    refund_requested_by: order.refund_requested_by,
+    refund_request_reason: order.refund_request_reason,
+    plan_id: order.plan_id,
+    provider_instance_id: order.provider_instance_id,
+    provider_snapshot: order.provider_snapshot,
+    device_code: order.device_code,
+  }
+}
+
+function mapPublicVerifyResultToPaymentOrder(order: PublicOrderVerifyResult): PaymentOrder | null {
   return {
     id: 0,
     user_id: 0,
@@ -1276,11 +1311,13 @@ function publicOrderToPaymentOrder(result: PublicOrderVerifyResult): PaymentOrde
     pay_amount: 0,
     fee_rate: 0,
     payment_type: 'paddle',
-    out_trade_no: result.out_trade_no,
-    status: result.status as PaymentOrder['status'],
+    out_trade_no: order.out_trade_no || '',
+    status: order.status as PaymentOrder['status'],
     order_type: 'balance',
-    created_at: result.created_at,
-    expires_at: result.expires_at,
+    created_at: order.created_at || new Date().toISOString(),
+    expires_at: order.expires_at || '',
+    paid_at: order.paid_at,
+    completed_at: order.completed_at,
     refund_amount: 0,
   }
 }
@@ -1289,11 +1326,11 @@ async function resolvePaddleCheckoutOrder(resumeToken: string, outTradeNo: strin
   try {
     if (resumeToken) {
       const result = await paymentAPI.resolveOrderPublicByResumeToken(resumeToken)
-      return publicOrderToPaymentOrder(result.data)
+      return mapPublicOrderToPaymentOrder(result.data)
     }
     if (outTradeNo) {
       const result = await paymentAPI.verifyOrderPublic(outTradeNo)
-      return publicOrderToPaymentOrder(result.data)
+      return mapPublicVerifyResultToPaymentOrder(result.data)
     }
   } catch (_err: unknown) {
     return null

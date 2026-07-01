@@ -74,7 +74,7 @@ func TestOpsSystemLogHandler_ListInvalidAccountID(t *testing.T) {
 
 func TestOpsSystemLogHandler_ListInvalidAPIKeyID(t *testing.T) {
 	svc := service.NewOpsService(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	h := NewOpsHandler(svc)
+	h := NewOpsHandler(svc, nil)
 	r := newOpsSystemLogTestRouter(h, false)
 
 	w := httptest.NewRecorder()
@@ -193,7 +193,7 @@ func TestOpsSystemLogHandler_CleanupServiceUnavailable(t *testing.T) {
 
 func TestOpsSystemLogHandler_CleanupAcceptsAPIKeyID(t *testing.T) {
 	svc := service.NewOpsService(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	h := NewOpsHandler(svc)
+	h := NewOpsHandler(svc, nil)
 	r := newOpsSystemLogTestRouter(h, true)
 
 	w := httptest.NewRecorder()
@@ -207,7 +207,7 @@ func TestOpsSystemLogHandler_CleanupAcceptsAPIKeyID(t *testing.T) {
 
 func TestOpsSystemLogHandler_CleanupInvalidAPIKeyID(t *testing.T) {
 	svc := service.NewOpsService(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	h := NewOpsHandler(svc)
+	h := NewOpsHandler(svc, nil)
 	r := newOpsSystemLogTestRouter(h, true)
 
 	w := httptest.NewRecorder()

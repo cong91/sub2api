@@ -300,7 +300,10 @@ describe('admin UsersView', () => {
     )
   })
 
-  it('shows invite redeem code next to truncated user email and copies it', async () => {
+  it('shows invite identity code next to truncated user email and copies it', async () => {
+    listUsers.mockResolvedValue({
+      items: [createAdminUser({
+        email: 'invalid-invite-user-email-that-is-too-long-to-render-cleanly@example.invalid.local',
         signup_source: 'invite',
         primary_redeem_code: 'INVITE-CODE-1234567890',
         primary_redeem_type: 'invitation',
@@ -342,15 +345,14 @@ describe('admin UsersView', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('admin.users.redeemCode')
     expect(wrapper.text()).toContain('INVITE-CODE-1234567890')
     expect(wrapper.get('[title="invalid-invite-user-email-that-is-too-long-to-render-cleanly@example.invalid.local"]').classes()).toContain('truncate')
 
-    await wrapper.get('button[aria-label="admin.users.copyRedeemCode"]').trigger('click')
+    await wrapper.get('button[aria-label="admin.users.copyIdentityCode"]').trigger('click')
     await flushPromises()
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('INVITE-CODE-1234567890')
-    expect(showSuccess).toHaveBeenCalledWith('admin.users.redeemCodeCopied')
+    expect(showSuccess).toHaveBeenCalledWith('admin.users.identityCodeCopied')
   })
 
   it('shows identity code next to truncated user email and copies it', async () => {
