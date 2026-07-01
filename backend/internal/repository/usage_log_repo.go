@@ -115,24 +115,6 @@ func safeDateFormat(granularity string) string {
 	return "YYYY-MM-DD"
 }
 
-func appendUsageLogBillingModeWhereCondition(conditions []string, args []any, billingMode string) ([]string, []any) {
-	mode := strings.TrimSpace(billingMode)
-	if mode == "" {
-		return conditions, args
-	}
-	placeholder := fmt.Sprintf("$%d", len(args)+1)
-	switch service.BillingMode(mode) {
-	case service.BillingModeImage:
-		conditions = append(conditions, fmt.Sprintf("(billing_mode = %s OR COALESCE(image_count, 0) > 0)", placeholder))
-	case service.BillingModeToken:
-		conditions = append(conditions, fmt.Sprintf("(billing_mode = %s OR ((billing_mode IS NULL OR billing_mode = '') AND COALESCE(image_count, 0) <= 0))", placeholder))
-	default:
-		conditions = append(conditions, fmt.Sprintf("billing_mode = %s", placeholder))
-	}
-	args = append(args, mode)
-	return conditions, args
-}
-
 // appendRawUsageLogModelWhereCondition keeps direct model filters on the raw model column for backward
 // compatibility with historical rows. Requested/upstream analytics must use
 // resolveModelDimensionExpression instead.

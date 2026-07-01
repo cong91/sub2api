@@ -156,6 +156,19 @@ vi.mock('vue-i18n', async () => {
 
 const simpleStub = { template: '<div><slot /></div>' }
 const chartStub = { template: '<div />' }
+const dataTableStub = {
+  props: ['data'],
+  template: `
+    <div>
+      <div v-for="row in data" :key="row.request_id || row.id">
+        <slot name="cell-billing_mode" :row="row" />
+        <slot name="cell-tokens" :row="row" />
+        <slot name="cell-cost" :row="row" />
+      </div>
+      <slot v-if="data.length === 0" name="empty" />
+    </div>
+  `,
+}
 
 const usageLog = {
   id: 1,
@@ -200,7 +213,8 @@ function mountUsageView() {
         Select: true,
         DateRangePicker: true,
         Icon: true,
-        UsageTable: chartStub,
+        DataTable: dataTableStub,
+        EmptyState: true,
         ModelDistributionChart: chartStub,
         GroupDistributionChart: chartStub,
         EndpointDistributionChart: chartStub,
@@ -224,6 +238,18 @@ describe('user UsageView', () => {
     showWarning.mockReset()
     showSuccess.mockReset()
     showInfo.mockReset()
+
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 20,
+      left: 20,
+      right: 120,
+      bottom: 40,
+      width: 100,
+      height: 20,
+      toJSON: () => ({}),
+    } as DOMRect)
 
     query.mockResolvedValue({ items: [usageLog], total: 1, pages: 1 })
     getStats.mockResolvedValue({
@@ -302,8 +328,8 @@ describe('user UsageView', () => {
     expect(text).toContain('282.43K')
     expect(text).toContain('Cache: 278.28K')
     expect(text).toContain('Cache Token Breakdown')
-    expect(text).toContain('Cache Creation 4')
-    expect(text).toContain('Cache Read 278.27K')
+    expect(text).toMatch(/Cache Creation\s*4/)
+    expect(text).toMatch(/Cache Read\s*278\.27K/)
     expect(text).not.toContain('usage.cacheTotal')
     expect(text).not.toContain('usage.cacheBreakdown')
     expect(text).not.toContain('usage.cacheCreationTokensLabel')
@@ -374,21 +400,9 @@ describe('user UsageView', () => {
     await flushPromises()
     await nextTick()
 
-    const setupState = (wrapper.vm as any).$?.setupState
-    setupState.tooltipData = {
-      request_id: 'req-user-1',
-      actual_cost: 0.092883,
-      total_cost: 0.092883,
-      rate_multiplier: 1,
-      service_tier: 'priority',
-      input_cost: 0.020285,
-      output_cost: 0.00303,
-      cache_creation_cost: 0,
-      cache_read_cost: 0.069568,
-      input_tokens: 4057,
-      output_tokens: 101,
-    }
-    setupState.tooltipVisible = true
+    const tooltipTriggers = wrapper.findAll('.group.relative')
+    expect(tooltipTriggers.length).toBeGreaterThanOrEqual(2)
+    await tooltipTriggers[tooltipTriggers.length - 1].trigger('mouseenter')
     await nextTick()
 
     const text = wrapper.text().replace(/\s+/g, ' ')
@@ -396,7 +410,7 @@ describe('user UsageView', () => {
     expect(text).toContain('Fast')
     expect(text).toContain('Rate')
     expect(text).toContain('1.00x')
-    expect(text).toContain('Billed')
+    expect(text).toContain('User billed')
     expect(text).toContain('$0.092883')
     expect(text).toContain('$5.0000 / 1M tokens')
     expect(text).toContain('$30.0000 / 1M tokens')

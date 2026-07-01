@@ -812,19 +812,6 @@ func calculateCreateOrderPayAmount(limitAmount, feeRate float64, currency string
 	return payAmountStr, payAmount, nil
 }
 
-func calculateCreateOrderPayAmountForOrder(orderType string, limitAmount, feeRate, multiplier float64, currency string) (string, float64, error) {
-	paymentAmount := calculateCreateOrderPaymentAmount(orderType, limitAmount, multiplier, currency)
-	return calculateCreateOrderPayAmount(paymentAmount, feeRate, currency)
-}
-
-func calculateCreateOrderPaymentAmount(orderType string, limitAmount, multiplier float64, currency string) float64 {
-	normalizedCurrency, err := payment.NormalizePaymentCurrency(currency)
-	if err != nil || normalizedCurrency != "CNY" || orderType != payment.OrderTypeSubscription {
-		return limitAmount
-	}
-	return calculateGatewayPaymentAmount(limitAmount, multiplier, normalizedCurrency)
-}
-
 func validateCreateOrderAmountCurrency(amount float64, currency string) error {
 	amountStr := strconv.FormatFloat(amount, 'f', -1, 64)
 	if _, err := payment.AmountToMinorUnit(amountStr, currency); err != nil {
