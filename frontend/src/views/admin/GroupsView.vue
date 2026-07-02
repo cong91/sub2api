@@ -4704,16 +4704,6 @@ const normalizeRateMultiplier = (
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
 };
 
-const normalizeImageRateMultiplier = (
-  value: number | string | null | undefined,
-): number => {
-  if (value === null || value === undefined || value === "") {
-    return 1;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
-};
-
 const handleCreateGroup = async () => {
   if (!createForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
