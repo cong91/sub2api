@@ -112,11 +112,43 @@ func TestUpdateUserPlatformQuotas_Success(t *testing.T) {
 	if len(repo.upsertCalls) != 1 {
 		t.Fatalf("UpsertForUser should be called once, got %d", len(repo.upsertCalls))
 	}
-	// upsert 记录数 = 请求体中给出的平台数（未给出的平台不落库）。
-	if repo.upsertCalls[0].userID != 42 || len(repo.upsertCalls[0].records) != 5 {
-		t.Errorf("unexpected upsert call: %+v", repo.upsertCalls[0])
+	// The handler stores exactly the quota platforms present in the request body.
+	floatPtr := func(v float64) *float64 { return &v }
+	sameFloatPtr := func(got, want *float64) bool {
+		if got == nil || want == nil {
+			return got == want
+		}
+		return *got == *want
 	}
-	// 缓存失效：按全部允许平台统一失效，覆盖 CN、OpenCode 及 soft-delete paths。
+	wantRecords := []struct {
+		platform string
+		daily    *float64
+		weekly   *float64
+		monthly  *float64
+	}{
+		{platform: "anthropic", daily: floatPtr(10.0), monthly: floatPtr(100.0)},
+		{platform: "openai", daily: floatPtr(80.0), weekly: floatPtr(300.0)},
+		{platform: "gemini"},
+		{platform: "antigravity"},
+		{platform: "grok"},
+	}
+	call := repo.upsertCalls[0]
+	if call.userID != 42 {
+		t.Errorf("unexpected upsert userID: got %d, want 42", call.userID)
+	}
+	if len(call.records) != len(wantRecords) {
+		t.Fatalf("unexpected upsert record count: got %d, want %d: %+v", len(call.records), len(wantRecords), call.records)
+	}
+	for i, want := range wantRecords {
+		got := call.records[i]
+		if got.UserID != 42 || got.Platform != want.platform ||
+			!sameFloatPtr(got.DailyLimitUSD, want.daily) ||
+			!sameFloatPtr(got.WeeklyLimitUSD, want.weekly) ||
+			!sameFloatPtr(got.MonthlyLimitUSD, want.monthly) {
+			t.Errorf("unexpected upsert record %d: got %+v, want platform=%s daily=%v weekly=%v monthly=%v", i, got, want.platform, want.daily, want.weekly, want.monthly)
+		}
+	}
+	// Invalidate all allowed quota platforms to cover CN/OpenCode and soft-delete paths.
 	if len(cache.deleteCalls) != len(service.AllowedQuotaPlatforms) {
 		t.Errorf("expected %d cache delete calls, got %d: %+v", len(service.AllowedQuotaPlatforms), len(cache.deleteCalls), cache.deleteCalls)
 	}
