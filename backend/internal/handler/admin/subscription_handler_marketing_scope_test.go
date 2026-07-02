@@ -33,6 +33,10 @@ func (r *subscriptionScopeRepoStub) GetByID(_ context.Context, id int64) (*servi
 	return &cp, nil
 }
 
+func (r *subscriptionScopeRepoStub) GetByIDIncludeDeleted(ctx context.Context, id int64) (*service.UserSubscription, error) {
+	return r.GetByID(ctx, id)
+}
+
 func (r *subscriptionScopeRepoStub) GetByUserIDAndGroupID(context.Context, int64, int64) (*service.UserSubscription, error) {
 	panic("unexpected GetByUserIDAndGroupID call")
 }
@@ -48,6 +52,10 @@ func (r *subscriptionScopeRepoStub) Update(context.Context, *service.UserSubscri
 func (r *subscriptionScopeRepoStub) Delete(_ context.Context, id int64) error {
 	r.deleted = append(r.deleted, id)
 	return nil
+}
+
+func (r *subscriptionScopeRepoStub) Restore(context.Context, int64, string) (*service.UserSubscription, error) {
+	panic("unexpected Restore call")
 }
 
 func (r *subscriptionScopeRepoStub) ListByUserID(context.Context, int64) ([]service.UserSubscription, error) {
@@ -68,6 +76,10 @@ func (r *subscriptionScopeRepoStub) List(context.Context, pagination.PaginationP
 
 func (r *subscriptionScopeRepoStub) ExistsByUserIDAndGroupID(context.Context, int64, int64) (bool, error) {
 	panic("unexpected ExistsByUserIDAndGroupID call")
+}
+
+func (r *subscriptionScopeRepoStub) ExistsActiveByUserIDAndGroupID(context.Context, int64, int64) (bool, error) {
+	panic("unexpected ExistsActiveByUserIDAndGroupID call")
 }
 
 func (r *subscriptionScopeRepoStub) ExtendExpiry(context.Context, int64, time.Time) error {
