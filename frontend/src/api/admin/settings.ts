@@ -1462,11 +1462,6 @@ export const settingsAPI = {
   updateWebSearchEmulationConfig,
   testWebSearchEmulation,
   resetWebSearchUsage,
-  getEmailTemplates,
-  getEmailTemplate,
-  updateEmailTemplate,
-  restoreOfficialEmailTemplate,
-  previewEmailTemplate,
 };
 
 export default settingsAPI;

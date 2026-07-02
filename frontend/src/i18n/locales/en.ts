@@ -612,8 +612,6 @@ const messages = {
     dingtalkProviderName: 'DingTalk',
     dingtalkCallbackPageTitle: 'DingTalk Sign-In Callback',
     linuxdoCallbackPageTitle: 'LinuxDo Sign-In Callback',
-    dingtalkCallbackPageTitle: 'DingTalk Sign-In Callback',
-    dingtalkProviderName: 'DingTalk',
     oidcCallbackPageTitle: 'OIDC Sign-In Callback',
     oauthCallbackPageTitle: 'OAuth Callback',
     wechatProviderName: 'WeChat',

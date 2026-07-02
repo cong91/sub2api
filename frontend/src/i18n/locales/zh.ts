@@ -610,8 +610,6 @@ const messages = {
     dingtalkProviderName: '钉钉',
     dingtalkCallbackPageTitle: '钉钉登录回调',
     linuxdoCallbackPageTitle: 'LinuxDo 登录回调',
-    dingtalkCallbackPageTitle: '钉钉登录回调',
-    dingtalkProviderName: '钉钉',
     oidcCallbackPageTitle: 'OIDC 登录回调',
     oauthCallbackPageTitle: 'OAuth 回调',
     wechatProviderName: '微信',
