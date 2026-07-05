@@ -826,6 +826,7 @@ import type { Column } from '@/components/common/types'
 import { formatDateTimeToMinute, formatUserDisplayName } from '@/utils/format'
 import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { makePlatformOptions } from '@/utils/platformOptions'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
@@ -1097,11 +1098,7 @@ const groupOptions = computed(() => [
 
 const platformFilterOptions = computed(() => [
   { value: '', label: t('admin.subscriptions.allPlatforms') },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'gemini', label: 'Gemini' },
-  { value: 'antigravity', label: 'Antigravity' },
-  { value: 'kiro', label: 'Kiro' }
+  ...makePlatformOptions(t)
 ])
 
 // Group options for assign (only subscription type groups)
