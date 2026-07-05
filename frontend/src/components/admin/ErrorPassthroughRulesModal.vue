@@ -439,6 +439,7 @@ import type { ErrorPassthroughRule } from '@/api/admin/errorPassthrough'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { makePlatformOptions } from '@/utils/platformOptions'
 
 const props = defineProps<{
   show: boolean
@@ -486,7 +487,7 @@ const matchModeOptions = computed(() => [
   { value: 'all', label: t('admin.errorPassthrough.matchMode.all'), description: t('admin.errorPassthrough.matchMode.allHint') }
 ])
 
-const platformOptions = CONCRETE_PLATFORM_OPTIONS
+const platformOptions = computed(() => makePlatformOptions(t))
 
 // Load rules when dialog opens
 watch(() => props.show, (newVal) => {

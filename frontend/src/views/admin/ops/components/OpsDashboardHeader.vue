@@ -11,6 +11,7 @@ import { opsAPI, type OpsDashboardOverview, type OpsMetricThresholds, type OpsRe
 import type { OpsRequestDetailsPreset } from './OpsRequestDetailsModal.vue'
 import { useAdminSettingsStore } from '@/stores'
 import { formatNumber } from '@/utils/format'
+import { makePlatformOptions } from '@/utils/platformOptions'
 import { formatMemorySizeMB } from '../utils/opsFormatters'
 import { translateOpsText } from '../utils/opsMessageTranslations'
 
@@ -111,7 +112,19 @@ const groups = ref<Array<{ id: number; name: string; platform: string }>>([])
 
 const platformOptions = computed(() => [
   { value: '', label: t('common.all') },
-  ...CONCRETE_PLATFORM_OPTIONS
+  ...makePlatformOptions(t, 'admin.groups.platforms', [
+    'openai',
+    'anthropic',
+    'gemini',
+    'antigravity',
+    'grok',
+    'kiro',
+    'deepseek',
+    'glm',
+    'zai',
+    'minimax',
+    'opencode'
+  ] as const)
 ])
 
 const timeRangeOptions = computed(() => [

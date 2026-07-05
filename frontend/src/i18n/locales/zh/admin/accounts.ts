@@ -340,6 +340,7 @@ export default {
         grok: 'Grok',
         kimi: 'Kimi',
         zhipu: 'Zhipu GLM',
+        composite: 'Composite',
         deepseek: 'DeepSeek',
       },
       cnProviders: {
