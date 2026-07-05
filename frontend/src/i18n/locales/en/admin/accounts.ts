@@ -123,6 +123,7 @@ export default {
         grok: 'Grok',
         kimi: 'Kimi',
         zhipu: 'Zhipu GLM',
+        composite: 'Composite',
         deepseek: 'DeepSeek',
         glm: 'GLM',
         zai: 'Z.ai',

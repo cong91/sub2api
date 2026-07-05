@@ -10,6 +10,7 @@ import { opsAPI, type OpsDashboardOverview, type OpsMetricThresholds, type OpsRe
 import type { OpsRequestDetailsPreset } from './OpsRequestDetailsModal.vue'
 import { useAdminSettingsStore } from '@/stores'
 import { formatNumber } from '@/utils/format'
+import { makePlatformOptions } from '@/utils/platformOptions'
 import { formatMemorySizeMB } from '../utils/opsFormatters'
 import { translateOpsText } from '../utils/opsMessageTranslations'
 
@@ -110,17 +111,19 @@ const groups = ref<Array<{ id: number; name: string; platform: string }>>([])
 
 const platformOptions = computed(() => [
   { value: '', label: t('common.all') },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'gemini', label: 'Gemini' },
-  { value: 'antigravity', label: 'Antigravity' },
-  { value: 'grok', label: 'Grok' },
-  { value: 'kiro', label: 'Kiro' },
-  { value: 'deepseek', label: 'DeepSeek' },
-  { value: 'glm', label: 'GLM' },
-  { value: 'zai', label: 'Z.ai' },
-  { value: 'minimax', label: 'MiniMax' },
-  { value: 'opencode', label: 'OpenCode' }
+  ...makePlatformOptions(t, 'admin.groups.platforms', [
+    'openai',
+    'anthropic',
+    'gemini',
+    'antigravity',
+    'grok',
+    'kiro',
+    'deepseek',
+    'glm',
+    'zai',
+    'minimax',
+    'opencode'
+  ] as const)
 ])
 
 const timeRangeOptions = computed(() => [
