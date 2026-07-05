@@ -4424,6 +4424,7 @@ import type { ChannelModelPricing } from "@/api/admin/channels";
 import { VueDraggable } from "vue-draggable-plus";
 import { createStableObjectKeyResolver } from "@/utils/stableObjectKey";
 import { extractApiErrorMessage } from "@/utils/apiError";
+import { makePlatformOptions } from "@/utils/platformOptions";
 import { useKeyedDebouncedSearch } from "@/composables/useKeyedDebouncedSearch";
 import { getPersistedPageSize } from "@/composables/usePersistedPageSize";
 import {
@@ -4708,34 +4709,12 @@ const exclusiveOptions = computed(() => [
 ]);
 
 const platformOptions = computed(() => [
-  { value: "anthropic", label: "Anthropic" },
-  { value: "openai", label: "OpenAI" },
-  { value: "gemini", label: "Gemini" },
-  { value: "antigravity", label: "Antigravity" },
-  { value: "grok", label: "Grok" },
-  { value: "composite", label: "Composite" },
-  { value: "kiro", label: "Kiro" },
-  { value: "deepseek", label: "DeepSeek" },
-  { value: "glm", label: "GLM" },
-  { value: "zai", label: "Z.ai" },
-  { value: "minimax", label: "MiniMax" },
-  { value: "opencode", label: "OpenCode" },
+  ...makePlatformOptions(t),
 ]);
 
 const platformFilterOptions = computed(() => [
   { value: "", label: t("admin.groups.allPlatforms") },
-  { value: "anthropic", label: "Anthropic" },
-  { value: "openai", label: "OpenAI" },
-  { value: "gemini", label: "Gemini" },
-  { value: "antigravity", label: "Antigravity" },
-  { value: "grok", label: "Grok" },
-  { value: "composite", label: "Composite" },
-  { value: "kiro", label: "Kiro" },
-  { value: "deepseek", label: "DeepSeek" },
-  { value: "glm", label: "GLM" },
-  { value: "zai", label: "Z.ai" },
-  { value: "minimax", label: "MiniMax" },
-  { value: "opencode", label: "OpenCode" },
+  ...makePlatformOptions(t),
 ]);
 
 const compositeRoutePlatformOptions = computed(() => [
@@ -5946,15 +5925,7 @@ const validateProfitControlForm = (form: ProfitControlFormState): boolean => {
   return true;
 };
 
-const normalizeImageRateMultiplier = (
-  value: number | string | null | undefined,
-): number => {
-  if (value === null || value === undefined || value === "") {
-    return 1;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
-};
+const normalizeImageRateMultiplier = normalizeRateMultiplier;
 
 const handleCreateGroup = async () => {
   if (!createForm.name.trim()) {
