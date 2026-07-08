@@ -631,6 +631,8 @@ func defaultModelMappingForPlatform(platform string) map[string]string {
 		return domain.DefaultAntigravityModelMapping
 	case domain.PlatformKiro:
 		return domain.DefaultKiroModelMapping
+	case domain.PlatformOpenCode:
+		return domain.DefaultOpenCodeModelMapping
 	default:
 		return nil
 	}
