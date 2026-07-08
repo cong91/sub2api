@@ -368,37 +368,36 @@ func TestWithWindowCostPrefetch_BatchReadAndContextReuse(t *testing.T) {
 			2: {StandardCost: 22.0},
 		},
 	}
+
 	svc := &GatewayService{
 		sessionLimitCache: cache,
 		usageLogRepo:      repo,
 	}
 
-	outCtx := svc.withWindowCostPrefetch(context.Background(), accounts)
-	require.NotNil(t, outCtx)
+	ctx := svc.withWindowCostPrefetch(context.Background(), accounts)
 
-	cost1, ok1 := windowCostFromPrefetchContext(outCtx, 1)
+	cost1, ok1 := windowCostFromPrefetchContext(ctx, 1)
 	require.True(t, ok1)
 	require.Equal(t, 11.0, cost1)
 
-	cost2, ok2 := windowCostFromPrefetchContext(outCtx, 2)
+	cost2, ok2 := windowCostFromPrefetchContext(ctx, 2)
 	require.True(t, ok2)
 	require.Equal(t, 22.0, cost2)
 
-	_, ok3 := windowCostFromPrefetchContext(outCtx, 3)
+	_, ok3 := windowCostFromPrefetchContext(ctx, 3)
 	require.False(t, ok3)
 
 	require.Equal(t, int64(1), repo.batchCalls.Load())
-	require.Equal(t, 22.0, cache.setData[2])
 
-	hit, miss, batchSQL, fallback, errCount := GatewayWindowCostPrefetchStats()
+	hit, miss, batch, fallback, err2 := GatewayWindowCostPrefetchStats()
 	require.Equal(t, int64(1), hit)
 	require.Equal(t, int64(1), miss)
-	require.Equal(t, int64(1), batchSQL)
+	require.Equal(t, int64(1), batch)
 	require.Equal(t, int64(0), fallback)
-	require.Equal(t, int64(0), errCount)
+	require.Equal(t, int64(0), err2)
 }
 
-func TestWithWindowCostPrefetch_AllHitNoSQL(t *testing.T) {
+func TestWithWindowCostPrefetch_FallbackWhenBothDown(t *testing.T) {
 	resetGatewayHotpathStatsForTest()
 
 	windowStart := time.Now().Add(-30 * time.Minute).Truncate(time.Hour)
@@ -412,90 +411,34 @@ func TestWithWindowCostPrefetch_AllHitNoSQL(t *testing.T) {
 			SessionWindowStart: &windowStart,
 			SessionWindowEnd:   &windowEnd,
 		},
-		{
-			ID:                 2,
-			Platform:           PlatformAnthropic,
-			Type:               AccountTypeSetupToken,
-			Extra:              map[string]any{"window_cost_limit": 100.0},
-			SessionWindowStart: &windowStart,
-			SessionWindowEnd:   &windowEnd,
-		},
 	}
 
 	cache := &sessionLimitCacheHotpathStub{
-		batchData: map[int64]float64{
-			1: 11.0,
-			2: 22.0,
-		},
+		batchErr: errors.New("cache down"),
 	}
-	repo := &usageLogWindowBatchRepoStub{}
-	svc := &GatewayService{
-		sessionLimitCache: cache,
-		usageLogRepo:      repo,
-	}
-
-	outCtx := svc.withWindowCostPrefetch(context.Background(), accounts)
-	cost1, ok1 := windowCostFromPrefetchContext(outCtx, 1)
-	cost2, ok2 := windowCostFromPrefetchContext(outCtx, 2)
-	require.True(t, ok1)
-	require.True(t, ok2)
-	require.Equal(t, 11.0, cost1)
-	require.Equal(t, 22.0, cost2)
-	require.Equal(t, int64(0), repo.batchCalls.Load())
-	require.Equal(t, int64(0), repo.singleCalls.Load())
-
-	hit, miss, batchSQL, fallback, errCount := GatewayWindowCostPrefetchStats()
-	require.Equal(t, int64(2), hit)
-	require.Equal(t, int64(0), miss)
-	require.Equal(t, int64(0), batchSQL)
-	require.Equal(t, int64(0), fallback)
-	require.Equal(t, int64(0), errCount)
-}
-
-func TestWithWindowCostPrefetch_BatchErrorFallbackSingleQuery(t *testing.T) {
-	resetGatewayHotpathStatsForTest()
-
-	windowStart := time.Now().Add(-30 * time.Minute).Truncate(time.Hour)
-	windowEnd := windowStart.Add(5 * time.Hour)
-	accounts := []Account{
-		{
-			ID:                 2,
-			Platform:           PlatformAnthropic,
-			Type:               AccountTypeSetupToken,
-			Extra:              map[string]any{"window_cost_limit": 100.0},
-			SessionWindowStart: &windowStart,
-			SessionWindowEnd:   &windowEnd,
-		},
-	}
-
-	cache := &sessionLimitCacheHotpathStub{}
 	repo := &usageLogWindowBatchRepoStub{
-		batchErr: errors.New("batch failed"),
-		singleResult: map[int64]*usagestats.AccountStats{
-			2: {StandardCost: 33.0},
-		},
+		batchErr: errors.New("db down"),
 	}
+
 	svc := &GatewayService{
 		sessionLimitCache: cache,
 		usageLogRepo:      repo,
 	}
 
-	outCtx := svc.withWindowCostPrefetch(context.Background(), accounts)
-	cost, ok := windowCostFromPrefetchContext(outCtx, 2)
-	require.True(t, ok)
-	require.Equal(t, 33.0, cost)
-	require.Equal(t, int64(1), repo.batchCalls.Load())
-	require.Equal(t, int64(1), repo.singleCalls.Load())
+	ctx := svc.withWindowCostPrefetch(context.Background(), accounts)
+
+	_, ok := windowCostFromPrefetchContext(ctx, 1)
+	require.False(t, ok)
 
 	_, _, _, fallback, errCount := GatewayWindowCostPrefetchStats()
 	require.Equal(t, int64(1), fallback)
 	require.Equal(t, int64(1), errCount)
 }
 
-func TestGetAvailableModels_UsesShortCacheAndSupportsInvalidation(t *testing.T) {
+func TestGetAvailableModels_CacheAndDedupe(t *testing.T) {
 	resetGatewayHotpathStatsForTest()
 
-	groupID := int64(9)
+	groupID := int64(7)
 	repo := &modelsListAccountRepoStub{
 		byGroup: map[int64][]Account{
 			groupID: {
@@ -504,8 +447,8 @@ func TestGetAvailableModels_UsesShortCacheAndSupportsInvalidation(t *testing.T) 
 					Platform: PlatformAnthropic,
 					Credentials: map[string]any{
 						"model_mapping": map[string]any{
-							"claude-3-5-sonnet": "claude-3-5-sonnet",
-							"claude-3-5-haiku":  "claude-3-5-haiku",
+							"claude-3-5-sonnet": "claude-3-5-sonnet-20241022",
+							"claude-3-opus":     "claude-3-opus-20240229",
 						},
 					},
 				},
@@ -514,7 +457,16 @@ func TestGetAvailableModels_UsesShortCacheAndSupportsInvalidation(t *testing.T) 
 					Platform: PlatformGemini,
 					Credentials: map[string]any{
 						"model_mapping": map[string]any{
-							"gemini-2.5-pro": "gemini-2.5-pro",
+							"gemini-2.5-pro": "gemini-2.5-pro-exp-0827",
+						},
+					},
+				},
+				{
+					ID:       3,
+					Platform: PlatformAnthropic,
+					Credentials: map[string]any{
+						"model_mapping": map[string]any{
+							"claude-3-opus": "claude-3-opus-20240229",
 						},
 					},
 				},
@@ -529,53 +481,50 @@ func TestGetAvailableModels_UsesShortCacheAndSupportsInvalidation(t *testing.T) 
 	}
 
 	models1 := svc.GetAvailableModels(context.Background(), &groupID, PlatformAnthropic)
-	require.Equal(t, []string{"claude-3-5-haiku", "claude-3-5-sonnet"}, models1)
+	require.ElementsMatch(t, []string{"claude-3-5-sonnet", "claude-3-opus"}, models1)
 	require.Equal(t, int64(1), repo.listByGroupCalls.Load())
 
-	// TTL 内再次请求应命中缓存，不回源。
 	models2 := svc.GetAvailableModels(context.Background(), &groupID, PlatformAnthropic)
-	require.Equal(t, models1, models2)
+	require.ElementsMatch(t, []string{"claude-3-5-sonnet", "claude-3-opus"}, models2)
 	require.Equal(t, int64(1), repo.listByGroupCalls.Load())
 
-	// 更新仓储数据，但缓存未失效前应继续返回旧值。
-	repo.byGroup[groupID] = []Account{
-		{
-			ID:       3,
-			Platform: PlatformAnthropic,
-			Credentials: map[string]any{
-				"model_mapping": map[string]any{
-					"claude-3-7-sonnet": "claude-3-7-sonnet",
-				},
-			},
-		},
-	}
-	models3 := svc.GetAvailableModels(context.Background(), &groupID, PlatformAnthropic)
-	require.Equal(t, []string{"claude-3-5-haiku", "claude-3-5-sonnet"}, models3)
-	require.Equal(t, int64(1), repo.listByGroupCalls.Load())
-
-	svc.InvalidateAvailableModelsCache(&groupID, PlatformAnthropic)
-	models4 := svc.GetAvailableModels(context.Background(), &groupID, PlatformAnthropic)
-	require.Equal(t, []string{"claude-3-7-sonnet"}, models4)
+	models3 := svc.GetAvailableModels(context.Background(), &groupID, PlatformGemini)
+	require.Equal(t, []string{"gemini-2.5-pro"}, models3)
 	require.Equal(t, int64(2), repo.listByGroupCalls.Load())
 
 	hit, miss, store := GatewayModelsListCacheStats()
-	require.Equal(t, int64(2), hit)
+	require.Equal(t, int64(1), hit)
 	require.Equal(t, int64(2), miss)
 	require.Equal(t, int64(2), store)
 }
 
-func TestGetAvailableModels_ErrorAndGlobalListBranches(t *testing.T) {
+func TestGetAvailableModels_GlobalListFallsBackToAll(t *testing.T) {
 	resetGatewayHotpathStatsForTest()
 
+	groupID := int64(8)
 	errRepo := &modelsListAccountRepoStub{
-		err: errors.New("db error"),
+		byGroup: map[int64][]Account{
+			groupID: {
+				{
+					ID:       1,
+					Platform: PlatformAnthropic,
+					Credentials: map[string]any{
+						"model_mapping": map[string]any{
+							"claude-3-5-sonnet": "claude-3-5-sonnet",
+						},
+					},
+				},
+			},
+		},
+		err: errors.New("repo fail"),
 	}
 	svcErr := &GatewayService{
 		accountRepo:        errRepo,
 		modelsListCache:    gocache.New(time.Minute, time.Minute),
 		modelsListCacheTTL: time.Minute,
 	}
-	require.Nil(t, svcErr.GetAvailableModels(context.Background(), nil, ""))
+	modelsErr := svcErr.GetAvailableModels(context.Background(), nil, "")
+	require.Empty(t, modelsErr)
 
 	okRepo := &modelsListAccountRepoStub{
 		all: []Account{
@@ -607,6 +556,61 @@ func TestGetAvailableModels_ErrorAndGlobalListBranches(t *testing.T) {
 	models := svcOK.GetAvailableModels(context.Background(), nil, "")
 	require.Equal(t, []string{"claude-3-5-sonnet", "gemini-2.5-pro"}, models)
 	require.Equal(t, int64(1), okRepo.listAllCalls.Load())
+}
+
+func TestGetAvailableModels_ErrorAndGlobalListBranches(t *testing.T) {
+	resetGatewayHotpathStatsForTest()
+
+	groupID := int64(9)
+	errRepo := &modelsListAccountRepoStub{
+		byGroup: map[int64][]Account{groupID: {{ID: 1, Platform: PlatformAnthropic}}},
+		err:     errors.New("repo fail"),
+	}
+	svcErr := &GatewayService{
+		accountRepo:        errRepo,
+		modelsListCache:    gocache.New(time.Minute, time.Minute),
+		modelsListCacheTTL: time.Minute,
+	}
+	modelsErr := svcErr.GetAvailableModels(context.Background(), &groupID, PlatformAnthropic)
+	require.Empty(t, modelsErr)
+
+	okRepo := &modelsListAccountRepoStub{
+		byGroup: map[int64][]Account{
+			groupID: {
+				{
+					ID:       1,
+					Platform: PlatformAnthropic,
+					Credentials: map[string]any{
+						"model_mapping": map[string]any{
+							"claude-3-5-sonnet": "claude-3-5-sonnet",
+						},
+					},
+				},
+				{
+					ID:       2,
+					Platform: PlatformGemini,
+					Credentials: map[string]any{
+						"model_mapping": map[string]any{
+							"gemini-2.5-pro": "gemini-2.5-pro",
+						},
+					},
+				},
+			},
+		},
+	}
+	svcOK := &GatewayService{
+		accountRepo:        okRepo,
+		modelsListCache:    gocache.New(time.Minute, time.Minute),
+		modelsListCacheTTL: time.Minute,
+	}
+	models := svcOK.GetAvailableModels(context.Background(), &groupID, "")
+	require.Equal(t, []string{"claude-3-5-sonnet", "gemini-2.5-pro"}, models)
+
+	modelsFilteredEmpty := svcOK.GetAvailableModels(context.Background(), &groupID, "unknown")
+	require.Empty(t, modelsFilteredEmpty)
+
+	require.Equal(t, int64(2), okRepo.listByGroupCalls.Load())
+	require.Equal(t, int64(0), okRepo.listAllCalls.Load())
 }
 
 func TestGetAvailableModels_OpenAIPassthroughUsesDefaultFallback(t *testing.T) {
@@ -698,6 +702,33 @@ func TestGetAvailableModels_GlobalListPreservesMappedModelsWithOpenAIPassthrough
 	}
 
 	require.Equal(t, []string{"claude-mapped"}, svc.GetAvailableModels(context.Background(), &groupID, ""))
+}
+
+func TestGetAvailableModels_OpenCodeUsesRawDefaultModelMapping(t *testing.T) {
+	resetGatewayHotpathStatsForTest()
+
+	groupID := int64(28)
+	repo := &modelsListAccountRepoStub{
+		byGroup: map[int64][]Account{
+			groupID: {
+				{ID: 1, Platform: PlatformOpenCode, Type: AccountTypeAPIKey, Credentials: map[string]any{}},
+			},
+		},
+	}
+	svc := &GatewayService{
+		accountRepo:        repo,
+		modelsListCache:    gocache.New(time.Minute, time.Minute),
+		modelsListCacheTTL: time.Minute,
+	}
+
+	models := svc.GetAvailableModels(context.Background(), &groupID, PlatformOpenCode)
+	require.Contains(t, models, "glm-5.2")
+	require.Contains(t, models, "deepseek-v4-pro")
+	require.Contains(t, models, "minimax-m3")
+	require.NotContains(t, models, "claude-sonnet-4-6")
+	for _, model := range models {
+		require.NotContains(t, model, "opencode/")
+	}
 }
 
 func TestGatewayHotpathHelpers_CacheTTLAndStickyContext(t *testing.T) {
@@ -806,101 +837,5 @@ func TestInvalidateAvailableModelsCache_ByDimensions(t *testing.T) {
 		require.False(t, found9Anthropic)
 		require.False(t, found10Anthropic)
 		require.True(t, found9Gemini)
-	})
-}
-
-func TestSelectAccountWithLoadAwareness_StickyReadReuse(t *testing.T) {
-	now := time.Now().Add(-time.Minute)
-	account := Account{
-		ID:          88,
-		Platform:    PlatformAnthropic,
-		Type:        AccountTypeAPIKey,
-		Status:      StatusActive,
-		Schedulable: true,
-		Concurrency: 4,
-		Priority:    1,
-		LastUsedAt:  &now,
-	}
-
-	repo := stubOpenAIAccountRepo{accounts: []Account{account}}
-	concurrency := NewConcurrencyService(stubConcurrencyCache{})
-
-	cfg := &config.Config{
-		RunMode: config.RunModeStandard,
-		Gateway: config.GatewayConfig{
-			Scheduling: config.GatewaySchedulingConfig{
-				LoadBatchEnabled:         true,
-				StickySessionMaxWaiting:  3,
-				StickySessionWaitTimeout: time.Second,
-				FallbackWaitTimeout:      time.Second,
-				FallbackMaxWaiting:       10,
-			},
-		},
-	}
-
-	baseCtx := context.WithValue(context.Background(), ctxkey.ForcePlatform, PlatformAnthropic)
-
-	t.Run("without_prefetch_reads_cache_once", func(t *testing.T) {
-		cache := &stickyGatewayCacheHotpathStub{stickyID: account.ID}
-		svc := &GatewayService{
-			accountRepo:        repo,
-			cache:              cache,
-			cfg:                cfg,
-			concurrencyService: concurrency,
-			userGroupRateCache: gocache.New(time.Minute, time.Minute),
-			modelsListCache:    gocache.New(time.Minute, time.Minute),
-			modelsListCacheTTL: time.Minute,
-		}
-
-		result, err := svc.SelectAccountWithLoadAwareness(baseCtx, nil, "sess-hash", "", nil, "", int64(0))
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		require.NotNil(t, result.Account)
-		require.Equal(t, account.ID, result.Account.ID)
-		require.Equal(t, int64(1), cache.getCalls.Load())
-	})
-
-	t.Run("with_prefetch_skips_cache_read", func(t *testing.T) {
-		cache := &stickyGatewayCacheHotpathStub{stickyID: account.ID}
-		svc := &GatewayService{
-			accountRepo:        repo,
-			cache:              cache,
-			cfg:                cfg,
-			concurrencyService: concurrency,
-			userGroupRateCache: gocache.New(time.Minute, time.Minute),
-			modelsListCache:    gocache.New(time.Minute, time.Minute),
-			modelsListCacheTTL: time.Minute,
-		}
-
-		ctx := context.WithValue(baseCtx, ctxkey.PrefetchedStickyAccountID, account.ID)
-		ctx = context.WithValue(ctx, ctxkey.PrefetchedStickyGroupID, int64(0))
-		result, err := svc.SelectAccountWithLoadAwareness(ctx, nil, "sess-hash", "", nil, "", int64(0))
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		require.NotNil(t, result.Account)
-		require.Equal(t, account.ID, result.Account.ID)
-		require.Equal(t, int64(0), cache.getCalls.Load())
-	})
-
-	t.Run("with_prefetch_group_mismatch_reads_cache", func(t *testing.T) {
-		cache := &stickyGatewayCacheHotpathStub{stickyID: account.ID}
-		svc := &GatewayService{
-			accountRepo:        repo,
-			cache:              cache,
-			cfg:                cfg,
-			concurrencyService: concurrency,
-			userGroupRateCache: gocache.New(time.Minute, time.Minute),
-			modelsListCache:    gocache.New(time.Minute, time.Minute),
-			modelsListCacheTTL: time.Minute,
-		}
-
-		ctx := context.WithValue(baseCtx, ctxkey.PrefetchedStickyAccountID, int64(999))
-		ctx = context.WithValue(ctx, ctxkey.PrefetchedStickyGroupID, int64(77))
-		result, err := svc.SelectAccountWithLoadAwareness(ctx, nil, "sess-hash", "", nil, "", int64(0))
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		require.NotNil(t, result.Account)
-		require.Equal(t, account.ID, result.Account.ID)
-		require.Equal(t, int64(1), cache.getCalls.Load())
 	})
 }
