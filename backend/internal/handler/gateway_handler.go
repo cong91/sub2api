@@ -1168,6 +1168,8 @@ func defaultModelIDsForPlatform(platform string) []string {
 		return ids
 	case service.PlatformGrok:
 		return xai.DefaultModelIDs()
+	case service.PlatformOpenCode:
+		return domain.DefaultOpenCodeModelIDs()
 	default:
 		ids := make([]string, 0, len(claude.DefaultModels))
 		for _, model := range claude.DefaultModels {
