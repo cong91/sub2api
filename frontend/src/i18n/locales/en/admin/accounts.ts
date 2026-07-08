@@ -743,6 +743,30 @@ export default {
         fileReadFailed: 'Failed to read the selected file',
         noResponseBody: 'No response body from server'
       },
+      antigravity: {
+        baseUrlHint: 'Leave default for the Antigravity upstream endpoint',
+        apiKeyHint: 'API Key for the Antigravity upstream'
+      },
+      deepseek: {
+        baseUrlHint: 'Leave default for the official DeepSeek API',
+        apiKeyHint: 'Your DeepSeek API Key'
+      },
+      glm: {
+        baseUrlHint: 'Leave default for the official GLM/Z.ai API',
+        apiKeyHint: 'Your GLM/Z.ai API Key'
+      },
+      zai: {
+        baseUrlHint: 'Leave default for the Z.ai Chat API endpoint',
+        apiKeyHint: 'Your Z.ai API Key'
+      },
+      minimax: {
+        baseUrlHint: 'Leave default for the official MiniMax API',
+        apiKeyHint: 'Your MiniMax API Key'
+      },
+      opencode: {
+        baseUrlHint: 'Leave default for the official OpenCode Zen API endpoint',
+        apiKeyHint: 'Your OpenCode API Key'
+      },
       kiro: {
         baseUrlHint: 'Enter the Base URL of the Kiro-compatible upstream',
         apiKeyHint: 'API Key for that Kiro upstream',
