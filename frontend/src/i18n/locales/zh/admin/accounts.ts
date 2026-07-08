@@ -786,6 +786,30 @@ export default {
         fileReadFailed: '读取所选文件失败',
         noResponseBody: '服务器未返回响应体'
       },
+      antigravity: {
+        baseUrlHint: '留空使用默认 Antigravity 上游端点',
+        apiKeyHint: '用于 Antigravity 上游的 API Key'
+      },
+      deepseek: {
+        baseUrlHint: '留空使用官方 DeepSeek API',
+        apiKeyHint: '您的 DeepSeek API Key'
+      },
+      glm: {
+        baseUrlHint: '留空使用官方 GLM/Z.ai API',
+        apiKeyHint: '您的 GLM/Z.ai API Key'
+      },
+      zai: {
+        baseUrlHint: '留空使用默认 Z.ai Chat API 端点',
+        apiKeyHint: '您的 Z.ai API Key'
+      },
+      minimax: {
+        baseUrlHint: '留空使用官方 MiniMax API',
+        apiKeyHint: '您的 MiniMax API Key'
+      },
+      opencode: {
+        baseUrlHint: '留空使用默认 OpenCode Zen API 端点',
+        apiKeyHint: '您的 OpenCode API Key'
+      },
       kiro: {
         baseUrlHint: '请输入 Kiro 兼容上游的 Base URL',
         apiKeyHint: '用于该 Kiro 上游的 API Key',
