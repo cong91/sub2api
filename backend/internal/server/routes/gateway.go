@@ -113,6 +113,16 @@ func RegisterGatewayRoutes(
 		}
 		rejectUnsupportedEndpoint(c, "Videos API")
 	}
+	modelsHandler := func(c *gin.Context) {
+		// Codex CLI / Codex app refresh their model picker from the provider's
+		// /models endpoint with a client_version query and expect the ChatGPT
+		// Codex manifest format; other clients keep the OpenAI-style list.
+		if isOpenAIGatewayPlatform(c) && c.Query("client_version") != "" {
+			h.OpenAIGateway.CodexModels(c)
+			return
+		}
+		h.Gateway.Models(c)
+	}
 	// API网关（Claude API兼容）
 	gateway := r.Group("/v1")
 	gateway.Use(bodyLimit)
@@ -124,7 +134,7 @@ func RegisterGatewayRoutes(
 	{
 		// /v1/messages: auto-route based on group platform
 		gateway.POST("/messages", func(c *gin.Context) {
-			if isOpenAIResponsesCompatibleGatewayPlatform(c) {
+			if isOpenAIResponsesCompatibleGatewayPlatform(c) || isOpenAIChatCompletionsGatewayPlatform(c) {
 				h.OpenAIGateway.Messages(c)
 				return
 			}
@@ -150,16 +160,7 @@ func RegisterGatewayRoutes(
 			}
 			h.Gateway.CountTokens(c)
 		})
-		// Codex CLI / Codex app refresh their model picker from the provider's
-		// /models endpoint with a client_version query and expect the ChatGPT
-		// Codex manifest format; other clients keep the OpenAI-style list.
-		gateway.GET("/models", func(c *gin.Context) {
-			if isOpenAIGatewayPlatform(c) && c.Query("client_version") != "" {
-				h.OpenAIGateway.CodexModels(c)
-				return
-			}
-			h.Gateway.Models(c)
-		})
+		gateway.GET("/models", modelsHandler)
 		gateway.GET("/usage", h.Gateway.Usage)
 		// OpenAI Responses API: auto-route based on group platform
 		gateway.POST("/responses", func(c *gin.Context) {
@@ -256,6 +257,7 @@ func RegisterGatewayRoutes(
 		}
 		h.Gateway.Responses(c)
 	}
+	r.GET("/models", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gatewayAPIKeyAuth, requireGroupAnthropic, modelsHandler)
 	r.POST("/responses", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gatewayAPIKeyAuth, requireGroupAnthropic, responsesHandler)
 	r.POST("/responses/*subpath", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gatewayAPIKeyAuth, requireGroupAnthropic, responsesHandler)
 	r.POST("/alpha/search", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gatewayAPIKeyAuth, requireGroupAnthropic, h.OpenAIGateway.AlphaSearch)
