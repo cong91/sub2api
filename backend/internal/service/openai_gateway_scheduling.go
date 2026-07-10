@@ -247,14 +247,20 @@ func (s *OpenAIGatewayService) SelectAccountForModelWithExclusions(ctx context.C
 // deepseek）的原值，其他值一律归一为 openai。调度器据此对账号与请求做精确平台匹配：
 // kimi 分组请求只命中 kimi 账号，语义与 openai/grok 一致。
 // （upstream 曾将本函数改为未导出 normalizeOpenAICompatiblePlatform，本分支的
-// handler 调度入口仍需导出，保持导出名。）
+// handler 调度入口仍需导出，保持导出名。Upstream logic 使用 IsOpenAICompatiblePlatform
+// 判断，本分支保持导出接口的同时采纳 upstream 实现。）
 func NormalizeOpenAICompatiblePlatform(platform string) string {
-	switch platform {
-	case PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek:
+	platform = strings.ToLower(strings.TrimSpace(platform))
+	if IsOpenAICompatiblePlatform(platform) {
 		return platform
-	default:
-		return PlatformOpenAI
 	}
+	return PlatformOpenAI
+}
+
+// normalizeOpenAICompatiblePlatform is the internal unexported alias for
+// NormalizeOpenAICompatiblePlatform, used within the service layer.
+func normalizeOpenAICompatiblePlatform(platform string) string {
+	return NormalizeOpenAICompatiblePlatform(platform)
 }
 
 // noAvailableOpenAISelectionError builds the standard "no account available" error
