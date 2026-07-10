@@ -538,17 +538,6 @@ func getGroupPlatform(c *gin.Context) string {
 	}
 	return group.Platform
 }
-
-func rejectGrokUnsupportedEndpoint(c *gin.Context, endpoint string) {
-	service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
-	c.JSON(http.StatusNotFound, gin.H{
-		"error": gin.H{
-			"type":    "not_found_error",
-			"message": endpoint + " is not supported for Grok",
-		},
-	})
-}
-
 func compositeTargetPlatformMiddleware(resolver *service.CompositeRouteResolver) gin.HandlerFunc {
 	if resolver == nil {
 		resolver = service.NewCompositeRouteResolver(nil)
