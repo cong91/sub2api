@@ -643,4 +643,3 @@ const hideTokenTooltip = () => {
   tokenTooltipData.value = null
 }
 </script>
-
