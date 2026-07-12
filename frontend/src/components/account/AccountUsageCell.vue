@@ -868,7 +868,9 @@ const showUsageWindows = computed(() => {
     return true
   }
   if (props.account.platform === 'opencode') {
-    return props.account.type === 'apikey' && props.account.credentials_status?.has_auth_cookie === true
+    return props.account.type === 'apikey' &&
+      props.account.credentials_status?.has_auth_cookie === true &&
+      props.account.credentials_status?.has_workspace_id === true
   }
   return props.account.type === 'oauth' || props.account.type === 'setup-token'
 })
@@ -893,7 +895,9 @@ const shouldFetchUsage = computed(() => {
     return props.account.type === 'oauth'
   }
   if (props.account.platform === 'opencode') {
-    return props.account.type === 'apikey' && props.account.credentials_status?.has_auth_cookie === true
+    return props.account.type === 'apikey' &&
+      props.account.credentials_status?.has_auth_cookie === true &&
+      props.account.credentials_status?.has_workspace_id === true
   }
   return false
 })
