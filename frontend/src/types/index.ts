@@ -1374,6 +1374,9 @@ export interface AccountUsageInfo {
   seven_day_sonnet: UsageProgress | null
   seven_day_fable?: UsageProgress | null
   thirty_day?: UsageProgress | null
+  opencode_rolling?: UsageProgress | null
+  opencode_weekly?: UsageProgress | null
+  opencode_monthly?: UsageProgress | null
   gemini_shared_daily?: UsageProgress | null
   gemini_pro_daily?: UsageProgress | null
   gemini_flash_daily?: UsageProgress | null
