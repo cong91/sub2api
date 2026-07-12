@@ -17,6 +17,11 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 )
 
+// OpenCode's hosted API rejects Go's default HTTP User-Agent with Cloudflare
+// error 1010. Match the official client format when an account does not define
+// an explicit override.
+const defaultOpenCodeUserAgent = "opencode/1.17.18"
+
 type Account struct {
 	ID                      int64
 	Name                    string
@@ -1330,7 +1335,13 @@ func (a *Account) GetOpenAIUserAgent() string {
 	if a == nil || !IsOpenAICompatiblePlatform(a.Platform) {
 		return ""
 	}
-	return a.GetCredential("user_agent")
+	if userAgent := strings.TrimSpace(a.GetCredential("user_agent")); userAgent != "" {
+		return userAgent
+	}
+	if a.Platform == PlatformOpenCode {
+		return defaultOpenCodeUserAgent
+	}
+	return ""
 }
 
 func (a *Account) GetChatGPTAccountID() string {
