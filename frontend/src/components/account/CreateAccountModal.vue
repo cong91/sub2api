@@ -1611,6 +1611,21 @@
           <p class="input-hint">{{ apiKeyHint }}</p>
         </div>
 
+        <div v-if="form.platform === 'opencode'">
+          <label class="input-label">{{ t('admin.accounts.opencode.authCookie') }}</label>
+          <input
+            v-model="openCodeAuthCookie"
+            type="password"
+            class="input font-mono"
+            autocomplete="new-password"
+            data-1p-ignore
+            data-lpignore="true"
+            data-bwignore="true"
+            :placeholder="t('admin.accounts.opencode.authCookiePlaceholder')"
+          />
+          <p class="input-hint">{{ t('admin.accounts.opencode.authCookieHint') }}</p>
+        </div>
+
         <!-- Gemini API Key tier selection -->
         <div v-if="form.platform === 'gemini'">
           <label class="input-label">{{ t('admin.accounts.gemini.tier.label') }}</label>
@@ -4133,6 +4148,7 @@ const accountCategory = ref<'oauth-based' | 'apikey' | 'bedrock' | 'service_acco
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
 const apiKeyValue = ref('')
+const openCodeAuthCookie = ref('')
 
 const syncPreviewCredentials = computed(() => {
   if (!apiKeyValue.value) return undefined
@@ -5077,6 +5093,7 @@ const resetForm = () => {
   addMethod.value = 'oauth'
   apiKeyBaseUrl.value = 'https://api.anthropic.com'
   apiKeyValue.value = ''
+  openCodeAuthCookie.value = ''
   editQuotaLimit.value = null
   editQuotaDailyLimit.value = null
   editQuotaWeeklyLimit.value = null
@@ -5542,6 +5559,9 @@ const handleSubmit = async () => {
   const credentials: Record<string, unknown> = {
     base_url: apiKeyBaseUrl.value.trim() || defaultBaseUrl,
     api_key: apiKeyValue.value.trim()
+  }
+  if (form.platform === 'opencode' && openCodeAuthCookie.value.trim()) {
+    credentials.auth_cookie = openCodeAuthCookie.value.trim()
   }
   if (form.platform === 'gemini') {
     credentials.tier_id = geminiTierAIStudio.value
