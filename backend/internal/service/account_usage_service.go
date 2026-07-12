@@ -124,14 +124,15 @@ const (
 
 // UsageCache 封装账户使用量相关的缓存
 type UsageCache struct {
-	apiCache          sync.Map           // accountID -> *apiUsageCache
-	windowStatsCache  sync.Map           // accountID -> *windowStatsCache
-	antigravityCache  sync.Map           // accountID -> *antigravityUsageCache
-	kiroUsageCache    sync.Map           // accountID -> *kiroUsageCache
-	apiFlight         singleflight.Group // 防止同一账号的并发请求击穿缓存（Anthropic）
-	antigravityFlight singleflight.Group // 防止同一 Antigravity 账号的并发请求击穿缓存
-	kiroUsageFlight   singleflight.Group // 防止同一 Kiro 账号的并发请求击穿缓存
-	openAIProbeCache  sync.Map           // accountID -> time.Time
+	apiCache            sync.Map           // accountID -> *apiUsageCache
+	windowStatsCache    sync.Map           // accountID -> *windowStatsCache
+	antigravityCache    sync.Map           // accountID -> *antigravityUsageCache
+	kiroUsageCache      sync.Map           // accountID -> *kiroUsageCache
+	apiFlight           singleflight.Group // 防止同一账号的并发请求击穿缓存（Anthropic）
+	antigravityFlight   singleflight.Group // 防止同一 Antigravity 账号的并发请求击穿缓存
+	kiroUsageFlight     singleflight.Group // 防止同一 Kiro 账号的并发请求击穿缓存
+	openCodeUsageFlight singleflight.Group // 防止同一 OpenCode 账号的并发用量查询击穿上游
+	openAIProbeCache    sync.Map           // accountID -> time.Time
 }
 
 // NewUsageCache 创建 UsageCache 实例
@@ -212,6 +213,9 @@ type UsageInfo struct {
 	SevenDay           *UsageProgress `json:"seven_day,omitempty"`            // 7天窗口
 	SevenDaySonnet     *UsageProgress `json:"seven_day_sonnet,omitempty"`     // 7天Sonnet窗口
 	SevenDayFable      *UsageProgress `json:"seven_day_fable,omitempty"`      // 7天Fable窗口（响应头 7d_oi）
+	OpenCodeRolling    *UsageProgress `json:"opencode_rolling,omitempty"`     // OpenCode Go rolling 窗口
+	OpenCodeWeekly     *UsageProgress `json:"opencode_weekly,omitempty"`      // OpenCode Go weekly 窗口
+	OpenCodeMonthly    *UsageProgress `json:"opencode_monthly,omitempty"`     // OpenCode Go monthly 窗口
 	GeminiSharedDaily  *UsageProgress `json:"gemini_shared_daily,omitempty"`  // Gemini shared pool RPD (Google One / Code Assist)
 	GeminiProDaily     *UsageProgress `json:"gemini_pro_daily,omitempty"`     // Gemini Pro 日配额
 	GeminiFlashDaily   *UsageProgress `json:"gemini_flash_daily,omitempty"`   // Gemini Flash 日配额
@@ -388,6 +392,10 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64, for
 			s.tryClearRecoverableAccountError(ctx, account)
 		}
 		return usage, err
+	}
+
+	if account.Platform == PlatformOpenCode && account.Type == AccountTypeAPIKey {
+		return s.getOpenCodeUsage(ctx, account, forceProbe)
 	}
 
 	if account.Platform == PlatformGemini {
