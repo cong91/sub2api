@@ -162,12 +162,12 @@ func ProvideAccountUsageService(
 		geminiQuotaService,
 		antigravityQuotaFetcher,
 		grokQuotaFetcher,
-		grokQuotaService,
 		openAIQuotaService,
 		cache,
 		identityCache,
 		tlsFPProfileService,
 	)
+	service.grokQuotaService = grokQuotaService
 	service.agentIdentityWS = openAIGatewayService
 	return service
 }
