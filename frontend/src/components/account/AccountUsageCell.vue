@@ -799,7 +799,9 @@ const showUsageWindows = computed(() => {
   // Gemini: we can always compute local usage windows from DB logs (simulated quotas).
   if (props.account.platform === 'gemini') return true
   if (props.account.platform === 'opencode') {
-    return props.account.type === 'apikey' && props.account.credentials_status?.has_auth_cookie === true
+    return props.account.type === 'apikey' &&
+      props.account.credentials_status?.has_auth_cookie === true &&
+      props.account.credentials_status?.has_workspace_id === true
   }
   return props.account.type === 'oauth' || props.account.type === 'setup-token'
 })
@@ -824,7 +826,9 @@ const shouldFetchUsage = computed(() => {
     return props.account.type === 'oauth'
   }
   if (props.account.platform === 'opencode') {
-    return props.account.type === 'apikey' && props.account.credentials_status?.has_auth_cookie === true
+    return props.account.type === 'apikey' &&
+      props.account.credentials_status?.has_auth_cookie === true &&
+      props.account.credentials_status?.has_workspace_id === true
   }
   return false
 })
