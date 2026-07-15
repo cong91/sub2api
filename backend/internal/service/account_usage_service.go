@@ -364,12 +364,7 @@ func NewAccountUsageService(
 	cache *UsageCache,
 	identityCache IdentityCache,
 	tlsFingerprintProfileService *TLSFingerprintProfileService,
-	grokQuotaServices ...*GrokQuotaService,
 ) *AccountUsageService {
-	var grokQuotaService *GrokQuotaService
-	if len(grokQuotaServices) > 0 {
-		grokQuotaService = grokQuotaServices[0]
-	}
 	return &AccountUsageService{
 		accountRepo:             accountRepo,
 		usageLogRepo:            usageLogRepo,
