@@ -535,6 +535,9 @@ export default {
         oauthPassthrough: 'Auto passthrough (auth only)',
         oauthPassthroughDesc:
           'When enabled, this OpenAI account uses automatic passthrough: the gateway forwards request/response as-is and only swaps auth, while keeping billing/concurrency/audit and necessary safety filtering.',
+        longContextBilling: 'API Long-Context Billing',
+        longContextBillingDesc:
+          'Disabled by default. Enable only when the upstream charges OpenAI API long-context rates based on model thresholds.',
         responsesWebsocketsV2: 'Responses WebSocket v2',
         responsesWebsocketsV2Desc:
           'Disabled by default. Enable to allow responses_websockets_v2 capability (still gated by global and account-type switches).',
@@ -580,6 +583,10 @@ export default {
         responsesStatusAutoUnknown: 'Auto probe: unknown',
         responsesStatusForcedResponses: 'Forced Responses',
         responsesStatusForcedChatCompletions: 'Forced Chat Completions',
+        planType: 'Subscription Tier (Manual Override)',
+        planTypeDesc:
+          'Manually override the ChatGPT subscription tier for this account (Plus / Pro / Free). Note: when a token refresh or 429 rate limit occurs, the actual tier will automatically overwrite this value.',
+        planTypeClear: 'Clear (Auto Detect)',
         codexCLIOnly: 'Codex official clients only',
         codexCLIOnlyDesc:
           'Only applies to OpenAI OAuth. When enabled, only Codex official client families are allowed; when disabled, the gateway bypasses this restriction and keeps existing behavior.',
@@ -1065,6 +1072,15 @@ export default {
           refreshTokenAuth: 'Manual RT Input',
           refreshTokenDesc: 'Enter existing xAI refresh token(s). Supports batch input, one per line.',
           refreshTokenPlaceholder: 'Paste your xAI refresh token...\nSupports multiple, one per line',
+          ssoCookieAuth: 'SSO Cookie Import',
+          ssoCookieDesc:
+            'Paste one Grok Web SSO key per line. The system will automatically go through xAI Device Flow and convert to Grok Build OAuth credentials.',
+          ssoCookieLabel: 'Grok Web SSO Key',
+          ssoCookiePlaceholder: 'One SSO key per line\nSupports multiple, one per line',
+          ssoCookieHint:
+            'One SSO key per line; multiple keys are imported with 3-way concurrency, taking ~90 seconds per batch. Use a region-appropriate proxy.',
+          convertingSSO: 'Converting...',
+          convertSSOAndCreate: 'Convert & Create Account',
           validating: 'Validating...',
           validateAndCreate: 'Validate & Create Account',
           pleaseEnterRefreshToken: 'Please enter Refresh Token',
@@ -1072,6 +1088,7 @@ export default {
           missingExchangeParams: 'Missing authorization code, state, or OAuth session',
           failedToExchangeCode: 'Failed to exchange Grok authorization code',
           failedToValidateRT: 'Failed to validate Grok refresh token',
+          failedToConvertSSO: 'Grok SSO conversion failed',
           errors: {
             GROK_OAUTH_SESSION_NOT_FOUND:
               'Grok OAuth session was not found or has expired. Generate a new auth URL and paste the newest callback URL.',
