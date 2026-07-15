@@ -413,7 +413,7 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		ModelsListConfig:                req.ModelsListConfig,
 		RPMLimit:                        req.RPMLimit.ToCreateInput(),
 
-		CopyAccountsFromGroupIDs:        req.CopyAccountsFromGroupIDs,
+		CopyAccountsFromGroupIDs: req.CopyAccountsFromGroupIDs,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -483,7 +483,7 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		ModelsListConfig:                req.ModelsListConfig,
 		RPMLimit:                        req.RPMLimit.ToUpdateInput(),
 
-		CopyAccountsFromGroupIDs:        req.CopyAccountsFromGroupIDs,
+		CopyAccountsFromGroupIDs: req.CopyAccountsFromGroupIDs,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
