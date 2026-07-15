@@ -48,7 +48,7 @@ func TestPaymentCheckoutInfoReturnsCurrencyMetadata(t *testing.T) {
 		service.SettingFXRatesUpdatedAt:         time.Now().UTC().Format(time.RFC3339),
 	}}
 	configSvc := service.NewPaymentConfigService(client, settings, []byte("0123456789abcdef0123456789abcdef"))
-	h := NewPaymentHandler(nil, configSvc, nil)
+	h := NewPaymentHandler(nil, configSvc)
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
@@ -128,7 +128,7 @@ func TestPaymentCheckoutInfoExposesSepayVNDMethodCurrency(t *testing.T) {
 		service.SettingFXRatesUpdatedAt:         time.Now().UTC().Format(time.RFC3339),
 	}}
 	configSvc := service.NewPaymentConfigService(client, settings, []byte("0123456789abcdef0123456789abcdef"))
-	h := NewPaymentHandler(nil, configSvc, nil)
+	h := NewPaymentHandler(nil, configSvc)
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
@@ -198,7 +198,7 @@ func TestPaymentCheckoutInfoExposesConfiguredProviderCurrencies(t *testing.T) {
 		service.SettingFXRatesUpdatedAt:         time.Now().UTC().Format(time.RFC3339),
 	}}
 	configSvc := service.NewPaymentConfigService(client, settings, []byte("0123456789abcdef0123456789abcdef"))
-	h := NewPaymentHandler(nil, configSvc, nil)
+	h := NewPaymentHandler(nil, configSvc)
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
@@ -275,7 +275,7 @@ func TestPaymentQuoteEndpointReturnsSignedSnapshot(t *testing.T) {
 	}}
 	configSvc := service.NewPaymentConfigService(client, settings, []byte("0123456789abcdef0123456789abcdef"))
 	paymentSvc := service.NewPaymentService(nil, nil, nil, nil, nil, configSvc, nil, nil, nil)
-	h := NewPaymentHandler(paymentSvc, configSvc, nil)
+	h := NewPaymentHandler(paymentSvc, configSvc)
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
