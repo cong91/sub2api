@@ -37,21 +37,28 @@ var openaiCCRawAllowedHeaders = map[string]bool{
 	"user-agent":      true,
 }
 
-// normalizeOpenCodeExtraBody expands a client transport envelope before
-// forwarding it to OpenCode. ZCode 3.3.4 sends its OpenAI-compatible GLM
-// provider options (for example, chat_template_kwargs.reasoning_effort) under
-// a literal top-level "extra_body". OpenCode expects those extension fields at
-// the Chat Completions top level and rejects the wrapper with HTTP 400.
+// normalizeOpenCodeExtraBody expands the OpenAI SDK transport envelope and
+// applies a model-specific compatibility adapter before forwarding the request.
 //
-// Treat the envelope as a shallow client extension: duplicate keys from
-// extra_body take precedence here, then the caller restores gateway-controlled
-// routing fields before forwarding.
+// OpenCode's current @ai-sdk/openai-compatible path emits provider options as
+// top-level fields (for example chat_template_args and reasoning_effort). Older
+// ZCode/OpenCode-compatible clients can instead use extra_body with
+// chat_template_kwargs. The envelope is transport-level and can be flattened
+// for every OpenCode account, but the template-option translation is GLM-only:
 //
-// Keep this compatibility shim scoped to OpenCode. Other OpenAI-compatible
-// platforms retain the raw passthrough contract, including provider-specific
-// top-level extensions that Sub2API does not understand.
-func normalizeOpenCodeExtraBody(body []byte) ([]byte, bool, error) {
-	if !gjson.GetBytes(body, "extra_body").Exists() {
+//   - enable_thinking  -> thinking.type
+//   - reasoning_effort -> top-level reasoning_effort
+//
+// The cloud GLM endpoint rejects the self-host/template fields themselves.
+// Non-GLM OpenCode models retain those fields after envelope expansion because
+// their provider contracts are not interchangeable with GLM's contract.
+func normalizeOpenCodeExtraBody(body []byte, upstreamModel string) ([]byte, bool, error) {
+	isGLMModel := strings.HasPrefix(strings.ToLower(strings.TrimSpace(upstreamModel)), "glm-")
+	hasTemplateOptions := gjson.GetBytes(body, "chat_template_kwargs").Exists() ||
+		gjson.GetBytes(body, "chat_template_args").Exists() ||
+		gjson.GetBytes(body, "enable_thinking").Exists()
+	if !gjson.GetBytes(body, "extra_body").Exists() && !hasTemplateOptions &&
+		(!isGLMModel || !gjson.GetBytes(body, "thinking.clear_thinking").Exists()) {
 		return body, false, nil
 	}
 
@@ -60,22 +67,26 @@ func normalizeOpenCodeExtraBody(body []byte) ([]byte, bool, error) {
 		return nil, false, fmt.Errorf("parse request body: %w", err)
 	}
 
-	extraBodyRaw, exists := request["extra_body"]
-	if !exists {
-		return body, false, nil
-	}
-	delete(request, "extra_body")
+	if extraBodyRaw, exists := request["extra_body"]; exists {
+		delete(request, "extra_body")
 
-	var extraBody map[string]json.RawMessage
-	if err := json.Unmarshal(extraBodyRaw, &extraBody); err != nil || extraBody == nil {
-		return nil, false, fmt.Errorf("extra_body must be a JSON object")
-	}
-	for key, value := range extraBody {
-		// Never recreate the invalid transport envelope recursively.
-		if key == "extra_body" {
-			continue
+		var extraBody map[string]json.RawMessage
+		if err := json.Unmarshal(extraBodyRaw, &extraBody); err != nil || extraBody == nil {
+			return nil, false, fmt.Errorf("extra_body must be a JSON object")
 		}
-		request[key] = value
+		for key, value := range extraBody {
+			// Never recreate the invalid transport envelope recursively.
+			if key == "extra_body" {
+				continue
+			}
+			request[key] = value
+		}
+	}
+
+	if isGLMModel {
+		if err := normalizeOpenCodeGLMTemplateOptions(request); err != nil {
+			return nil, false, err
+		}
 	}
 
 	normalized, err := json.Marshal(request)
@@ -83,6 +94,74 @@ func normalizeOpenCodeExtraBody(body []byte) ([]byte, bool, error) {
 		return nil, false, fmt.Errorf("encode normalized request body: %w", err)
 	}
 	return normalized, true, nil
+}
+
+func normalizeOpenCodeGLMTemplateOptions(request map[string]json.RawMessage) error {
+	var enabledRaw json.RawMessage
+	if raw, ok := request["enable_thinking"]; ok {
+		enabledRaw = raw
+		delete(request, "enable_thinking")
+	}
+
+	templateOptions := make(map[string]json.RawMessage)
+	for _, field := range []string{"chat_template_kwargs", "chat_template_args"} {
+		raw, exists := request[field]
+		if !exists {
+			continue
+		}
+		delete(request, field)
+
+		var options map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &options); err != nil || options == nil {
+			return fmt.Errorf("%s must be a JSON object", field)
+		}
+		for key, value := range options {
+			templateOptions[key] = value
+		}
+	}
+
+	if enabledRaw == nil {
+		enabledRaw = templateOptions["enable_thinking"]
+	}
+
+	if effort, ok := templateOptions["reasoning_effort"]; ok {
+		request["reasoning_effort"] = effort
+	}
+
+	thinking := make(map[string]json.RawMessage)
+	if rawThinking, exists := request["thinking"]; exists {
+		if err := json.Unmarshal(rawThinking, &thinking); err != nil || thinking == nil {
+			return fmt.Errorf("thinking must be a JSON object")
+		}
+		// GLM cloud accepts thinking.type but rejects the legacy clear_thinking
+		// member. Other model families do not enter this GLM-only adapter.
+		delete(thinking, "clear_thinking")
+	}
+	if enabledRaw != nil {
+		var enabled bool
+		if err := json.Unmarshal(enabledRaw, &enabled); err != nil {
+			return fmt.Errorf("enable_thinking must be a boolean")
+		}
+		typeValue := "disabled"
+		if enabled {
+			typeValue = "enabled"
+		}
+		encoded, _ := json.Marshal(typeValue)
+		thinking["type"] = encoded
+		encodedThinking, err := json.Marshal(thinking)
+		if err != nil {
+			return fmt.Errorf("encode thinking options: %w", err)
+		}
+		request["thinking"] = encodedThinking
+	} else if _, exists := request["thinking"]; exists {
+		encodedThinking, err := json.Marshal(thinking)
+		if err != nil {
+			return fmt.Errorf("encode thinking options: %w", err)
+		}
+		request["thinking"] = encodedThinking
+	}
+
+	return nil
 }
 
 // forwardAsRawChatCompletions 直转客户端的 Chat Completions 请求到上游
@@ -131,7 +210,7 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	// 3. Normalize SDK-only transport options, then rewrite the routed model.
 	upstreamBody := body
 	if account.Platform == PlatformOpenCode {
-		normalizedBody, _, normalizeErr := normalizeOpenCodeExtraBody(upstreamBody)
+		normalizedBody, _, normalizeErr := normalizeOpenCodeExtraBody(upstreamBody, upstreamModel)
 		if normalizeErr != nil {
 			writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", normalizeErr.Error())
 			return nil, normalizeErr
