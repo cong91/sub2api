@@ -113,6 +113,20 @@ func RegisterGatewayRoutes(
 		}
 		rejectUnsupportedEndpoint(c, "Videos API")
 	}
+	videoEditHandler := func(c *gin.Context) {
+		if getGroupPlatform(c) == service.PlatformGrok {
+			h.OpenAIGateway.GrokVideoEdit(c)
+			return
+		}
+		rejectUnsupportedEndpoint(c, "Videos API")
+	}
+	videoExtensionHandler := func(c *gin.Context) {
+		if getGroupPlatform(c) == service.PlatformGrok {
+			h.OpenAIGateway.GrokVideoExtension(c)
+			return
+		}
+		rejectUnsupportedEndpoint(c, "Videos API")
+	}
 	modelsHandler := func(c *gin.Context) {
 		// Codex CLI / Codex app refresh their model picker from the provider's
 		// /models endpoint with a client_version query and expect the ChatGPT
@@ -228,6 +242,8 @@ func RegisterGatewayRoutes(
 		gateway.DELETE("/images/batches/:id/outputs", h.BatchImage.DeleteOutputs)
 		gateway.POST("/videos/generations", videoGenerationHandler)
 		gateway.GET("/videos/:request_id", videoStatusHandler)
+		gateway.POST("/videos/edits", videoEditHandler)
+		gateway.POST("/videos/extensions", videoExtensionHandler)
 	}
 
 	// Gemini 原生 API 兼容层（Gemini SDK/CLI 直连）
@@ -308,6 +324,8 @@ func RegisterGatewayRoutes(
 	r.POST("/images/edits", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gatewayAPIKeyAuth, requireGroupAnthropic, imagesHandler)
 	r.POST("/videos/generations", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gatewayAPIKeyAuth, requireGroupAnthropic, videoGenerationHandler)
 	r.GET("/videos/:request_id", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gatewayAPIKeyAuth, requireGroupAnthropic, videoStatusHandler)
+	r.POST("/videos/edits", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gatewayAPIKeyAuth, requireGroupAnthropic, videoEditHandler)
+	r.POST("/videos/extensions", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gatewayAPIKeyAuth, requireGroupAnthropic, videoExtensionHandler)
 
 	// Antigravity 模型列表
 	r.GET("/antigravity/models", gatewayAPIKeyAuth, requireGroupAnthropic, h.Gateway.AntigravityModels)
