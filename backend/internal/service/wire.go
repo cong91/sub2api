@@ -161,13 +161,12 @@ func ProvideAccountUsageService(
 		geminiQuotaService,
 		antigravityQuotaFetcher,
 		grokQuotaFetcher,
-		grokQuotaService,
 		openAIQuotaService,
 		cache,
 		identityCache,
 		tlsFPProfileService,
+		grokQuotaService,
 	)
-	service.agentIdentityWS = openAIGatewayService
 	return service
 }
 
@@ -176,6 +175,7 @@ func ProvideAccountTestService(
 	geminiTokenProvider *GeminiTokenProvider,
 	claudeTokenProvider *ClaudeTokenProvider,
 	grokTokenProvider *GrokTokenProvider,
+	kiroTokenProvider *KiroTokenProvider,
 	antigravityGatewayService *AntigravityGatewayService,
 	httpUpstream HTTPUpstream,
 	cfg *config.Config,
@@ -187,6 +187,7 @@ func ProvideAccountTestService(
 		geminiTokenProvider,
 		claudeTokenProvider,
 		grokTokenProvider,
+		kiroTokenProvider,
 		antigravityGatewayService,
 		httpUpstream,
 		cfg,

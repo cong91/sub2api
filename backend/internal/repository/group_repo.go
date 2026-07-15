@@ -80,10 +80,7 @@ func (r *groupRepository) Create(ctx context.Context, groupIn *service.Group) er
 		SetPeakRateEnabled(groupIn.PeakRateEnabled).
 		SetPeakStart(groupIn.PeakStart).
 		SetPeakEnd(groupIn.PeakEnd).
-		SetPeakRateMultiplier(groupIn.PeakRateMultiplier).
-		SetNillableTokenPricePerMillion(groupIn.TokenPricePerMillion).
-		SetNillablePricingReferenceModel(groupIn.PricingReferenceModel).
-		SetNillableInputOutputRatio(groupIn.InputOutputRatio)
+		SetPeakRateMultiplier(groupIn.PeakRateMultiplier)
 
 	// 设置模型路由配置
 	if groupIn.ModelRouting != nil {
@@ -174,21 +171,7 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		SetPeakRateMultiplier(groupIn.PeakRateMultiplier)
 
 	// 显式处理可空字段：nil 需要 clear，非 nil 需要 set。
-	if groupIn.TokenPricePerMillion != nil {
-		builder = builder.SetTokenPricePerMillion(*groupIn.TokenPricePerMillion)
-	} else {
-		builder = builder.ClearTokenPricePerMillion()
-	}
-	if groupIn.PricingReferenceModel != nil {
-		builder = builder.SetPricingReferenceModel(*groupIn.PricingReferenceModel)
-	} else {
-		builder = builder.ClearPricingReferenceModel()
-	}
-	if groupIn.InputOutputRatio != nil {
-		builder = builder.SetInputOutputRatio(*groupIn.InputOutputRatio)
-	} else {
-		builder = builder.ClearInputOutputRatio()
-	}
+
 	if groupIn.DailyLimitUSD != nil {
 		builder = builder.SetDailyLimitUsd(*groupIn.DailyLimitUSD)
 	} else {

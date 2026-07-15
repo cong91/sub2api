@@ -1176,10 +1176,6 @@ func init() {
 	groupDescRpmLimit := groupFields[44].Descriptor()
 	// group.DefaultRpmLimit holds the default value on creation for the rpm_limit field.
 	group.DefaultRpmLimit = groupDescRpmLimit.Default.(int)
-	// groupDescPricingReferenceModel is the schema descriptor for pricing_reference_model field.
-	groupDescPricingReferenceModel := groupFields[40].Descriptor()
-	// group.PricingReferenceModelValidator is a validator for the "pricing_reference_model" field. It is called by the builders before save.
-	group.PricingReferenceModelValidator = groupDescPricingReferenceModel.Validators[0].(func(string) error)
 	idempotencyrecordMixin := schema.IdempotencyRecord{}.Mixin()
 	idempotencyrecordMixinFields0 := idempotencyrecordMixin[0].Fields()
 	_ = idempotencyrecordMixinFields0
