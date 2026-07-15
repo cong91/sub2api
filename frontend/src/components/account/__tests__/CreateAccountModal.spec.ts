@@ -110,7 +110,10 @@ async function selectButtonByText(wrapper: ReturnType<typeof mountModal>, text: 
 
 async function submitApiKeyAccount(platform: 'openai' | 'anthropic', enableLongContextBilling = false) {
   const wrapper = mountModal()
-  await selectButtonByText(wrapper, platform === 'openai' ? 'admin.accounts.platforms.openai' : 'admin.accounts.claudeConsole')
+  await selectButtonByText(
+    wrapper,
+    platform === 'openai' ? 'admin.accounts.platforms.openai' : 'admin.accounts.claudeConsole'
+  )
   if (platform === 'openai') {
     await selectButtonByText(wrapper, 'API Key')
   }
