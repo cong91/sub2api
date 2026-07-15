@@ -213,9 +213,6 @@ func groupFromServiceBase(g *service.Group) Group {
 		RPMLimit:                        g.RPMLimit,
 		MaxReasoningEffort:              g.MaxReasoningEffort,
 		ReasoningEffortMappings:         g.ReasoningEffortMappings,
-		TokenPricePerMillion:            g.TokenPricePerMillion,
-		PricingReferenceModel:           g.PricingReferenceModel,
-		InputOutputRatio:                g.InputOutputRatio,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
 	}
