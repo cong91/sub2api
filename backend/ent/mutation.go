@@ -28723,6 +28723,8 @@ type PaymentOrderMutation struct {
 	addsubscription_days         *int
 	balance_group_id             *int64
 	addbalance_group_id          *int64
+	actual_credits               *int64
+	addactual_credits            *int64
 	provider_instance_id         *string
 	provider_key                 *string
 	provider_snapshot            *map[string]interface{}
@@ -30121,6 +30123,76 @@ func (m *PaymentOrderMutation) ResetBalanceGroupID() {
 	delete(m.clearedFields, paymentorder.FieldBalanceGroupID)
 }
 
+// SetActualCredits sets the "actual_credits" field.
+func (m *PaymentOrderMutation) SetActualCredits(i int64) {
+	m.actual_credits = &i
+	m.addactual_credits = nil
+}
+
+// ActualCredits returns the value of the "actual_credits" field in the mutation.
+func (m *PaymentOrderMutation) ActualCredits() (r int64, exists bool) {
+	v := m.actual_credits
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActualCredits returns the old "actual_credits" field's value of the PaymentOrder entity.
+// If the PaymentOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentOrderMutation) OldActualCredits(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActualCredits is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActualCredits requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActualCredits: %w", err)
+	}
+	return oldValue.ActualCredits, nil
+}
+
+// AddActualCredits adds i to the "actual_credits" field.
+func (m *PaymentOrderMutation) AddActualCredits(i int64) {
+	if m.addactual_credits != nil {
+		*m.addactual_credits += i
+	} else {
+		m.addactual_credits = &i
+	}
+}
+
+// AddedActualCredits returns the value that was added to the "actual_credits" field in this mutation.
+func (m *PaymentOrderMutation) AddedActualCredits() (r int64, exists bool) {
+	v := m.addactual_credits
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearActualCredits clears the value of the "actual_credits" field.
+func (m *PaymentOrderMutation) ClearActualCredits() {
+	m.actual_credits = nil
+	m.addactual_credits = nil
+	m.clearedFields[paymentorder.FieldActualCredits] = struct{}{}
+}
+
+// ActualCreditsCleared returns if the "actual_credits" field was cleared in this mutation.
+func (m *PaymentOrderMutation) ActualCreditsCleared() bool {
+	_, ok := m.clearedFields[paymentorder.FieldActualCredits]
+	return ok
+}
+
+// ResetActualCredits resets all changes to the "actual_credits" field.
+func (m *PaymentOrderMutation) ResetActualCredits() {
+	m.actual_credits = nil
+	m.addactual_credits = nil
+	delete(m.clearedFields, paymentorder.FieldActualCredits)
+}
+
 // SetProviderInstanceID sets the "provider_instance_id" field.
 func (m *PaymentOrderMutation) SetProviderInstanceID(s string) {
 	m.provider_instance_id = &s
@@ -31127,7 +31199,7 @@ func (m *PaymentOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PaymentOrderMutation) Fields() []string {
-	fields := make([]string, 0, 47)
+	fields := make([]string, 0, 48)
 	if m.user != nil {
 		fields = append(fields, paymentorder.FieldUserID)
 	}
@@ -31205,6 +31277,9 @@ func (m *PaymentOrderMutation) Fields() []string {
 	}
 	if m.balance_group_id != nil {
 		fields = append(fields, paymentorder.FieldBalanceGroupID)
+	}
+	if m.actual_credits != nil {
+		fields = append(fields, paymentorder.FieldActualCredits)
 	}
 	if m.provider_instance_id != nil {
 		fields = append(fields, paymentorder.FieldProviderInstanceID)
@@ -31329,6 +31404,8 @@ func (m *PaymentOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.SubscriptionDays()
 	case paymentorder.FieldBalanceGroupID:
 		return m.BalanceGroupID()
+	case paymentorder.FieldActualCredits:
+		return m.ActualCredits()
 	case paymentorder.FieldProviderInstanceID:
 		return m.ProviderInstanceID()
 	case paymentorder.FieldProviderKey:
@@ -31432,6 +31509,8 @@ func (m *PaymentOrderMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldSubscriptionDays(ctx)
 	case paymentorder.FieldBalanceGroupID:
 		return m.OldBalanceGroupID(ctx)
+	case paymentorder.FieldActualCredits:
+		return m.OldActualCredits(ctx)
 	case paymentorder.FieldProviderInstanceID:
 		return m.OldProviderInstanceID(ctx)
 	case paymentorder.FieldProviderKey:
@@ -31665,6 +31744,13 @@ func (m *PaymentOrderMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetBalanceGroupID(v)
 		return nil
+	case paymentorder.FieldActualCredits:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActualCredits(v)
+		return nil
 	case paymentorder.FieldProviderInstanceID:
 		v, ok := value.(string)
 		if !ok {
@@ -31850,6 +31936,9 @@ func (m *PaymentOrderMutation) AddedFields() []string {
 	if m.addbalance_group_id != nil {
 		fields = append(fields, paymentorder.FieldBalanceGroupID)
 	}
+	if m.addactual_credits != nil {
+		fields = append(fields, paymentorder.FieldActualCredits)
+	}
 	if m.addrefund_amount != nil {
 		fields = append(fields, paymentorder.FieldRefundAmount)
 	}
@@ -31881,6 +31970,8 @@ func (m *PaymentOrderMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedSubscriptionDays()
 	case paymentorder.FieldBalanceGroupID:
 		return m.AddedBalanceGroupID()
+	case paymentorder.FieldActualCredits:
+		return m.AddedActualCredits()
 	case paymentorder.FieldRefundAmount:
 		return m.AddedRefundAmount()
 	}
@@ -31962,6 +32053,13 @@ func (m *PaymentOrderMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddBalanceGroupID(v)
 		return nil
+	case paymentorder.FieldActualCredits:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddActualCredits(v)
+		return nil
 	case paymentorder.FieldRefundAmount:
 		v, ok := value.(float64)
 		if !ok {
@@ -32006,6 +32104,9 @@ func (m *PaymentOrderMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(paymentorder.FieldBalanceGroupID) {
 		fields = append(fields, paymentorder.FieldBalanceGroupID)
+	}
+	if m.FieldCleared(paymentorder.FieldActualCredits) {
+		fields = append(fields, paymentorder.FieldActualCredits)
 	}
 	if m.FieldCleared(paymentorder.FieldProviderInstanceID) {
 		fields = append(fields, paymentorder.FieldProviderInstanceID)
@@ -32089,6 +32190,9 @@ func (m *PaymentOrderMutation) ClearField(name string) error {
 		return nil
 	case paymentorder.FieldBalanceGroupID:
 		m.ClearBalanceGroupID()
+		return nil
+	case paymentorder.FieldActualCredits:
+		m.ClearActualCredits()
 		return nil
 	case paymentorder.FieldProviderInstanceID:
 		m.ClearProviderInstanceID()
@@ -32214,6 +32318,9 @@ func (m *PaymentOrderMutation) ResetField(name string) error {
 		return nil
 	case paymentorder.FieldBalanceGroupID:
 		m.ResetBalanceGroupID()
+		return nil
+	case paymentorder.FieldActualCredits:
+		m.ResetActualCredits()
 		return nil
 	case paymentorder.FieldProviderInstanceID:
 		m.ResetProviderInstanceID()
@@ -51913,7 +52020,7 @@ func (m *UserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 24)
+	fields := make([]string, 0, 25)
 	if m.created_at != nil {
 		fields = append(fields, user.FieldCreatedAt)
 	}

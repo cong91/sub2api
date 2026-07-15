@@ -970,9 +970,7 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		PeakStart:                       g.PeakStart,
 		PeakEnd:                         g.PeakEnd,
 		PeakRateMultiplier:              g.PeakRateMultiplier,
-		TokenPricePerMillion:            g.TokenPricePerMillion,
-		PricingReferenceModel:           g.PricingReferenceModel,
-		InputOutputRatio:                g.InputOutputRatio,
+
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
 	}
