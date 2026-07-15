@@ -442,7 +442,7 @@ func (s *BotSalesFulfillmentService) rebindBotSalesAPIKeyGroup(ctx context.Conte
 		return nil, ErrGroupNotAllowed
 	}
 	apiKey.GroupID = &targetGroupID
-	if err := s.apiKeyService.apiKeyRepo.Update(ctx, apiKey); err != nil {
+	if err := s.apiKeyService.apiKeyRepo.Update(ctx, apiKey, APIKeyUpdateFields{GroupID: true}); err != nil {
 		return nil, fmt.Errorf("update api key: %w", err)
 	}
 	s.apiKeyService.InvalidateAuthCacheByKey(ctx, apiKey.Key)
@@ -1045,6 +1045,7 @@ func botSalesProviderSnapshot(req BotSalesTokenFulfillmentRequest, pkg *dbent.Ba
 		"payment_provider_txn_id": strings.TrimSpace(req.PaymentProviderTxnID),
 		"payment_amount":          paymentAmount,
 		"payment_amount_source":   paymentAmountSource,
+		"currency":                currency,
 		"payment_currency":        currency,
 		"quantity":                botSalesQuantity(req),
 		"operation":               req.Operation,
