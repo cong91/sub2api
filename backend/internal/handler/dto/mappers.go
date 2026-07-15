@@ -212,8 +212,8 @@ func groupFromServiceBase(g *service.Group) Group {
 		RequirePrivacySet:               g.RequirePrivacySet,
 		RPMLimit:                        g.RPMLimit,
 
-		CreatedAt:                       g.CreatedAt,
-		UpdatedAt:                       g.UpdatedAt,
+		CreatedAt: g.CreatedAt,
+		UpdatedAt: g.UpdatedAt,
 	}
 }
 
