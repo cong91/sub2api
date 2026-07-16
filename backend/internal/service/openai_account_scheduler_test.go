@@ -869,6 +869,7 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_DefaultDisabled_AllowsO
 		OpenAIEndpointCapabilityChatCompletions,
 		false,
 		false,
+		false,
 		PlatformOpenCode,
 	)
 	require.NoError(t, err)
@@ -1498,6 +1499,7 @@ func TestOpenAIGatewayService_AdvancedSchedulerTopKSkipsQuotaPausedAccounts(t *t
 		nil,
 		OpenAIUpstreamTransportAny,
 		OpenAIEndpointCapabilityChatCompletions,
+		false,
 		false,
 		false,
 	)
