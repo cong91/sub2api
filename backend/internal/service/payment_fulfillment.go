@@ -46,6 +46,12 @@ type paymentFulfillmentLease struct {
 	version time.Time
 }
 
+// legacyPaymentOrderIDPrefix is the pre-V-Claw order prefix emitted by
+// upstream's original numeric order-ID format. The fork's current orderIDPrefix
+// is intentionally vclaw_ with a random suffix, so it must not be used as the
+// legacy numeric parser prefix.
+const legacyPaymentOrderIDPrefix = "sub2_"
+
 // --- Payment Notification & Fulfillment ---
 
 func (s *PaymentService) HandlePaymentNotification(ctx context.Context, n *payment.PaymentNotification, pk string) error {
@@ -55,12 +61,37 @@ func (s *PaymentService) HandlePaymentNotification(ctx context.Context, n *payme
 	// Look up order by out_trade_no (the external order ID we sent to the provider).
 	order, err := s.findPaymentOrderForNotification(ctx, n.OrderID)
 	if err != nil {
+		// Preserve upstream compatibility for old numeric sub2_* order IDs, but
+		// only after a genuine not-found result. Other database errors must not be
+		// interpreted as a legacy order and silently redirected to another row.
+		if oid, ok := parseLegacyPaymentOrderID(n.OrderID, err); ok {
+			return s.confirmPayment(ctx, oid, n.TradeNo, n.Amount, n.Currency, pk, n.Metadata)
+		}
 		if dbent.IsNotFound(err) {
 			return fmt.Errorf("%w: out_trade_no=%s", ErrOrderNotFound, n.OrderID)
 		}
 		return fmt.Errorf("lookup order failed for out_trade_no %s: %w", n.OrderID, err)
 	}
 	return s.confirmPayment(ctx, order.ID, n.TradeNo, n.Amount, n.Currency, pk, n.Metadata)
+}
+
+func parseLegacyPaymentOrderID(orderID string, lookupErr error) (int64, bool) {
+	if !dbent.IsNotFound(lookupErr) {
+		return 0, false
+	}
+	orderID = strings.TrimSpace(orderID)
+	if !strings.HasPrefix(orderID, legacyPaymentOrderIDPrefix) {
+		return 0, false
+	}
+	trimmed := strings.TrimPrefix(orderID, legacyPaymentOrderIDPrefix)
+	if trimmed == "" || trimmed == orderID {
+		return 0, false
+	}
+	oid, err := strconv.ParseInt(trimmed, 10, 64)
+	if err != nil || oid <= 0 {
+		return 0, false
+	}
+	return oid, true
 }
 
 func (s *PaymentService) findPaymentOrderForNotification(ctx context.Context, orderID string) (*dbent.PaymentOrder, error) {
