@@ -570,7 +570,7 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 		SettingMaxPendingOrders:                  formatPositiveInt(req.MaxPendingOrders),
 		SettingBalancePayDisabled:                formatBoolOrEmpty(req.BalanceDisabled),
 		SettingBalanceRechargeMult:               formatPositiveFloat(req.BalanceRechargeMultiplier),
-		SettingSubscriptionUSDToCNYRate:          formatPositiveFloatExact(req.SubscriptionUSDToCNYRate),
+		SettingSubscriptionUSDToCNYRate:          formatNonNegativeFloatExact(req.SubscriptionUSDToCNYRate),
 		SettingRechargeFeeRate:                   formatNonNegativeFloat(req.RechargeFeeRate),
 		SettingLoadBalanceStrategy:               derefStr(req.LoadBalanceStrategy),
 		SettingProductNamePrefix:                 derefStr(req.ProductNamePrefix),
@@ -661,6 +661,15 @@ func formatNonNegativeFloat(v *float64) string {
 		return ""
 	}
 	return strconv.FormatFloat(*v, 'f', 2, 64)
+}
+
+// formatNonNegativeFloatExact preserves exchange-rate precision while retaining
+// the fork contract that zero explicitly disables subscription USD→CNY conversion.
+func formatNonNegativeFloatExact(v *float64) string {
+	if v == nil || *v < 0 {
+		return ""
+	}
+	return strconv.FormatFloat(*v, 'f', -1, 64)
 }
 
 func formatPositiveInt(v *int) string {
