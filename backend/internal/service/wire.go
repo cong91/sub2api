@@ -812,6 +812,16 @@ func ProvideVClawClaimService(
 	return NewVClawClaimService(entClient, userRepo, redeemRepo, userDeviceRepo, cfg, settingService, defaultSubAssigner, affiliateService)
 }
 
+// ProvideModelMarketplaceService binds marketplace listing to the immutable
+// catalog reader while preserving the configured legacy/shadow/db rollout mode.
+func ProvideModelMarketplaceService(pricingService *PricingService, billingService *BillingService, apiKeyService *APIKeyService, gatewayService *GatewayService, catalogRuntime *ModelCatalogProjectionRuntime) *ModelMarketplaceService {
+	svc := NewModelMarketplaceService(pricingService, billingService, apiKeyService, gatewayService)
+	if catalogRuntime != nil {
+		svc.SetCatalogRuntime(catalogRuntime.Reader(), catalogRuntime.ReadModes().ListReadMode)
+	}
+	return svc
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
@@ -920,7 +930,7 @@ var ProviderSet = wire.NewSet(
 	NewGroupCapacityService,
 	ProvideChannelService,
 	NewProviderCatalogService,
-	NewModelMarketplaceService,
+	ProvideModelMarketplaceService,
 	NewModelPricingResolver,
 	NewContentModerationService,
 	NewAffiliateService,
