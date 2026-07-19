@@ -44,16 +44,16 @@ func ProvidePricingService(cfg *config.Config, remoteClient PricingRemoteClient)
 	return svc, nil
 }
 
-// ProvideModelCatalogProjectionRuntime starts only the additive shadow
-// projection mode. Legacy remains the default request/billing authority.
+// ProvideModelCatalogProjectionRuntime keeps public marketplace listing on the
+// published catalog while leaving pricing/admission rollout modes independent.
 func ProvideModelCatalogProjectionRuntime(repository ModelCatalogRepository, pricing *PricingService, cfg *config.Config) *ModelCatalogProjectionRuntime {
 	maxStale := 10 * time.Minute
 	refreshInterval := 10 * time.Minute
-	mode := "legacy"
+	mode := "shadow"
 	scope := CatalogScopeGlobal
 	readModes := ModelCatalogReadModes{
 		ImportMode:      "off",
-		ListReadMode:    "legacy",
+		ListReadMode:    "db",
 		PricingReadMode: "legacy",
 		AdmissionMode:   "off",
 	}
@@ -888,6 +888,16 @@ func ProvideVClawClaimService(
 	return NewVClawClaimService(entClient, userRepo, redeemRepo, userDeviceRepo, cfg, settingService, defaultSubAssigner, affiliateService)
 }
 
+// ProvideModelMarketplaceService binds marketplace listing to the immutable
+// catalog reader while preserving the configured legacy/shadow/db rollout mode.
+func ProvideModelMarketplaceService(pricingService *PricingService, billingService *BillingService, apiKeyService *APIKeyService, gatewayService *GatewayService, catalogRuntime *ModelCatalogProjectionRuntime) *ModelMarketplaceService {
+	svc := NewModelMarketplaceService(pricingService, billingService, apiKeyService, gatewayService)
+	if catalogRuntime != nil {
+		svc.SetCatalogRuntime(catalogRuntime.Reader(), catalogRuntime.ReadModes().ListReadMode)
+	}
+	return svc
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
@@ -1006,7 +1016,7 @@ var ProviderSet = wire.NewSet(
 	ProvideChannelService,
 	wire.Bind(new(ChannelCacheInvalidator), new(*ChannelService)),
 	NewProviderCatalogService,
-	NewModelMarketplaceService,
+	ProvideModelMarketplaceService,
 	NewModelPricingResolver,
 	NewContentModerationService,
 	NewAffiliateService,
