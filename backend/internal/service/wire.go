@@ -32,16 +32,16 @@ func ProvidePricingService(cfg *config.Config, remoteClient PricingRemoteClient)
 	return svc, nil
 }
 
-// ProvideModelCatalogProjectionRuntime starts only the additive shadow
-// projection mode. Legacy remains the default request/billing authority.
+// ProvideModelCatalogProjectionRuntime keeps public marketplace listing on the
+// published catalog while leaving pricing/admission rollout modes independent.
 func ProvideModelCatalogProjectionRuntime(repository ModelCatalogRepository, pricing *PricingService, cfg *config.Config) *ModelCatalogProjectionRuntime {
 	maxStale := 10 * time.Minute
 	refreshInterval := 10 * time.Minute
-	mode := "legacy"
+	mode := "shadow"
 	scope := CatalogScopeGlobal
 	readModes := ModelCatalogReadModes{
 		ImportMode:      "off",
-		ListReadMode:    "legacy",
+		ListReadMode:    "db",
 		PricingReadMode: "legacy",
 		AdmissionMode:   "off",
 	}
