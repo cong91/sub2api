@@ -18871,6 +18871,10 @@ type CatalogModelRevisionMutation struct {
 	addpricing_schema_version *int
 	pricing_json              *map[string]interface{}
 	pricing_valid             *bool
+	operator_state            *string
+	operator_reason           *string
+	operator_version          *int64
+	addoperator_version       *int64
 	pricing_source            *string
 	source_metadata           *map[string]interface{}
 	source_hash               *string
@@ -19552,6 +19556,147 @@ func (m *CatalogModelRevisionMutation) ResetPricingValid() {
 	m.pricing_valid = nil
 }
 
+// SetOperatorState sets the "operator_state" field.
+func (m *CatalogModelRevisionMutation) SetOperatorState(s string) {
+	m.operator_state = &s
+}
+
+// OperatorState returns the value of the "operator_state" field in the mutation.
+func (m *CatalogModelRevisionMutation) OperatorState() (r string, exists bool) {
+	v := m.operator_state
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOperatorState returns the old "operator_state" field's value of the CatalogModelRevision entity.
+// If the CatalogModelRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CatalogModelRevisionMutation) OldOperatorState(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOperatorState is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOperatorState requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOperatorState: %w", err)
+	}
+	return oldValue.OperatorState, nil
+}
+
+// ResetOperatorState resets all changes to the "operator_state" field.
+func (m *CatalogModelRevisionMutation) ResetOperatorState() {
+	m.operator_state = nil
+}
+
+// SetOperatorReason sets the "operator_reason" field.
+func (m *CatalogModelRevisionMutation) SetOperatorReason(s string) {
+	m.operator_reason = &s
+}
+
+// OperatorReason returns the value of the "operator_reason" field in the mutation.
+func (m *CatalogModelRevisionMutation) OperatorReason() (r string, exists bool) {
+	v := m.operator_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOperatorReason returns the old "operator_reason" field's value of the CatalogModelRevision entity.
+// If the CatalogModelRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CatalogModelRevisionMutation) OldOperatorReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOperatorReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOperatorReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOperatorReason: %w", err)
+	}
+	return oldValue.OperatorReason, nil
+}
+
+// ClearOperatorReason clears the value of the "operator_reason" field.
+func (m *CatalogModelRevisionMutation) ClearOperatorReason() {
+	m.operator_reason = nil
+	m.clearedFields[catalogmodelrevision.FieldOperatorReason] = struct{}{}
+}
+
+// OperatorReasonCleared returns if the "operator_reason" field was cleared in this mutation.
+func (m *CatalogModelRevisionMutation) OperatorReasonCleared() bool {
+	_, ok := m.clearedFields[catalogmodelrevision.FieldOperatorReason]
+	return ok
+}
+
+// ResetOperatorReason resets all changes to the "operator_reason" field.
+func (m *CatalogModelRevisionMutation) ResetOperatorReason() {
+	m.operator_reason = nil
+	delete(m.clearedFields, catalogmodelrevision.FieldOperatorReason)
+}
+
+// SetOperatorVersion sets the "operator_version" field.
+func (m *CatalogModelRevisionMutation) SetOperatorVersion(i int64) {
+	m.operator_version = &i
+	m.addoperator_version = nil
+}
+
+// OperatorVersion returns the value of the "operator_version" field in the mutation.
+func (m *CatalogModelRevisionMutation) OperatorVersion() (r int64, exists bool) {
+	v := m.operator_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOperatorVersion returns the old "operator_version" field's value of the CatalogModelRevision entity.
+// If the CatalogModelRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CatalogModelRevisionMutation) OldOperatorVersion(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOperatorVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOperatorVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOperatorVersion: %w", err)
+	}
+	return oldValue.OperatorVersion, nil
+}
+
+// AddOperatorVersion adds i to the "operator_version" field.
+func (m *CatalogModelRevisionMutation) AddOperatorVersion(i int64) {
+	if m.addoperator_version != nil {
+		*m.addoperator_version += i
+	} else {
+		m.addoperator_version = &i
+	}
+}
+
+// AddedOperatorVersion returns the value that was added to the "operator_version" field in this mutation.
+func (m *CatalogModelRevisionMutation) AddedOperatorVersion() (r int64, exists bool) {
+	v := m.addoperator_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetOperatorVersion resets all changes to the "operator_version" field.
+func (m *CatalogModelRevisionMutation) ResetOperatorVersion() {
+	m.operator_version = nil
+	m.addoperator_version = nil
+}
+
 // SetPricingSource sets the "pricing_source" field.
 func (m *CatalogModelRevisionMutation) SetPricingSource(s string) {
 	m.pricing_source = &s
@@ -19743,7 +19888,7 @@ func (m *CatalogModelRevisionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *CatalogModelRevisionMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 19)
 	if m.catalog_revision_id != nil {
 		fields = append(fields, catalogmodelrevision.FieldCatalogRevisionID)
 	}
@@ -19779,6 +19924,15 @@ func (m *CatalogModelRevisionMutation) Fields() []string {
 	}
 	if m.pricing_valid != nil {
 		fields = append(fields, catalogmodelrevision.FieldPricingValid)
+	}
+	if m.operator_state != nil {
+		fields = append(fields, catalogmodelrevision.FieldOperatorState)
+	}
+	if m.operator_reason != nil {
+		fields = append(fields, catalogmodelrevision.FieldOperatorReason)
+	}
+	if m.operator_version != nil {
+		fields = append(fields, catalogmodelrevision.FieldOperatorVersion)
 	}
 	if m.pricing_source != nil {
 		fields = append(fields, catalogmodelrevision.FieldPricingSource)
@@ -19824,6 +19978,12 @@ func (m *CatalogModelRevisionMutation) Field(name string) (ent.Value, bool) {
 		return m.PricingJSON()
 	case catalogmodelrevision.FieldPricingValid:
 		return m.PricingValid()
+	case catalogmodelrevision.FieldOperatorState:
+		return m.OperatorState()
+	case catalogmodelrevision.FieldOperatorReason:
+		return m.OperatorReason()
+	case catalogmodelrevision.FieldOperatorVersion:
+		return m.OperatorVersion()
 	case catalogmodelrevision.FieldPricingSource:
 		return m.PricingSource()
 	case catalogmodelrevision.FieldSourceMetadata:
@@ -19865,6 +20025,12 @@ func (m *CatalogModelRevisionMutation) OldField(ctx context.Context, name string
 		return m.OldPricingJSON(ctx)
 	case catalogmodelrevision.FieldPricingValid:
 		return m.OldPricingValid(ctx)
+	case catalogmodelrevision.FieldOperatorState:
+		return m.OldOperatorState(ctx)
+	case catalogmodelrevision.FieldOperatorReason:
+		return m.OldOperatorReason(ctx)
+	case catalogmodelrevision.FieldOperatorVersion:
+		return m.OldOperatorVersion(ctx)
 	case catalogmodelrevision.FieldPricingSource:
 		return m.OldPricingSource(ctx)
 	case catalogmodelrevision.FieldSourceMetadata:
@@ -19966,6 +20132,27 @@ func (m *CatalogModelRevisionMutation) SetField(name string, value ent.Value) er
 		}
 		m.SetPricingValid(v)
 		return nil
+	case catalogmodelrevision.FieldOperatorState:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOperatorState(v)
+		return nil
+	case catalogmodelrevision.FieldOperatorReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOperatorReason(v)
+		return nil
+	case catalogmodelrevision.FieldOperatorVersion:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOperatorVersion(v)
+		return nil
 	case catalogmodelrevision.FieldPricingSource:
 		v, ok := value.(string)
 		if !ok {
@@ -20017,6 +20204,9 @@ func (m *CatalogModelRevisionMutation) AddedFields() []string {
 	if m.addpricing_schema_version != nil {
 		fields = append(fields, catalogmodelrevision.FieldPricingSchemaVersion)
 	}
+	if m.addoperator_version != nil {
+		fields = append(fields, catalogmodelrevision.FieldOperatorVersion)
+	}
 	return fields
 }
 
@@ -20035,6 +20225,8 @@ func (m *CatalogModelRevisionMutation) AddedField(name string) (ent.Value, bool)
 		return m.AddedMaxOutputTokens()
 	case catalogmodelrevision.FieldPricingSchemaVersion:
 		return m.AddedPricingSchemaVersion()
+	case catalogmodelrevision.FieldOperatorVersion:
+		return m.AddedOperatorVersion()
 	}
 	return nil, false
 }
@@ -20079,6 +20271,13 @@ func (m *CatalogModelRevisionMutation) AddField(name string, value ent.Value) er
 		}
 		m.AddPricingSchemaVersion(v)
 		return nil
+	case catalogmodelrevision.FieldOperatorVersion:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOperatorVersion(v)
+		return nil
 	}
 	return fmt.Errorf("unknown CatalogModelRevision numeric field %s", name)
 }
@@ -20095,6 +20294,9 @@ func (m *CatalogModelRevisionMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(catalogmodelrevision.FieldPricingJSON) {
 		fields = append(fields, catalogmodelrevision.FieldPricingJSON)
+	}
+	if m.FieldCleared(catalogmodelrevision.FieldOperatorReason) {
+		fields = append(fields, catalogmodelrevision.FieldOperatorReason)
 	}
 	if m.FieldCleared(catalogmodelrevision.FieldPricingSource) {
 		fields = append(fields, catalogmodelrevision.FieldPricingSource)
@@ -20121,6 +20323,9 @@ func (m *CatalogModelRevisionMutation) ClearField(name string) error {
 		return nil
 	case catalogmodelrevision.FieldPricingJSON:
 		m.ClearPricingJSON()
+		return nil
+	case catalogmodelrevision.FieldOperatorReason:
+		m.ClearOperatorReason()
 		return nil
 	case catalogmodelrevision.FieldPricingSource:
 		m.ClearPricingSource()
@@ -20168,6 +20373,15 @@ func (m *CatalogModelRevisionMutation) ResetField(name string) error {
 		return nil
 	case catalogmodelrevision.FieldPricingValid:
 		m.ResetPricingValid()
+		return nil
+	case catalogmodelrevision.FieldOperatorState:
+		m.ResetOperatorState()
+		return nil
+	case catalogmodelrevision.FieldOperatorReason:
+		m.ResetOperatorReason()
+		return nil
+	case catalogmodelrevision.FieldOperatorVersion:
+		m.ResetOperatorVersion()
 		return nil
 	case catalogmodelrevision.FieldPricingSource:
 		m.ResetPricingSource()
