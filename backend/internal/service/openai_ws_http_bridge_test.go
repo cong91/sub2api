@@ -63,7 +63,6 @@ func TestOpenAIWSHTTPBridgeDecisionKeepsSmallFramesOnWS(t *testing.T) {
 }
 
 func TestOpenAIWSHTTPBridgeRelaysSSEFramesAsWebSocketMessages(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	sseBody := strings.Join([]string{
 		`data: {"type":"response.created","response":{"id":"resp_bridge","model":"gpt-5"}}`,
@@ -191,7 +190,6 @@ func TestOpenAIWSHTTPBridgeRelaysSSEFramesAsWebSocketMessages(t *testing.T) {
 }
 
 func TestProxyOpenAIWSHTTPBridgeTurnForGrokDefaultsEmptyModelTo45(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	upstream := &httpUpstreamRecorder{resp: &http.Response{
 		StatusCode: http.StatusOK,
@@ -236,7 +234,6 @@ func TestProxyOpenAIWSHTTPBridgeTurnForGrokDefaultsEmptyModelTo45(t *testing.T) 
 }
 
 func TestProxyResponsesWebSocketFromClientForGrokUsesXAIHTTPBridge(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	bridgeResponse := func(responseID, requestID string, cachedTokens int) *http.Response {
 		sseBody := strings.Join([]string{
@@ -404,7 +401,6 @@ func TestProxyResponsesWebSocketFromClientForGrokUsesXAIHTTPBridge(t *testing.T)
 }
 
 func TestOpenAIWSHTTPBridgeAcceptsFirstFrameAboveLegacy16MiB(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	sseBody := strings.Join([]string{
 		`data: {"type":"response.created","response":{"id":"resp_large_bridge","model":"gpt-5"}}`,
@@ -536,7 +532,6 @@ func TestOpenAIWSHTTPBridgeAcceptsFirstFrameAboveLegacy16MiB(t *testing.T) {
 }
 
 func TestOpenAIWSHTTPBridgeKeepsContinuationFramesOnHTTPWithoutPreviousResponseID(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	firstSSEBody := strings.Join([]string{
 		`data: {"type":"response.completed","response":{"id":"resp_bridge_first","model":"gpt-5.1","output":[{"type":"function_call","id":"fc_bridge_1","call_id":"call_bridge_1","name":"shell","arguments":"{}"}],"usage":{"input_tokens":9,"output_tokens":1}}}`,
@@ -691,7 +686,6 @@ func TestOpenAIWSHTTPBridgeKeepsContinuationFramesOnHTTPWithoutPreviousResponseI
 }
 
 func TestOpenAIWSHTTPBridge_IdleTimeoutClosesClientSession(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	sseBody := strings.Join([]string{
 		`data: {"type":"response.completed","response":{"id":"resp_bridge_idle","model":"gpt-5.1","usage":{"input_tokens":1,"output_tokens":1}}}`,

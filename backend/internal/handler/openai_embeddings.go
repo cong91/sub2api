@@ -80,6 +80,10 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 	}
 
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
+	if channelMapping.CatalogError != nil {
+		writeCatalogAdmissionError(c, channelMapping.CatalogError)
+		return
+	}
 
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
@@ -159,6 +163,9 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 		}
 		account := selection.Account
 		setOpsSelectedAccount(c, account.ID, account.Platform)
+		if !finalizeCatalogEffectiveModel(c, &channelMapping, account, reqModel, selection.ReleaseFunc) {
+			return
+		}
 
 		accountReleaseFunc, accountAcquired := h.acquireResponsesAccountSlot(c, apiKey.GroupID, "", selection, false, &streamStarted, reqLog)
 		if !accountAcquired {
