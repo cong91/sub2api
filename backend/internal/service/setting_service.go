@@ -180,7 +180,7 @@ var (
 
 const (
 	defaultAuthSourceBalance     = 0
-	defaultAuthSourceConcurrency = 5
+	defaultAuthSourceConcurrency = 50
 	defaultWeChatConnectMode     = "open"
 	defaultWeChatConnectScopes   = "snsapi_login"
 	defaultWeChatConnectFrontend = "/auth/wechat/callback"
