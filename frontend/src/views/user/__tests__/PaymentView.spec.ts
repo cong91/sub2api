@@ -278,6 +278,17 @@ async function mountSubscriptionConfirm(options: Parameters<typeof checkoutInfoW
 }
 
 describe('PaymentView subscription confirmation amounts', () => {
+  it('renders plural weekly validity through the shared validity contract', async () => {
+    const wrapper = await mountSubscriptionConfirm({
+      plan: {
+        validity_days: 2,
+        validity_unit: 'weeks',
+      },
+    })
+
+    expect(wrapper.text()).toContain('/ 2payment.weeks')
+  })
+
   it('shows converted CNY pay amount using the subscription rate, not the balance multiplier', async () => {
     const wrapper = await mountSubscriptionConfirm({
       checkout: {
