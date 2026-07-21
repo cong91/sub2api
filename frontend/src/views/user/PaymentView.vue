@@ -364,12 +364,7 @@ import BalancePackageCard from '@/components/payment/BalancePackageCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 import PaddleCheckoutInline from '@/components/payment/PaddleCheckoutInline.vue'
 import Icon from '@/components/icons/Icon.vue'
-import {
-  DEFAULT_PAYMENT_CURRENCY,
-  formatPaymentAmount,
-  getDefaultPaymentCurrencyByLocale,
-  normalizePaymentCurrency,
-} from '@/components/payment/currency'
+import { getDefaultPaymentCurrencyByLocale, normalizePaymentCurrency } from '@/components/payment/currency'
 import { planValiditySuffix as validitySuffixOf } from '@/components/payment/validity'
 import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSelector.vue'
 import { buildPaymentErrorToastMessage, describePaymentScenarioError } from './paymentUx'
