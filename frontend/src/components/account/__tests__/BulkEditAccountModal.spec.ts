@@ -4,8 +4,9 @@ import BulkEditAccountModal from '../BulkEditAccountModal.vue'
 import ModelWhitelistSelector from '../ModelWhitelistSelector.vue'
 import { adminAPI } from '@/api/admin'
 
-const { showError } = vi.hoisted(() => ({
-  showError: vi.fn()
+const { showError, getModelsListCandidates } = vi.hoisted(() => ({
+  showError: vi.fn(),
+  getModelsListCandidates: vi.fn()
 }))
 
 vi.mock('@/stores/app', () => ({
@@ -26,7 +27,15 @@ vi.mock('@/api/admin', () => ({
 }))
 
 vi.mock('@/api/admin/accounts', () => ({
-  getAntigravityDefaultModelMapping: vi.fn()
+  getAntigravityDefaultModelMapping: vi.fn(),
+  accountsAPI: {
+    syncUpstreamModels: vi.fn(),
+    syncUpstreamModelsPreview: vi.fn()
+  }
+}))
+
+vi.mock('@/api/admin/groups', () => ({
+  getModelsListCandidates
 }))
 
 vi.mock('vue-i18n', async () => {
@@ -82,6 +91,7 @@ describe('BulkEditAccountModal', () => {
     vi.mocked(adminAPI.accounts.bulkUpdate).mockReset()
     vi.mocked(adminAPI.accounts.checkMixedChannelRisk).mockReset()
     showError.mockReset()
+    getModelsListCandidates.mockReset()
 
     vi.mocked(adminAPI.accounts.bulkUpdate).mockResolvedValue({
       success: 2,
@@ -91,6 +101,7 @@ describe('BulkEditAccountModal', () => {
     vi.mocked(adminAPI.accounts.checkMixedChannelRisk).mockResolvedValue({
       has_risk: false
     } as any)
+    getModelsListCandidates.mockResolvedValue(['gemini-3.1-flash-image', 'gemini-2.5-flash-image'])
   })
 
   it('批量修改倍率时提示自动同步账号需要先关闭同步', async () => {
@@ -125,6 +136,7 @@ describe('BulkEditAccountModal', () => {
     const selector = wrapper.findComponent(ModelWhitelistSelector)
     expect(selector.exists()).toBe(true)
 
+    await flushPromises()
     await selector.find('div.cursor-pointer').trigger('click')
 
     expect(wrapper.text()).toContain('gemini-3.1-flash-image')
