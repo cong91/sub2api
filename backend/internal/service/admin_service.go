@@ -651,6 +651,7 @@ type adminServiceImpl struct {
 	affiliateService     adminRechargeAffiliateAccruer
 	compositeRouteRepo   CompositeModelRouteRepository
 	compositeResolver    *CompositeRouteResolver
+	modelCatalogReader   ModelCatalogReader
 }
 
 type adminRechargeAffiliateAccruer interface {
@@ -684,7 +685,12 @@ func NewAdminService(
 	affiliateService *AffiliateService,
 	compositeRouteRepo CompositeModelRouteRepository,
 	compositeResolver *CompositeRouteResolver,
+	modelCatalogRuntime *ModelCatalogProjectionRuntime,
 ) AdminService {
+	var modelCatalogReader ModelCatalogReader
+	if modelCatalogRuntime != nil {
+		modelCatalogReader = modelCatalogRuntime.Reader()
+	}
 	return &adminServiceImpl{
 		userRepo:             userRepo,
 		groupRepo:            groupRepo,
@@ -709,5 +715,6 @@ func NewAdminService(
 		affiliateService:     affiliateService,
 		compositeRouteRepo:   compositeRouteRepo,
 		compositeResolver:    compositeResolver,
+		modelCatalogReader:   modelCatalogReader,
 	}
 }
