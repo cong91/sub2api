@@ -683,6 +683,7 @@ type adminServiceImpl struct {
 	compositeResolver    *CompositeRouteResolver
 	// 分组平台变更后用来失效渠道缓存；可为 nil（缓存会在 TTL 到期后自然重建）
 	channelCacheInvalidator ChannelCacheInvalidator
+	modelCatalogReader      ModelCatalogReader
 }
 
 // ChannelCacheInvalidator 失效渠道缓存。
@@ -723,33 +724,38 @@ func NewAdminService(
 	compositeRouteRepo CompositeModelRouteRepository,
 	compositeResolver *CompositeRouteResolver,
 	channelCacheInvalidator ChannelCacheInvalidator,
+	modelCatalogRuntime *ModelCatalogProjectionRuntime,
 ) AdminService {
+	var modelCatalogReader ModelCatalogReader
+	if modelCatalogRuntime != nil {
+		modelCatalogReader = modelCatalogRuntime.Reader()
+	}
 	return &adminServiceImpl{
-		userRepo:             userRepo,
-		groupRepo:            groupRepo,
-		groupDuplicateRepo:   groupRepo,
-		accountRepo:          accountRepo,
-		accountDuplicateRepo: accountRepo,
-		accountBillingRepo:   accountRepo,
-		proxyRepo:            proxyRepo,
-		apiKeyRepo:           apiKeyRepo,
-		redeemCodeRepo:       redeemCodeRepo,
-		userGroupRateRepo:    userGroupRateRepo,
-		userRPMCache:         userRPMCache,
-		billingCacheService:  billingCacheService,
-		proxyProber:          proxyProber,
-		proxyLatencyCache:    proxyLatencyCache,
-		authCacheInvalidator: authCacheInvalidator,
-		entClient:            entClient,
-		settingService:       settingService,
-		defaultSubAssigner:   defaultSubAssigner,
-		userSubRepo:          userSubRepo,
-		privacyClientFactory: privacyClientFactory,
-		runtimeBlocker:       runtimeBlocker,
-		affiliateService:     affiliateService,
-		compositeRouteRepo:   compositeRouteRepo,
-		compositeResolver:    compositeResolver,
-
+		userRepo:                userRepo,
+		groupRepo:               groupRepo,
+		groupDuplicateRepo:      groupRepo,
+		accountRepo:             accountRepo,
+		accountDuplicateRepo:    accountRepo,
+		accountBillingRepo:      accountRepo,
+		proxyRepo:               proxyRepo,
+		apiKeyRepo:              apiKeyRepo,
+		redeemCodeRepo:          redeemCodeRepo,
+		userGroupRateRepo:       userGroupRateRepo,
+		userRPMCache:            userRPMCache,
+		billingCacheService:     billingCacheService,
+		proxyProber:             proxyProber,
+		proxyLatencyCache:       proxyLatencyCache,
+		authCacheInvalidator:    authCacheInvalidator,
+		entClient:               entClient,
+		settingService:          settingService,
+		defaultSubAssigner:      defaultSubAssigner,
+		userSubRepo:             userSubRepo,
+		privacyClientFactory:    privacyClientFactory,
+		runtimeBlocker:          runtimeBlocker,
+		affiliateService:        affiliateService,
+		compositeRouteRepo:      compositeRouteRepo,
+		compositeResolver:       compositeResolver,
 		channelCacheInvalidator: channelCacheInvalidator,
+		modelCatalogReader:      modelCatalogReader,
 	}
 }

@@ -5,8 +5,8 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/stretchr/testify/require"
 )
 
@@ -158,7 +158,7 @@ func TestAdminService_UpdateAccountAllowsCompositeGroupAssignment(t *testing.T) 
 	require.ElementsMatch(t, []int64{99}, accountRepo.bindGroupsByAccount[7])
 }
 
-func TestAdminService_CompositeModelsListCandidatesIncludeConcreteAccountMappings(t *testing.T) {
+func TestAdminService_CompositeModelsListCandidatesRequirePublishedCatalog(t *testing.T) {
 	accountRepo := &accountRepoStubForCompositeModelsList{
 		accounts: []Account{
 			{
@@ -175,13 +175,6 @@ func TestAdminService_CompositeModelsListCandidatesIncludeConcreteAccountMapping
 					"model_mapping": map[string]any{"gemini-custom": "gemini-2.5-flash"},
 				},
 			},
-			{
-				ID:       3,
-				Platform: PlatformKimi,
-				Credentials: map[string]any{
-					"model_mapping": map[string]any{"kimi-custom": "kimi-k2"},
-				},
-			},
 		},
 	}
 	groupRepo := &groupRepoStubForAdmin{
@@ -194,21 +187,119 @@ func TestAdminService_CompositeModelsListCandidatesIncludeConcreteAccountMapping
 	candidates, err := svc.GetGroupModelsListCandidates(context.Background(), 99, PlatformComposite)
 
 	require.NoError(t, err)
-	require.Contains(t, candidates, "gpt-custom")
-	require.Contains(t, candidates, "gemini-custom")
-	require.Contains(t, candidates, "kimi-custom")
-	require.Contains(t, candidates, "gpt-5.5")
-	require.Contains(t, candidates, "gemini-2.5-flash")
+	require.Empty(t, candidates)
 }
 
-// 独立 CN 分组的模型列表候选沿用 default 分支的 Claude 默认列表；
-// composite 支持不得改变独立分组的候选语义。
-func TestAdminService_CNProviderModelsListCandidatesKeepClaudeDefaults(t *testing.T) {
-	want := make([]string, 0, len(claude.DefaultModels))
-	for _, model := range claude.DefaultModels {
-		want = append(want, model.ID)
+func TestAdminService_GroupModelsListCandidatesUseStrictPublishedCatalogOnly(t *testing.T) {
+	now := time.Now().UTC()
+	spec := CatalogSnapshotSpec{
+		Scope:      CatalogScopeGlobal,
+		Epoch:      13,
+		RevisionID: 1300,
+		Revision:   13,
+		Checksum:   "admin-group-candidates",
+		VerifiedAt: now,
+		Models: []CatalogSnapshotModelSpec{
+			{
+				ID: 1, RevisionID: 101, CanonicalKey: "claude-opus-5",
+				OperatorState: CatalogOperatorStateEnabled, SourceState: CatalogSourceStatePresent,
+				Provider: "anthropic", Platform: "anthropic", PricingValid: true, PricingSource: "official:anthropic",
+				Pricing: &LiteLLMModelPricing{InputCostPerToken: 1e-6},
+			},
+			{
+				ID: 2, RevisionID: 102, CanonicalKey: "disabled-catalog-model",
+				OperatorState: CatalogOperatorStateDisabled, SourceState: CatalogSourceStatePresent,
+				Provider: "anthropic", Platform: "anthropic", PricingValid: true, PricingSource: "official:anthropic",
+				Pricing: &LiteLLMModelPricing{InputCostPerToken: 1e-6},
+			},
+			{
+				ID: 3, RevisionID: 103, CanonicalKey: "unpriced-catalog-model",
+				OperatorState: CatalogOperatorStateEnabled, SourceState: CatalogSourceStatePresent,
+				Provider: "anthropic", Platform: "anthropic", PricingValid: false, PricingSource: "official:anthropic",
+			},
+			{
+				ID: 4, RevisionID: 104, CanonicalKey: "missing-source-catalog-model",
+				OperatorState: CatalogOperatorStateEnabled, SourceState: CatalogSourceStateMissing,
+				Provider: "anthropic", Platform: "anthropic", PricingValid: true, PricingSource: "official:anthropic",
+				Pricing: &LiteLLMModelPricing{InputCostPerToken: 1e-6},
+			},
+			{
+				ID: 5, RevisionID: 105, CanonicalKey: "manual-catalog-model",
+				OperatorState: CatalogOperatorStateEnabled, SourceState: CatalogSourceStatePresent,
+				Provider: "anthropic", Platform: "anthropic", PricingValid: true,
+				Pricing: &LiteLLMModelPricing{InputCostPerToken: 1e-6},
+			},
+		},
 	}
-	for _, platform := range []string{PlatformKimi, PlatformZhipu, PlatformDeepseek} {
-		require.Equal(t, want, defaultModelsListCandidateIDs(platform), "platform=%s", platform)
+	accountRepo := &accountRepoStubForCompositeModelsList{
+		accounts: []Account{{
+			ID:       1,
+			Platform: PlatformAnthropic,
+			Credentials: map[string]any{
+				"model_mapping": map[string]any{"customer-custom-model": "claude-opus-5"},
+			},
+		}},
+	}
+	groupRepo := &groupRepoStubForAdmin{
+		getByIDByID: map[int64]*Group{
+			99: {ID: 99, Platform: PlatformAnthropic},
+		},
+	}
+	reader := NewAtomicModelCatalogReader(mustCatalogSnapshot(t, spec), time.Hour)
+	svc := &adminServiceImpl{
+		accountRepo:        accountRepo,
+		groupRepo:          groupRepo,
+		modelCatalogReader: reader,
+	}
+
+	candidates, err := svc.GetGroupModelsListCandidates(context.Background(), 99, PlatformAnthropic)
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"claude-opus-5"}, candidates)
+	require.NotContains(t, candidates, "disabled-catalog-model")
+	require.NotContains(t, candidates, "unpriced-catalog-model")
+	require.NotContains(t, candidates, "missing-source-catalog-model")
+	require.NotContains(t, candidates, "manual-catalog-model")
+	require.NotContains(t, candidates, "customer-custom-model")
+	require.NotContains(t, candidates, "claude-fable-5")
+}
+
+func TestCatalogModelMatchesGroupPlatformAcceptsNativePlatformsAndAliases(t *testing.T) {
+	tests := []struct {
+		name     string
+		model    CatalogModelDecision
+		platform string
+		want     bool
+	}{
+		{
+			name:     "kiro native platform",
+			model:    CatalogModelDecision{Provider: PlatformKiro, Platform: PlatformKiro},
+			platform: PlatformKiro,
+			want:     true,
+		},
+		{
+			name:     "antigravity native platform",
+			model:    CatalogModelDecision{Provider: PlatformAntigravity, Platform: PlatformAntigravity},
+			platform: PlatformAntigravity,
+			want:     true,
+		},
+		{
+			name:     "antigravity anthropic provider alias",
+			model:    CatalogModelDecision{Provider: PlatformAnthropic},
+			platform: PlatformAntigravity,
+			want:     true,
+		},
+		{
+			name:     "provider mismatch",
+			model:    CatalogModelDecision{Provider: PlatformGemini, Platform: PlatformGemini},
+			platform: PlatformOpenAI,
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, catalogModelMatchesGroupPlatform(tt.model, tt.platform))
+		})
 	}
 }
