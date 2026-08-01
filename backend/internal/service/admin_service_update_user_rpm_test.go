@@ -107,7 +107,7 @@ type userStatusUpdateUserRepoStub struct {
 	lastUpdated *User
 }
 
-func (s *userStatusUpdateUserRepoStub) Update(_ context.Context, user *User) error {
+func (s *userStatusUpdateUserRepoStub) Update(_ context.Context, user *User, _ UserUpdateFields) error {
 	if user == nil {
 		return nil
 	}

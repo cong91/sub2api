@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"strings"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
@@ -41,6 +42,74 @@ func ProvidePricingService(cfg *config.Config, remoteClient PricingRemoteClient)
 		println("[Service] Warning: Pricing service initialization failed:", err.Error())
 	}
 	return svc, nil
+}
+
+// ProvideModelCatalogProjectionRuntime starts only the additive shadow
+// projection mode. Legacy remains the default request/billing authority.
+func ProvideModelCatalogProjectionRuntime(repository ModelCatalogRepository, pricing *PricingService, cfg *config.Config) *ModelCatalogProjectionRuntime {
+	maxStale := 10 * time.Minute
+	refreshInterval := 10 * time.Minute
+	mode := "legacy"
+	scope := CatalogScopeGlobal
+	readModes := ModelCatalogReadModes{
+		ImportMode:      "off",
+		ListReadMode:    "legacy",
+		PricingReadMode: "legacy",
+		AdmissionMode:   "off",
+	}
+	if cfg != nil {
+		mode = cfg.ModelCatalog.Mode
+		readModes = ModelCatalogReadModes{
+			ImportMode:      cfg.ModelCatalog.ImportMode,
+			ListReadMode:    cfg.ModelCatalog.ListReadMode,
+			PricingReadMode: cfg.ModelCatalog.PricingReadMode,
+			AdmissionMode:   cfg.ModelCatalog.AdmissionMode,
+		}
+		if cfg.ModelCatalog.Scope != "" {
+			scope = cfg.ModelCatalog.Scope
+		}
+		if cfg.ModelCatalog.MaxStaleMinutes > 0 {
+			maxStale = time.Duration(cfg.ModelCatalog.MaxStaleMinutes) * time.Minute
+		}
+		if cfg.ModelCatalog.RefreshIntervalMinutes > 0 {
+			refreshInterval = time.Duration(cfg.ModelCatalog.RefreshIntervalMinutes) * time.Minute
+		}
+	}
+	reader := NewAtomicModelCatalogReader(nil, maxStale)
+	pricing.SetCatalogRuntime(reader, readModes.PricingReadMode)
+	projection, err := NewModelCatalogProjectionService(repository, pricing, reader, scope)
+	if err != nil {
+		println("[Service] Warning: model catalog projection disabled:", err.Error())
+		return NewModelCatalogProjectionRuntime(nil, reader, "legacy", refreshInterval)
+	}
+	runtime := NewModelCatalogProjectionRuntimeWithModes(projection, reader, mode, refreshInterval, readModes)
+	runtime.Start()
+	return runtime
+}
+
+// ProvideModelCatalogAdminService creates the admin control-plane service.
+func ProvideModelCatalogAdminService(repository ModelCatalogRepository, adminRepository ModelCatalogAdminRepository, runtime *ModelCatalogProjectionRuntime, pricing *PricingService, cfg *config.Config) *ModelCatalogAdminService {
+	scope := CatalogScopeGlobal
+	if cfg != nil && strings.TrimSpace(cfg.ModelCatalog.Scope) != "" {
+		scope = cfg.ModelCatalog.Scope
+	}
+	return NewModelCatalogAdminService(repository, adminRepository, runtime, pricing, scope)
+}
+
+// channel service's legacy dependencies are constructed. The binding is
+// startup-only; request handling reads the immutable atomic view.
+func ProvideChannelService(
+	repo ChannelRepository,
+	groupRepo GroupRepository,
+	authCacheInvalidator APIKeyAuthCacheInvalidator,
+	pricingService *PricingService,
+	catalogRuntime *ModelCatalogProjectionRuntime,
+) *ChannelService {
+	svc := NewChannelService(repo, groupRepo, authCacheInvalidator, pricingService)
+	if catalogRuntime != nil {
+		svc.SetCatalogAdmission(catalogRuntime.Reader(), catalogRuntime.ReadModes().AdmissionMode)
+	}
+	return svc
 }
 
 // ProvideUpdateService creates UpdateService with BuildInfo
@@ -400,7 +469,14 @@ func ProvideDashboardAggregationService(repo DashboardAggregationRepository, tim
 	return svc
 }
 
-// ProvideUsageCleanupService 创建并启动使用记录清理任务服务
+// ProvideUsageBillingSettlementWorker creates the durable billing retry worker.
+// The worker is a no-op for test/fallback billing repositories that do not
+// implement UsageBillingSettlementRepository.
+func ProvideUsageBillingSettlementWorker(repo UsageBillingRepository) *UsageBillingSettlementWorker {
+	return NewUsageBillingSettlementWorker(repo)
+}
+
+// ProvideUsageCleanupService creates and starts the usage cleanup service.
 func ProvideUsageCleanupService(repo UsageCleanupRepository, timingWheel *TimingWheelService, dashboardAgg *DashboardAggregationService, cfg *config.Config) *UsageCleanupService {
 	svc := NewUsageCleanupService(repo, timingWheel, dashboardAgg, cfg)
 	svc.Start()
@@ -869,6 +945,8 @@ var ProviderSet = wire.NewSet(
 	NewUsageService,
 	NewDashboardService,
 	ProvidePricingService,
+	ProvideModelCatalogProjectionRuntime,
+	ProvideModelCatalogAdminService,
 	NewBillingService,
 	ProvideBillingCacheService,
 	NewAnnouncementService,
@@ -938,6 +1016,7 @@ var ProviderSet = wire.NewSet(
 	ProvideConcurrencyService,
 	ProvideUserMessageQueueService,
 	NewUsageRecordWorkerPool,
+	ProvideUsageBillingSettlementWorker,
 	ProvideSchedulerSnapshotService,
 	NewIdentityService,
 	NewCRSSyncService,
@@ -966,7 +1045,7 @@ var ProviderSet = wire.NewSet(
 	ProvideScheduledTestService,
 	ProvideScheduledTestRunnerService,
 	NewGroupCapacityService,
-	NewChannelService,
+	ProvideChannelService,
 	wire.Bind(new(ChannelCacheInvalidator), new(*ChannelService)),
 	NewProviderCatalogService,
 	NewModelMarketplaceService,

@@ -1080,7 +1080,7 @@ func writeChatCompletionsError(c *gin.Context, statusCode int, errType, message 
 	MarkResponseCommitted(c)
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
-			"type":    clienterror.TypeForHTTPStatus(statusCode, errType),
+			"type":    compatErrorTypeForHTTPStatus(c, statusCode, errType),
 			"message": clienterror.UpstreamMessageWithCode(statusCode, errType, message),
 		},
 	})

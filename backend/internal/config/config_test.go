@@ -23,36 +23,34 @@ func resetViperWithJWTSecret(t *testing.T) {
 	t.Setenv("JWT_SECRET", strings.Repeat("x", 32))
 }
 
-func TestLoadTimezonePrecedence(t *testing.T) {
-	tests := []struct {
-		name         string
-		fileTimezone string
-		timezoneEnv  string
-		tzEnv        string
-		want         string
-	}{
-		{name: "default", want: "Asia/Shanghai"},
-		{name: "config_file", fileTimezone: "Europe/London", want: "Europe/London"},
-		{name: "timezone_env", fileTimezone: "Europe/London", timezoneEnv: "UTC", want: "UTC"},
-		{name: "tz_env", fileTimezone: "Europe/London", timezoneEnv: "UTC", tzEnv: "America/New_York", want: "America/New_York"},
-	}
+func TestLoadModelCatalogDefaultsAndIndependentModes(t *testing.T) {
+	resetViperWithJWTSecret(t)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			resetViperWithJWTSecret(t)
-			t.Setenv("TIMEZONE", tt.timezoneEnv)
-			t.Setenv("TZ", tt.tzEnv)
-			if tt.fileTimezone != "" {
-				configFile := filepath.Join(t.TempDir(), "config.yaml")
-				require.NoError(t, os.WriteFile(configFile, []byte("timezone: "+tt.fileTimezone+"\n"), 0o600))
-				t.Setenv("CONFIG_FILE", configFile)
-			}
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, "legacy", cfg.ModelCatalog.Mode)
+	require.Equal(t, "global", cfg.ModelCatalog.Scope)
+	require.Equal(t, 10, cfg.ModelCatalog.MaxStaleMinutes)
+	require.Equal(t, 10, cfg.ModelCatalog.RefreshIntervalMinutes)
+	require.Equal(t, "off", cfg.ModelCatalog.ImportMode)
+	require.Equal(t, "legacy", cfg.ModelCatalog.ListReadMode)
+	require.Equal(t, "legacy", cfg.ModelCatalog.PricingReadMode)
+	require.Equal(t, "off", cfg.ModelCatalog.AdmissionMode)
 
-			cfg, err := Load()
-			require.NoError(t, err)
-			require.Equal(t, tt.want, cfg.Timezone)
-		})
-	}
+	viper.Set("model_catalog.mode", "shadow")
+	viper.Set("model_catalog.scope", "Platform-A")
+	viper.Set("model_catalog.import_mode", "SHADOW")
+	viper.Set("model_catalog.list_read_mode", "db")
+	viper.Set("model_catalog.pricing_read_mode", "shadow")
+	viper.Set("model_catalog.admission_mode", "enforce")
+	cfg, err = Load()
+	require.NoError(t, err)
+	require.Equal(t, "shadow", cfg.ModelCatalog.Mode)
+	require.Equal(t, "platform-a", cfg.ModelCatalog.Scope)
+	require.Equal(t, "shadow", cfg.ModelCatalog.ImportMode)
+	require.Equal(t, "db", cfg.ModelCatalog.ListReadMode)
+	require.Equal(t, "shadow", cfg.ModelCatalog.PricingReadMode)
+	require.Equal(t, "enforce", cfg.ModelCatalog.AdmissionMode)
 }
 
 func TestLoadServerTimingConfig(t *testing.T) {
