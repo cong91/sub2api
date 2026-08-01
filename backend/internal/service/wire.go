@@ -225,6 +225,7 @@ func ProvideAccountUsageService(
 		cache,
 		identityCache,
 		tlsFPProfileService,
+		grokQuotaService,
 	)
 	service.agentIdentityWS = openAIGatewayService
 	service.SetKiroCooldownStore(kiroCooldownStore)
