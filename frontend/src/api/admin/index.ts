@@ -9,6 +9,7 @@ import groupsAPI from './groups'
 import accountsAPI from './accounts'
 import proxiesAPI from './proxies'
 import redeemAPI from './redeem'
+import * as modelCatalog from './modelCatalog'
 import promoAPI from './promo'
 import announcementsAPI from './announcements'
 import settingsAPI from './settings'
@@ -67,6 +68,7 @@ export const adminAPI = {
   backup: backupAPI,
   tlsFingerprintProfiles: tlsFingerprintProfileAPI,
   channels: channelsAPI,
+  modelCatalog,
   channelMonitor: channelMonitorAPI,
   channelMonitorTemplate: channelMonitorTemplateAPI,
   payment: adminPaymentAPI,
@@ -103,6 +105,7 @@ export {
   backupAPI,
   tlsFingerprintProfileAPI,
   channelsAPI,
+  modelCatalog,
   channelMonitorAPI,
   channelMonitorTemplateAPI,
   adminPaymentAPI,

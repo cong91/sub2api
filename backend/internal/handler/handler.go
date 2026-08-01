@@ -35,6 +35,7 @@ type AdminHandlers struct {
 	APIKey                 *admin.AdminAPIKeyHandler
 	ScheduledTest          *admin.ScheduledTestHandler
 	Channel                *admin.ChannelHandler
+	ModelCatalog           *admin.ModelCatalogHandler
 	ChannelMonitor         *admin.ChannelMonitorHandler
 	ChannelMonitorTemplate *admin.ChannelMonitorRequestTemplateHandler
 	ContentModeration      *admin.ContentModerationHandler
