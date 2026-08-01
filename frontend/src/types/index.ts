@@ -550,7 +550,21 @@ export interface PaginationConfig {
 
 // ==================== API Key & Group Types ====================
 
-export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'composite' | 'kiro'
+export type GroupPlatform =
+  | 'anthropic'
+  | 'openai'
+  | 'gemini'
+  | 'antigravity'
+  | 'grok'
+  | 'kimi'
+  | 'zhipu'
+  | 'deepseek'
+  | 'glm'
+  | 'zai'
+  | 'minimax'
+  | 'opencode'
+  | 'composite'
+  | 'kiro'
 
 export type VideoModelPrices = Record<string, Record<string, number>>
 
@@ -907,7 +921,7 @@ export interface UpdateGroupRequest {
 
 // ==================== Account & Proxy Types ====================
 
-export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'kiro'
+export type AccountPlatform = GroupPlatform
 export type AccountType = 'oauth' | 'setup-token' | 'apikey' | 'upstream' | 'bedrock' | 'service_account'
 export type OAuthAddMethod = 'oauth' | 'setup-token'
 export type ProxyProtocol = 'http' | 'https' | 'socks5' | 'socks5h'
