@@ -423,9 +423,31 @@ func (s *EntitlementService) attachCurrentBalanceCreditQuota(ctx context.Context
 }
 
 func buildCurrentBalanceCreditQuota(balanceLedgerAmount, creditUnitScale float64, group *Group) *EntitlementCreditQuota {
-	// token_price_per_million removed; balance credit estimation via computeDisplayCreditsFromLedgerPrice
-	// is no longer accurate. Return nil — balance users don't get a per-group credit quota.
-	return nil
+	if group == nil || group.IsSubscriptionType() || balanceLedgerAmount <= 0 || group.RateMultiplier <= 0 {
+		return nil
+	}
+	credits := creditsFromUSD(balanceLedgerAmount, group.RateMultiplier)
+	if credits <= 0 {
+		return nil
+	}
+	if creditUnitScale <= 0 {
+		creditUnitScale = 1.0
+	}
+	return &EntitlementCreditQuota{
+		PurchasedLedgerAmount: balanceLedgerAmount,
+		PurchasedCredits:      credits,
+		UsedLedgerAmount:      0,
+		UsedCredits:           0,
+		RemainingCredits:      credits,
+		UsedPercent:           0,
+		NearLimit:             false,
+		CreditUnitScale:       creditUnitScale,
+		Accuracy:              "current_balance_estimate",
+		AccuracyNotes: []string{
+			"no completed balance package/order is linked to this credit; credits are derived from current balance and the selected balance group rate",
+			"remaining_credits = current_balance / rate_multiplier × 1,000,000",
+		},
+	}
 }
 
 func buildEntitlementCreditQuota(est usagestats.CreditUsageGroupEstimate, totalPurchasedCredits, totalUsedCredits, totalUsedLedger, creditUnitScale float64) *EntitlementCreditQuota {
@@ -598,14 +620,30 @@ func entitlementFallbackReason(balance float64) string {
 	return "insufficient_balance"
 }
 
-// (creditsFromUSD removed — token_price_per_million field dropped)
+func creditsFromUSD(usd, rateMultiplier float64) float64 {
+	if usd <= 0 || rateMultiplier <= 0 {
+		return 0
+	}
+	return usd / rateMultiplier * 1_000_000
+}
 
 func buildEntitlementCreditQuotaBucket(usedUSD float64, limitUSD *float64, rateMultiplier float64, resetAt *time.Time) *EntitlementCreditQuotaBucket {
-	_ = usedUSD
-	_ = limitUSD
-	_ = rateMultiplier
-	_ = resetAt
-	return &EntitlementCreditQuotaBucket{}
+	limit := 0.0
+	if limitUSD != nil {
+		limit = *limitUSD
+	}
+	usedCredits := creditsFromUSD(usedUSD, rateMultiplier)
+	totalCredits := creditsFromUSD(limit, rateMultiplier)
+	remainingCredits := totalCredits - usedCredits
+	if remainingCredits < 0 {
+		remainingCredits = 0
+	}
+	return &EntitlementCreditQuotaBucket{
+		UsedCredits:      usedCredits,
+		TotalCredits:     totalCredits,
+		RemainingCredits: remainingCredits,
+		ResetAt:          resetAt,
+	}
 }
 
 func buildSubscriptionCreditQuota(sub UserSubscription, group *Group) *EntitlementCreditQuota {
