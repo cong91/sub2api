@@ -363,7 +363,13 @@ func NewAccountUsageService(
 	cache *UsageCache,
 	identityCache IdentityCache,
 	tlsFingerprintProfileService *TLSFingerprintProfileService,
+	grokQuotaService ...*GrokQuotaService,
 ) *AccountUsageService {
+	var grokQuotaSvc *GrokQuotaService
+	if len(grokQuotaService) > 0 {
+		grokQuotaSvc = grokQuotaService[0]
+	}
+
 	return &AccountUsageService{
 		accountRepo:             accountRepo,
 		usageLogRepo:            usageLogRepo,
@@ -371,7 +377,7 @@ func NewAccountUsageService(
 		geminiQuotaService:      geminiQuotaService,
 		antigravityQuotaFetcher: antigravityQuotaFetcher,
 		grokQuotaFetcher:        grokQuotaFetcher,
-		grokQuotaService:        grokQuotaService,
+		grokQuotaService:        grokQuotaSvc,
 		openAIQuotaService:      openAIQuotaService,
 		cache:                   cache,
 		identityCache:           identityCache,
