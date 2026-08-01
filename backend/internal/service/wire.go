@@ -210,7 +210,6 @@ func ProvideAccountUsageService(
 		geminiQuotaService,
 		antigravityQuotaFetcher,
 		grokQuotaFetcher,
-		grokQuotaService,
 		openAIQuotaService,
 		cache,
 		identityCache,
