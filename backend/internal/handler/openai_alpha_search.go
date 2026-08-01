@@ -84,6 +84,10 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 	}
 
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, requestedModel)
+	if channelMapping.CatalogError != nil {
+		writeCatalogAdmissionError(c, channelMapping.CatalogError)
+		return
+	}
 	forwardBody := openAIModelMappedBody(body, channelMapping.Mapped, channelMapping.MappedModel, h.gatewayService.ReplaceModelInBody)
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
@@ -157,6 +161,9 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 
 		account := selection.Account
 		setOpsSelectedAccount(c, account.ID, account.Platform)
+		if !finalizeCatalogEffectiveModel(c, &channelMapping, account, requestedModel, selection.ReleaseFunc) {
+			return
+		}
 		accountRelease, slotResult := h.acquireResponsesAccountSlot(c, apiKey.GroupID, sessionHash, selection, false, &streamStarted, reqLog)
 		if slotResult == openAISlotAcquireProfitVetoed {
 			// 利润终检否决：排除该账号重新选号；否决次数达上限则按无可用账号终止。

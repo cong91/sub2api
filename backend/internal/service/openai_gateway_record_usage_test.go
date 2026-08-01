@@ -1309,12 +1309,17 @@ func TestOpenAIGatewayServiceRecordUsage_UsesRequestedModelAndUpstreamModelMetad
 	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, nil)
 	serviceTier := "priority"
 	reasoning := "high"
+	groupID := int64(11)
+	apiKey := new(APIKey)
+	apiKey.ID = 10
+	apiKey.GroupID = &groupID
+	apiKey.Group = &Group{ID: groupID, RateMultiplier: 1.2}
 
 	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
 		Result: &OpenAIForwardResult{
 			RequestID:       "resp_billing_model_override",
 			BillingModel:    "gpt-5.1-codex",
-			Model:           "gpt-5.1",
+			Model:           "gpt-5.1-codex",
 			UpstreamModel:   "gpt-5.1-codex",
 			ServiceTier:     &serviceTier,
 			ReasoningEffort: &reasoning,
@@ -1325,16 +1330,21 @@ func TestOpenAIGatewayServiceRecordUsage_UsesRequestedModelAndUpstreamModelMetad
 			Duration:     2 * time.Second,
 			FirstTokenMs: func() *int { v := 120; return &v }(),
 		},
-		APIKey:    &APIKey{ID: 10, GroupID: i64p(11), Group: &Group{ID: 11, RateMultiplier: 1.2}},
+		APIKey:    apiKey,
 		User:      &User{ID: 20},
 		Account:   &Account{ID: 30},
 		UserAgent: "codex-cli/1.0",
 		IPAddress: "127.0.0.1",
+		ChannelUsageFields: ChannelUsageFields{
+			OriginalModel:      "gpt-5.1",
+			ChannelMappedModel: "gpt-5.1-codex",
+			ModelMappingChain:  "gpt-5.1→gpt-5.1-codex",
+		},
 	})
 
 	require.NoError(t, err)
 	require.NotNil(t, usageRepo.lastLog)
-	require.Equal(t, "gpt-5.1", usageRepo.lastLog.Model)
+	require.Equal(t, "gpt-5.1-codex", usageRepo.lastLog.Model)
 	require.Equal(t, "gpt-5.1", usageRepo.lastLog.RequestedModel)
 	require.NotNil(t, usageRepo.lastLog.UpstreamModel)
 	require.Equal(t, "gpt-5.1-codex", *usageRepo.lastLog.UpstreamModel)
@@ -2550,6 +2560,7 @@ func TestGatewayServiceCalculateRecordUsageCost_ChannelImageBillingUsesImageCoun
 		0.15,
 		1.0,
 		nil,
+		nil,
 	)
 
 	require.NotNil(t, cost)
@@ -2589,6 +2600,7 @@ func TestGatewayServiceCalculateRecordUsageCost_ChannelImageBillingUsesSizeTier(
 		1.0,
 		1.0,
 		nil,
+		nil,
 	)
 
 	require.NotNil(t, cost)
@@ -2620,6 +2632,7 @@ func TestGatewayServiceCalculateRecordUsageCost_GroupImagePriceOverridesChannelI
 		"gemini-image",
 		1.0,
 		1.0,
+		nil,
 		nil,
 	)
 
@@ -2683,6 +2696,7 @@ func TestGatewayServiceCalculateRecordUsageCost_ChannelImageBillingNormalizesMis
 		"gemini-image",
 		1.0,
 		1.0,
+		nil,
 		nil,
 	)
 
