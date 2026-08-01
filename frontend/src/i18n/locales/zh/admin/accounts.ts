@@ -370,6 +370,10 @@ export default {
         balanceLow: '余额不足',
         noBalanceEndpoint: '该平台暂无余额查询接口',
         resetSoon: '即将重置',
+        glm: 'GLM',
+        zai: 'Z.ai',
+        minimax: 'MiniMax',
+        opencode: 'OpenCode',
       },
       types: {
         oauth: 'OAuth',

@@ -124,6 +124,10 @@ export default {
         kimi: 'Kimi',
         zhipu: 'Zhipu GLM',
         deepseek: 'DeepSeek',
+        glm: 'GLM',
+        zai: 'Z.ai',
+        minimax: 'MiniMax',
+        opencode: 'OpenCode',
       },
       cnProviders: {
         accountMode: {

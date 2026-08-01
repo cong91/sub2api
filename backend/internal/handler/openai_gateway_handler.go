@@ -172,7 +172,8 @@ func wrapUsageRecordTaskContext(parent context.Context, task service.UsageRecord
 
 func openAICompatibleRequestPlatform(ctx context.Context, apiKey *service.APIKey) string {
 	if platform, ok := service.ResolvedTargetPlatformFromContext(ctx); ok {
-		// 保留 grok 与国产供应商原值，其他归一为 openai（与调度器精确匹配语义一致）。
+		// Preserve every OpenAI-compatible platform identifier so scheduling and
+		// request routing select the same provider-specific account pool.
 		return service.NormalizeOpenAICompatiblePlatform(platform)
 	}
 	if apiKey != nil && apiKey.Group != nil {

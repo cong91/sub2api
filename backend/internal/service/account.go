@@ -314,8 +314,7 @@ func (a *Account) IsKiro() bool {
 // openai/grok 原生走 OpenAI 网关；kimi/zhipu/deepseek 同为 OpenAI Chat Completions
 // 兼容上游，也经 OpenAI 网关转发。
 func (a *Account) IsOpenAICompatible() bool {
-	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok ||
-		a.Platform == PlatformKimi || a.Platform == PlatformZhipu || a.Platform == PlatformDeepseek)
+	return a != nil && IsOpenAICompatiblePlatform(a.Platform)
 }
 
 func (a *Account) GeminiOAuthType() string {
@@ -1311,7 +1310,7 @@ func (a *Account) IsAnthropic() bool {
 }
 
 func (a *Account) IsOpenAIOAuth() bool {
-	return a.IsOpenAI() && a.Type == AccountTypeOAuth
+	return a != nil && IsOpenAICompatiblePlatform(a.Platform) && a.Type == AccountTypeOAuth
 }
 
 func (a *Account) IsOpenAIChatGPTSubscription() bool {
@@ -1335,14 +1334,14 @@ func (a *Account) IsOpenAIPersonalAccessToken() bool {
 }
 
 func (a *Account) IsOpenAIApiKey() bool {
-	return a.IsOpenAI() && a.Type == AccountTypeAPIKey
+	return a != nil && IsOpenAICompatiblePlatform(a.Platform) && a.Type == AccountTypeAPIKey
 }
 
 // GetOpenAIBaseURL 解析 OpenAI 协议族账号的上游 base_url。
 // 适用 openai 与国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）；grok 走 GetGrokBaseURL，
 // 此处对 grok 返回 "" 以保持原有行为。
 func (a *Account) GetOpenAIBaseURL() string {
-	if !a.IsOpenAI() && !a.IsCNProvider() {
+	if a == nil || !IsOpenAICompatiblePlatform(a.Platform) {
 		return ""
 	}
 	if a.IsCNProvider() && a.IsAdaptiveAPIProtocol() {
@@ -1372,7 +1371,7 @@ func (a *Account) GetOpenAIBaseURL() string {
 	case PlatformDeepseek:
 		return DefaultDeepseekBaseURL
 	default:
-		return "https://api.openai.com"
+		return DefaultOpenAICompatibleBaseURL(a.Platform)
 	}
 }
 
@@ -1568,7 +1567,7 @@ func (a *Account) GetCodingPlanProvider() string {
 }
 
 func (a *Account) GetOpenAIAccessToken() string {
-	if !a.IsOpenAI() {
+	if a == nil || !IsOpenAICompatiblePlatform(a.Platform) {
 		return ""
 	}
 	return a.GetCredential("access_token")
@@ -1695,7 +1694,7 @@ func (a *Account) GetOpenAIProtocolAPIKey() string {
 }
 
 func (a *Account) GetOpenAIUserAgent() string {
-	if !a.IsOpenAI() {
+	if a == nil || !IsOpenAICompatiblePlatform(a.Platform) {
 		return ""
 	}
 	return a.GetCredential("user_agent")

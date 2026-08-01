@@ -50,6 +50,11 @@ const (
 	PlatformKimi      = domain.PlatformKimi
 	PlatformZhipu     = domain.PlatformZhipu
 	PlatformDeepseek  = domain.PlatformDeepseek
+	PlatformDeepSeek  = domain.PlatformDeepSeek
+	PlatformGLM       = domain.PlatformGLM
+	PlatformZAI       = domain.PlatformZAI
+	PlatformMiniMax   = domain.PlatformMiniMax
+	PlatformOpenCode  = domain.PlatformOpenCode
 	PlatformComposite = domain.PlatformComposite
 	PlatformKiro      = domain.PlatformKiro
 )
@@ -109,6 +114,10 @@ var AllowedQuotaPlatforms = []string{
 	PlatformKimi,
 	PlatformZhipu,
 	PlatformDeepseek,
+	PlatformGLM,
+	PlatformZAI,
+	PlatformMiniMax,
+	PlatformOpenCode,
 }
 
 // AllowedSchedulingThresholdPlatforms 是允许设置账号自动停调阈值的平台列表。

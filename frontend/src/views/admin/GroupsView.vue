@@ -1612,9 +1612,9 @@
           </p>
         </div>
 
-        <!-- OpenAI Messages 调度配置（仅 openai 平台） -->
+        <!-- OpenAI Messages 调度配置（OpenAI-compatible 平台） -->
         <div
-          v-if="createForm.platform === 'openai'"
+          v-if="supportsOpenAIMessagesDispatch(createForm.platform)"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -3332,9 +3332,9 @@
           </p>
         </div>
 
-        <!-- OpenAI Messages 调度配置（仅 openai 平台） -->
+        <!-- OpenAI Messages 调度配置（OpenAI-compatible 平台） -->
         <div
-          v-if="editForm.platform === 'openai'"
+          v-if="supportsOpenAIMessagesDispatch(editForm.platform)"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -4782,6 +4782,18 @@ const compositeRouteMatchOptions = computed(() => [
   { value: "prefix", label: t("admin.groups.compositeRoutes.match.prefix") },
 ]);
 
+const openAICompatibleMessageDispatchPlatforms = new Set<GroupPlatform>([
+  "openai",
+  "deepseek",
+  "glm",
+  "zai",
+  "minimax",
+  "opencode",
+]);
+
+const supportsOpenAIMessagesDispatch = (platform: GroupPlatform | string) =>
+  openAICompatibleMessageDispatchPlatforms.has(platform as GroupPlatform);
+
 const editStatusOptions = computed(() => [
   { value: "active", label: t("admin.accounts.status.active") },
   { value: "inactive", label: t("admin.accounts.status.inactive") },
@@ -6001,7 +6013,7 @@ const handleCreateGroup = async () => {
         createForm.supported_model_scopes,
       ),
       messages_dispatch_model_config:
-        createForm.platform === "openai"
+        supportsOpenAIMessagesDispatch(createForm.platform)
           ? messagesDispatchFormStateToConfig({
               allow_messages_dispatch: createForm.allow_messages_dispatch,
               opus_mapped_model: createForm.opus_mapped_model,
@@ -6277,7 +6289,7 @@ const handleUpdateGroup = async () => {
         editForm.supported_model_scopes,
       ),
       messages_dispatch_model_config:
-        editForm.platform === "openai"
+        supportsOpenAIMessagesDispatch(editForm.platform)
           ? messagesDispatchFormStateToConfig({
               allow_messages_dispatch: editForm.allow_messages_dispatch,
               opus_mapped_model: editForm.opus_mapped_model,
