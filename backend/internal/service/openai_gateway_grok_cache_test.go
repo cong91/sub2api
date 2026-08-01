@@ -55,7 +55,6 @@ func TestResolveGrokCacheIdentityUsesPreviousResponseIDWhenNoOtherSeed(t *testin
 }
 
 func TestResolveGrokCacheIdentityStableAcrossAppendOnlyTurns(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	c := newGrokCacheTestContext(101)
 	round1 := []byte(`{"model":"grok","instructions":"be concise","tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}],"input":[{"role":"user","content":"first question"}]}`)
 	round2 := []byte(`{"model":"grok","instructions":"be concise","tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}],"input":[{"role":"user","content":"first question"},{"role":"assistant","content":"first answer"},{"role":"user","content":"second question"}]}`)
@@ -69,7 +68,6 @@ func TestResolveGrokCacheIdentityStableAcrossAppendOnlyTurns(t *testing.T) {
 }
 
 func TestResolveGrokCacheIdentityStableAcrossIndependentPromptsWithSamePrefix(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	c := newGrokCacheTestContext(102)
 	firstBody := []byte(`{"model":"grok","instructions":"be concise","tools":[{"type":"function","name":"lookup"}],"input":[{"role":"user","content":"Question A"}]}`)
 	secondBody := []byte(`{"model":"grok","instructions":"be concise","tools":[{"type":"function","name":"lookup"}],"input":[{"role":"user","content":"Question B"}]}`)
@@ -82,7 +80,6 @@ func TestResolveGrokCacheIdentityStableAcrossIndependentPromptsWithSamePrefix(t 
 }
 
 func TestResolveGrokCacheIdentityStablePrefixIsolation(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	baseBody := []byte(`{"model":"grok","instructions":"be concise","tools":[{"type":"function","name":"lookup"}],"input":[{"role":"system","content":"System A"},{"role":"user","content":"Question A"}]}`)
 	differentInstructions := []byte(`{"model":"grok","instructions":"be detailed","tools":[{"type":"function","name":"lookup"}],"input":[{"role":"system","content":"System A"},{"role":"user","content":"Question B"}]}`)
 	differentSystem := []byte(`{"model":"grok","instructions":"be concise","tools":[{"type":"function","name":"lookup"}],"input":[{"role":"system","content":"System B"},{"role":"user","content":"Question B"}]}`)
@@ -97,7 +94,6 @@ func TestResolveGrokCacheIdentityStablePrefixIsolation(t *testing.T) {
 }
 
 func TestResolveGrokCacheIdentityFallsBackWhenStablePrefixIsEmpty(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	c := newGrokCacheTestContext(105)
 	firstBody := []byte(`{"model":"grok","tools":[],"input":"Question A"}`)
 	secondBody := []byte(`{"model":"grok","tools":[],"input":"Question B"}`)
@@ -111,7 +107,6 @@ func TestResolveGrokCacheIdentityFallsBackWhenStablePrefixIsEmpty(t *testing.T) 
 }
 
 func TestResolveGrokCacheIdentitySkipsUnanchoredFallback(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	c := newGrokCacheTestContext(106)
 	tests := [][]byte{
 		[]byte(`{"model":"grok"}`),
@@ -126,7 +121,6 @@ func TestResolveGrokCacheIdentitySkipsUnanchoredFallback(t *testing.T) {
 }
 
 func TestResolveGrokCacheIdentityIsolatesAPIKeyAndMappedModel(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	body := []byte(`{"model":"grok","input":"same prompt"}`)
 
 	base := resolveGrokCacheIdentity(newGrokCacheTestContext(201), body, "", "grok-4.5")
@@ -139,7 +133,6 @@ func TestResolveGrokCacheIdentityIsolatesAPIKeyAndMappedModel(t *testing.T) {
 }
 
 func TestResolveGrokCacheIdentityUsesAndIsolatesNativeConversationHeader(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	c := newGrokCacheTestContext(301)
 	c.Request.Header.Set(grokConversationIDHeader, "raw-native-conversation")
 	body1 := []byte(`{"model":"grok","input":"one"}`)
@@ -155,7 +148,6 @@ func TestResolveGrokCacheIdentityUsesAndIsolatesNativeConversationHeader(t *test
 }
 
 func TestResolveGrokCacheIdentityExplicitHeaderPriority(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	body := []byte(`{"model":"grok","prompt_cache_key":"body-key","input":"hi"}`)
 	c := newGrokCacheTestContext(401)
 	c.Request.Header.Set(grokConversationIDHeader, "grok-key")
@@ -311,7 +303,6 @@ func TestResolveGrokCacheIdentityPrefersClaudeCodeSession(t *testing.T) {
 }
 
 func TestResolveGrokCacheIdentityFailsClosedWithoutAPIKeyContext(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	c := newGrokCacheTestContext(0)
 	c.Request.Header.Set(grokConversationIDHeader, "native-session")
 
@@ -320,7 +311,6 @@ func TestResolveGrokCacheIdentityFailsClosedWithoutAPIKeyContext(t *testing.T) {
 }
 
 func TestGrokConversationHeaderIsScopedToGrokRequestScheduling(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	body := []byte(`{"model":"grok","prompt_cache_key":"body-session","input":"hi"}`)
 
 	grokContext := newGrokCacheTestContext(601)
@@ -1070,7 +1060,6 @@ func TestApplyGrokCacheIdentityWithoutFreeTierRoutingOnlyWritesIdentity(t *testi
 }
 
 func TestGrokCompactRequestSkipsCacheIdentityAndNativeTools(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	c := newGrokCacheTestContext(701)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses/compact", nil)
 	body := []byte(`{"model":"grok","input":"compact this","prompt_cache_key":"raw-client-key"}`)
@@ -1086,7 +1075,6 @@ func TestGrokCompactRequestSkipsCacheIdentityAndNativeTools(t *testing.T) {
 }
 
 func TestResolveGrokCacheIdentityConcurrentDeterminism(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	const workers = 50
 	body := []byte(`{"model":"grok","messages":[{"role":"system","content":"stable"},{"role":"user","content":"hello"}]}`)
 	identities := make(chan string, workers)
