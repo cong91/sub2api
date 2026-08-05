@@ -37,6 +37,30 @@ func TestIsUpstreamModelNotFoundError(t *testing.T) {
 			want:       false,
 		},
 		{
+			name:       "404 model not found message with quoted model id",
+			statusCode: http.StatusNotFound,
+			body:       []byte(`{"error":{"message":"model \"claude-3-5-sonnet-20241022\" is not found"}}`),
+			want:       true,
+		},
+		{
+			name:       "404 endpoint not found with model parameter is not model specific",
+			statusCode: http.StatusNotFound,
+			body:       []byte(`{"error":{"message":"endpoint not found","param":"model"}}`),
+			want:       false,
+		},
+		{
+			name:       "404 endpoint not found with model not found parameter value is not model specific",
+			statusCode: http.StatusNotFound,
+			body:       []byte(`{"error":{"message":"endpoint not found","param":"model_not_found"}}`),
+			want:       false,
+		},
+		{
+			name:       "404 route not found while resolving model endpoint is not model specific",
+			statusCode: http.StatusNotFound,
+			body:       []byte(`{"error":{"message":"route not found while resolving model endpoint"}}`),
+			want:       false,
+		},
+		{
 			name:       "404 arbitrary body is not model specific",
 			statusCode: http.StatusNotFound,
 			body:       []byte(`404 page not found`),
