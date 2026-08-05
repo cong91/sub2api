@@ -27,6 +27,24 @@ func TestBuildAnthropicUpstreamURLVersionedBaseURL(t *testing.T) {
 			path:    "/v1/messages/count_tokens",
 			want:    "https://relay.example.com/anthropic/v1/messages/count_tokens?beta=true",
 		},
+		{
+			name:    "versioned base preserves existing query",
+			baseURL: "https://relay.example.com/v1?tenant=acme",
+			path:    "/v1/messages",
+			want:    "https://relay.example.com/v1/messages?beta=true&tenant=acme",
+		},
+		{
+			name:    "encoded slash in base path remains encoded",
+			baseURL: "https://relay.example.com/tenant%2Fblue/v1?tenant=acme",
+			path:    "/v1/messages",
+			want:    "https://relay.example.com/tenant%2Fblue/v1/messages?beta=true&tenant=acme",
+		},
+		{
+			name:    "existing beta query is overridden",
+			baseURL: "https://relay.example.com/v1?tenant=acme&beta=false",
+			path:    "/v1/messages/count_tokens",
+			want:    "https://relay.example.com/v1/messages/count_tokens?beta=true&tenant=acme",
+		},
 	}
 
 	for _, tt := range tests {

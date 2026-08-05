@@ -271,6 +271,7 @@ func TestRateLimitService_HandleUpstreamError_CustomPolicyExclusionSkipsAllState
 	repo := &modelNotFoundAccountRepoStub{}
 	svc := &RateLimitService{accountRepo: repo}
 	account := openAIModelNotFoundTempAccount()
+	account.Credentials["pool_mode"] = true
 	account.Credentials["custom_error_codes_enabled"] = true
 	account.Credentials["custom_error_codes"] = []any{float64(http.StatusServiceUnavailable)}
 
@@ -279,7 +280,7 @@ func TestRateLimitService_HandleUpstreamError_CustomPolicyExclusionSkipsAllState
 		account,
 		http.StatusNotFound,
 		http.Header{},
-		[]byte(`{"error":{"message":"endpoint not found"}}`),
+		[]byte(`{"error":{"type":"model_not_found","code":"model_not_found","message":"requested model was not found"}}`),
 		"gpt-5.4",
 	)
 

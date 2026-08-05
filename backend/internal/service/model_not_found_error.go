@@ -1,21 +1,67 @@
 package service
 
 import (
+	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
-var upstreamModelNotFoundKeywords = []string{"model not found", "unknown model", "not found"}
+var upstreamModelNotFoundKeywords = []string{
+	"model not found",
+	"unknown model",
+	"model was not found",
+	"model is not found",
+	"model does not exist",
+}
+
+var quotedModelNotFoundPattern = regexp.MustCompile("(?i)\\bmodel\\s+(?:\\\"[^\\\"]+\\\"|'[^']+'|`[^`]+`)\\s+(?:(?:is|was)\\s+)?not\\s+found\\b")
 
 func isUpstreamModelNotFoundError(statusCode int, body []byte) bool {
-	if statusCode != http.StatusNotFound {
+	if statusCode != http.StatusNotFound || len(body) == 0 {
 		return false
 	}
-	normalized := normalizeModelNotFoundBody(body)
-	if normalized == "" || !strings.Contains(normalized, "model") {
-		return false
+
+	var payload any
+	if err := json.Unmarshal(body, &payload); err == nil {
+		return hasSemanticModelNotFoundError(payload)
 	}
-	return containsModelNotFoundKeyword(normalized)
+	return isSemanticModelNotFoundMessage(string(body))
+}
+
+func hasSemanticModelNotFoundError(payload any) bool {
+	switch value := payload.(type) {
+	case string:
+		return isSemanticModelNotFoundMessage(value)
+	case map[string]any:
+		for _, field := range []string{"type", "code"} {
+			if identifier, ok := value[field].(string); ok && isModelNotFoundIdentifier(identifier) {
+				return true
+			}
+		}
+		for _, field := range []string{"message", "detail"} {
+			if message, ok := value[field].(string); ok && isSemanticModelNotFoundMessage(message) {
+				return true
+			}
+		}
+		if nestedError, ok := value["error"]; ok {
+			return hasSemanticModelNotFoundError(nestedError)
+		}
+	}
+	return false
+}
+
+func isModelNotFoundIdentifier(identifier string) bool {
+	normalizedIdentifier := normalizeModelNotFoundText(identifier)
+	return normalizedIdentifier == "model not found" || normalizedIdentifier == "model not found error"
+}
+
+func isSemanticModelNotFoundMessage(message string) bool {
+	normalizedMessage := normalizeModelNotFoundText(message)
+	if containsModelNotFoundKeyword(normalizedMessage) {
+		return true
+	}
+	return quotedModelNotFoundPattern.MatchString(message)
 }
 
 func isModelNotFoundError(statusCode int, body []byte) bool {
@@ -62,7 +108,11 @@ func normalizeModelNotFoundBody(body []byte) string {
 	if len(body) == 0 {
 		return ""
 	}
-	normalized := strings.ToLower(string(body))
+	return normalizeModelNotFoundText(string(body))
+}
+
+func normalizeModelNotFoundText(value string) string {
+	normalized := strings.ToLower(value)
 	normalized = strings.NewReplacer("_", " ", "-", " ", "\n", " ", "\r", " ", "\t", " ").Replace(normalized)
 	return strings.Join(strings.Fields(normalized), " ")
 }
