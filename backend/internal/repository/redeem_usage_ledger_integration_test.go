@@ -293,6 +293,9 @@ func (noopUserSubscriptionRepository) Create(context.Context, *service.UserSubsc
 func (noopUserSubscriptionRepository) GetByID(context.Context, int64) (*service.UserSubscription, error) {
 	panic("unexpected call")
 }
+func (noopUserSubscriptionRepository) GetByIDForUpdate(context.Context, int64) (*service.UserSubscription, error) {
+	panic("unexpected call")
+}
 func (noopUserSubscriptionRepository) GetByIDIncludeDeleted(context.Context, int64) (*service.UserSubscription, error) {
 	panic("unexpected call")
 }
