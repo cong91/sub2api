@@ -33,6 +33,10 @@ func (r *subscriptionScopeRepoStub) GetByID(_ context.Context, id int64) (*servi
 	return &cp, nil
 }
 
+func (r *subscriptionScopeRepoStub) GetByIDForUpdate(ctx context.Context, id int64) (*service.UserSubscription, error) {
+	return r.GetByID(ctx, id)
+}
+
 func (r *subscriptionScopeRepoStub) GetByIDIncludeDeleted(ctx context.Context, id int64) (*service.UserSubscription, error) {
 	return r.GetByID(ctx, id)
 }
