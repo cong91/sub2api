@@ -41,6 +41,37 @@ func orderedResponseBillingModels(t *testing.T, svc *BillingService, tokens Usag
 	return b, a, costB, costA
 }
 
+func responseModelBillingCatalogDecision(t *testing.T, platform string) *CatalogDecision {
+	t.Helper()
+	pricing := LiteLLMModelPricing{
+		InputCostPerToken:  0.001,
+		OutputCostPerToken: 0.002,
+	}
+	now := time.Unix(3_000, 0).UTC()
+	snapshot, err := NewCatalogRuntimeSnapshot(CatalogSnapshotSpec{
+		Scope: "*", Epoch: 9, RevisionID: 91, Revision: 1, Checksum: "response-model-pinned-pricing",
+		VerifiedAt: now,
+		Models: []CatalogSnapshotModelSpec{{
+			ID: 12, RevisionID: 22, CanonicalKey: "catalog/model-effective",
+			OperatorState: CatalogOperatorStateEnabled, SourceState: CatalogSourceStatePresent,
+			Provider: "catalog", Platform: platform, PricingSchemaVersion: 1,
+			PricingValid: true, PricingSource: "catalog-source", Pricing: &pricing,
+		}},
+	})
+	require.NoError(t, err)
+	return &CatalogDecision{
+		Requested: CatalogModelDecision{ID: 11, RevisionID: 21, CatalogRevisionID: 91, CatalogEpoch: 9},
+		Effective: CatalogModelDecision{
+			ID: 12, RevisionID: 22, CatalogRevisionID: 91, CatalogEpoch: 9,
+			PricingSource: "catalog-source", Pricing: pricing, PricingSchemaVersion: 1, HasPricing: true,
+		},
+		View: snapshot.readView(), CreatedAt: now,
+	}
+}
+
+// 100*0.001 + 50*0.002 = 0.2; the default 1.1 multiplier yields 0.22.
+const responseModelBillingPinnedCatalogActualCost = 0.22
+
 // --- Anthropic gateway (GatewayService.RecordUsage) ---
 
 func TestGatewayServiceRecordUsage_ResponseModelBillsCheaperResponseModel(t *testing.T) {
@@ -81,6 +112,42 @@ func TestGatewayServiceRecordUsage_ResponseModelBillsCheaperResponseModel(t *tes
 	require.Equal(t, cheaper, *usageRepo.lastLog.UpstreamResponseModel)
 	require.NotNil(t, usageRepo.lastLog.UpstreamModelMismatch)
 	require.True(t, *usageRepo.lastLog.UpstreamModelMismatch)
+}
+
+func TestGatewayServiceRecordUsage_CatalogPricingIgnoresCheaperResponseModel(t *testing.T) {
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	userRepo := &openAIRecordUsageUserRepoStub{}
+	svc := newGatewayRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{})
+	svc.resolver = NewModelPricingResolver(nil, svc.billingService)
+
+	apiKey := new(APIKey)
+	apiKey.ID = 501
+	apiKey.Quota = 100
+
+	err := svc.RecordUsage(context.Background(), &RecordUsageInput{
+		Result: &ForwardResult{
+			RequestID:             "gateway_catalog_ignores_response_model",
+			Usage:                 ClaudeUsage{InputTokens: 100, OutputTokens: 50},
+			Model:                 "catalog/model-effective",
+			UpstreamResponseModel: anthropicCheapFixtureModel,
+			Duration:              time.Second,
+		},
+		APIKey:  apiKey,
+		User:    &User{ID: 601},
+		Account: &Account{ID: 701},
+		ChannelUsageFields: ChannelUsageFields{
+			ChannelID:          9,
+			OriginalModel:      "catalog/model-requested",
+			ChannelMappedModel: "catalog/model-effective",
+			BillingModelSource: BillingModelSourceResponse,
+			CatalogDecision:    responseModelBillingCatalogDecision(t, PlatformAnthropic),
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, usageRepo.lastLog)
+	require.InDelta(t, responseModelBillingPinnedCatalogActualCost, usageRepo.lastLog.ActualCost, 1e-12)
+	require.InDelta(t, responseModelBillingPinnedCatalogActualCost, userRepo.lastAmount, 1e-12)
 }
 
 func TestGatewayServiceRecordUsage_ResponseModelRejectsPricierResponseModel(t *testing.T) {
@@ -221,6 +288,48 @@ func TestOpenAIGatewayServiceRecordUsage_ResponseModelBillsCheaperResponseModel(
 	require.Equal(t, cheaper, *usageRepo.lastLog.UpstreamResponseModel)
 	require.NotNil(t, usageRepo.lastLog.UpstreamModelMismatch)
 	require.True(t, *usageRepo.lastLog.UpstreamModelMismatch)
+}
+
+func TestOpenAIGatewayServiceRecordUsage_CatalogPricingIgnoresCheaperResponseModel(t *testing.T) {
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	userRepo := &openAIRecordUsageUserRepoStub{}
+	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{}, nil)
+	channelService := NewChannelService(nil, nil, nil, nil)
+	channelCache := newEmptyChannelCache()
+	channelCache.loadedAt = time.Now()
+	channelService.cache.Store(channelCache)
+	svc.channelService = channelService
+	svc.resolver = NewModelPricingResolver(channelService, svc.billingService)
+	apiKey := new(APIKey)
+	apiKey.ID = 501
+	apiKey.Quota = 100
+	apiKey.Group = &Group{ID: 13}
+
+	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+		Result: &OpenAIForwardResult{
+			RequestID:             "openai_catalog_ignores_response_model",
+			Model:                 "catalog/model-effective",
+			UpstreamModel:         "catalog/model-effective",
+			UpstreamResponseModel: openAICheapFixtureModel,
+			Usage:                 OpenAIUsage{InputTokens: 100, OutputTokens: 50},
+			Duration:              time.Second,
+		},
+		APIKey:  apiKey,
+		User:    &User{ID: 20},
+		Account: &Account{ID: 30},
+		ChannelUsageFields: ChannelUsageFields{
+			ChannelID:          9,
+			OriginalModel:      "catalog/model-requested",
+			ChannelMappedModel: "catalog/model-effective",
+			BillingModelSource: BillingModelSourceResponse,
+			CatalogDecision:    responseModelBillingCatalogDecision(t, PlatformOpenAI),
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, usageRepo.lastLog)
+	require.InDelta(t, responseModelBillingPinnedCatalogActualCost, usageRepo.lastLog.ActualCost, 1e-12)
+	require.InDelta(t, responseModelBillingPinnedCatalogActualCost, userRepo.lastAmount, 1e-12)
 }
 
 func TestOpenAIGatewayServiceRecordUsage_ResponseModelRejectsPricierResponseModel(t *testing.T) {
