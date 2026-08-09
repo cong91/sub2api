@@ -335,10 +335,10 @@ func (noopUserSubscriptionRepository) ExtendExpiry(context.Context, int64, time.
 }
 func (noopUserSubscriptionRepository) UpdateStatus(context.Context, int64, string) error { return nil }
 func (noopUserSubscriptionRepository) UpdateNotes(context.Context, int64, string) error  { return nil }
-func (noopUserSubscriptionRepository) ActivateWindows(context.Context, int64, time.Time) error {
+func (noopUserSubscriptionRepository) ActivateWindows(context.Context, int64, time.Time, time.Time) error {
 	return nil
 }
-func (noopUserSubscriptionRepository) ResetUsageWindows(context.Context, int64, bool, bool, bool, time.Time) error {
+func (noopUserSubscriptionRepository) ResetUsageWindows(context.Context, int64, bool, bool, bool, time.Time, time.Time) error {
 	return nil
 }
 func (noopUserSubscriptionRepository) ResetDailyUsage(context.Context, int64, *time.Time, time.Time) error {

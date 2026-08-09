@@ -1603,7 +1603,7 @@ func TestAPIKeyAuthAutoSwitchesExpiredBootstrapSubscriptionKeyToNewSubscription(
 			}, nil
 		},
 		updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
-		activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
+		activateWindow: func(ctx context.Context, id int64, dailyStart, periodicStart time.Time) error { return nil },
 		resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
@@ -1710,7 +1710,7 @@ func TestAPIKeyAuthAutoSwitchesExpiredBootstrapSubscriptionKeyToBalanceGroup(t *
 			}, nil
 		},
 		updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
-		activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
+		activateWindow: func(ctx context.Context, id int64, dailyStart, periodicStart time.Time) error { return nil },
 		resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
@@ -1814,7 +1814,7 @@ func TestAPIKeyAuthDoesNotRebindAcrossProviderPlatforms(t *testing.T) {
 			}, nil
 		},
 		updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
-		activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
+		activateWindow: func(ctx context.Context, id int64, dailyStart, periodicStart time.Time) error { return nil },
 		resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
@@ -1905,7 +1905,7 @@ func TestAPIKeyAuthGoogleDoesNotRebindAcrossProviderPlatforms(t *testing.T) {
 			}, nil
 		},
 		updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
-		activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
+		activateWindow: func(ctx context.Context, id int64, dailyStart, periodicStart time.Time) error { return nil },
 		resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
@@ -2013,7 +2013,7 @@ func TestAPIKeyAuthGoogleAutoSwitchesExhaustedSubscriptionToActiveSubscriptionWh
 			return []service.UserSubscription{exhaustedSubscription, activeSubscription}, nil
 		},
 		updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
-		activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
+		activateWindow: func(ctx context.Context, id int64, dailyStart, periodicStart time.Time) error { return nil },
 		resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
@@ -2239,7 +2239,7 @@ func TestAPIKeyAuthAutoSwitchesBalanceKeyToActiveSubscriptionWhenBalanceEmpty(t 
 			return []service.UserSubscription{subscription}, nil
 		},
 		updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
-		activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
+		activateWindow: func(ctx context.Context, id int64, dailyStart, periodicStart time.Time) error { return nil },
 		resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
@@ -2411,7 +2411,7 @@ func TestAPIKeyAuthAutoSwitchesExhaustedSubscriptionToActiveSubscriptionWhenBala
 			return []service.UserSubscription{exhaustedSubscription, activeSubscription}, nil
 		},
 		updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
-		activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
+		activateWindow: func(ctx context.Context, id int64, dailyStart, periodicStart time.Time) error { return nil },
 		resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
@@ -2567,7 +2567,7 @@ func TestAPIKeyAuthAutoSwitchesSubscriptionLimitToFallbackGroup(t *testing.T) {
 			return []service.UserSubscription{subscription}, nil
 		},
 		updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
-		activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
+		activateWindow: func(ctx context.Context, id int64, dailyStart, periodicStart time.Time) error { return nil },
 		resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
@@ -2737,7 +2737,7 @@ func runAPIKeyAuthBrokenSubscriptionToBalanceGroup(t *testing.T, google bool, mi
 			return []service.UserSubscription{expiredSubscription}, nil
 		},
 		updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
-		activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
+		activateWindow: func(ctx context.Context, id int64, dailyStart, periodicStart time.Time) error { return nil },
 		resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
 		resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
