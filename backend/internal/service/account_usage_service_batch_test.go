@@ -100,6 +100,9 @@ func (r *usageBatchLogRepoStub) GetUserUsageTrendByUserID(context.Context, int64
 func (r *usageBatchLogRepoStub) GetUserModelStats(context.Context, int64, time.Time, time.Time) ([]usagestats.ModelStat, error) {
 	return nil, nil
 }
+func (r *usageBatchLogRepoStub) GetUserCreditUsageSummary(context.Context, int64) (*usagestats.CreditUsageSummary, error) {
+	return nil, nil
+}
 func (r *usageBatchLogRepoStub) ListWithFilters(context.Context, pagination.PaginationParams, usagestats.UsageLogFilters) ([]UsageLog, *pagination.PaginationResult, error) {
 	return nil, nil, nil
 }
