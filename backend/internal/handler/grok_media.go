@@ -654,6 +654,13 @@ func firstNonEmptyString(values ...string) string {
 	return ""
 }
 
+func grokMediaUpstreamModel(result *service.OpenAIForwardResult) string {
+	if result == nil {
+		return ""
+	}
+	return result.UpstreamModel
+}
+
 func recordGrokMediaUsage(
 	c *gin.Context,
 	h *OpenAIGatewayHandler,
@@ -678,7 +685,7 @@ func recordGrokMediaUsage(
 	inboundEndpoint := GetInboundEndpoint(c)
 	upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
 	quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
-	channelUsageFields := clientRequestedUsageFields(c, channelMapping, requestModel, result.UpstreamModel)
+	channelUsageFields := clientRequestedUsageFields(c, channelMapping, requestModel, grokMediaUpstreamModel(result))
 	// Async video: force durable task request id and release claim if billing fails.
 	videoTaskID := ""
 	if result != nil && result.VideoCount > 0 {

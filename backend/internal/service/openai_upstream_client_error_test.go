@@ -197,7 +197,7 @@ func TestHandleErrorResponse_PassthroughRuleStillWinsOver400Branch(t *testing.T)
 	c, rec := newOpenAIUpstreamErrorTestContext(t)
 	ruleSvc := &ErrorPassthroughService{}
 	ruleSvc.setLocalCache([]*model.ErrorPassthroughRule{
-		newNonFailoverPassthroughRule(http.StatusBadRequest, "automation_update", http.StatusTeapot, "自定义文案"),
+		newNonFailoverPassthroughRule(http.StatusBadRequest, "automation_update", http.StatusTeapot, "custom passthrough message"),
 	})
 	BindErrorPassthroughService(c, ruleSvc)
 	svc := &OpenAIGatewayService{cfg: &config.Config{}}
@@ -210,7 +210,7 @@ func TestHandleErrorResponse_PassthroughRuleStillWinsOver400Branch(t *testing.T)
 
 	require.Error(t, err)
 	require.Equal(t, http.StatusTeapot, rec.Code, "命中透传规则时必须按规则的状态码回写")
-	require.Equal(t, "自定义文案", gjson.Get(rec.Body.String(), "error.message").String())
+	require.Equal(t, "custom passthrough message", gjson.Get(rec.Body.String(), "error.message").String())
 }
 
 func TestIsOpenAIDeterministicClientError(t *testing.T) {
