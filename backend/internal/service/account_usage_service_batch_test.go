@@ -101,7 +101,7 @@ func (r *usageBatchLogRepoStub) GetUserModelStats(context.Context, int64, time.T
 	return nil, nil
 }
 func (r *usageBatchLogRepoStub) GetUserCreditUsageSummary(context.Context, int64) (*usagestats.CreditUsageSummary, error) {
-	return &usagestats.CreditUsageSummary{}, nil
+	return nil, nil
 }
 func (r *usageBatchLogRepoStub) ListWithFilters(context.Context, pagination.PaginationParams, usagestats.UsageLogFilters) ([]UsageLog, *pagination.PaginationResult, error) {
 	return nil, nil, nil
