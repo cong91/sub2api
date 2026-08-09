@@ -243,7 +243,7 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
   // namespace 摊平是仅 OAuth 的兼容开关：API Key 走 chat completions 回退桥时由桥自行摊平
   it('shows the Codex namespace flatten toggle only for OpenAI OAuth accounts', async () => {
     const wrapper = mountModal()
-    await selectButtonByText(wrapper, 'OpenAI')
+    await selectButtonByText(wrapper, 'admin.accounts.platforms.openai')
 
     expect(wrapper.find('[data-testid="create-openai-flatten-namespaces-toggle"]').exists()).toBe(
       true
@@ -378,7 +378,7 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     // antigravity upstream 走独立创建 helper，
     // 也必须与其余 API-key 平台一样默认开启探测并传递开关。
     const wrapper = mountModal()
-    await selectButtonByText(wrapper, 'Antigravity')
+    await selectButtonByText(wrapper, 'admin.accounts.platforms.antigravity')
     await selectButtonByText(wrapper, 'admin.accounts.types.antigravityApikey')
     await wrapper.get('form#create-account-form input[type="text"]').setValue('antigravity relay')
     const baseInput = wrapper
