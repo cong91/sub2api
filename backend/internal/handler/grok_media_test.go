@@ -85,6 +85,13 @@ func TestShouldRecordGrokMediaUsage(t *testing.T) {
 	}
 }
 
+func TestGrokMediaUpstreamModel(t *testing.T) {
+	require.Empty(t, grokMediaUpstreamModel(nil))
+	require.Equal(t, "grok-imagine-video", grokMediaUpstreamModel(&service.OpenAIForwardResult{
+		UpstreamModel: "grok-imagine-video",
+	}))
+}
+
 func TestGrokMediaRequiredCapability(t *testing.T) {
 	tests := []struct {
 		name     string
