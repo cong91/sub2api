@@ -98,11 +98,11 @@ func (r *subscriptionScopeRepoStub) UpdateNotes(context.Context, int64, string) 
 	panic("unexpected UpdateNotes call")
 }
 
-func (r *subscriptionScopeRepoStub) ActivateWindows(context.Context, int64, time.Time) error {
+func (r *subscriptionScopeRepoStub) ActivateWindows(context.Context, int64, time.Time, time.Time) error {
 	panic("unexpected ActivateWindows call")
 }
 
-func (r *subscriptionScopeRepoStub) ResetUsageWindows(context.Context, int64, bool, bool, bool, time.Time) error {
+func (r *subscriptionScopeRepoStub) ResetUsageWindows(context.Context, int64, bool, bool, bool, time.Time, time.Time) error {
 	panic("unexpected ResetUsageWindows call")
 }
 
