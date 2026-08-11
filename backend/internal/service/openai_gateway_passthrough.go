@@ -897,6 +897,40 @@ func isOpenAIUpstreamCapacityShedEvent(payload []byte) bool {
 // 客户端内置的退避重试。
 const openAICapacityShedRetryableClientCode = "server_error"
 
+const openAICapacityShedFailureReason GatewayFailureReason = "openai_capacity_shed"
+
+func logOpenAICapacityShedDecision(
+	ctx context.Context,
+	account *Account,
+	upstreamRequestID string,
+	payload []byte,
+	clientOutputStarted bool,
+	decision string,
+	retryableOnSameAccount bool,
+) {
+	if !isOpenAIUpstreamCapacityShedEvent(payload) {
+		return
+	}
+
+	fields := []zap.Field{
+		zap.String("upstream_request_id", truncateString(strings.TrimSpace(upstreamRequestID), 256)),
+		zap.String("upstream_error_code", openAIStreamFailedEventErrorCode(payload)),
+		zap.String("upstream_error_message", truncateString(extractOpenAISSEErrorMessage(payload), 512)),
+		zap.Bool("client_output_started", clientOutputStarted),
+		zap.Bool("retryable_on_same_account", retryableOnSameAccount),
+		zap.String("decision", decision),
+	}
+	if account != nil {
+		fields = append(fields,
+			zap.Int64("account_id", account.ID),
+			zap.String("account_name", account.Name),
+			zap.String("platform", account.Platform),
+			zap.String("account_type", account.Type),
+		)
+	}
+	logger.FromContext(ctx).Warn("openai.capacity_shed_decision", fields...)
+}
+
 // sanitizeOpenAICapacityShedErrorCodeForClient 把即将写给下游客户端的
 // error / response.failed 事件中的容量降载错误码改写为客户端可重试的错误码。
 // 走到转发这一步说明网关侧 failover 已不可用（流中途）或已用尽；保留原始降载码
@@ -1131,6 +1165,11 @@ func (s *OpenAIGatewayService) recordOpenAIStreamUpstreamError(
 			Message:            message,
 			Detail:             detail,
 		}
+		if isOpenAIUpstreamCapacityShedEvent(payload) {
+			event.Stage = string(GatewayFailureStageInference)
+			event.Scope = string(GatewayFailureScopeRequest)
+			event.Reason = string(openAICapacityShedFailureReason)
+		}
 		if account != nil {
 			event.Platform = account.Platform
 			event.AccountID = account.ID
@@ -1173,12 +1212,34 @@ func (s *OpenAIGatewayService) newOpenAIStreamFailoverError(
 			"message": message,
 		},
 	})
+	retryableOnSameAccount := openAIStreamFailedEventRetryableOnSameAccount(account, payload, message)
+	requestScopedTransient := isOpenAIUpstreamCapacityShedEvent(payload)
+	stage := GatewayFailureStage("")
+	scope := GatewayFailureScope("")
+	reason := GatewayFailureReason("")
+	if requestScopedTransient {
+		stage = GatewayFailureStageInference
+		scope = GatewayFailureScopeRequest
+		reason = openAICapacityShedFailureReason
+		logOpenAICapacityShedDecision(
+			c.Request.Context(),
+			account,
+			upstreamRequestID,
+			payload,
+			false,
+			"pre_output_failover",
+			retryableOnSameAccount,
+		)
+	}
 	return &UpstreamFailoverError{
 		StatusCode:             statusCode,
 		ResponseBody:           body,
 		ResponseHeaders:        headers,
-		RetryableOnSameAccount: openAIStreamFailedEventRetryableOnSameAccount(account, payload, message),
-		RequestScopedTransient: isOpenAIUpstreamCapacityShedEvent(payload),
+		RetryableOnSameAccount: retryableOnSameAccount,
+		RequestScopedTransient: requestScopedTransient,
+		Stage:                  stage,
+		Scope:                  scope,
+		Reason:                 reason,
 	}
 }
 
@@ -1323,7 +1384,8 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 						UpstreamOutTok: usage.OutputTokens,
 					})
 				}
-				if !openAIStreamClientOutputStarted(c, clientOutputStarted) {
+				clientOutputStartedForDecision := openAIStreamClientOutputStarted(c, clientOutputStarted)
+				if !clientOutputStartedForDecision {
 					if status, errType, errMsg, matched := applyOpenAIStreamFailedErrorPassthroughRule(c, account.Platform, dataBytes, failedMessage); matched {
 						// 命中透传规则也要记录 ops 上游错误事件（对齐 CC/Messages 与
 						// antigravity 先例），否则透传命中的 failed 在监控中不可见。
@@ -1342,6 +1404,17 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 						return resultWithUsage(),
 							s.newOpenAIStreamFailoverError(c, account, true, upstreamRequestID, dataBytes, failedMessage, resp.Header)
 					}
+				}
+				if clientOutputStartedForDecision && isOpenAIUpstreamCapacityShedEvent(dataBytes) {
+					logOpenAICapacityShedDecision(
+						ctx,
+						account,
+						upstreamRequestID,
+						dataBytes,
+						true,
+						"post_output_forward_sanitized_error",
+						false,
+					)
 				}
 				forceFlushFailedEvent = true
 				sawFailedEvent = true
