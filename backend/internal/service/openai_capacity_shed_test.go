@@ -11,9 +11,12 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 // --- mock: 只记录临时不可调度写入，其余方法不应被调用 ---
@@ -111,9 +114,11 @@ func TestOpenAIStreamCapacityShedErrorFramePrecedingFailedStillFailsOver(t *test
 	}
 	svc := &OpenAIGatewayService{cfg: cfg}
 
+	core, observedLogs := observer.New(zap.WarnLevel)
+	requestCtx := logger.IntoContext(context.Background(), zap.New(core))
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
-	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil).WithContext(requestCtx)
 
 	resp := &http.Response{
 		StatusCode: http.StatusOK,
@@ -140,8 +145,34 @@ func TestOpenAIStreamCapacityShedErrorFramePrecedingFailedStillFailsOver(t *test
 	require.ErrorAs(t, err, &failoverErr)
 	require.True(t, failoverErr.RetryableOnSameAccount)
 	require.True(t, failoverErr.RequestScopedTransient)
+	require.Equal(t, GatewayFailureStageInference, failoverErr.Stage)
+	require.Equal(t, GatewayFailureScopeRequest, failoverErr.Scope)
+	require.Equal(t, GatewayFailureReason("openai_capacity_shed"), failoverErr.Reason)
 	require.False(t, c.Writer.Written())
 	require.Empty(t, rec.Body.String())
+
+	entries := observedLogs.FilterMessage("openai.capacity_shed_decision").All()
+	require.Len(t, entries, 1)
+	fields := entries[0].ContextMap()
+	require.Equal(t, "pre_output_failover", fields["decision"])
+	require.Equal(t, int64(1), fields["account_id"])
+	require.Equal(t, "acc", fields["account_name"])
+	require.Equal(t, PlatformOpenAI, fields["platform"])
+	require.Equal(t, "rid-shed-error-then-failed", fields["upstream_request_id"])
+	require.Equal(t, "server_is_overloaded", fields["upstream_error_code"])
+	require.Equal(t, false, fields["client_output_started"])
+	require.Equal(t, true, fields["retryable_on_same_account"])
+
+	opsValue, ok := c.Get(OpsUpstreamErrorsKey)
+	require.True(t, ok)
+	opsEvents, ok := opsValue.([]*OpsUpstreamErrorEvent)
+	require.True(t, ok)
+	require.NotEmpty(t, opsEvents)
+	lastOpsEvent := opsEvents[len(opsEvents)-1]
+	require.Equal(t, string(GatewayFailureStageInference), lastOpsEvent.Stage)
+	require.Equal(t, string(GatewayFailureScopeRequest), lastOpsEvent.Scope)
+	require.Equal(t, "openai_capacity_shed", lastOpsEvent.Reason)
+	require.Equal(t, "rid-shed-error-then-failed", lastOpsEvent.UpstreamRequestID)
 }
 
 // 流中途（已有真实输出）降载时无法再 failover，此时必须把降载码改写为客户端
@@ -154,9 +185,11 @@ func TestOpenAIStreamCapacityShedAfterOutputRewritesCodeForClient(t *testing.T) 
 	}
 	svc := &OpenAIGatewayService{cfg: cfg}
 
+	core, observedLogs := observer.New(zap.WarnLevel)
+	requestCtx := logger.IntoContext(context.Background(), zap.New(core))
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
-	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil).WithContext(requestCtx)
 
 	resp := &http.Response{
 		StatusCode: http.StatusOK,
@@ -188,6 +221,15 @@ func TestOpenAIStreamCapacityShedAfterOutputRewritesCodeForClient(t *testing.T) 
 	require.Contains(t, body, `"code":"server_error"`)
 	require.NotContains(t, body, "server_is_overloaded")
 	require.Contains(t, body, "Our servers are currently overloaded")
+
+	entries := observedLogs.FilterMessage("openai.capacity_shed_decision").All()
+	require.Len(t, entries, 1)
+	fields := entries[0].ContextMap()
+	require.Equal(t, "post_output_forward_sanitized_error", fields["decision"])
+	require.Equal(t, "rid-shed-after-output", fields["upstream_request_id"])
+	require.Equal(t, "server_is_overloaded", fields["upstream_error_code"])
+	require.Equal(t, true, fields["client_output_started"])
+	require.Equal(t, false, fields["retryable_on_same_account"])
 }
 
 // helper 单测：只有降载码被改写，其余错误码（尤其 rate_limit_exceeded，客户端

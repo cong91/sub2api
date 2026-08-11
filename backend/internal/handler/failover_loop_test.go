@@ -7,10 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 // ---------------------------------------------------------------------------
@@ -385,6 +388,46 @@ func TestHandleFailoverError_CacheBilling(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestHandleFailoverError_SameAccountRetry(t *testing.T) {
+	t.Run("capacity shed log explains retry and switch decisions", func(t *testing.T) {
+		core, observedLogs := observer.New(zap.WarnLevel)
+		ctx := logger.IntoContext(context.Background(), zap.New(core))
+		mock := &mockTempUnscheduler{}
+		fs := NewFailoverState(3, false)
+		err := &service.UpstreamFailoverError{
+			StatusCode:             http.StatusServiceUnavailable,
+			ResponseHeaders:        http.Header{"X-Request-Id": []string{"rid-capacity-shed"}},
+			RetryableOnSameAccount: true,
+			RequestScopedTransient: true,
+			Stage:                  service.GatewayFailureStageInference,
+			Scope:                  service.GatewayFailureScopeRequest,
+			Reason:                 service.GatewayFailureReason("openai_capacity_shed"),
+		}
+
+		action := fs.HandleFailoverError(ctx, mock, 100, service.PlatformOpenAI, 1, err)
+		require.Equal(t, FailoverContinue, action)
+
+		retryEntries := observedLogs.FilterMessage("gateway.failover_same_account_retry").All()
+		require.Len(t, retryEntries, 1)
+		retryFields := retryEntries[0].ContextMap()
+		require.Equal(t, "retry_same_account", retryFields["decision"])
+		require.Equal(t, service.PlatformOpenAI, retryFields["platform"])
+		require.Equal(t, "openai_capacity_shed", retryFields["failure_reason"])
+		require.Equal(t, "request", retryFields["failure_scope"])
+		require.Equal(t, "rid-capacity-shed", retryFields["upstream_request_id"])
+		require.Equal(t, true, retryFields["request_scoped_transient"])
+
+		action = fs.HandleFailoverError(ctx, mock, 100, service.PlatformOpenAI, 1, err)
+		require.Equal(t, FailoverContinue, action)
+		switchEntries := observedLogs.FilterMessage("gateway.failover_switch_account").All()
+		require.Len(t, switchEntries, 1)
+		switchFields := switchEntries[0].ContextMap()
+		require.Equal(t, "switch_account", switchFields["decision"])
+		require.Equal(t, int64(100), switchFields["account_id"])
+		require.Equal(t, int64(1), switchFields["switch_count"])
+		require.Equal(t, int64(1), switchFields["failed_account_count"])
+		require.Equal(t, "rid-capacity-shed", switchFields["upstream_request_id"])
+	})
+
 	t.Run("第一次重试返回FailoverContinue", func(t *testing.T) {
 		mock := &mockTempUnscheduler{}
 		fs := NewFailoverState(3, false)
