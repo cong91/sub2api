@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -119,6 +120,38 @@ func (s *FailoverState) allExclusionsAreProfitVetoed() bool {
 	return true
 }
 
+func (s *FailoverState) failoverDecisionLogFields(
+	decision string,
+	accountID int64,
+	platform string,
+	retryLimit int,
+	failoverErr *service.UpstreamFailoverError,
+) []zap.Field {
+	fields := []zap.Field{
+		zap.String("decision", decision),
+		zap.Int64("account_id", accountID),
+		zap.String("platform", platform),
+		zap.Int("same_account_retry_count", s.SameAccountRetryCount[accountID]),
+		zap.Int("same_account_retry_max", retryLimit),
+		zap.Int("switch_count", s.SwitchCount),
+		zap.Int("max_switches", s.MaxSwitches),
+		zap.Int("failed_account_count", len(s.FailedAccountIDs)),
+	}
+	if failoverErr == nil {
+		return fields
+	}
+	return append(fields,
+		zap.Int("upstream_status", failoverErr.StatusCode),
+		zap.String("failure_stage", string(failoverErr.Stage)),
+		zap.String("failure_scope", string(failoverErr.Scope)),
+		zap.String("failure_reason", string(failoverErr.Reason)),
+		zap.String("upstream_request_id", strings.TrimSpace(failoverErr.ResponseHeaders.Get("x-request-id"))),
+		zap.Bool("retryable_on_same_account", failoverErr.RetryableOnSameAccount),
+		zap.Bool("request_scoped_transient", failoverErr.RequestScopedTransient),
+		zap.Bool("safe_to_failover_after_write", failoverErr.SafeToFailoverAfterWrite),
+	)
+}
+
 // HandleFailoverError 处理 UpstreamFailoverError，返回下一步动作。
 // 包含：缓存计费判断、同账号重试、临时封禁、切换计数、Antigravity 延时。
 func (s *FailoverState) HandleFailoverError(
@@ -136,6 +169,10 @@ func (s *FailoverState) HandleFailoverError(
 	}
 	s.LastFailoverErr = failoverErr
 	if failoverErr == nil || !failoverErr.ShouldRetryNextAccount() {
+		logger.FromContext(ctx).Warn(
+			"gateway.failover_exhausted",
+			s.failoverDecisionLogFields("stop", accountID, platform, retryLimit, failoverErr)...,
+		)
 		return FailoverExhausted
 	}
 
@@ -149,13 +186,15 @@ func (s *FailoverState) HandleFailoverError(
 	// 重试次数上限 retryLimit 由调用方传入（账号级 pool_mode_retry_count 配置）。
 	if failoverErr.RetryableOnSameAccount && s.SameAccountRetryCount[accountID] < retryLimit {
 		s.SameAccountRetryCount[accountID]++
-		logger.FromContext(ctx).Warn("gateway.failover_same_account_retry",
-			zap.Int64("account_id", accountID),
-			zap.Int("upstream_status", failoverErr.StatusCode),
-			zap.Int("same_account_retry_count", s.SameAccountRetryCount[accountID]),
-			zap.Int("same_account_retry_max", retryLimit),
+		logger.FromContext(ctx).Warn(
+			"gateway.failover_same_account_retry",
+			s.failoverDecisionLogFields("retry_same_account", accountID, platform, retryLimit, failoverErr)...,
 		)
 		if !sleepWithContext(ctx, sameAccountRetryDelay) {
+			logger.FromContext(ctx).Warn(
+				"gateway.failover_canceled",
+				s.failoverDecisionLogFields("canceled", accountID, platform, retryLimit, failoverErr)...,
+			)
 			return FailoverCanceled
 		}
 		return FailoverContinue
@@ -171,22 +210,28 @@ func (s *FailoverState) HandleFailoverError(
 
 	// 检查是否耗尽
 	if s.SwitchCount >= s.MaxSwitches {
+		logger.FromContext(ctx).Warn(
+			"gateway.failover_exhausted",
+			s.failoverDecisionLogFields("exhausted", accountID, platform, retryLimit, failoverErr)...,
+		)
 		return FailoverExhausted
 	}
 
 	// 递增切换计数
 	s.SwitchCount++
-	logger.FromContext(ctx).Warn("gateway.failover_switch_account",
-		zap.Int64("account_id", accountID),
-		zap.Int("upstream_status", failoverErr.StatusCode),
-		zap.Int("switch_count", s.SwitchCount),
-		zap.Int("max_switches", s.MaxSwitches),
+	logger.FromContext(ctx).Warn(
+		"gateway.failover_switch_account",
+		s.failoverDecisionLogFields("switch_account", accountID, platform, retryLimit, failoverErr)...,
 	)
 
 	// Antigravity 平台换号线性递增延时
 	if platform == service.PlatformAntigravity {
 		delay := time.Duration(s.SwitchCount-1) * time.Second
 		if !sleepWithContext(ctx, delay) {
+			logger.FromContext(ctx).Warn(
+				"gateway.failover_canceled",
+				s.failoverDecisionLogFields("canceled", accountID, platform, retryLimit, failoverErr)...,
+			)
 			return FailoverCanceled
 		}
 	}
