@@ -12,8 +12,11 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 type passthroughFlushTestWriter struct {
@@ -92,7 +95,7 @@ func runPassthroughFlushTest(
 		Body:       body,
 	}
 	result, err := svc.handleStreamingResponsePassthrough(
-		context.Background(),
+		c.Request.Context(),
 		resp,
 		c,
 		&Account{ID: 1, Platform: PlatformOpenAI, Name: "flush-test"},
@@ -174,6 +177,33 @@ func TestOpenAIStreamingPassthroughFailedBeforeOutputCanStillFailOverWithoutFlus
 	require.Empty(t, writer.flushBodyLengths)
 }
 
+func TestOpenAIStreamingPassthroughCapacityShedLogsPreOutputFailover(t *testing.T) {
+	core, observedLogs := observer.New(zap.WarnLevel)
+	requestCtx := logger.IntoContext(context.Background(), zap.New(core))
+	upstream := "event: response.failed\n" +
+		`data: {"type":"response.failed","error":{"code":"server_is_overloaded","message":"Our servers are currently overloaded. Please try again later."}}` + "\n\n"
+
+	_, recorder, writer, err := runPassthroughFlushTest(
+		t,
+		io.NopCloser(strings.NewReader(upstream)),
+		-1,
+		func(c *gin.Context) { c.Request = c.Request.WithContext(requestCtx) },
+	)
+
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, GatewayFailureReason("openai_capacity_shed"), failoverErr.Reason)
+	require.Empty(t, recorder.Body.String())
+	require.Empty(t, writer.flushBodyLengths)
+
+	entries := observedLogs.FilterMessage("openai.capacity_shed_decision").All()
+	require.Len(t, entries, 1)
+	fields := entries[0].ContextMap()
+	require.Equal(t, "pre_output_failover", fields["decision"])
+	require.Equal(t, false, fields["client_output_started"])
+}
+
 func TestOpenAIStreamingPassthroughNonRetryableFailedBeforeOutputFlushesAtBoundary(t *testing.T) {
 	upstream := "event: response.failed\n" +
 		`data: {"type":"response.failed","error":{"code":"content_policy","message":"request blocked by policy"},"usage":{"input_tokens":6,"output_tokens":0,"total_tokens":6}}` + "\n\n"
@@ -206,6 +236,31 @@ func TestOpenAIStreamingPassthroughFailedAfterOutputFlushesAtBoundaryAndKeepsUsa
 	require.Equal(t, []int{len(firstOutput), len(upstream)}, writer.flushBodyLengths)
 	require.Equal(t, 7, result.usage.InputTokens)
 	require.Equal(t, 2, result.usage.OutputTokens)
+}
+
+func TestOpenAIStreamingPassthroughCapacityShedLogsPostOutputForward(t *testing.T) {
+	core, observedLogs := observer.New(zap.WarnLevel)
+	requestCtx := logger.IntoContext(context.Background(), zap.New(core))
+	firstOutput := `data: {"type":"response.output_text.delta","delta":"partial"}` + "\n\n"
+	failedEvent := "event: response.failed\n" +
+		`data: {"type":"response.failed","error":{"code":"server_is_overloaded","message":"Our servers are currently overloaded. Please try again later."}}` + "\n\n"
+
+	_, recorder, _, err := runPassthroughFlushTest(
+		t,
+		io.NopCloser(strings.NewReader(firstOutput+failedEvent)),
+		-1,
+		func(c *gin.Context) { c.Request = c.Request.WithContext(requestCtx) },
+	)
+
+	require.Error(t, err)
+	require.Contains(t, recorder.Body.String(), `"code":"server_error"`)
+	require.NotContains(t, recorder.Body.String(), "server_is_overloaded")
+
+	entries := observedLogs.FilterMessage("openai.capacity_shed_decision").All()
+	require.Len(t, entries, 1)
+	fields := entries[0].ContextMap()
+	require.Equal(t, "post_output_forward_sanitized_error", fields["decision"])
+	require.Equal(t, true, fields["client_output_started"])
 }
 
 func TestOpenAIStreamingPassthroughClientDisconnectStillDrainsTerminalUsage(t *testing.T) {
