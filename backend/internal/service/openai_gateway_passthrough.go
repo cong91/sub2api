@@ -880,11 +880,15 @@ func openAIStreamFailedEventErrorCode(payload []byte) string {
 
 // isOpenAIUpstreamCapacityShedEvent 判断流内 failed 事件是否为上游容量降载信号。
 // 上游在容量紧张时会把请求丢进降载路径：HTTP 200 之后立刻推 event: error
-// （code=server_is_overloaded / slow_down）并以 response.failed 收尾。
+// （code=server_is_overloaded / slow_down）并以 response.failed 收尾。部分上游
+// 只返回固定 overload message；仅当错误码缺失时才按精确 allowlist 识别，避免
+// 用文本覆盖未知但有语义的错误码。
 func isOpenAIUpstreamCapacityShedEvent(payload []byte) bool {
 	switch openAIStreamFailedEventErrorCode(payload) {
 	case "server_is_overloaded", "slow_down":
 		return true
+	case "":
+		return strings.TrimSpace(extractOpenAISSEErrorMessage(payload)) == openAICapacityShedMessage
 	default:
 		return false
 	}
@@ -895,7 +899,10 @@ func isOpenAIUpstreamCapacityShedEvent(payload []byte) bool {
 // 被判为致命错误（客户端提示 "Selected model is at capacity. Please try a
 // different model." 并直接终止会话），而 server_error 等致命集之外的错误码会进入
 // 客户端内置的退避重试。
-const openAICapacityShedRetryableClientCode = "server_error"
+const (
+	openAICapacityShedRetryableClientCode = "server_error"
+	openAICapacityShedMessage             = "Our servers are currently overloaded. Please try again later."
+)
 
 const openAICapacityShedFailureReason GatewayFailureReason = "openai_capacity_shed"
 
@@ -943,13 +950,21 @@ func sanitizeOpenAICapacityShedErrorCodeForClient(payload []byte) ([]byte, bool)
 	}
 	updated := payload
 	changed := false
-	for _, path := range []string{"response.error.code", "error.code"} {
-		switch strings.ToLower(strings.TrimSpace(gjson.GetBytes(updated, path).String())) {
+	for _, errorPath := range []string{"response.error", "error"} {
+		if !gjson.GetBytes(updated, errorPath).Exists() {
+			continue
+		}
+		codePath := errorPath + ".code"
+		switch strings.ToLower(strings.TrimSpace(gjson.GetBytes(updated, codePath).String())) {
 		case "server_is_overloaded", "slow_down":
+		case "":
+			if strings.TrimSpace(gjson.GetBytes(updated, errorPath+".message").String()) != openAICapacityShedMessage {
+				continue
+			}
 		default:
 			continue
 		}
-		next, err := sjson.SetBytes(updated, path, openAICapacityShedRetryableClientCode)
+		next, err := sjson.SetBytes(updated, codePath, openAICapacityShedRetryableClientCode)
 		if err != nil {
 			return payload, false
 		}
