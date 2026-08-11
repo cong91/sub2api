@@ -500,7 +500,8 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 						UpstreamOutTok: usage.OutputTokens,
 					})
 				}
-				if !openAIStreamClientOutputStarted(c, clientOutputStarted) {
+				clientOutputStartedForDecision := openAIStreamClientOutputStarted(c, clientOutputStarted)
+				if !clientOutputStartedForDecision {
 					if status, errType, errMsg, matched := applyOpenAIStreamFailedErrorPassthroughRule(c, account.Platform, dataBytes, failedMessage); matched {
 						sawFailedEvent = true
 						// 命中透传规则也要记录 ops 上游错误事件（对齐 CC/Messages 与
@@ -522,6 +523,17 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 						streamEarlyErr = s.newOpenAIStreamFailoverError(c, account, false, upstreamRequestID, dataBytes, failedMessage, resp.Header)
 						return
 					}
+				}
+				if clientOutputStartedForDecision && isOpenAIUpstreamCapacityShedEvent(dataBytes) {
+					logOpenAICapacityShedDecision(
+						ctx,
+						account,
+						upstreamRequestID,
+						dataBytes,
+						true,
+						"post_output_forward_sanitized_error",
+						false,
+					)
 				}
 				forceFlushFailedEvent = true
 				sawFailedEvent = true
