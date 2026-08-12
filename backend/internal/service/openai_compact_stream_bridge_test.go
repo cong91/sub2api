@@ -145,6 +145,31 @@ func TestBuildOpenAICompactSSEPayload_RejectsNonJSONObject(t *testing.T) {
 	}
 }
 
+// Compact success is a protocol contract, not merely an upstream HTTP 2xx.
+// Codex requires exactly one compaction item; emitting response.completed for
+// zero or multiple items makes the client reject the result and resubmit the
+// compact request, so every rejected attempt can be charged again.
+func TestBuildOpenAICompactSSEPayload_RejectsInvalidCompactionItemCount(t *testing.T) {
+	for name, body := range map[string][]byte{
+		"missing_output": []byte(`{"id":"resp_missing"}`),
+		"empty_output":   []byte(`{"id":"resp_empty","output":[]}`),
+		"message_only":   []byte(`{"id":"resp_message","output":[{"type":"message"}]}`),
+		"two_compactions": []byte(`{
+			"id":"resp_duplicate",
+			"output":[
+				{"type":"compaction","encrypted_content":"first"},
+				{"type":"compaction_summary","encrypted_content":"second"}
+			]
+		}`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			payload, ok := buildOpenAICompactSSEPayload(body)
+			require.False(t, ok)
+			require.Empty(t, payload)
+		})
+	}
+}
+
 func TestWriteOpenAICompactSSEBridge_RequiresMarkAndSuccessStatus(t *testing.T) {
 	finalResponse := []byte(`{"id":"resp_1","output":[{"type":"compaction","encrypted_content":"x"}]}`)
 
@@ -202,6 +227,34 @@ func TestHandleNonStreamingResponse_CompactClientStreamBridgesToSSE(t *testing.T
 	require.Equal(t, 9, result.usage.InputTokens)
 	require.Equal(t, 4, result.usage.OutputTokens)
 	require.Equal(t, "resp_compact_json", result.responseID)
+}
+
+// Regression: an API-key upstream may return HTTP 200 + usage but no compact
+// item. This must fail before producing a billable ForwardResult; otherwise
+// Codex rejects the fake completed stream, retries, and the user is charged for
+// each unusable attempt.
+func TestHandleNonStreamingResponse_APIKeyCompactEmptyOutputFailsWithoutUsageResult(t *testing.T) {
+	svc := newCompactBridgeTestService()
+	c, rec := newCompactBridgeTestContext(t, true)
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body: io.NopCloser(strings.NewReader(`{
+			"id":"resp_compact_empty",
+			"object":"response",
+			"status":"completed",
+			"output":[],
+			"usage":{"input_tokens":900,"output_tokens":1,"total_tokens":901}
+		}`)),
+	}
+
+	result, err := svc.handleNonStreamingResponse(context.Background(), resp, c, &Account{ID: 1, Type: AccountTypeAPIKey}, "gpt-5.5", "gpt-5.5")
+	require.Error(t, err)
+	require.Nil(t, result, "invalid compact response must not expose usage for billing")
+	require.Equal(t, http.StatusBadGateway, rec.Code)
+	require.Equal(t, "upstream_error", gjson.Get(rec.Body.String(), "error.type").String())
+	require.Contains(t, gjson.Get(rec.Body.String(), "error.message").String(), "exactly one compaction output item")
+	require.NotContains(t, rec.Body.String(), "response.completed")
 }
 
 // 回归防护：path-based compact（Codex v1 unary 协议、链式 sub2api）未标记
@@ -453,6 +506,27 @@ func TestHandleSSEToJSON_CompactSupplementsMissingCompactionIntoNonEmptyOutput(t
 	require.Contains(t, itemTypes, "message")
 	require.Equal(t, "response.completed", events[2][0])
 	require.Len(t, gjson.Get(events[2][1], "response.output").Array(), 2)
+}
+
+func TestHandleSSEToJSON_CompactEmptyOutputFailsWithoutUsageResult(t *testing.T) {
+	svc := newCompactBridgeTestService()
+	c, rec := newCompactBridgeTestContext(t, true)
+	upstreamSSE := strings.Join([]string{
+		`data: {"type":"response.completed","response":{"id":"resp_empty_sse","object":"response","status":"completed","output":[],"usage":{"input_tokens":900,"output_tokens":1,"total_tokens":901}}}`,
+		``,
+	}, "\n")
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       io.NopCloser(strings.NewReader(upstreamSSE)),
+	}
+
+	result, err := svc.handleNonStreamingResponse(context.Background(), resp, c, &Account{ID: 1, Type: AccountTypeOAuth}, "gpt-5.5", "gpt-5.5")
+	require.Error(t, err)
+	require.Nil(t, result, "invalid compact response must not expose usage for billing")
+	require.Equal(t, http.StatusBadGateway, rec.Code)
+	require.Equal(t, "upstream_error", gjson.Get(rec.Body.String(), "error.type").String())
+	require.Contains(t, gjson.Get(rec.Body.String(), "error.message").String(), "exactly one compaction output item")
 }
 
 // 补全逻辑的门控：非 compact 请求原样返回；终态已含 compaction 不重复补入。
