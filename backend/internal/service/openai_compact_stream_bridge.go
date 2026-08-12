@@ -144,7 +144,7 @@ func buildOpenAICompactSSEPayload(finalResponse []byte) ([]byte, bool) {
 	if len(finalResponse) == 0 || !gjson.ValidBytes(finalResponse) {
 		return nil, false
 	}
-	if !gjson.ParseBytes(finalResponse).IsObject() {
+	if !gjson.ParseBytes(finalResponse).IsObject() || !openAICompactResponseHasExactlyOneCompactionItem(finalResponse) {
 		return nil, false
 	}
 	// SSE 的 data 行不允许出现裸换行：上游 JSON 可能是 pretty-printed 形态，
@@ -201,6 +201,21 @@ func buildOpenAICompactSSEPayload(finalResponse []byte) ([]byte, bool) {
 	}
 	appendEvent("response.completed", completed)
 	return buf.Bytes(), true
+}
+
+func openAICompactResponseHasExactlyOneCompactionItem(response []byte) bool {
+	output := gjson.GetBytes(response, "output")
+	if !output.Exists() || !output.IsArray() {
+		return false
+	}
+
+	compactionItems := 0
+	for _, item := range output.Array() {
+		if item.IsObject() && isResponsesCompactionItemType(item.Get("type").String()) {
+			compactionItems++
+		}
+	}
+	return compactionItems == 1
 }
 
 func openAICompactUsageParsableByCodex(usage gjson.Result) bool {

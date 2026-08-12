@@ -1255,6 +1255,9 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 			return nil, fmt.Errorf("convert Grok compact response: %w", err)
 		}
 	}
+	if openAICompactClientWantsStream(c) && !openAICompactResponseHasExactlyOneCompactionItem(body) {
+		return nil, s.writeOpenAINonStreamingProtocolError(resp, c, "Upstream compact response must contain exactly one compaction output item")
+	}
 
 	usageValue, usageOK := extractOpenAIUsageFromJSONBytes(body)
 	if !usageOK {
@@ -1370,6 +1373,9 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 			bodyText = s.replaceModelInSSEBody(bodyText, mappedModel, originalModel)
 		}
 		body = []byte(bodyText)
+	}
+	if openAICompactClientWantsStream(c) && !openAICompactResponseHasExactlyOneCompactionItem(body) {
+		return nil, s.writeOpenAINonStreamingProtocolError(resp, c, "Upstream compact response must contain exactly one compaction output item")
 	}
 
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
