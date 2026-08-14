@@ -1116,10 +1116,21 @@ func openAIStreamFailedEventErrorCode(payload []byte) string {
 // （code=server_is_overloaded / slow_down）并以 response.failed 收尾。部分上游
 // 只返回固定 overload message；仅当错误码缺失时才按精确 allowlist 识别，避免
 // 用文本覆盖未知但有语义的错误码。
+//
+// 特例：上游有时将降载事件以 code=server_error 下发，但同时携带
+// type=service_unavailable_error 和精确 overload message。仅当三者同时满足时才
+// 识别为降载，防止普通 server_error（无 type 或 message 不符）被误归入此路径。
 func isOpenAIUpstreamCapacityShedEvent(payload []byte) bool {
 	switch openAIStreamFailedEventErrorCode(payload) {
 	case "server_is_overloaded", "slow_down":
 		return true
+	case "server_error":
+		errType := strings.ToLower(strings.TrimSpace(gjson.GetBytes(payload, "response.error.type").String()))
+		if errType == "" {
+			errType = strings.ToLower(strings.TrimSpace(gjson.GetBytes(payload, "error.type").String()))
+		}
+		return errType == "service_unavailable_error" &&
+			strings.TrimSpace(extractOpenAISSEErrorMessage(payload)) == openAICapacityShedMessage
 	case "":
 		return strings.TrimSpace(extractOpenAISSEErrorMessage(payload)) == openAICapacityShedMessage
 	default:
