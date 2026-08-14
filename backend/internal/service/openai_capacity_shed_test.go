@@ -88,6 +88,25 @@ func TestStreamFailedEventCapacityShedRetriesOnSameAccount(t *testing.T) {
 	require.False(t, isOpenAIUpstreamCapacityShedEvent(other))
 	require.False(t, openAIStreamFailedEventRetryableOnSameAccount(nonPool, other, "boom"))
 
+	// server_error + service_unavailable_error + exact message = capacity shed.
+	// 上游真实降载在 code=server_error 时必须同时携带 type=service_unavailable_error
+	// 和精确 overload message，才能进入降载路径，防止普通 server_error 被误判。
+	for _, shedPayload := range [][]byte{
+		[]byte(`{"type":"response.failed","response":{"error":{"code":"server_error","type":"service_unavailable_error","message":"` + overloadMessage + `"}}}`),
+		[]byte(`{"type":"error","error":{"code":"server_error","type":"service_unavailable_error","message":"` + overloadMessage + `"}}`),
+	} {
+		require.True(t, isOpenAIUpstreamCapacityShedEvent(shedPayload), string(shedPayload))
+		require.True(t, openAIStreamFailedEventRetryableOnSameAccount(nonPool, shedPayload, overloadMessage), string(shedPayload))
+	}
+
+	// server_error 缺少 type 字段 → 不识别为降载（type 是必要的 corroboration）。
+	noType := []byte(`{"type":"response.failed","response":{"error":{"code":"server_error","message":"` + overloadMessage + `"}}}`)
+	require.False(t, isOpenAIUpstreamCapacityShedEvent(noType))
+
+	// server_error + service_unavailable_error 但 message 不精确 → 不识别为降载。
+	wrongMsg := []byte(`{"type":"response.failed","response":{"error":{"code":"server_error","type":"service_unavailable_error","message":"something else"}}}`)
+	require.False(t, isOpenAIUpstreamCapacityShedEvent(wrongMsg))
+
 	for _, payload := range [][]byte{
 		[]byte(`{"type":"response.failed","response":{"error":{"code":"backend_error","message":"` + overloadMessage + `"}}}`),
 		[]byte(`{"type":"response.failed","response":{"error":{"message":"Our servers are currently overloaded. Please try again later!"}}}`),
@@ -109,6 +128,9 @@ func TestOpenAIStreamErrorFrameDoesNotStartClientOutput(t *testing.T) {
 		{`{"type":"error","error":{"code":"server_is_overloaded","message":"overloaded"}}`, "error", false},
 		{`{"type":"error","error":{"code":"slow_down","message":"slow down"}}`, "error", false},
 		{`{"type":"error","error":{"type":"rate_limit_error","code":"rate_limit_exceeded","message":"limited"}}`, "error", false},
+		// server_error + service_unavailable_error + exact overload message も降載と同じく
+		// クライアント出力を開始しない。
+		{`{"type":"error","error":{"code":"server_error","type":"service_unavailable_error","message":"Our servers are currently overloaded. Please try again later."}}`, "error", false},
 		// 不可重试类错误帧维持原样转发（不进 failover），保留上游错误细节。
 		{`{"type":"error","error":{"type":"invalid_request_error","code":"content_policy_violation","message":"blocked"}}`, "error", true},
 		{`{"type":"response.failed","response":{"error":{"code":"server_is_overloaded"}}}`, "response.failed", false},
@@ -190,6 +212,65 @@ func TestOpenAIStreamCapacityShedErrorFramePrecedingFailedStillFailsOver(t *test
 	require.Equal(t, string(GatewayFailureScopeRequest), lastOpsEvent.Scope)
 	require.Equal(t, "openai_capacity_shed", lastOpsEvent.Reason)
 	require.Equal(t, "rid-shed-error-then-failed", lastOpsEvent.UpstreamRequestID)
+}
+
+// TestOpenAIStreamCapacityShedServerErrorWithServiceUnavailableType: case thực tế từ
+// production — upstream trả code=server_error + type=service_unavailable_error + exact
+// overload message. Classifier hiện tại bỏ qua case này; test này xác nhận sau patch
+// nó phải đi vào pre-output failover đúng như server_is_overloaded.
+func TestOpenAIStreamCapacityShedServerErrorWithServiceUnavailableType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &OpenAIGatewayService{cfg: &config.Config{
+		Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize},
+	}}
+
+	core, observedLogs := observer.New(zap.WarnLevel)
+	requestCtx := logger.IntoContext(context.Background(), zap.New(core))
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil).WithContext(requestCtx)
+
+	const overloadMsg = "Our servers are currently overloaded. Please try again later."
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body: io.NopCloser(strings.NewReader(strings.Join([]string{
+			"event: response.created",
+			`data: {"type":"response.created","response":{"id":"resp_svc_unavail"}}`,
+			"",
+			"event: response.in_progress",
+			`data: {"type":"response.in_progress","response":{"id":"resp_svc_unavail"}}`,
+			"",
+			"event: error",
+			`data: {"type":"error","error":{"code":"server_error","type":"service_unavailable_error","message":"` + overloadMsg + `"}}`,
+			"",
+			"event: response.failed",
+			`data: {"type":"response.failed","response":{"id":"resp_svc_unavail","status":"failed","error":{"code":"server_error","type":"service_unavailable_error","message":"` + overloadMsg + `"}}}`,
+			"",
+		}, "\n"))),
+		Header: http.Header{"X-Request-Id": []string{"rid-server-error-svc-unavail"}},
+	}
+
+	_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Name: "acc"}, time.Now(), "model", "model")
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr, "server_error+service_unavailable_error+exact message should failover")
+	require.True(t, failoverErr.RetryableOnSameAccount)
+	require.True(t, failoverErr.RequestScopedTransient)
+	require.Equal(t, GatewayFailureStageInference, failoverErr.Stage)
+	require.Equal(t, GatewayFailureScopeRequest, failoverErr.Scope)
+	require.Equal(t, openAICapacityShedFailureReason, failoverErr.Reason)
+	require.False(t, c.Writer.Written())
+	require.Empty(t, rec.Body.String())
+
+	entries := observedLogs.FilterMessage("openai.capacity_shed_decision").All()
+	require.Len(t, entries, 1)
+	fields := entries[0].ContextMap()
+	require.Equal(t, "pre_output_failover", fields["decision"])
+	require.Equal(t, "rid-server-error-svc-unavail", fields["upstream_request_id"])
+	require.Equal(t, "server_error", fields["upstream_error_code"])
+	require.Equal(t, false, fields["client_output_started"])
+	require.Equal(t, true, fields["retryable_on_same_account"])
 }
 
 func TestOpenAIStreamCapacityShedMessageOnlyPreOutputStillFailsOver(t *testing.T) {
@@ -378,6 +459,15 @@ func TestSanitizeOpenAICapacityShedErrorCodeForClient(t *testing.T) {
 		{
 			name:        "普通server_error不改写",
 			payload:     `{"type":"response.failed","response":{"error":{"code":"server_error","message":"boom"}}}`,
+			wantChanged: false,
+			wantContain: `"code":"server_error"`,
+		},
+		{
+			// server_error + service_unavailable_error + exact message: code 已是
+			// 客户端可重试码，sanitize 不需要再改写（isOpenAIUpstreamCapacityShedEvent
+			// 此时返回 true，但 switch case 中 server_error 未匹配需要改写的码）。
+			name:        "server_error+service_unavailable_error+精确message已为客户端重试码无需改写",
+			payload:     `{"type":"response.failed","response":{"error":{"code":"server_error","type":"service_unavailable_error","message":"Our servers are currently overloaded. Please try again later."}}}`,
 			wantChanged: false,
 			wantContain: `"code":"server_error"`,
 		},
