@@ -34,6 +34,8 @@ import glmIcon from '@/assets/platform-icons/glm.svg'
 import zaiIcon from '@/assets/platform-icons/zai.svg'
 import minimaxIcon from '@/assets/platform-icons/minimax.svg'
 import opencodeIcon from '@/assets/platform-icons/opencode.svg'
+import kimiIcon from '@/assets/platform-icons/kimi.svg'
+import zhipuIcon from '@/assets/platform-icons/zhipu.svg'
 
 interface Props {
   platform?: GroupPlatform
@@ -55,6 +57,8 @@ const platformIcons = {
   gemini: { src: geminiIcon, renderAs: 'image' },
   antigravity: { src: antigravityIcon, renderAs: 'image' },
   grok: { src: grokIcon, renderAs: 'mask' },
+  kimi: { src: kimiIcon, renderAs: 'mask' },
+  zhipu: { src: zhipuIcon, renderAs: 'mask' },
   composite: { src: compositeIcon, renderAs: 'mask' },
   kiro: { src: kiroIcon, renderAs: 'image' },
   deepseek: { src: deepseekIcon, renderAs: 'mask' },

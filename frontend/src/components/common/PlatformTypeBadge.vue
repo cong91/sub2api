@@ -103,7 +103,6 @@ const platformLabel = computed(() => {
   if (props.platform === 'zhipu') return 'Zhipu GLM'
   if (props.platform === 'deepseek') return 'DeepSeek'
   if (props.platform === 'kiro') return 'Kiro'
-  if (props.platform === 'deepseek') return 'DeepSeek'
   if (props.platform === 'glm') return 'GLM'
   if (props.platform === 'zai') return 'Z.ai'
   if (props.platform === 'minimax') return 'MiniMax'
@@ -219,9 +218,6 @@ const platformClass = computed(() => {
   if (props.platform === 'kiro') {
     return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
   }
-  if (props.platform === 'deepseek') {
-    return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300'
-  }
   if (props.platform === 'glm') {
     return 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300'
   }
@@ -261,9 +257,6 @@ const typeClass = computed(() => {
   }
   if (props.platform === 'kiro') {
     return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
-  }
-  if (props.platform === 'deepseek') {
-    return 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300'
   }
   if (props.platform === 'glm') {
     return 'bg-fuchsia-100 text-fuchsia-600 dark:bg-fuchsia-900/30 dark:text-fuchsia-300'

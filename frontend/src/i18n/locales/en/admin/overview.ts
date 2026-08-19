@@ -992,7 +992,6 @@ export default {
         zhipu: 'Zhipu GLM',
         deepseek: 'DeepSeek',
         composite: 'Composite',
-        deepseek: 'DeepSeek',
         glm: 'GLM',
         zai: 'Z.ai',
         minimax: 'MiniMax',
