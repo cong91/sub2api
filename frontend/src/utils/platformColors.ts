@@ -352,7 +352,6 @@ export function platformLabel(p: string): string {
     case 'deepseek': return 'DeepSeek'
     case 'composite': return 'Composite'
     case 'kiro': return 'Kiro'
-    case 'deepseek': return 'DeepSeek'
     case 'glm': return 'GLM'
     case 'zai': return 'Z.ai'
     case 'minimax': return 'MiniMax'
