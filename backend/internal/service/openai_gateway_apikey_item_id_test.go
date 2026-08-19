@@ -63,6 +63,44 @@ func TestOpenAIGatewayService_APIKeyPassthrough_StripsInvalidInputItemIDs(t *tes
 	require.Equal(t, "item_unconstrained", gjson.GetBytes(forwarded, "input.5.id").String())
 }
 
+func TestOpenAIGatewayService_APIKeyPassthrough_StripsInvalidCustomToolCallIDs(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body: io.NopCloser(strings.NewReader(
+			`{"id":"resp_test","model":"gpt-5.6-sol","output":[],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}`,
+		)),
+	}}
+	svc := newOpenAIImageGenerationControlTestService(upstream)
+	c, _ := newOpenAIImageGenerationControlTestContext(true, "codex_cli_rs/0.144.1")
+	account := newOpenAIImageGenerationControlTestAccount()
+	account.Extra = map[string]any{"openai_passthrough": true}
+
+	body := []byte(`{
+		"model":"gpt-5.6-sol",
+		"stream":false,
+		"input":[
+			{"type":"custom_tool_call","id":"fc_wrong_prefix","call_id":"call_custom_1","name":"apply_patch","input":"{}"},
+			{"type":"custom_tool_call","id":"ctc_valid","call_id":"call_custom_2","name":"apply_patch","input":"{}"},
+			{"type":"function_call","id":"fc_valid","call_id":"call_function_1","name":"exec_command","arguments":"{}"}
+		]
+	}`)
+
+	result, err := svc.Forward(context.Background(), c, account, body)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, upstream.lastReq)
+
+	forwarded := upstream.lastBody
+	require.False(t, gjson.GetBytes(forwarded, "input.0.id").Exists(),
+		"custom_tool_call IDs must use the ctc prefix")
+	require.Equal(t, "ctc_valid", gjson.GetBytes(forwarded, "input.1.id").String())
+	require.Equal(t, "fc_valid", gjson.GetBytes(forwarded, "input.2.id").String(),
+		"function_call IDs must continue to use the fc prefix")
+}
+
 // TestOpenAIGatewayService_APIKeyPassthrough_StripsInvalidReasoningItemIDs
 // verifies that reasoning items with a non-rs id (e.g. item_*) are stripped
 // before forwarding. OpenAI upstream requires reasoning ids to begin with
@@ -120,6 +158,8 @@ func TestShouldStripOpenAIResponsesInputItemID_Reasoning(t *testing.T) {
 		{"message item id", "message", "item_x", true},
 		{"function_call fc id", "function_call", "fc_abc", false},
 		{"function_call item id", "function_call", "item_x", true},
+		{"custom_tool_call ctc id", "custom_tool_call", "ctc_abc", false},
+		{"custom_tool_call fc id", "custom_tool_call", "fc_abc", true},
 		{"unconstrained type", "web_search_call", "ws_001", false},
 	}
 	for _, tc := range cases {

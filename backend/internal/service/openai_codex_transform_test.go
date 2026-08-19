@@ -1952,3 +1952,22 @@ func TestFilterCodexInput_PreservesReasoningInMixedInput(t *testing.T) {
 		})
 	}
 }
+
+func TestFilterCodexInput_StripsInvalidCustomToolCallIDs(t *testing.T) {
+	input := []any{
+		map[string]any{"type": "custom_tool_call", "id": "fc_wrong_prefix", "call_id": "call_1", "name": "apply_patch"},
+		map[string]any{"type": "custom_tool_call", "id": "ctc_valid", "call_id": "call_2", "name": "apply_patch"},
+	}
+
+	filtered := filterCodexInput(input, true)
+	require.Len(t, filtered, 2)
+
+	wrongID, ok := filtered[0].(map[string]any)
+	require.True(t, ok)
+	_, exists := wrongID["id"]
+	require.False(t, exists, "custom_tool_call IDs must use the ctc prefix")
+
+	validID, ok := filtered[1].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "ctc_valid", validID["id"])
+}
