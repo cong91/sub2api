@@ -184,7 +184,7 @@ func (r *ModelPricingResolver) applyFirstTokenTier(resolved *ResolvedPricing, co
 			first = interval
 		}
 	}
-	resolved.BasePricing = intervalToModelPricing(&first, resolved.BasePricing, config)
+	resolved.BasePricing = intervalToModelPricing(&first, resolved.SupportsCacheBreakdown, config)
 	resolved.Intervals = nil
 }
 
