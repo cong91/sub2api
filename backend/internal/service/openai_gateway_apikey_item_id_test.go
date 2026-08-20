@@ -120,6 +120,10 @@ func TestShouldStripOpenAIResponsesInputItemID_Reasoning(t *testing.T) {
 		{"message item id", "message", "item_x", true},
 		{"function_call fc id", "function_call", "fc_abc", false},
 		{"function_call item id", "function_call", "item_x", true},
+		{"custom_tool_call ctc id", "custom_tool_call", "ctc_valid", false},
+		{"custom_tool_call fc id", "custom_tool_call", "fc_wrong", true},
+		{"custom_tool_call_output ctco id", "custom_tool_call_output", "ctco_valid", false},
+		{"custom_tool_call_output fc id", "custom_tool_call_output", "fc_wrong", true},
 		{"unconstrained type", "web_search_call", "ws_001", false},
 	}
 	for _, tc := range cases {
