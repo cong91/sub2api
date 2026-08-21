@@ -154,6 +154,8 @@ type AffiliateInviteRecord struct {
 	AffCode         string    `json:"aff_code"`
 	TotalRebate     float64   `json:"total_rebate"`
 	CreatedAt       time.Time `json:"created_at"`
+	// Enriched by handler
+	InviteeDeviceCode string `json:"invitee_device_code,omitempty"`
 }
 
 type AffiliateRebateRecord struct {
@@ -171,6 +173,8 @@ type AffiliateRebateRecord struct {
 	PaymentType     string    `json:"payment_type"`
 	OrderStatus     string    `json:"order_status"`
 	CreatedAt       time.Time `json:"created_at"`
+	// Enriched by handler
+	InviteeDeviceCode string `json:"invitee_device_code,omitempty"`
 }
 
 type AffiliateTransferRecord struct {
@@ -189,6 +193,8 @@ type AffiliateTransferRecord struct {
 	FrozenQuota         float64   `json:"-"`
 	HistoryQuota        float64   `json:"-"`
 	CreatedAt           time.Time `json:"created_at"`
+	// Enriched by handler
+	DeviceCode string `json:"device_code,omitempty"`
 }
 
 type AffiliateUserOverview struct {
