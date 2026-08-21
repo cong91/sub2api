@@ -503,6 +503,7 @@ function onPaymentSettled() {
 const checkout = ref<CheckoutInfoResponse>({
   methods: {}, global_min: 0, global_max: 0,
   plans: [], balance_disabled: false, balance_recharge_multiplier: 1, subscription_usd_to_cny_rate: 0, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '',
+  ledger_currency: 'USD', allowed_payment_currencies: [], manual_fx_rates: {}, currency_meta: {}, fx_status: { source: '', stale_after_seconds: 0, stale: false, missing_currencies: [] }
 })
 
 const tabs = computed(() => {
