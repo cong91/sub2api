@@ -63,9 +63,6 @@ export interface UserProfileSourceContext {
   provider_label?: string | null
 }
 
-export type UserRole = 'admin' | 'marketing' | 'user'
-export type UserStatus = 'active' | 'pending_activation' | 'blocked' | 'disabled'
-
 export interface User {
   id: number
   username: string
@@ -87,12 +84,12 @@ export interface User {
   linuxdo_bound?: boolean
   oidc_bound?: boolean
   wechat_bound?: boolean
-  role: UserRole // User role for authorization
+  role: 'admin' | 'user' // User role for authorization
   balance: number // User balance for API usage
   frozen_balance?: number // Balance currently held by async batch jobs
   concurrency: number // Allowed concurrent requests
   rpm_limit?: number // User-level RPM cap (0 = unlimited); effective as fallback when group has no rpm_limit
-  status: UserStatus // Account status
+  status: 'active' | 'disabled' // Account status
   allowed_groups: number[] | null // Allowed group IDs (null = all non-exclusive groups)
   balance_notify_enabled: boolean
   balance_notify_threshold: number | null
@@ -104,19 +101,18 @@ export interface User {
   deleted_at?: string | null
 }
 
-export type AdminUser = Omit<User, 'status'> & {
+export interface AdminUser extends User {
   // 管理员备注（普通用户接口不返回）
   notes: string
   last_used_at?: string | null
   signup_source?: 'email' | 'invite' | 'admin' | string | null
   primary_redeem_code?: string | null
   primary_redeem_type?: string | null
-  status: UserStatus
+  has_device_binding?: boolean
   // 用户专属分组倍率配置 (group_id -> rate_multiplier)
   group_rates?: Record<number, number>
   // 当前并发数（仅管理员列表接口返回）
   current_concurrency?: number
-  device_activation_status?: 'active' | 'pending_activation' | 'revoked' | 'blocked' | null
 }
 
 export interface LoginRequest {
@@ -140,9 +136,12 @@ export interface ActionCaptchaRequestProof extends Partial<TencentCaptchaRequest
 
 export interface InviteLoginRequest extends ActionCaptchaRequestProof {
   invitation_code: string
-  client_kind?: 'web'
   device_hash?: string
   install_id?: string
+}
+
+export interface RedeemLoginRequest extends ActionCaptchaRequestProof {
+  invitation_code: string
 }
 
 export interface RegisterRequest {
@@ -283,6 +282,8 @@ export interface PublicSettings {
   channel_monitor_default_interval_seconds: number
   /** When true, user monitor hides RPM/TPM so scale cannot be reverse-estimated. */
   channel_monitor_hide_throughput?: boolean
+  /** When true, user monitor shows account quota/balance snapshots (default off). */
+  channel_monitor_show_quota?: boolean
   available_channels_enabled: boolean
   model_plaza_enabled: boolean
   model_plaza_require_auth: boolean
@@ -290,7 +291,6 @@ export interface PublicSettings {
   service_quota_enabled: boolean
   affiliate_enabled: boolean
   allow_user_view_error_requests?: boolean
-  device_auto_activation_aff_codes: string
 }
 
 export interface AuthResponse {
@@ -542,7 +542,7 @@ export interface PaginationConfig {
 
 // ==================== API Key & Group Types ====================
 
-export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'composite' | 'kiro'
+export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'composite'
 
 export type VideoModelPrices = Record<string, Record<string, number>>
 
@@ -899,7 +899,7 @@ export interface UpdateGroupRequest {
 
 // ==================== Account & Proxy Types ====================
 
-export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'kiro'
+export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'kimi' | 'zhipu' | 'deepseek'
 export type AccountType = 'oauth' | 'setup-token' | 'apikey' | 'upstream' | 'bedrock' | 'service_account'
 export type OAuthAddMethod = 'oauth' | 'setup-token'
 export type ProxyProtocol = 'http' | 'https' | 'socks5' | 'socks5h'
@@ -1193,12 +1193,6 @@ export interface Account {
   overload_until: string | null
   temp_unschedulable_until: string | null
   temp_unschedulable_reason: string | null
-  kiro_quota_state?: string | null
-  kiro_quota_reason?: string | null
-  kiro_quota_reset_at?: string | null
-  kiro_runtime_state?: string | null
-  kiro_runtime_reason?: string | null
-  kiro_runtime_reset_at?: string | null
 
   // Session window fields (5-hour window)
   session_window_start: string | null
@@ -1346,21 +1340,6 @@ export interface GrokBillingSummary {
   failed_windows?: string[]
 }
 
-export interface KiroCreditProgress {
-  current_usage: number
-  usage_limit: number
-  percentage_used: number
-  days_remaining?: number
-  expiry_date?: string | null
-}
-
-export interface KiroOverageInfo {
-  current_overages: number
-  overage_charges: number
-  currency_code?: string
-  currency_symbol?: string
-}
-
 export interface AccountUsageInfo {
   source?: 'passive' | 'active'
   updated_at: string | null
@@ -1397,19 +1376,6 @@ export interface AccountUsageInfo {
     amount?: number
     minimum_balance?: number
   }> | null
-  kiro_subscription_name?: string | null
-  kiro_subscription_type?: string | null
-  kiro_reset_at?: string | null
-  kiro_overages_enabled?: boolean
-  kiro_credit?: KiroCreditProgress | null
-  kiro_bonus?: KiroCreditProgress | null
-  kiro_overage?: KiroOverageInfo | null
-  kiro_quota_state?: string | null
-  kiro_quota_reason?: string | null
-  kiro_quota_reset_at?: string | null
-  kiro_runtime_state?: string | null
-  kiro_runtime_reason?: string | null
-  kiro_runtime_reset_at?: string | null
   // Antigravity 403 forbidden 状态
   is_forbidden?: boolean
   forbidden_reason?: string
@@ -1766,12 +1732,6 @@ export interface AdminUsageLog extends UsageLog {
   channel_id?: number | null
   billing_tier?: string | null
 
-  // 用户请求 IP（仅管理员可见）
-  ip_address?: string | null
-
-  // 用户设备码（仅管理员可见）
-  device_code?: string | null
-
   // 最小账号信息（仅管理员接口返回）
   account?: UsageLogAccountSummary
 }
@@ -1812,8 +1772,6 @@ export interface RedeemCode {
   status: 'active' | 'used' | 'expired' | 'unused' | 'disabled'
   used_by: number | null
   used_at: string | null
-  created_by?: number | null
-  created_by_user?: User
   created_at: string
   expires_at?: string | null
   updated_at?: string
@@ -2023,11 +1981,11 @@ export interface UpdateUserRequest {
   password?: string
   username?: string
   notes?: string
-  role?: UserRole
+  role?: 'admin' | 'user'
   balance?: number
   concurrency?: number
   rpm_limit?: number
-  status?: UserStatus
+  status?: 'active' | 'disabled'
   allowed_groups?: number[] | null
   // 用户专属分组倍率配置 (group_id -> rate_multiplier | null)
   // null 表示删除该分组的专属倍率
@@ -2059,9 +2017,6 @@ export interface UserSubscription {
   expires_at: string | null
   user?: User
   group?: Group
-  device_identity_code?: string | null
-  device_identity_type?: string | null
-  has_device_binding?: boolean
 }
 
 export interface SubscriptionProgress {
@@ -2304,8 +2259,6 @@ export interface PromoCode {
   status: 'active' | 'disabled'
   expires_at: string | null
   notes: string | null
-  created_by?: number | null
-  created_by_user?: User
   created_at: string
   updated_at: string
 }
