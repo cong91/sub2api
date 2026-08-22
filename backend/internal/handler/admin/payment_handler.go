@@ -123,11 +123,11 @@ func (h *PaymentHandler) RetryFulfillment(c *gin.Context) {
 type AdminPaymentOrderResult struct {
 	ID                  int64      `json:"id"`
 	UserID              int64      `json:"user_id"`
-	UserEmail           string         `json:"user_email,omitempty"`
-	UserName            string         `json:"user_name,omitempty"`
-	UserNotes           *string        `json:"user_notes,omitempty"`
-	DeviceCode          string         `json:"device_code,omitempty"`
-	Amount              float64        `json:"amount"`
+	UserEmail           string     `json:"user_email,omitempty"`
+	UserName            string     `json:"user_name,omitempty"`
+	UserNotes           *string    `json:"user_notes,omitempty"`
+	DeviceCode          string     `json:"device_code,omitempty"`
+	Amount              float64    `json:"amount"`
 	PayAmount           float64    `json:"pay_amount"`
 	FeeRate             float64    `json:"fee_rate"`
 	Currency            string     `json:"currency"`
