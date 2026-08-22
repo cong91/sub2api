@@ -109,6 +109,7 @@ export interface AdminUser extends User {
   primary_redeem_code?: string | null
   primary_redeem_type?: string | null
   has_device_binding?: boolean
+  device_activation_status?: 'active' | 'pending_activation' | 'revoked' | 'blocked' | null
   // 用户专属分组倍率配置 (group_id -> rate_multiplier)
   group_rates?: Record<number, number>
   // 当前并发数（仅管理员列表接口返回）
@@ -1944,6 +1945,7 @@ export interface UserUsageTrendPoint {
   user_id: number
   email: string
   username: string
+  device_code?: string
   requests: number
   tokens: number
   cost: number // 标准计费
@@ -1954,6 +1956,7 @@ export interface UserSpendingRankingItem {
   user_id: number
   email: string
   username: string
+  device_code?: string
   actual_cost: number
   requests: number
   tokens: number
