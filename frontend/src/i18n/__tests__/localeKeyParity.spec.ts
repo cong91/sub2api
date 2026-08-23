@@ -28,11 +28,25 @@ describe('locale key parity', () => {
   it('Vietnamese preserves English message placeholders', () => {
     const enMessages = collectMessages(en)
     const viMessages = collectMessages(vi)
+    const missing = Object.keys(enMessages).filter((key) => !(key in viMessages))
+    expect(missing).toEqual([])
     const mismatches = Object.keys(enMessages).filter(
       (key) => JSON.stringify(placeholders(enMessages[key])) !== JSON.stringify(placeholders(viMessages[key]))
     )
 
     expect(mismatches).toEqual([])
+  })
+
+  it('preserves required technical locale literals', () => {
+    const enMessages = collectMessages(en)
+    const viMessages = collectMessages(vi)
+    expect(viMessages['admin.accounts.oauth.openai.codexPatPlaceholder']).toBe(enMessages['admin.accounts.oauth.openai.codexPatPlaceholder'])
+    expect(viMessages['admin.settings.gatewayForwarding.openaiCodexUserAgentPlaceholder']).toBe(
+      enMessages['admin.settings.gatewayForwarding.openaiCodexUserAgentPlaceholder']
+    )
+    expect(viMessages['admin.settings.openaiFastPolicy.modelPatternPlaceholder']).toContain('gpt-5.6-sol')
+    expect(viMessages['admin.settings.openaiFastPolicy.modelPatternPlaceholder']).toContain('gpt-5.6*')
+    expect(viMessages['admin.settings.openaiFastPolicy.modelWhitelistHint']).toContain('gpt-5.6*')
   })
 })
 
