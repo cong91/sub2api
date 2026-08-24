@@ -60,7 +60,7 @@ func (r *userRepository) ListUserModelBlocks(ctx context.Context, userID int64) 
 	if err != nil {
 		return nil, fmt.Errorf("list user model blocks: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	blocks := make([]service.UserModelBlock, 0)
 	for rows.Next() {
@@ -124,7 +124,7 @@ func (r *userRepository) IsUserModelBlocked(ctx context.Context, userID int64, b
 	if err != nil {
 		return false, fmt.Errorf("check user model block: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var blocked bool
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
