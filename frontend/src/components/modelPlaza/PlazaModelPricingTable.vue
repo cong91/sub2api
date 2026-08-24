@@ -1,6 +1,7 @@
 <template>
-  <div class="plaza-pricing-table overflow-x-auto" :style="accentStyle">
-    <table class="w-full min-w-[860px] table-fixed border-collapse text-sm tabular-nums">
+  <div class="plaza-pricing-table" :style="accentStyle">
+    <div class="hidden overflow-x-auto sm:block">
+      <table class="w-full min-w-[860px] table-fixed border-collapse text-sm tabular-nums">
       <colgroup>
         <col class="w-[22%]" />
         <col class="w-[10%]" />
@@ -204,7 +205,107 @@
           </td>
         </tr>
       </tbody>
-    </table>
+      </table>
+    </div>
+
+    <div class="space-y-3 p-3 sm:hidden">
+      <article
+        v-for="m in sortedModels"
+        :key="`mobile-${m.platform}:${m.name}`"
+        data-testid="mobile-pricing-card"
+        class="rounded-xl border border-gray-200 bg-white p-3 dark:border-dark-700 dark:bg-dark-800"
+      >
+        <header class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="break-words font-mono text-sm font-semibold text-gray-900 dark:text-white">{{ m.name }}</p>
+            <span
+              v-if="platform && m.platform !== platform"
+              class="mt-1 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-medium"
+              :class="platformBadgeLightClass(m.platform)"
+            >
+              {{ platformLabel(m.platform) }}
+            </span>
+            <span
+              v-if="billingMode(m) !== BILLING_MODE_TOKEN"
+              class="mt-1 inline-flex rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-dark-700/70 dark:text-dark-300"
+            >
+              {{ billingModeLabel(m) }}
+            </span>
+          </div>
+          <span class="shrink-0 rounded-md bg-gray-100 px-2 py-1 font-mono text-xs text-gray-600 dark:bg-dark-700 dark:text-dark-300">
+            <template v-if="usesIndependentImageRate(m)">{{ requestRate(m) }}x</template>
+            <template v-else-if="hasCustomRate">
+              <span class="mr-1 text-gray-400 line-through dark:text-dark-500">{{ rateMultiplier }}x</span>
+              <span class="font-bold text-primary-600 dark:text-primary-400">{{ effectiveRate }}x</span>
+            </template>
+            <template v-else>{{ effectiveRate }}x</template>
+          </span>
+        </header>
+
+        <div class="mt-3 space-y-3 text-xs">
+          <section class="rounded-lg bg-primary-50/70 p-3 dark:bg-primary-500/10">
+            <h4 class="font-semibold text-primary-800 dark:text-primary-200">{{ t('modelPlaza.table.paidPrice') }}</h4>
+            <template v-if="billingMode(m) === BILLING_MODE_TOKEN">
+              <div class="mt-2 grid gap-2 sm:grid-cols-3">
+                <div>
+                  <p class="text-gray-500 dark:text-dark-400">{{ t('modelPlaza.table.input') }}</p>
+                  <template v-if="tokenIntervals(m).length">
+                    <p v-for="(iv, idx) in tokenIntervals(m)" :key="`mobile-input-${idx}`" class="font-mono text-gray-900 dark:text-white">{{ tierLabel(iv) }} {{ paidPerMillion(iv.input_price) }}</p>
+                  </template>
+                  <p v-else class="font-mono text-gray-900 dark:text-white">{{ paidPerMillion(m.pricing?.input_price) }}</p>
+                </div>
+                <div>
+                  <p class="text-gray-500 dark:text-dark-400">{{ t('modelPlaza.table.output') }}</p>
+                  <template v-if="tokenIntervals(m).length">
+                    <p v-for="(iv, idx) in tokenIntervals(m)" :key="`mobile-output-${idx}`" class="font-mono text-gray-900 dark:text-white">{{ tierLabel(iv) }} {{ paidPerMillion(iv.output_price) }}</p>
+                  </template>
+                  <p v-else class="font-mono text-gray-900 dark:text-white">{{ paidPerMillion(m.pricing?.output_price) }}</p>
+                </div>
+                <div>
+                  <p class="text-gray-500 dark:text-dark-400">{{ t('modelPlaza.table.cache') }}</p>
+                  <template v-if="hasCachePricing(m)">
+                    <p class="font-mono text-gray-900 dark:text-white">{{ t('modelPlaza.table.cacheWrite') }} {{ paidPerMillion(m.pricing?.cache_write_price) }}</p>
+                    <p class="font-mono text-gray-900 dark:text-white">{{ t('modelPlaza.table.cacheRead') }} {{ paidPerMillion(m.pricing?.cache_read_price) }}</p>
+                  </template>
+                  <p v-else class="font-mono text-gray-400 dark:text-dark-500">-</p>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <div v-if="requestIntervals(m).length" class="mt-2 space-y-1 font-mono text-gray-900 dark:text-white">
+                <p v-for="(iv, idx) in requestIntervals(m)" :key="`mobile-request-${idx}`">{{ tierLabel(iv) }} {{ paidRequestPrice(m, iv.per_request_price) }} {{ perUnitSuffix(m) }}</p>
+              </div>
+              <p v-else class="mt-2 font-mono text-gray-900 dark:text-white">{{ paidRequestPrice(m, m.pricing?.per_request_price) }} {{ perUnitSuffix(m) }}</p>
+            </template>
+          </section>
+
+          <section class="rounded-lg bg-gray-50 p-3 dark:bg-dark-900/50">
+            <h4 class="font-semibold text-gray-600 dark:text-dark-300">{{ t('modelPlaza.table.officialPrice') }}</h4>
+            <div v-if="m.official_pricing" class="mt-2 grid gap-2 sm:grid-cols-3">
+              <div>
+                <p class="text-gray-500 dark:text-dark-500">{{ t('modelPlaza.table.input') }}</p>
+                <p class="font-mono text-gray-700 dark:text-dark-200">{{ official(m.official_pricing.input_price) }}</p>
+              </div>
+              <div>
+                <p class="text-gray-500 dark:text-dark-500">{{ t('modelPlaza.table.output') }}</p>
+                <p class="font-mono text-gray-700 dark:text-dark-200">{{ official(m.official_pricing.output_price) }}</p>
+              </div>
+              <div>
+                <p class="text-gray-500 dark:text-dark-500">{{ t('modelPlaza.table.cache') }}</p>
+                <template v-if="hasOfficialCache(m.official_pricing)">
+                  <p class="font-mono text-gray-700 dark:text-dark-200">{{ t('modelPlaza.table.cacheWrite') }} {{ official(m.official_pricing.cache_write_price) }}</p>
+                  <p class="font-mono text-gray-700 dark:text-dark-200">{{ t('modelPlaza.table.cacheRead') }} {{ official(m.official_pricing.cache_read_price) }}</p>
+                </template>
+                <p v-else class="font-mono text-gray-400 dark:text-dark-500">-</p>
+              </div>
+            </div>
+            <div v-else class="mt-2 grid grid-cols-3 gap-2 font-mono text-gray-400 dark:text-dark-500">
+              <span>-</span><span>-</span><span>-</span>
+            </div>
+          </section>
+        </div>
+      </article>
+    </div>
   </div>
 </template>
 
@@ -249,9 +350,12 @@ const PER_MILLION = 1_000_000
  */
 const sortedModels = computed(() => {
   return [...props.models].sort((a, b) => {
-    const ta = billingMode(a) === BILLING_MODE_TOKEN
-    const tb = billingMode(b) === BILLING_MODE_TOKEN
-    if (ta !== tb) return ta ? -1 : 1
+    const modeA = billingMode(a)
+    const modeB = billingMode(b)
+    const rankA = modeA === BILLING_MODE_TOKEN ? 0 : modeA === 'per_request' ? 1 : 2
+    const rankB = modeB === BILLING_MODE_TOKEN ? 0 : modeB === 'per_request' ? 1 : 2
+    if (rankA !== rankB) return rankA - rankB
+    if (modeA !== BILLING_MODE_TOKEN) return a.name.localeCompare(b.name)
     const pa = a.official_pricing?.output_price ?? null
     const pb = b.official_pricing?.output_price ?? null
     if (pa != null && pb != null && pa !== pb) return pb - pa

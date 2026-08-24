@@ -50,9 +50,64 @@ export interface ModelPlazaResponse {
   /** 管理员配置的全局价格说明（Markdown）。 */
   description: string
   groups: ModelPlazaGroup[]
+  blocked_models?: UserModelBlock[]
 }
 
-/** 获取模型广场数据。开关未启用时后端返回 404。 */
+export interface UserModelBlock {
+  platform: string
+  model: string
+}
+
+export interface UpdateUserModelBlockRequest extends UserModelBlock {
+  blocked: boolean
+}
+
+export interface UserModelBlockResponse extends UpdateUserModelBlockRequest {}
+
+export interface AggregatedPlazaOffer {
+  group: ModelPlazaGroup
+  model: PlazaModel
+  rate: number
+}
+
+export interface AggregatedPlazaModel {
+  key: string
+  platform: string
+  name: string
+  offers: AggregatedPlazaOffer[]
+}
+
+export function modelPlazaModelKey(platform: string, model: string): string {
+  return `${platform}:${model}`
+}
+
+export function aggregatePlazaModels(groups: ModelPlazaGroup[]): AggregatedPlazaModel[] {
+  const models = new Map<string, AggregatedPlazaModel>()
+  for (const group of groups) {
+    const rate = group.user_rate_multiplier ?? group.rate_multiplier
+    for (const model of group.models) {
+      const platform = model.platform || group.platform
+      const key = modelPlazaModelKey(platform, model.name)
+      const current = models.get(key) ?? { key, platform, name: model.name, offers: [] }
+      current.offers.push({ group, model, rate })
+      models.set(key, current)
+    }
+  }
+  return [...models.values()].sort((a, b) => a.platform.localeCompare(b.platform) || a.name.localeCompare(b.name))
+}
+
+export type PlazaSort = 'default' | 'name' | 'platform' | 'offers'
+
+export function sortAggregatedPlazaModels(models: AggregatedPlazaModel[], sort: PlazaSort): AggregatedPlazaModel[] {
+  if (sort === 'default') return models
+  return [...models].sort((a, b) => {
+    if (sort === 'name') return a.name.localeCompare(b.name) || a.platform.localeCompare(b.platform)
+    if (sort === 'platform') return a.platform.localeCompare(b.platform) || a.name.localeCompare(b.name)
+    if (sort === 'offers') return b.offers.length - a.offers.length || a.name.localeCompare(b.name)
+    return 0
+  })
+}
+
 export async function getModelPlaza(options?: { signal?: AbortSignal }): Promise<ModelPlazaResponse> {
   const { data } = await apiClient.get<ModelPlazaResponse>('/model-plaza', {
     signal: options?.signal
@@ -60,6 +115,13 @@ export async function getModelPlaza(options?: { signal?: AbortSignal }): Promise
   return data
 }
 
-export const modelPlazaAPI = { getModelPlaza }
+export async function updateUserModelBlock(
+  request: UpdateUserModelBlockRequest
+): Promise<UserModelBlockResponse> {
+  const { data } = await apiClient.put<UserModelBlockResponse>('/model-plaza/model-blocks', request)
+  return data
+}
+
+export const modelPlazaAPI = { getModelPlaza, updateUserModelBlock }
 
 export default modelPlazaAPI

@@ -573,18 +573,52 @@ export default {
     empty: 'No groups to display',
     loadFailed: 'Failed to load model plaza',
     noSearchResult: 'No matching models',
+    retry: 'Retry',
+    resultCount: '{count} results',
+    offerCount: '{count} offers',
+    offerDetails: 'View offer details',
+    offerRate: 'Rate ×{rate}',
     anonymousHint: 'Sign in to see your exclusive groups and personal rates',
+    view: {
+      label: 'Model Plaza view',
+      discover: 'Discover',
+      pricing: 'Pricing'
+    },
     filters: {
-      platformLabel: 'Platform',
+      label: 'Filters',
+      clear: 'Clear filters',
+      showBlocked: 'Show disabled models',
+      clearSearch: 'Clear model search',
       groupLabel: 'Group',
       rateLabel: 'Rate',
       modelLabel: 'Model',
+      platformLabel: 'Platform',
       searchPlaceholder: 'Search models',
+      sortLabel: 'Sort',
       all: 'All'
+    },
+    sort: {
+      default: 'Recommended',
+      name: 'Model name',
+      platform: 'Platform',
+      offers: 'Most offers'
     },
     badges: {
       exclusive: 'Exclusive',
       subscription: 'Subscription'
+    },
+    copy: {
+      id: 'Copy model ID',
+      copied: 'Copied',
+      failed: 'Could not copy the model ID'
+    },
+    blocked: {
+      badge: 'Disabled',
+      disable: 'Disable model',
+      enable: 'Enable model',
+      saving: 'Saving...',
+      confirm: 'Disable {model} for all of your API keys?',
+      failed: 'Could not update model availability'
     },
     detail: {
       noModels: 'No models configured for this group',

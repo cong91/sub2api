@@ -330,6 +330,24 @@ func (s *APIKeyService) AuthLookupMetrics() APIKeyAuthLookupMetrics {
 	}
 }
 
+func (s *APIKeyService) UserModelBlockRepository() UserModelBlockRepository {
+	if s == nil {
+		return nil
+	}
+	repo, _ := s.userRepo.(UserModelBlockRepository)
+	return repo
+}
+
+// CheckUserModelBlock enforces one exact user-level platform/model block.
+// Gateway route guards call this before handlers acquire concurrency slots.
+func (s *APIKeyService) CheckUserModelBlock(ctx context.Context, platform, model string) error {
+	var repo UserModelBlockRepository
+	if s != nil {
+		repo = s.UserModelBlockRepository()
+	}
+	return enforceUserModelBlock(ctx, repo, platform, model)
+}
+
 // NewAPIKeyService 创建API Key服务实例
 func NewAPIKeyService(
 	apiKeyRepo APIKeyRepository,

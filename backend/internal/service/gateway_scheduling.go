@@ -20,6 +20,43 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 )
 
+// enforceUserModelBlock enforces the authenticated user's exact platform/model
+// block before any account selection or scheduling side effect.
+func enforceUserModelBlock(ctx context.Context, repo UserModelBlockRepository, platform, requestedModel string) error {
+	userID, _ := ctx.Value(ctxkey.UserID).(int64)
+	if userID <= 0 || requestedModel == "" {
+		return nil
+	}
+	if resolvedPlatform, ok := ResolvedTargetPlatformFromContext(ctx); ok {
+		platform = resolvedPlatform
+	}
+	if resolvedModel, ok := ResolvedUpstreamModelFromContext(ctx); ok {
+		requestedModel = resolvedModel
+	}
+	if repo == nil {
+		return ErrUserModelBlockRepositoryUnavailable
+	}
+	block, err := NormalizeUserModelBlock(platform, requestedModel)
+	if err != nil {
+		return err
+	}
+	blocked, err := repo.IsUserModelBlocked(ctx, userID, block)
+	if err != nil {
+		return fmt.Errorf("check user model block: %w", err)
+	}
+	if blocked {
+		slog.Info("gateway_model_blocked", "user_id", userID, "platform", block.Platform, "model", block.Model)
+		return fmt.Errorf("%w: %s", ErrUserModelBlocked, block.Model)
+	}
+	return nil
+}
+
+// checkUserModelBlock enforces the authenticated user's exact platform/model block
+// before any account selection or scheduling side effect.
+func (s *GatewayService) checkUserModelBlock(ctx context.Context, platform, requestedModel string) error {
+	return enforceUserModelBlock(ctx, s.userModelBlockRepo, platform, requestedModel)
+}
+
 // SelectAccount 选择账号（粘性会话+优先级）
 func (s *GatewayService) SelectAccount(ctx context.Context, groupID *int64, sessionHash string) (*Account, error) {
 	return s.SelectAccountForModel(ctx, groupID, sessionHash, "")
@@ -63,6 +100,9 @@ func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context
 	} else {
 		// 无分组时只使用原生 anthropic 平台
 		platform = PlatformAnthropic
+	}
+	if err := s.checkUserModelBlock(ctx, platform, requestedModel); err != nil {
+		return nil, err
 	}
 	ctx = s.withGatewayProfitControlGate(ctx, groupID)
 
@@ -117,6 +157,14 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		return nil, err
 	}
 	ctx = s.withGroupContext(ctx, group)
+	loadAware := s.concurrencyService != nil && cfg.LoadBatchEnabled
+	platform, hasForcePlatform, err := s.resolvePlatform(ctx, groupID, group, requestedModel)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.checkUserModelBlock(ctx, platform, requestedModel); err != nil {
+		return nil, err
+	}
 	ctx = s.withGatewayProfitControlGate(ctx, groupID)
 
 	// Claude Code 限制可能已将 groupID 解析为 fallback group，
@@ -161,7 +209,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			derefGroupID(groupID), groupPlatform, requestedModel, shortSessionHash(sessionHash), stickyAccountID, cfg.LoadBatchEnabled, s.concurrencyService != nil)
 	}
 
-	if s.concurrencyService == nil || !cfg.LoadBatchEnabled {
+	if !loadAware {
 		// 复制排除列表，用于会话限制拒绝时的重试
 		localExcluded := make(map[int64]struct{})
 		for k, v := range excludedIDs {
@@ -211,10 +259,6 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		}
 	}
 
-	platform, hasForcePlatform, err := s.resolvePlatform(ctx, groupID, group, requestedModel)
-	if err != nil {
-		return nil, err
-	}
 	preferOAuth := platform == PlatformGemini
 	if s.debugModelRoutingEnabled() && platform == PlatformAnthropic && requestedModel != "" {
 		logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] load-aware enabled: group_id=%v model=%s session=%s platform=%s", derefGroupID(groupID), requestedModel, shortSessionHash(sessionHash), platform)

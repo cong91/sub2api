@@ -20,6 +20,7 @@ type ModelPlazaHandler struct {
 	channelService *service.ChannelService
 	apiKeyService  *service.APIKeyService
 	settingService *service.SettingService
+	modelBlockRepo service.UserModelBlockRepository
 }
 
 // NewModelPlazaHandler 创建模型广场 handler。
@@ -32,7 +33,15 @@ func NewModelPlazaHandler(
 		channelService: channelService,
 		apiKeyService:  apiKeyService,
 		settingService: settingService,
+		modelBlockRepo: modelBlockRepositoryFromAPIKeyService(apiKeyService),
 	}
+}
+
+func modelBlockRepositoryFromAPIKeyService(apiKeyService *service.APIKeyService) service.UserModelBlockRepository {
+	if apiKeyService == nil {
+		return nil
+	}
+	return apiKeyService.UserModelBlockRepository()
 }
 
 // modelPlazaOfficialPricing LiteLLM 官方参考价（USD per token）。
@@ -75,8 +84,22 @@ type modelPlazaGroup struct {
 
 // modelPlazaResponse 广场页响应。
 type modelPlazaResponse struct {
-	Description string            `json:"description"`
-	Groups      []modelPlazaGroup `json:"groups"`
+	Description   string                   `json:"description"`
+	Groups        []modelPlazaGroup        `json:"groups"`
+	BlockedModels []service.UserModelBlock `json:"blocked_models"`
+}
+
+// modelPlazaModelBlockRequest is the authenticated user preference mutation.
+type modelPlazaModelBlockRequest struct {
+	Platform string `json:"platform"`
+	Model    string `json:"model"`
+	Blocked  bool   `json:"blocked"`
+}
+
+type modelPlazaModelBlockResponse struct {
+	Platform string `json:"platform"`
+	Model    string `json:"model"`
+	Blocked  bool   `json:"blocked"`
 }
 
 // Get 返回模型广场数据。
@@ -107,6 +130,7 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 	// allowedExclusive == nil 表示匿名；登录用户恒为非 nil（可能为空集合）。
 	var allowedExclusive map[int64]struct{}
 	var userRates map[int64]float64
+	blockedModels := make([]service.UserModelBlock, 0)
 	if authed {
 		allowedExclusive, err = h.apiKeyService.GetUserAllowedGroupIDSet(c.Request.Context(), subject.UserID)
 		if err != nil {
@@ -120,6 +144,15 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 			slog.Warn("model_plaza_user_rates_failed", "error", err, "user_id", subject.UserID)
 			userRates = nil
 		}
+		if h.modelBlockRepo == nil {
+			response.InternalError(c, "Model block preferences are unavailable")
+			return
+		}
+		blockedModels, err = h.modelBlockRepo.ListUserModelBlocks(c.Request.Context(), subject.UserID)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
 	}
 
 	visible := filterPlazaVisibleGroups(groups, allowedExclusive)
@@ -129,8 +162,53 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 		out = append(out, toModelPlazaGroupDTO(&visible[i], userRates))
 	}
 	response.Success(c, modelPlazaResponse{
-		Description: rt.Description,
-		Groups:      out,
+		Description:   rt.Description,
+		Groups:        out,
+		BlockedModels: blockedModels,
+	})
+}
+
+// UpdateModelBlock changes one exact user-level model block preference.
+// PUT /api/v1/model-plaza/model-blocks
+func (h *ModelPlazaHandler) UpdateModelBlock(c *gin.Context) {
+	if h.settingService == nil {
+		response.NotFound(c, "Model plaza is not enabled")
+		return
+	}
+	rt := h.settingService.GetModelPlazaRuntime(c.Request.Context())
+	if !rt.Enabled {
+		response.NotFound(c, "Model plaza is not enabled")
+		return
+	}
+
+	subject, authed := middleware.GetAuthSubjectFromContext(c)
+	if !authed {
+		response.Unauthorized(c, "Authentication required")
+		return
+	}
+	if h.modelBlockRepo == nil {
+		response.InternalError(c, "Model block preferences are unavailable")
+		return
+	}
+
+	var req modelPlazaModelBlockRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid model block request")
+		return
+	}
+	block, err := service.NormalizeUserModelBlock(req.Platform, req.Model)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if err := h.modelBlockRepo.SetUserModelBlock(c.Request.Context(), subject.UserID, block, req.Blocked); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, modelPlazaModelBlockResponse{
+		Platform: block.Platform,
+		Model:    block.Model,
+		Blocked:  req.Blocked,
 	})
 }
 

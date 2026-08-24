@@ -175,11 +175,11 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			if len(fs.FailedAccountIDs) == 0 {
 				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, groupPlatform)
 				cls = classifySelectionFailureError(err, cls)
-				if !cls.ModelNotFound {
+				if !cls.ModelNotFound && !cls.SelectionBlocked {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 				}
 				message := cls.Message
-				if !cls.ModelNotFound {
+				if !cls.ModelNotFound && !cls.SelectionBlocked {
 					message = "No available accounts: " + err.Error()
 				}
 				h.chatCompletionsErrorResponse(c, cls.Status, cls.ErrType, message)

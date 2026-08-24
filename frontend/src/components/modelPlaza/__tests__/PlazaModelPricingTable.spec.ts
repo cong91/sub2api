@@ -384,15 +384,11 @@ describe('PlazaModelPricingTable', () => {
     expect(text).not.toContain('$0.000003')
   })
 
-  it('Composite 分组中相同模型名按具体平台分别展示徽章', () => {
+  it('shows concrete platform identity in each mobile pricing card', () => {
     const anthropic = tokenModel({ name: 'shared-model', platform: 'anthropic' })
     const openai = tokenModel({ name: 'shared-model', platform: 'openai' })
     const wrapper = mount(PlazaModelPricingTable, {
-      props: {
-        models: [anthropic, openai],
-        platform: 'composite',
-        rateMultiplier: 1
-      }
+      props: { models: [anthropic, openai], platform: 'composite', rateMultiplier: 1 }
     })
 
     const rows = wrapper.findAll('tbody tr')
@@ -401,7 +397,43 @@ describe('PlazaModelPricingTable', () => {
       'shared-modelAnthropic',
       'shared-modelOpenAI'
     ])
-    expect(wrapper.text()).toContain('Anthropic')
-    expect(wrapper.text()).toContain('OpenAI')
+    const cards = wrapper.findAll('[data-testid="mobile-pricing-card"]')
+    expect(cards).toHaveLength(2)
+    expect(cards[0].text()).toContain('Anthropic')
+    expect(cards[1].text()).toContain('OpenAI')
+  })
+
+  it('does not rank image and per-request workloads by token-oriented official output price', () => {
+    const image = tokenModel({
+      name: 'image-expensive-reference',
+      platform: 'openai',
+      pricing: {
+        billing_mode: 'image', input_price: null, output_price: null,
+        cache_write_price: null, cache_read_price: null, image_input_price: null,
+        image_output_price: null, per_request_price: 0.02, intervals: []
+      },
+      official_pricing: {
+        input_price: null, output_price: 1e-3, cache_write_price: null,
+        cache_write_1h_price: null, cache_read_price: null
+      }
+    })
+    const request = tokenModel({
+      name: 'request-cheap-reference',
+      platform: 'openai',
+      pricing: {
+        billing_mode: 'per_request', input_price: null, output_price: null,
+        cache_write_price: null, cache_read_price: null, image_input_price: null,
+        image_output_price: null, per_request_price: 0.02, intervals: []
+      },
+      official_pricing: {
+        input_price: null, output_price: 1e-6, cache_write_price: null,
+        cache_write_1h_price: null, cache_read_price: null
+      }
+    })
+
+    const wrapper = mountTable([image, request], 1)
+    const names = wrapper.findAll('tbody tr').map((row) => row.find('td').text())
+    expect(names[0]).toContain('request-cheap-reference')
+    expect(names[1]).toContain('image-expensive-reference')
   })
 })

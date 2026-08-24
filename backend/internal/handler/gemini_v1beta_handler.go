@@ -371,11 +371,12 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		if err != nil {
 			if len(fs.FailedAccountIDs) == 0 {
 				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, modelName, modelName, service.PlatformGemini)
-				if !cls.ModelNotFound {
+				cls = classifySelectionFailureError(err, cls)
+				if !cls.ModelNotFound && !cls.SelectionBlocked {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 				}
 				message := cls.Message
-				if !cls.ModelNotFound {
+				if !cls.ModelNotFound && !cls.SelectionBlocked {
 					message = "No available Gemini accounts: " + err.Error()
 				}
 				googleError(c, cls.Status, message)
