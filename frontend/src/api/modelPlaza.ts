@@ -50,19 +50,7 @@ export interface ModelPlazaResponse {
   /** 管理员配置的全局价格说明（Markdown）。 */
   description: string
   groups: ModelPlazaGroup[]
-  blocked_models?: UserModelBlock[]
 }
-
-export interface UserModelBlock {
-  platform: string
-  model: string
-}
-
-export interface UpdateUserModelBlockRequest extends UserModelBlock {
-  blocked: boolean
-}
-
-export interface UserModelBlockResponse extends UpdateUserModelBlockRequest {}
 
 export interface AggregatedPlazaOffer {
   group: ModelPlazaGroup
@@ -115,13 +103,6 @@ export async function getModelPlaza(options?: { signal?: AbortSignal }): Promise
   return data
 }
 
-export async function updateUserModelBlock(
-  request: UpdateUserModelBlockRequest
-): Promise<UserModelBlockResponse> {
-  const { data } = await apiClient.put<UserModelBlockResponse>('/model-plaza/model-blocks', request)
-  return data
-}
-
-export const modelPlazaAPI = { getModelPlaza, updateUserModelBlock }
+export const modelPlazaAPI = { getModelPlaza }
 
 export default modelPlazaAPI

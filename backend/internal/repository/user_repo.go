@@ -35,7 +35,6 @@ type userRepository struct {
 }
 
 var _ service.RedeemUserAdjustmentRepository = (*userRepository)(nil)
-var _ service.UserModelBlockRepository = (*userRepository)(nil)
 
 func NewUserRepository(client *dbent.Client, sqlDB *sql.DB) service.UserRepository {
 	return newUserRepositoryWithSQL(client, sqlDB)
@@ -43,99 +42,6 @@ func NewUserRepository(client *dbent.Client, sqlDB *sql.DB) service.UserReposito
 
 func newUserRepositoryWithSQL(client *dbent.Client, sqlq sqlExecutor) *userRepository {
 	return &userRepository{client: client, sql: sqlq}
-}
-
-func (r *userRepository) ListUserModelBlocks(ctx context.Context, userID int64) ([]service.UserModelBlock, error) {
-	if r.sql == nil {
-		return nil, service.ErrUserModelBlockRepositoryUnavailable
-	}
-	if userID <= 0 {
-		return []service.UserModelBlock{}, nil
-	}
-	rows, err := r.sql.QueryContext(ctx, `
-		SELECT platform, model
-		FROM user_model_blocks
-		WHERE user_id = $1
-		ORDER BY platform, model`, userID)
-	if err != nil {
-		return nil, fmt.Errorf("list user model blocks: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	blocks := make([]service.UserModelBlock, 0)
-	for rows.Next() {
-		var block service.UserModelBlock
-		if err := rows.Scan(&block.Platform, &block.Model); err != nil {
-			return nil, fmt.Errorf("scan user model block: %w", err)
-		}
-		blocks = append(blocks, block)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate user model blocks: %w", err)
-	}
-	return blocks, nil
-}
-
-func (r *userRepository) SetUserModelBlock(ctx context.Context, userID int64, block service.UserModelBlock, blocked bool) error {
-	if r.sql == nil {
-		return service.ErrUserModelBlockRepositoryUnavailable
-	}
-	if userID <= 0 {
-		return fmt.Errorf("user model block user id is invalid")
-	}
-	if _, err := service.NormalizeUserModelBlock(block.Platform, block.Model); err != nil {
-		return err
-	}
-	if blocked {
-		_, err := r.sql.ExecContext(ctx, `
-			INSERT INTO user_model_blocks (user_id, platform, model)
-			VALUES ($1, $2, $3)
-			ON CONFLICT (user_id, platform, model)
-			DO UPDATE SET updated_at = NOW()`, userID, block.Platform, block.Model)
-		if err != nil {
-			return fmt.Errorf("set user model block: %w", err)
-		}
-		return nil
-	}
-	_, err := r.sql.ExecContext(ctx, `
-		DELETE FROM user_model_blocks
-		WHERE user_id = $1 AND platform = $2 AND model = $3`, userID, block.Platform, block.Model)
-	if err != nil {
-		return fmt.Errorf("clear user model block: %w", err)
-	}
-	return nil
-}
-
-func (r *userRepository) IsUserModelBlocked(ctx context.Context, userID int64, block service.UserModelBlock) (bool, error) {
-	if r.sql == nil {
-		return false, service.ErrUserModelBlockRepositoryUnavailable
-	}
-	if userID <= 0 {
-		return false, nil
-	}
-	if _, err := service.NormalizeUserModelBlock(block.Platform, block.Model); err != nil {
-		return false, err
-	}
-	rows, err := r.sql.QueryContext(ctx, `
-		SELECT EXISTS(
-			SELECT 1 FROM user_model_blocks
-			WHERE user_id = $1 AND platform = $2 AND model = $3
-		)`, userID, block.Platform, block.Model)
-	if err != nil {
-		return false, fmt.Errorf("check user model block: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	var blocked bool
-	if !rows.Next() {
-		if err := rows.Err(); err != nil {
-			return false, fmt.Errorf("read user model block: %w", err)
-		}
-		return false, fmt.Errorf("check user model block: no result")
-	}
-	if err := rows.Scan(&blocked); err != nil {
-		return false, fmt.Errorf("scan user model block: %w", err)
-	}
-	return blocked, nil
 }
 
 func (r *userRepository) Create(ctx context.Context, userIn *service.User) error {

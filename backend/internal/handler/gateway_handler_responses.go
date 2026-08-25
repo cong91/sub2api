@@ -177,11 +177,11 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			if len(fs.FailedAccountIDs) == 0 {
 				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, effectiveAPIKeyPlatform(c, apiKey))
 				cls = classifySelectionFailureError(err, cls)
-				if !cls.ModelNotFound && !cls.SelectionBlocked {
+				if !cls.ModelNotFound {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 				}
 				message := cls.Message
-				if !cls.ModelNotFound && !cls.SelectionBlocked {
+				if !cls.ModelNotFound {
 					message = "No available accounts: " + err.Error()
 				}
 				h.responsesErrorResponse(c, cls.Status, cls.ErrType, message)

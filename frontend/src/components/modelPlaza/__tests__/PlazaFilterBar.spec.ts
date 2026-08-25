@@ -17,10 +17,7 @@ describe('PlazaFilterBar', () => {
         groupId: 'all',
         rate: 'all',
         search: '',
-        sort: 'name',
-        view: 'discover',
-        showBlocked: false,
-        resultCount: 1
+        sort: 'name'
       },
       global: { stubs: { PlatformIcon: true, Icon: true } }
     })

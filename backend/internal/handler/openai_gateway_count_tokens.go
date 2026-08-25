@@ -108,8 +108,7 @@ func (h *OpenAIGatewayHandler) ResponsesInputTokens(c *gin.Context) {
 	if err != nil {
 		reqLog.Warn("openai_input_tokens.account_select_failed", zap.Error(openAICompatibleSelectionErrorForLog(err, requestPlatform)))
 		cls := classifyOpenAICompatibleNoAccountErrorFromGin(c, h.gatewayService, apiKey, routingModel, reqModel)
-		cls = classifySelectionFailureError(err, cls)
-		if !cls.ModelNotFound && !cls.SelectionBlocked {
+		if !cls.ModelNotFound {
 			markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 		}
 		h.errorResponse(c, cls.Status, cls.ErrType, cls.Message)
@@ -117,7 +116,7 @@ func (h *OpenAIGatewayHandler) ResponsesInputTokens(c *gin.Context) {
 	}
 	if account == nil {
 		cls := classifyOpenAICompatibleNoAccountErrorFromGin(c, h.gatewayService, apiKey, routingModel, reqModel)
-		if !cls.ModelNotFound && !cls.SelectionBlocked {
+		if !cls.ModelNotFound {
 			markOpsRoutingCapacityLimited(c)
 		}
 		h.errorResponse(c, cls.Status, cls.ErrType, cls.Message)
@@ -282,8 +281,7 @@ func (h *OpenAIGatewayHandler) CountTokens(c *gin.Context) {
 		requestPlatform := openAICompatibleRequestPlatform(c.Request.Context(), apiKey)
 		reqLog.Warn("openai_count_tokens.account_select_failed", zap.Error(openAICompatibleSelectionErrorForLog(err, requestPlatform)))
 		cls := classifyOpenAICompatibleNoAccountErrorFromGin(c, h.gatewayService, apiKey, currentRoutingModel, reqModel)
-		cls = classifySelectionFailureError(err, cls)
-		if !cls.ModelNotFound && !cls.SelectionBlocked {
+		if !cls.ModelNotFound {
 			markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 		}
 		h.anthropicErrorResponse(c, cls.Status, cls.ErrType, cls.Message)
@@ -291,7 +289,7 @@ func (h *OpenAIGatewayHandler) CountTokens(c *gin.Context) {
 	}
 	if account == nil {
 		cls := classifyOpenAICompatibleNoAccountErrorFromGin(c, h.gatewayService, apiKey, currentRoutingModel, reqModel)
-		if !cls.ModelNotFound && !cls.SelectionBlocked {
+		if !cls.ModelNotFound {
 			markOpsRoutingCapacityLimited(c)
 		}
 		h.anthropicErrorResponse(c, cls.Status, cls.ErrType, cls.Message)

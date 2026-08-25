@@ -27,7 +27,7 @@ vi.mock('vue-router', async () => {
 })
 
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({ isAuthenticated: false })
+  useAuthStore: () => ({ isAuthenticated: true })
 }))
 
 vi.mock('vue-i18n', async () => {
@@ -97,6 +97,14 @@ describe('ModelPlazaContent', () => {
     expect(wrapper.find('[data-testid="pricing-group"]').text()).toBe('openai:shared-model')
   })
 
+  it('does not render a per-user model policy control for authenticated users', () => {
+    routerState.route.query = {}
+    const wrapper = mountContent()
+
+    expect(wrapper.findAll('button').some((button) => button.text() === 'modelPlaza.blocked.disable')).toBe(false)
+    expect(wrapper.findAll('button').some((button) => button.text() === 'modelPlaza.blocked.enable')).toBe(false)
+  })
+
   it('hydrates controls when route query changes after mount', async () => {
     routerState.route.query = {}
     const wrapper = mountContent()
@@ -109,6 +117,6 @@ describe('ModelPlazaContent', () => {
     const filter = wrapper.findComponent(PlazaFilterBar)
     expect(filter.props('platform')).toBe('openai')
     expect(filter.props('sort')).toBe('name')
-    expect(filter.props('view')).toBe('pricing')
+    expect(wrapper.vm.view).toBe('pricing')
   })
 })

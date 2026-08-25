@@ -592,7 +592,6 @@ export default {
     filters: {
       label: '筛选',
       clear: '清除筛选',
-      showBlocked: '显示已停用模型',
       clearSearch: '清除模型搜索',
       groupLabel: '分组',
       rateLabel: '倍率',
@@ -617,14 +616,7 @@ export default {
       copied: '已复制',
       failed: '无法复制模型 ID'
     },
-    blocked: {
-      badge: '已停用',
-      disable: '停用模型',
-      enable: '启用模型',
-      saving: '保存中...',
-      confirm: '要为你的所有 API Key 停用 {model} 吗？',
-      failed: '更新模型可用状态失败'
-    },
+
     detail: {
       noModels: '该分组暂未配置模型',
       noPricing: '未配置定价',

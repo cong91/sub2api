@@ -587,7 +587,6 @@ export default {
     filters: {
       label: 'Filters',
       clear: 'Clear filters',
-      showBlocked: 'Show disabled models',
       clearSearch: 'Clear model search',
       groupLabel: 'Group',
       rateLabel: 'Rate',
@@ -612,14 +611,7 @@ export default {
       copied: 'Copied',
       failed: 'Could not copy the model ID'
     },
-    blocked: {
-      badge: 'Disabled',
-      disable: 'Disable model',
-      enable: 'Enable model',
-      saving: 'Saving...',
-      confirm: 'Disable {model} for all of your API keys?',
-      failed: 'Could not update model availability'
-    },
+
     detail: {
       noModels: 'No models configured for this group',
       noPricing: 'Pricing not configured',

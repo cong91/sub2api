@@ -322,7 +322,6 @@ const additions = {
     filters: {
       label: 'Bộ lọc',
       clear: 'Xóa bộ lọc',
-      showBlocked: 'Hiển thị model đã tắt',
       clearSearch: 'Xóa tìm kiếm model',
       groupLabel: 'Nhóm',
       rateLabel: 'Tỷ lệ',
@@ -347,14 +346,7 @@ const additions = {
       copied: 'Đã sao chép',
       failed: 'Không thể sao chép model ID',
     },
-    blocked: {
-      badge: 'Đã tắt',
-      disable: 'Tắt model',
-      enable: 'Bật model',
-      saving: 'Đang lưu...',
-      confirm: 'Tắt {model} cho tất cả API key của bạn?',
-      failed: 'Không thể cập nhật trạng thái model',
-    },
+
     detail: {
       noModels: 'Không có mô hình nào được định cấu hình cho nhóm này',
       noPricing: 'Giá chưa được định cấu hình',

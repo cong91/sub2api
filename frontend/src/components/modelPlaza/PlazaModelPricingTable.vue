@@ -343,19 +343,20 @@ const accentStyle = computed(() => ({ '--plaza-accent': platformAccentColor(prop
 const PER_MILLION = 1_000_000
 
 /**
- * 展示顺序:
- * 1. token 计费的排在前,按图/按次计费的沉到末尾——它们的官方 token 价与实付的按张/按次价不同量纲,混排无意义;
- * 2. 组内按官方输出价从高到低,无官方价的排最后;
- * 3. 同价按名称降序(新版本号在前,如 gpt-5.6 先于 gpt-5.5)。
+ * 只在同一计费口径内排序，避免为 token / 按次 / 按图建立跨口径排名：
+ * - 混合计费口径时保留后端（管理员发布）的顺序；
+ * - token 组内按官方输出价从高到低，无官方价的排最后；
+ * - 同一非 token 口径按名称稳定展示；
+ * - 同价 token 按名称降序（新版本号在前，如 gpt-5.6 先于 gpt-5.5）。
  */
 const sortedModels = computed(() => {
-  return [...props.models].sort((a, b) => {
-    const modeA = billingMode(a)
-    const modeB = billingMode(b)
-    const rankA = modeA === BILLING_MODE_TOKEN ? 0 : modeA === 'per_request' ? 1 : 2
-    const rankB = modeB === BILLING_MODE_TOKEN ? 0 : modeB === 'per_request' ? 1 : 2
-    if (rankA !== rankB) return rankA - rankB
-    if (modeA !== BILLING_MODE_TOKEN) return a.name.localeCompare(b.name)
+  const models = [...props.models]
+  const modes = new Set(models.map(billingMode))
+  if (modes.size > 1) return models
+  const [mode] = modes
+  if (mode !== BILLING_MODE_TOKEN) return models.sort((a, b) => a.name.localeCompare(b.name))
+
+  return models.sort((a, b) => {
     const pa = a.official_pricing?.output_price ?? null
     const pb = b.official_pricing?.output_price ?? null
     if (pa != null && pb != null && pa !== pb) return pb - pa

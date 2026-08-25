@@ -1,16 +1,10 @@
 <template>
   <div class="space-y-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-card dark:border-dark-700/50 dark:bg-dark-800/50">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center gap-2">
-        <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-dark-500">{{ t('modelPlaza.filters.label') }}</span>
-        <button v-if="hasActiveFilters" type="button" class="rounded-md px-2 py-1 text-xs font-semibold text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-primary-300 dark:hover:bg-primary-500/10" @click="$emit('clear')">
-          {{ t('modelPlaza.filters.clear') }}
-        </button>
-      </div>
-      <label class="inline-flex min-h-10 cursor-pointer items-center gap-2 text-xs text-gray-600 dark:text-dark-300">
-        <input :checked="showBlocked" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="$emit('update:showBlocked', ($event.target as HTMLInputElement).checked)" />
-        {{ t('modelPlaza.filters.showBlocked') }}
-      </label>
+    <div class="flex items-center gap-2">
+      <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-dark-500">{{ t('modelPlaza.filters.label') }}</span>
+      <button v-if="hasActiveFilters" type="button" class="rounded-md px-2 py-1 text-xs font-semibold text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-primary-300 dark:hover:bg-primary-500/10" @click="$emit('clear')">
+        {{ t('modelPlaza.filters.clear') }}
+      </button>
     </div>
 
     <div class="flex items-start gap-3">
@@ -80,9 +74,6 @@ const props = defineProps<{
   rate: number | 'all'
   search: string
   sort: PlazaSort
-  view: 'discover' | 'pricing'
-  showBlocked: boolean
-  resultCount: number
 }>()
 
 defineEmits<{
@@ -91,13 +82,11 @@ defineEmits<{
   'update:rate': [value: number | 'all']
   'update:search': [value: string]
   'update:sort': [value: PlazaSort]
-  'update:view': [value: 'discover' | 'pricing']
-  'update:showBlocked': [value: boolean]
   clear: []
 }>()
 
 const { t } = useI18n()
-const hasActiveFilters = computed(() => props.platform !== 'all' || props.groupId !== 'all' || props.rate !== 'all' || props.search.trim() !== '' || props.sort !== 'default' || props.showBlocked)
+const hasActiveFilters = computed(() => props.platform !== 'all' || props.groupId !== 'all' || props.rate !== 'all' || props.search.trim() !== '' || props.sort !== 'default')
 
 function platformEnabled(platform: string): boolean {
   return props.groups.some((group) => (group.platform === platform || group.modelPlatforms?.includes(platform)) && (props.groupId === 'all' || group.id === props.groupId) && (props.rate === 'all' || group.rate === props.rate))

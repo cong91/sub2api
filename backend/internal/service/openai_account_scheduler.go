@@ -2156,17 +2156,6 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 	previousResponseCanMove bool,
 	useUpstreamTokenCost bool,
 ) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
-	if s == nil {
-		return nil, OpenAIAccountScheduleDecision{}, ErrUserModelBlockRepositoryUnavailable
-	}
-	if err := enforceUserModelBlock(
-		ctx,
-		userModelBlockRepositoryFromUserRepository(s.userRepo),
-		platform,
-		requestedModel,
-	); err != nil {
-		return nil, OpenAIAccountScheduleDecision{}, err
-	}
 	selection, decision, err := s.selectAccountWithSchedulerOnce(ctx, groupID, previousResponseID, sessionHash, requestedModel, excludedIDs, requiredTransport, requiredCapability, requiredImageCapability, requireCompact, platform, previousResponseCanMove, useUpstreamTokenCost)
 	if err == nil || openAIProxyStreamQuarantineBypassed(ctx) {
 		return selection, decision, err

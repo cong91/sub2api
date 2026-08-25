@@ -76,25 +76,6 @@ func TestClassifySelectionFailureError_RateLimitedPool(t *testing.T) {
 	require.Equal(t, fallback, classifySelectionFailureError(fmt.Errorf("no available accounts"), fallback))
 }
 
-func TestClassifySelectionFailureError_UserModelBlockedReturnsForbidden(t *testing.T) {
-	fallback := noAccountErrorClassification{
-		Status:  http.StatusServiceUnavailable,
-		ErrType: "api_error",
-		Message: "Service temporarily unavailable",
-	}
-
-	got := classifySelectionFailureError(
-		fmt.Errorf("%w: gpt-4.1", service.ErrUserModelBlocked),
-		fallback,
-	)
-
-	require.Equal(t, http.StatusForbidden, got.Status)
-	require.Equal(t, "MODEL_BLOCKED", got.ErrType)
-	require.Equal(t, "This model is blocked for the current user.", got.Message)
-	require.True(t, got.SelectionBlocked)
-	require.False(t, got.ModelNotFound)
-}
-
 func TestClassifyNoAccountError_NilAPIKey_Falls503(t *testing.T) {
 	c := newTestGinContextWithRequest()
 	fd := &fakeDiagnoser{resp: service.ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: false}}

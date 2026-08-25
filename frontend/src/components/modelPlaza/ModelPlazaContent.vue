@@ -54,16 +54,11 @@
         :rate="selectedRate"
         :search="searchQuery"
         :sort="sort"
-        :view="view"
-        :show-blocked="showBlocked"
-        :result-count="resultCount"
         @update:platform="selectedPlatform = $event"
         @update:group-id="selectedGroupId = $event"
         @update:rate="selectedRate = $event"
         @update:search="searchQuery = $event"
         @update:sort="sort = $event"
-        @update:view="view = $event"
-        @update:show-blocked="showBlocked = $event"
         @clear="clearFilters"
       />
 
@@ -77,17 +72,13 @@
           <article
             v-for="model in aggregatedModels"
             :key="model.key"
-            class="rounded-2xl border bg-white p-5 shadow-card transition dark:bg-dark-800/50"
-            :class="isBlocked(model) ? 'border-amber-300/70 opacity-85 dark:border-amber-500/40' : 'border-gray-100 dark:border-dark-700/50'"
+            class="rounded-2xl border border-gray-100 bg-white p-5 shadow-card transition dark:border-dark-700/50 dark:bg-dark-800/50"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-dark-500">{{ model.platform }}</p>
                 <h3 class="mt-1 break-words font-mono text-sm font-semibold text-gray-900 dark:text-white">{{ model.name }}</h3>
               </div>
-              <span v-if="isBlocked(model)" class="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-                {{ t('modelPlaza.blocked.badge') }}
-              </span>
             </div>
 
             <div class="mt-4 flex items-center justify-between gap-2 text-xs text-gray-500 dark:text-dark-400">
@@ -123,14 +114,11 @@
               <button type="button" class="inline-flex min-h-10 items-center rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-dark-600 dark:text-dark-200 dark:hover:bg-dark-700" @click="copyModelId(model)">
                 {{ copyKey === model.key ? t('modelPlaza.copy.copied') : t('modelPlaza.copy.id') }}
               </button>
-              <button v-if="isAuthenticated" type="button" class="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500" :class="isBlocked(model) ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark-700 dark:text-dark-200 dark:hover:bg-dark-600'" :aria-pressed="isBlocked(model)" :disabled="busyKey === model.key" @click="toggleBlock(model)">
-                {{ busyKey === model.key ? t('modelPlaza.blocked.saving') : isBlocked(model) ? t('modelPlaza.blocked.enable') : t('modelPlaza.blocked.disable') }}
-              </button>
             </div>
           </article>
         </div>
         <div v-else class="rounded-2xl border border-dashed border-gray-300 px-5 py-12 text-center text-sm text-gray-500 dark:border-dark-600 dark:text-dark-400">
-          {{ searchActive || showBlocked ? t('modelPlaza.noSearchResult') : t('modelPlaza.empty') }}
+          {{ searchActive ? t('modelPlaza.noSearchResult') : t('modelPlaza.empty') }}
         </div>
       </section>
 
@@ -156,8 +144,8 @@ import DOMPurify from 'dompurify'
 import Icon from '@/components/icons/Icon.vue'
 import PlazaFilterBar from './PlazaFilterBar.vue'
 import PlazaGroupSection from './PlazaGroupSection.vue'
-import type { ModelPlazaGroup, ModelPlazaResponse, PlazaModel, UserModelBlock } from '@/api/modelPlaza'
-import { aggregatePlazaModels, modelPlazaModelKey, sortAggregatedPlazaModels, updateUserModelBlock, type PlazaSort } from '@/api/modelPlaza'
+import type { ModelPlazaGroup, ModelPlazaResponse, PlazaModel } from '@/api/modelPlaza'
+import { aggregatePlazaModels, sortAggregatedPlazaModels, type PlazaSort } from '@/api/modelPlaza'
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
@@ -200,10 +188,7 @@ const selectedGroupId = ref<number | 'all'>(queryNumber('group', 'all'))
 const selectedRate = ref<number | 'all'>(queryNumber('rate', 'all'))
 const searchQuery = ref(queryString('search'))
 const sort = ref<PlazaSort>(querySort())
-const showBlocked = ref(queryString('blocked') === '1')
-const blockedModels = ref<UserModelBlock[]>([])
 const copyKey = ref('')
-const busyKey = ref('')
 const mutationError = ref('')
 
 const descriptionHtml = computed(() => {
@@ -211,28 +196,11 @@ const descriptionHtml = computed(() => {
   return md ? DOMPurify.sanitize(marked.parse(md) as string) : ''
 })
 
-watch(
-  () => props.response,
-  (response) => {
-    blockedModels.value = [...(response?.blocked_models ?? [])]
-  },
-  { immediate: true }
-)
-
 function effectiveRate(group: ModelPlazaGroup): number {
   return group.user_rate_multiplier ?? group.rate_multiplier
 }
 function modelPlatform(group: ModelPlazaGroup, model: PlazaModel): string {
   return model.platform || group.platform
-}
-function modelKey(platform: string, model: string): string {
-  return modelPlazaModelKey(platform, model)
-}
-function modelBlockKey(model: { platform: string; name: string }): string {
-  return modelKey(model.platform, model.name)
-}
-function isBlocked(model: { platform: string; name: string }): boolean {
-  return blockedModels.value.some((block) => modelKey(block.platform, block.model) === modelBlockKey(model))
 }
 function formatRate(rate: number): string {
   return Number.isInteger(rate) ? String(rate) : rate.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
@@ -260,9 +228,8 @@ const filteredGroups = computed(() => {
       const models = group.models.filter((model) => {
         const platform = modelPlatform(group, model)
         const matchesSearch = !query || model.name.toLowerCase().includes(query) || platform.toLowerCase().includes(query)
-        const blocked = isBlocked({ platform, name: model.name })
         const matchesPlatform = selectedPlatform.value === 'all' || platform === selectedPlatform.value
-        return matchesPlatform && matchesSearch && (showBlocked.value || !blocked)
+        return matchesPlatform && matchesSearch
       })
       return {
         ...group,
@@ -288,10 +255,9 @@ function clearFilters() {
   selectedRate.value = 'all'
   searchQuery.value = ''
   sort.value = 'default'
-  showBlocked.value = false
 }
 
-watch([view, selectedPlatform, selectedGroupId, selectedRate, searchQuery, sort, showBlocked], () => {
+watch([view, selectedPlatform, selectedGroupId, selectedRate, searchQuery, sort], () => {
   const query = { ...route.query } as Record<string, string>
   const values: Record<string, string | undefined> = {
     view: view.value === 'discover' ? undefined : view.value,
@@ -299,8 +265,7 @@ watch([view, selectedPlatform, selectedGroupId, selectedRate, searchQuery, sort,
     group: selectedGroupId.value === 'all' ? undefined : String(selectedGroupId.value),
     rate: selectedRate.value === 'all' ? undefined : String(selectedRate.value),
     search: searchQuery.value.trim() || undefined,
-    sort: sort.value === 'default' ? undefined : sort.value,
-    blocked: showBlocked.value ? '1' : undefined
+    sort: sort.value === 'default' ? undefined : sort.value
   }
   for (const [key, value] of Object.entries(values)) {
     if (value) query[key] = value
@@ -316,14 +281,12 @@ function syncStateFromRouteQuery() {
   const nextRate = queryNumber('rate', 'all')
   const nextSearch = queryString('search')
   const nextSort = querySort()
-  const nextShowBlocked = queryString('blocked') === '1'
   if (view.value !== nextView) view.value = nextView
   if (selectedPlatform.value !== nextPlatform) selectedPlatform.value = nextPlatform
   if (selectedGroupId.value !== nextGroupId) selectedGroupId.value = nextGroupId
   if (selectedRate.value !== nextRate) selectedRate.value = nextRate
   if (searchQuery.value !== nextSearch) searchQuery.value = nextSearch
   if (sort.value !== nextSort) sort.value = nextSort
-  if (showBlocked.value !== nextShowBlocked) showBlocked.value = nextShowBlocked
 }
 
 watch(() => route.query, syncStateFromRouteQuery, { deep: true })
@@ -341,23 +304,6 @@ async function copyModelId(model: { key: string }) {
     }, 1600)
   } catch {
     mutationError.value = t('modelPlaza.copy.failed')
-  }
-}
-
-async function toggleBlock(model: { key: string; platform: string; name: string }) {
-  const nextBlocked = !isBlocked(model)
-  if (nextBlocked && !window.confirm(t('modelPlaza.blocked.confirm', { model: model.key }))) return
-  busyKey.value = model.key
-  mutationError.value = ''
-  try {
-    const response = await updateUserModelBlock({ platform: model.platform, model: model.name, blocked: nextBlocked })
-    blockedModels.value = nextBlocked
-      ? [...blockedModels.value.filter((item) => modelKey(item.platform, item.model) !== model.key), { platform: response.platform, model: response.model }]
-      : blockedModels.value.filter((item) => modelKey(item.platform, item.model) !== model.key)
-  } catch {
-    mutationError.value = t('modelPlaza.blocked.failed')
-  } finally {
-    busyKey.value = ''
   }
 }
 </script>
