@@ -204,7 +204,7 @@ func (s *BotSalesFulfillmentService) fulfillInTransaction(ctx context.Context, i
 	}
 
 	// payment_order_id uses NULL when no order was created (graceful degradation)
-	var paymentOrderID interface{}
+	var paymentOrderID any
 	if response.PaymentOrderID > 0 {
 		paymentOrderID = response.PaymentOrderID
 	}
