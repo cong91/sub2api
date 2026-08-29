@@ -29,7 +29,7 @@
 - The restored targeted suite is included in the green full frontend run (`PlazaModelPricingTable.spec.ts`: `25` tests).
 
 ## Release blockers / risks
-- CI and Security Scan are green on the current PR head SHA `88d0b4afb86716b68569e30e064d48166b7da564` (duplicate CI/Security runs on the same SHA also passed).
+- CI and Security Scan are green on the current PR head; latest check-runs have no annotations.
 - Independent review remains unavailable; local verification and self-review do not replace formal approval.
 - No merge, deployment, release, or production-impacting action is authorized by this state.
 
