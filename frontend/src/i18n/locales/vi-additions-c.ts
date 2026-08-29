@@ -1,6 +1,8 @@
 const additions = {
   admin: {
     subscriptions: {
+      searchDeviceCode: 'Tìm kiếm theo mã thiết bị',
+      searchDeviceCodePlaceholder: 'Nhập mã thiết bị',
       restoreSubscription: 'Khôi phục đăng ký',
       quotaEndsInMinutes: 'Hạn ngạch kết thúc sau {minutes}m',
       quotaEndsInHoursMinutes: 'Hạn ngạch kết thúc sau {hours}h {minutes}m',
@@ -16,6 +18,12 @@ const additions = {
       restoreConfirm: 'Khôi phục đăng ký cho \'{user}\'? Nếu đăng ký ban đầu đã hết hạn, đăng ký đó sẽ được khôi phục dưới dạng đã hết hạn.',
     },
     accounts: {
+      syncUpstreamModelsMetadataIncomplete: 'ID model đã được đồng bộ, nhưng metadata khả năng chưa đầy đủ và không được cập nhật.',
+      fromModel: 'Model nguồn',
+      toModel: 'Model đích',
+      messages: {
+        accountCreated: 'Đã tạo tài khoản',
+      },
       dataExportedSkippedShadows: 'Đã xuất dữ liệu. Đã bỏ qua (các) tài khoản bóng tối {count}: cấu hình lập lịch của họ không được bao gồm trong bản sao lưu; tạo lại và điều chỉnh lại chúng sau khi khôi phục.',
       dataImportParseFailedFile: 'Không thể phân tích cú pháp {name}',
       dataImportInvalidFile: '{name} không phải là tệp xuất dữ liệu được hỗ trợ',
@@ -216,6 +224,14 @@ const additions = {
         resetAccountRecoveryFailed: 'Cửa sổ đã được đặt lại nhưng không thể khôi phục trạng thái tài khoản. Khôi phục trạng thái tài khoản theo cách thủ công.',
         resetAccountRefreshFailed: 'Cửa sổ, trạng thái tài khoản và bộ đệm tín dụng đặt lại đã được cập nhật nhưng không thể tải màn hình tài khoản mới nhất.',
         refreshCachePersistFailed: 'Hiển thị số lượng trực tiếp nhưng chi tiết hết hạn không có sẵn nên chi tiết được lưu trong bộ nhớ đệm vẫn được giữ lại.',
+        autoStatus: {
+          checking: 'Đang kiểm tra',
+          available: 'Có lượt đặt lại',
+          resetting: 'Đang tự động đặt lại',
+          success: 'Tự động đặt lại thành công',
+          noCredit: 'Không còn lượt',
+          failed: 'Tự động đặt lại thất bại',
+        },
         confirmTitle: 'Xác nhận đặt lại giới hạn hàng tuần',
         confirmMessage: 'Việc này sẽ tiêu tốn 1 tín dụng đặt lại để khôi phục ngay cửa sổ hiện tại (còn lại {count}). Không thể hoàn tác hành động này. Tiếp tục?',
       },

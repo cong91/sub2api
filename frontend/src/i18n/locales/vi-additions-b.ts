@@ -251,14 +251,12 @@ const additions = {
         unsupportedMessage: 'Máy chủ Sub2API này không thể tạo chứng thực Trực tiếp cần thiết. Trực tiếp sẽ không hoạt động ngay cả khi được bật. Vẫn tiếp tục chứ?',
         enableAnyway: 'Vẫn bật',
       },
-      modelRouting: {
-        claudeMaxSimulation: {
-          title: 'Claude Max được yêu thích',
-          tooltip: 'Khi bật, với các model Claude không có số liệu ghi cache từ upstream, hệ thống sẽ ánh xạ token một cách xác định thành một phần nhỏ input và tạo cache 1 giờ, đồng thời giữ nguyên tổng số token.',
-          enabled: 'Đã bật (mô phỏng cache 1 giờ)',
-          disabled: 'Đã tắt',
-          hint: 'Chỉ điều chỉnh loại token trong nhật ký tính phí sử dụng. Trạng thái ánh xạ của từng request sẽ không được lưu lâu dài.',
-        },
+      claudeMaxSimulation: {
+        title: 'Mô phỏng mức sử dụng Claude Max',
+        tooltip: 'Khi bật, với các model Claude không có số liệu ghi cache từ upstream, hệ thống sẽ ánh xạ token một cách xác định thành một phần nhỏ input và tạo cache 1 giờ, đồng thời giữ nguyên tổng số token.',
+        enabled: 'Đã bật (mô phỏng cache 1 giờ)',
+        disabled: 'Đã tắt',
+        hint: 'Chỉ điều chỉnh loại token trong nhật ký tính phí sử dụng. Trạng thái ánh xạ của từng request sẽ không được lưu lâu dài.',
       },
     },
     availableChannels: {
@@ -305,6 +303,9 @@ const additions = {
         cacheReadMultiplier: 'Đọc bộ nhớ cache Mult.',
         timePricing: 'Định giá theo thời gian (tùy chọn)',
         timezone: 'Múi giờ',
+        timePricingDayScope: 'Ngày áp dụng',
+        timePricingEveryDay: 'Mỗi ngày (Thứ Hai–Chủ Nhật, bao gồm cuối tuần)',
+        timePricingWeekdaysOnly: 'Chỉ ngày làm việc (Thứ Hai–Thứ Sáu)',
         addTimePeriod: 'Thêm dấu chấm',
         startTime: 'Thời gian bắt đầu',
         endTime: 'Thời gian kết thúc',
