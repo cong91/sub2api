@@ -2,7 +2,7 @@
 
 ## Current focus
 - Vietnamese locale content is complete and has been reorganized into the same module-folder layout used by English and Chinese.
-- Local verification for the folder refactor is green; commit/push and fresh CI on the new SHA remain pending.
+- Local verification, commit, push, and fresh CI/Security checks for the folder refactor are green on the current PR head.
 
 ## Repo
 - Branch: `feat/vietnamese-locale-coverage-followup`
@@ -29,8 +29,7 @@
 - The restored targeted suite is included in the green full frontend run (`PlazaModelPricingTable.spec.ts`: `25` tests).
 
 ## Release blockers / risks
-- CI and Security Scan were green on the previous PR head SHA `9661d0a1ae6bd014f06c3da54d7f6bdeee0daf40`.
-- The locale-folder refactor is not covered by that old SHA; require fresh CI/Security results after push before merge or release.
+- CI and Security Scan are green on the current PR head SHA `88d0b4afb86716b68569e30e064d48166b7da564` (duplicate CI/Security runs on the same SHA also passed).
 - Independent review remains unavailable; local verification and self-review do not replace formal approval.
 - No merge, deployment, release, or production-impacting action is authorized by this state.
 
