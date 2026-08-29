@@ -23,7 +23,10 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 	// 检查是否已有设置
 	_, err := s.settingRepo.GetValue(ctx, SettingKeyRegistrationEnabled)
 	if err == nil {
-		// 已有设置，不需要初始化
+		// 已有设置：不重写整套默认值，但要补齐新增的 DB-backed registry 默认值。
+		if err := s.ensureOpenAIAutoProvisionDefaults(ctx); err != nil {
+			return err
+		}
 		return nil
 	}
 	if !errors.Is(err, ErrSettingNotFound) {
@@ -245,6 +248,16 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyAllowUngroupedKeyScheduling:                        "false",
 		SettingKeyOpenAILowUpstreamRatePriorityEnabled:               "false",
 		SettingKeyOpenAIOAuthSchedulingRateMultiplier:                "1",
+		SettingKeyOpenAIAutoProvisionEnabled:                         "false",
+		SettingKeyOpenAIAutoProvisionTarget:                          "0",
+		SettingKeyOpenAIAutoProvisionIntervalSeconds:                 "60",
+		SettingKeyOpenAIAutoProvisionTurbURL:                         "",
+		SettingKeyOpenAIAutoProvisionTurbAuthCode:                    "",
+		SettingKeyOpenAIAutoProvisionCallbackURL:                     "",
+		SettingKeyOpenAIAutoProvisionCallbackSecret:                  "",
+		SettingKeyOpenAIAutoProvisionEmailSource:                     "",
+		SettingKeyOpenAIAutoProvisionWorkers:                         "3",
+		SettingKeyOpenAIReauthorizationEnabled:                       "false",
 		SettingKeyEnableAnthropicCacheTTL1hInjection:                 "false",
 		SettingKeyRewriteMessageCacheControl:                         strconv.FormatBool(s.defaultRewriteMessageCacheControl()),
 		SettingKeyEnableClientDatelineNormalization:                  "true",
@@ -276,6 +289,39 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 	}
 
 	return s.settingRepo.SetMultiple(ctx, defaults)
+}
+
+func (s *SettingService) ensureOpenAIAutoProvisionDefaults(ctx context.Context) error {
+	defaults := map[string]string{
+		SettingKeyOpenAIAutoProvisionEnabled:         "false",
+		SettingKeyOpenAIAutoProvisionTarget:          "0",
+		SettingKeyOpenAIAutoProvisionIntervalSeconds: "60",
+		SettingKeyOpenAIAutoProvisionTurbURL:         "",
+		SettingKeyOpenAIAutoProvisionTurbAuthCode:    "",
+		SettingKeyOpenAIAutoProvisionCallbackURL:     "",
+		SettingKeyOpenAIAutoProvisionCallbackSecret:  "",
+		SettingKeyOpenAIAutoProvisionEmailSource:     "",
+		SettingKeyOpenAIAutoProvisionWorkers:         "3",
+		SettingKeyOpenAIReauthorizationEnabled:       "false",
+	}
+	keys := make([]string, 0, len(defaults))
+	for key := range defaults {
+		keys = append(keys, key)
+	}
+	values, err := s.settingRepo.GetMultiple(ctx, keys)
+	if err != nil {
+		return fmt.Errorf("load OpenAI auto-provision defaults: %w", err)
+	}
+	missing := make(map[string]string)
+	for key, value := range defaults {
+		if _, ok := values[key]; !ok {
+			missing[key] = value
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return s.settingRepo.SetMultiple(ctx, missing)
 }
 
 func parseForwardedClientIPHeadersSetting(value string) ([]string, error) {
@@ -931,6 +977,18 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	result.PaymentVisibleMethodWxpayEnabled = settings[SettingPaymentVisibleMethodWxpayEnabled] == "true"
 	result.OpenAILowUpstreamRatePriorityEnabled = settings[SettingKeyOpenAILowUpstreamRatePriorityEnabled] == "true"
 	result.OpenAIOAuthSchedulingRateMultiplier = parseOpenAIOAuthSchedulingRateMultiplier(settings[SettingKeyOpenAIOAuthSchedulingRateMultiplier])
+	result.OpenAIAutoProvisionEnabled = settings[SettingKeyOpenAIAutoProvisionEnabled] == "true"
+	result.OpenAIAutoProvisionTarget = parseNonNegativeIntSetting(settings[SettingKeyOpenAIAutoProvisionTarget], 0)
+	result.OpenAIAutoProvisionIntervalSeconds = parsePositiveIntSetting(settings[SettingKeyOpenAIAutoProvisionIntervalSeconds], 60)
+	result.OpenAIAutoProvisionTurbURL = strings.TrimSpace(settings[SettingKeyOpenAIAutoProvisionTurbURL])
+	result.OpenAIAutoProvisionTurbAuthCode = strings.TrimSpace(settings[SettingKeyOpenAIAutoProvisionTurbAuthCode])
+	result.OpenAIAutoProvisionTurbAuthCodeConfigured = result.OpenAIAutoProvisionTurbAuthCode != ""
+	result.OpenAIAutoProvisionCallbackURL = strings.TrimSpace(settings[SettingKeyOpenAIAutoProvisionCallbackURL])
+	result.OpenAIAutoProvisionCallbackSecret = strings.TrimSpace(settings[SettingKeyOpenAIAutoProvisionCallbackSecret])
+	result.OpenAIAutoProvisionCallbackSecretConfigured = result.OpenAIAutoProvisionCallbackSecret != ""
+	result.OpenAIAutoProvisionEmailSource = strings.TrimSpace(settings[SettingKeyOpenAIAutoProvisionEmailSource])
+	result.OpenAIAutoProvisionWorkers = parsePositiveIntSetting(settings[SettingKeyOpenAIAutoProvisionWorkers], 3)
+	result.OpenAIReauthorizationEnabled = settings[SettingKeyOpenAIReauthorizationEnabled] == "true"
 	result.OpenAIAdvancedSchedulerEnabled = settings[openAIAdvancedSchedulerSettingKey] == "true"
 	result.OpenAIAdvancedSchedulerStickyWeightedEnabled = settings[SettingKeyOpenAIAdvancedSchedulerStickyWeightedEnabled] == "true"
 	result.OpenAIAdvancedSchedulerSubscriptionPriorityEnabled = settings[SettingKeyOpenAIAdvancedSchedulerSubscriptionPriorityEnabled] == "true"
@@ -1017,6 +1075,22 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	})
 
 	return result
+}
+
+func parseNonNegativeIntSetting(raw string, fallback int) int {
+	value, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || value < 0 {
+		return fallback
+	}
+	return value
+}
+
+func parsePositiveIntSetting(raw string, fallback int) int {
+	value, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || value <= 0 {
+		return fallback
+	}
+	return value
 }
 
 func clampAffiliateRebateRate(value float64) float64 {
