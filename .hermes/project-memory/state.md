@@ -1,40 +1,41 @@
 # State
 
 ## Current focus
-- Vietnamese locale coverage and translation quality are complete on a dedicated branch; local verification is complete, while push/PR, independent review, and CI remain pending.
+- Vietnamese locale content is complete and has been reorganized into the same module-folder layout used by English and Chinese.
+- Local verification for the folder refactor is green; commit/push and fresh CI on the new SHA remain pending.
 
 ## Repo
-- Branch: `feat/vietnamese-locale-coverage`
-- Remote: `https://github.com/cong91/sub2api.git`
+- Branch: `feat/vietnamese-locale-coverage-followup`
+- Pull request: `https://github.com/cong91/sub2api/pull/176`
+- Base: `main`
 
 ## Active changes
-- Vietnamese messages are split between `frontend/src/i18n/locales/vi.ts` and `vi-additions-a.ts` through `vi-additions-d.ts`.
-- Locale regression tests cover zh-to-vi key coverage, message compilation, and en-to-vi placeholder parity.
-- Technical literals such as endpoints, field names, model identifiers, environment variables, and code placeholders are preserved during translation cleanup.
+- `frontend/src/i18n/locales/vi/` now mirrors the `en/` and `zh/` topology: root locale modules plus `admin/` modules and index aggregators.
+- The former root-level `vi.ts` and `vi-additions-a.ts` through `vi-additions-d.ts` are removed.
+- `vi/merge.ts` preserves the previous ordered deep-merge behavior for keys that originated in additions files.
+- No translation value, key path, placeholder, component behavior, or backend code is changed by the structural refactor.
 
 ## Verification
+- Runtime equivalence against `HEAD` passed: old/new both contain `8,709` leaf keys; missing `0`; extra `0`; changed values `0`.
 - Focused i18n contract suite passed: `npm run test:run -- src/i18n/__tests__/localeKeyParity.spec.ts src/i18n/__tests__/localesMessageCompile.spec.ts src/i18n/__tests__/localeRegistry.spec.ts src/i18n/__tests__/localesNoKeyCollision.spec.ts` (`4` files / `13` tests).
 - Frontend lint: `npm run lint:check` passed.
 - Frontend typecheck: `npm run typecheck` passed.
+- Full frontend suite: `npm run test:run` passed (`255` files / `1,795` tests).
 - Production build: `npm run build` passed; Vite emitted only the existing large-chunk warning.
-- Targeted Model Plaza suite: `npm run test:run -- src/components/modelPlaza/__tests__/PlazaModelPricingTable.spec.ts` passed (`1` file / `25` tests).
-- Full Vitest suite: `npm run test:run` passed (`251` files / `1762` tests).
-- Locale audit passed: en/zh each have `8,079` leaf keys; vi has `8,686`; en-to-zh missing/extra `0/0`; zh-to-vi missing `0`; placeholder parity `0`; blank/non-string `0` for all locales; static consumer missing `0` for all locales.
 - `git diff --check` passed.
 
 ## Model Plaza triage
-- Both failures were test regressions introduced by commit `2838efa81` in `PlazaModelPricingTable.spec.ts`; `PlazaModelPricingTable.vue` was unchanged in that commit and still implements the documented table contract.
-- The mobile-card assertion targeted a nonexistent `[data-testid="mobile-pricing-card"]`; the component renders a responsive overflow table and already exposes concrete platform badges for composite groups.
-- The publication-order assertion contradicted `sortedModels`, which intentionally places token billing before image/per-request billing and then sorts by official output price/name. Backend `ListGroups` also documents and enforces deterministic group/model sorting rather than arbitrary admin publication order.
-- The test file was restored to the pre-`2838efa81` contract; no component behavior was changed.
+- Both previous failures were test regressions introduced by commit `2838efa81` in `PlazaModelPricingTable.spec.ts`; the component contract was not changed.
+- The restored targeted suite is included in the green full frontend run (`PlazaModelPricingTable.spec.ts`: `25` tests).
 
 ## Release blockers / risks
-- No push, PR, merge, or production deployment has occurred for this locale branch.
-- Local frontend verification is green, but CI and independent review remain pending; do not treat local green as release approval.
-- Independent delegated review was unavailable because the configured reviewer model returned HTTP 404; self-review and local verification do not replace formal review/CI.
+- CI and Security Scan were green on the previous PR head SHA `9661d0a1ae6bd014f06c3da54d7f6bdeee0daf40`.
+- The locale-folder refactor is not covered by that old SHA; require fresh CI/Security results after push before merge or release.
+- Independent review remains unavailable; local verification and self-review do not replace formal approval.
+- No merge, deployment, release, or production-impacting action is authorized by this state.
 
 ## Beads
-- br-missing: install beads_rust; `.beads` not initialized.
+- `br`/beads bootstrap is unavailable in this environment; `.beads` is not initialized.
 
 ## Bootstrap metadata
 - mode: smart
