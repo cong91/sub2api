@@ -15,6 +15,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"github.com/stretchr/testify/require"
 )
 
@@ -224,6 +225,9 @@ func (c *openAIAutoProvisionFlowOAuthClient) RefreshTokenWithClientID(context.Co
 }
 
 func TestOpenAIAutoProvisionFullReplenishmentAndReauthorizationFlow(t *testing.T) {
+	originalXAIModelMapping := xai.RuntimeModelMappingOptions()
+	t.Cleanup(func() { xai.SetRuntimeModelMappingOptions(originalXAIModelMapping) })
+
 	const (
 		errorAccountID = int64(99)
 		errorEmail     = "broken@example.com"
