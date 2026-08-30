@@ -76,7 +76,7 @@ func (c *turbOpenAIProvisionClient) post(ctx context.Context, path string, paylo
 	if err != nil {
 		return fmt.Errorf("send automation command: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	responseBody, _ := io.ReadAll(io.LimitReader(resp.Body, maxAutomationRespLen))
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("automation command returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(responseBody)))
