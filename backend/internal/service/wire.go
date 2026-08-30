@@ -125,7 +125,9 @@ func ProvideOpenAIOAuthService(
 	return svc
 }
 
-// ProvideTokenRefreshService creates and starts TokenRefreshService
+// ProvideTokenRefreshService creates TokenRefreshService. The service is
+// started after the automation coordinator injects its optional reauth
+// dispatcher, so the first refresh cycle cannot race that wiring step.
 func ProvideTokenRefreshService(
 	accountRepo AccountRepository,
 	oauthService *OAuthService,
@@ -150,7 +152,6 @@ func ProvideTokenRefreshService(
 	// 调用侧显式注入后台刷新策略，避免策略漂移
 	svc.SetRefreshPolicy(DefaultBackgroundRefreshPolicy())
 	svc.SetAccountRuntimeBlocker(runtimeBlocker)
-	svc.Start()
 	return svc
 }
 
@@ -966,6 +967,7 @@ var ProviderSet = wire.NewSet(
 	NewChannelMonitorQuotaFetcher,
 	ProvideChannelMonitorV2Service,
 	ProvideChannelMonitorV2Aggregator,
+	ProvideOpenAIAutoProvisionService,
 	NewChannelMonitorRequestTemplateService,
 	ProvideUserPlatformQuotaUsageFlusher,
 )
@@ -1061,4 +1063,25 @@ func ProvideChannelMonitorV2Aggregator(repo ChannelMonitorV2Repository, db *sql.
 	}
 	aggregator.Start()
 	return aggregator
+}
+
+// ProvideOpenAIAutoProvisionService creates and starts the OpenAI account
+// replenishment/reauthorization coordinator. It is stopped by server cleanup.
+func ProvideOpenAIAutoProvisionService(
+	accountRepo AccountRepository,
+	adminService AdminService,
+	settingService *SettingService,
+	settingRepo SettingRepository,
+	openaiOAuth *OpenAIOAuthService,
+	lockCache LeaderLockCache,
+	db *sql.DB,
+	tokenRefresh *TokenRefreshService,
+) *OpenAIAutoProvisionService {
+	svc := NewOpenAIAutoProvisionService(accountRepo, adminService, settingService, settingRepo, openaiOAuth, nil, lockCache, db)
+	if tokenRefresh != nil {
+		tokenRefresh.SetOpenAIReauthorizationDispatcher(svc)
+		tokenRefresh.Start()
+	}
+	svc.Start()
+	return svc
 }
