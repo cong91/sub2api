@@ -310,7 +310,7 @@ func TestOpsRecoveredCredentialFailoverDoesNotCreateRequestError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ops := service.NewOpsService(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	router := gin.New()
-	router.Use(OpsErrorLoggerMiddleware(ops))
+	router.Use(OpsErrorLoggerMiddleware(ops, nil))
 	router.GET("/openai/v1/responses", func(c *gin.Context) {
 		c.Set(service.OpsUpstreamErrorsKey, []*service.OpsUpstreamErrorEvent{
 			{Stage: string(service.GatewayFailureStageInference), UpstreamStatusCode: http.StatusForbidden, Message: "earlier inference failure"},
@@ -342,7 +342,7 @@ func TestOpsWebSocketCredentialFailoverSuccessDoesNotCreateRequestError(t *testi
 	gin.SetMode(gin.TestMode)
 	ops := service.NewOpsService(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	router := gin.New()
-	router.Use(OpsErrorLoggerMiddleware(ops))
+	router.Use(OpsErrorLoggerMiddleware(ops, nil))
 	router.GET("/openai/v1/responses", func(c *gin.Context) {
 		c.Set(service.OpsUpstreamErrorsKey, []*service.OpsUpstreamErrorEvent{{
 			Stage: string(service.GatewayFailureStageAccountAuth), Scope: string(service.GatewayFailureScopeAccount),
@@ -373,7 +373,7 @@ func TestOpsWebSocketCredentialFailoverExhaustedIsRecorded(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ops := service.NewOpsService(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	router := gin.New()
-	router.Use(OpsErrorLoggerMiddleware(ops))
+	router.Use(OpsErrorLoggerMiddleware(ops, nil))
 	router.GET("/openai/v1/responses", func(c *gin.Context) {
 		c.Set(service.OpsUpstreamErrorsKey, []*service.OpsUpstreamErrorEvent{{
 			Stage: string(service.GatewayFailureStageAccountAuth), Scope: string(service.GatewayFailureScopeAccount),
