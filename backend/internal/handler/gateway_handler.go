@@ -408,6 +408,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						zap.Int64("account_id", account.ID),
 						zap.Int("max_waiting", selection.WaitPlan.MaxWaiting),
 					)
+					if platform == service.PlatformOpenAI {
+						markOpenAIAccountConcurrencyCapacityLimited(c, account)
+					}
 					h.handleStreamingAwareErrorWithCode(c, http.StatusTooManyRequests, "rate_limit_error", gatewayQueueFullCode, "Too many pending requests, please retry later", streamStarted)
 					return
 				}
@@ -431,6 +434,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				)
 				if err != nil {
 					reqLog.Warn("gateway.account_slot_acquire_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+					if platform == service.PlatformOpenAI {
+						markOpenAIAccountConcurrencyCapacityLimited(c, account, err)
+					}
 					releaseWait()
 					h.handleConcurrencyError(c, err, "account", streamStarted)
 					return
@@ -449,6 +455,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				if fs.RecordProfitVeto(account.ID) == FailoverExhausted {
 					reqLog.Warn("gateway.profit_veto_attempts_exhausted", zap.Int("profit_veto_count", fs.ProfitVetoCount()))
 					markOpsRoutingCapacityLimited(c)
+					markOpsRoutingProfitControlRejected(c)
 					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", profitVetoExhaustedMessage, streamStarted)
 					return
 				}
@@ -749,6 +756,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						zap.Int64("account_id", account.ID),
 						zap.Int("max_waiting", selection.WaitPlan.MaxWaiting),
 					)
+					if platform == service.PlatformOpenAI {
+						markOpenAIAccountConcurrencyCapacityLimited(c, account)
+					}
 					h.handleStreamingAwareErrorWithCode(c, http.StatusTooManyRequests, "rate_limit_error", gatewayQueueFullCode, "Too many pending requests, please retry later", streamStarted)
 					return
 				}
@@ -772,6 +782,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				)
 				if err != nil {
 					reqLog.Warn("gateway.account_slot_acquire_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+					if platform == service.PlatformOpenAI {
+						markOpenAIAccountConcurrencyCapacityLimited(c, account, err)
+					}
 					releaseWait()
 					h.handleConcurrencyError(c, err, "account", streamStarted)
 					return
@@ -790,6 +803,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				if fs.RecordProfitVeto(account.ID) == FailoverExhausted {
 					reqLog.Warn("gateway.profit_veto_attempts_exhausted", zap.Int("profit_veto_count", fs.ProfitVetoCount()))
 					markOpsRoutingCapacityLimited(c)
+					markOpsRoutingProfitControlRejected(c)
 					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", profitVetoExhaustedMessage, streamStarted)
 					return
 				}
