@@ -37,6 +37,7 @@ import (
 type OpenAIGatewayHandler struct {
 	compositeResolver          *service.CompositeRouteResolver
 	gatewayService             *service.OpenAIGatewayService
+	openAIProvisionDemand      *service.OpenAIProvisionDemandService
 	billingCacheService        *service.BillingCacheService
 	apiKeyService              *service.APIKeyService
 	usageRecordWorkerPool      *service.UsageRecordWorkerPool
@@ -49,6 +50,19 @@ type OpenAIGatewayHandler struct {
 	imageLimiter               *imageConcurrencyLimiter
 	maxAccountSwitches         int
 	cfg                        *config.Config
+}
+
+func (h *OpenAIGatewayHandler) SetOpenAIProvisionDemandService(demand *service.OpenAIProvisionDemandService) {
+	if h != nil {
+		h.openAIProvisionDemand = demand
+	}
+}
+
+func (h *OpenAIGatewayHandler) OpenAIProvisionDemandService() *service.OpenAIProvisionDemandService {
+	if h == nil {
+		return nil
+	}
+	return h.openAIProvisionDemand
 }
 
 type openAIWSTurnChannelMappingSnapshot struct {
@@ -1623,6 +1637,7 @@ func (h *OpenAIGatewayHandler) handleAnthropicFailoverExhausted(c *gin.Context, 
 		return
 	}
 	if failoverErr != nil && failoverErr.IsOpenAICapacityShed() && strings.TrimSpace(failoverErr.ClientMessage) != "" {
+		markOpsRoutingCapacityLimited(c)
 		status := failoverErr.ClientStatusCode
 		if status <= 0 {
 			status = http.StatusServiceUnavailable
@@ -2246,6 +2261,7 @@ func (h *OpenAIGatewayHandler) handleOpenAIProfitVetoExhausted(
 ) {
 	reqLog.Warn("openai.profit_veto_attempts_exhausted", zap.Int("profit_veto_count", vetoCount))
 	markOpsRoutingCapacityLimited(c)
+	markOpsRoutingProfitControlRejected(c)
 	h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", profitVetoExhaustedMessage, streamStarted)
 }
 
@@ -2355,6 +2371,7 @@ func (h *OpenAIGatewayHandler) acquireOpenAIAccountSlot(
 			zap.Int64("account_id", account.ID),
 			zap.Int("max_waiting", selection.WaitPlan.MaxWaiting),
 		)
+		markOpenAIAccountConcurrencyCapacityLimited(c, account)
 		writeError(http.StatusTooManyRequests, "rate_limit_error", gatewayQueueFullCode, "Too many pending requests, please retry later")
 		return nil, openAISlotAcquireFailed
 	}
@@ -2378,6 +2395,7 @@ func (h *OpenAIGatewayHandler) acquireOpenAIAccountSlot(
 	)
 	if err != nil {
 		reqLog.Warn("openai.account_slot_acquire_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+		markOpenAIAccountConcurrencyCapacityLimited(c, account, err)
 		status, errType, code, message := concurrencyErrorResponse(err, "account")
 		writeError(status, errType, code, message)
 		return nil, openAISlotAcquireFailed
@@ -2401,6 +2419,19 @@ func (h *OpenAIGatewayHandler) acquireOpenAIAccountSlot(
 		reqLog.Warn("openai.bind_sticky_session_after_profit_admission_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 	}
 	return wrapReleaseOnDone(ctx, accountReleaseFunc), openAISlotAcquireOK
+}
+
+func markOpenAIAccountConcurrencyCapacityLimited(c *gin.Context, account *service.Account, acquireErr ...error) {
+	if account == nil || !account.IsOpenAIOAuth() || account.ParentAccountID != nil || account.IsCredentialShadow() {
+		return
+	}
+	if len(acquireErr) > 0 {
+		var concurrencyErr *ConcurrencyError
+		if !errors.As(acquireErr[0], &concurrencyErr) || concurrencyErr.SlotType != "account" {
+			return
+		}
+	}
+	markOpsRoutingCapacityLimited(c)
 }
 
 // ResponsesWebSocket handles OpenAI Responses API WebSocket ingress endpoint
@@ -2819,6 +2850,10 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			if lastFailoverErr != nil {
 				closeOpenAIWSFailoverExhausted(c, wsConn, lastFailoverErr)
 			} else {
+				classification := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, requestPlatform)
+				if !classification.ModelNotFound {
+					markOpsRoutingCapacityLimited(c)
+				}
 				closeOpenAIClientWS(wsConn, coderws.StatusTryAgainLater, "no available account")
 			}
 			return
@@ -2827,6 +2862,10 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			if lastFailoverErr != nil {
 				closeOpenAIWSFailoverExhausted(c, wsConn, lastFailoverErr)
 			} else {
+				classification := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, requestPlatform)
+				if !classification.ModelNotFound {
+					markOpsRoutingCapacityLimited(c)
+				}
 				closeOpenAIClientWS(wsConn, coderws.StatusTryAgainLater, "no available account")
 			}
 			return
@@ -2851,6 +2890,8 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				reqLog.Debug("openai.websocket_account_slot_profit_vetoed", zap.Int64("account_id", account.ID), zap.String("reason", reason))
 				if !recordOpenAIProfitVeto(failedAccountIDs, account.ID, &profitVetoCount) {
 					reqLog.Warn("openai.websocket_profit_veto_attempts_exhausted", zap.Int("profit_veto_count", profitVetoCount))
+					markOpsRoutingCapacityLimited(c)
+					markOpsRoutingProfitControlRejected(c)
 					closeOpenAIClientWS(wsConn, coderws.StatusTryAgainLater, "no available account")
 					return
 				}
@@ -2888,6 +2929,8 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				reqLog.Debug("openai.websocket_account_slot_profit_vetoed", zap.Int64("account_id", account.ID), zap.String("reason", reason))
 				if !recordOpenAIProfitVeto(failedAccountIDs, account.ID, &profitVetoCount) {
 					reqLog.Warn("openai.websocket_profit_veto_attempts_exhausted", zap.Int("profit_veto_count", profitVetoCount))
+					markOpsRoutingCapacityLimited(c)
+					markOpsRoutingProfitControlRejected(c)
 					closeOpenAIClientWS(wsConn, coderws.StatusTryAgainLater, "no available account")
 					return
 				}
@@ -3575,6 +3618,7 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 		return
 	}
 	if failoverErr.IsOpenAICapacityShed() && strings.TrimSpace(failoverErr.ClientMessage) != "" {
+		markOpsRoutingCapacityLimited(c)
 		status := failoverErr.ClientStatusCode
 		if status <= 0 {
 			status = http.StatusServiceUnavailable
@@ -3998,6 +4042,9 @@ func closeOpenAIWSFailoverExhausted(c *gin.Context, conn *coderws.Conn, failover
 	closeStatus := coderws.StatusInternalError
 
 	if failoverErr != nil {
+		if failoverErr.IsOpenAICapacityShed() {
+			markOpsRoutingCapacityLimited(c)
+		}
 		if reason := strings.TrimSpace(string(failoverErr.Reason)); reason != "" {
 			errorCode = reason
 		}
