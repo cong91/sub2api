@@ -6,7 +6,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
@@ -43,11 +45,11 @@ type ingressRejectOpsRepo struct {
 
 type openAIProvisionCapacityDemandStoreStub struct {
 	service.OpenAIProvisionCapacityDemandStore
-	userID int64
+	userID atomic.Int64
 }
 
 func (s *openAIProvisionCapacityDemandStoreStub) RecordOpenAICapacityDenied(_ context.Context, userID int64) error {
-	s.userID = userID
+	s.userID.Store(userID)
 	return nil
 }
 
@@ -76,13 +78,13 @@ func TestOpsErrorLoggerRecordsOpenAICapacityDemandWithoutOpsMonitoring(t *testin
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/v1/responses", nil))
 	require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
-	require.Equal(t, int64(17), store.userID)
+	require.Eventually(t, func() bool { return store.userID.Load() == 17 }, time.Second, time.Millisecond)
 
-	store.userID = 0
+	store.userID.Store(0)
 	recorder = httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/v1/messages/count_tokens", nil))
 	require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
-	require.Zero(t, store.userID)
+	require.Zero(t, store.userID.Load())
 }
 
 func TestOpsErrorLoggerSkipsProfitControlRejectionForOpenAIDemand(t *testing.T) {
@@ -103,7 +105,7 @@ func TestOpsErrorLoggerSkipsProfitControlRejectionForOpenAIDemand(t *testing.T) 
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/v1/responses", nil))
 	require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
-	require.Zero(t, store.userID)
+	require.Zero(t, store.userID.Load())
 }
 
 func (r *ingressRejectOpsRepo) InsertErrorLog(_ context.Context, entry *service.OpsInsertErrorLogInput) (int64, error) {

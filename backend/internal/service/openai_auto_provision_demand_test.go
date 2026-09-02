@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,11 +19,11 @@ func (s openAIProvisionUsageDemandStub) GetOpenAIProvisionDemand(context.Context
 
 type openAIProvisionCapacityDemandStub struct {
 	deniedUsers int64
-	recordedID  int64
+	recordedID  atomic.Int64
 }
 
 func (s *openAIProvisionCapacityDemandStub) RecordOpenAICapacityDenied(_ context.Context, userID int64) error {
-	s.recordedID = userID
+	s.recordedID.Store(userID)
 	return nil
 }
 
@@ -47,5 +48,5 @@ func TestOpenAIProvisionDemandServiceMergesRecentCapacityDenials(t *testing.T) {
 	}, demand)
 
 	svc.RecordOpenAICapacityDenied(context.Background(), 19)
-	require.Eventually(t, func() bool { return store.recordedID == 19 }, time.Second, time.Millisecond)
+	require.Eventually(t, func() bool { return store.recordedID.Load() == 19 }, time.Second, time.Millisecond)
 }
