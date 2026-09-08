@@ -98,7 +98,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	userAttributeDefinitionRepository := repository.NewUserAttributeDefinitionRepository(client)
 	userAttributeValueRepository := repository.NewUserAttributeValueRepository(client)
 	userAttributeService := service.NewUserAttributeService(userAttributeDefinitionRepository, userAttributeValueRepository)
-	authHandler := handler.NewAuthHandler(configConfig, authService, userService, settingService, promoService, redeemService, totpService, userAttributeService)
+	authHandler := handler.ProvideAuthHandler(configConfig, authService, userService, settingService, promoService, redeemService, totpService, userAttributeService, redisClient)
 	vClawClaimService := service.NewVClawClaimService(client, userRepository, redeemCodeRepository, userDeviceRepository, configConfig, settingService)
 	vClawHandler := handler.NewVClawHandler(vClawClaimService)
 	userHandler := handler.NewUserHandler(userService, authService, emailService, emailCache, affiliateService, serviceUserPlatformQuotaRepository)
