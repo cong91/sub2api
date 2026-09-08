@@ -4,15 +4,16 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/alicebob/miniredis/v2"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,16 +22,36 @@ const canvasTestSecret = "canvas-test-bff-shared-secret-0123456789"
 
 func newCanvasSSOHandler(t *testing.T) *AuthHandler {
 	t.Helper()
-	mini := miniredis.RunT(t)
-	client := redis.NewClient(&redis.Options{Addr: mini.Addr()})
-	t.Cleanup(func() { _ = client.Close() })
 	h := NewAuthHandler(&config.Config{Canvas: config.CanvasConfig{
 		Origin:            canvasTestOrigin,
 		BFFSharedSecret:   canvasTestSecret,
 		LaunchCodeTTLSecs: 60,
 	}}, nil, nil, nil, nil, nil, nil, nil)
-	h.SetCanvasLaunchRedis(client)
+	h.SetCanvasLaunchStore(newCanvasLaunchTestStore())
 	return h
+}
+
+type canvasLaunchTestStore struct{ values map[string]string }
+
+func newCanvasLaunchTestStore() *canvasLaunchTestStore {
+	return &canvasLaunchTestStore{values: map[string]string{}}
+}
+
+func (s *canvasLaunchTestStore) SetNX(_ context.Context, key, value string, _ time.Duration) (bool, error) {
+	if _, exists := s.values[key]; exists {
+		return false, nil
+	}
+	s.values[key] = value
+	return true, nil
+}
+
+func (s *canvasLaunchTestStore) GetDel(_ context.Context, key string) (string, error) {
+	value, ok := s.values[key]
+	if !ok {
+		return "", service.ErrCanvasLaunchNotFound
+	}
+	delete(s.values, key)
+	return value, nil
 }
 
 func canvasContext(method, target string, body any, headers map[string]string) (*gin.Context, *httptest.ResponseRecorder) {

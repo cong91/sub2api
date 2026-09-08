@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -22,7 +23,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 )
 
 // AuthHandler handles authentication-related requests
@@ -35,13 +35,11 @@ type AuthHandler struct {
 	redeemService        *service.RedeemService
 	totpService          *service.TotpService
 	userAttributeService *service.UserAttributeService
-	canvasRedis          *redis.Client
+	canvasLaunchStore    service.CanvasLaunchStore
 
 	dingTalkClientInstance *DingTalkClient
 	dingTalkClientMu       sync.Mutex
 }
-
-const canvasLaunchCodePrefix = "canvas:launch:"
 
 type canvasLaunchRequest struct {
 	CanvasOrigin string `json:"canvas_origin" binding:"required"`
@@ -66,9 +64,9 @@ type canvasLaunchExchangeResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-// SetCanvasLaunchRedis wires the Redis-backed one-use launch-code store after construction.
-func (h *AuthHandler) SetCanvasLaunchRedis(redisClient *redis.Client) {
-	h.canvasRedis = redisClient
+// SetCanvasLaunchStore wires the one-use launch-code store after construction.
+func (h *AuthHandler) SetCanvasLaunchStore(store service.CanvasLaunchStore) {
+	h.canvasLaunchStore = store
 }
 
 // NewAuthHandler creates a new AuthHandler
@@ -118,7 +116,7 @@ func (h *AuthHandler) CreateCanvasLaunch(c *gin.Context) {
 			response.InternalError(c, "Failed to create Canvas launch code")
 			return
 		}
-		stored, err := h.canvasRedis.SetNX(c.Request.Context(), canvasLaunchCodePrefix+code, payload, ttl).Result()
+		stored, err := h.canvasLaunchStore.SetNX(c.Request.Context(), code, string(payload), ttl)
 		if err != nil {
 			response.InternalError(c, "Canvas SSO is temporarily unavailable")
 			return
@@ -156,8 +154,8 @@ func (h *AuthHandler) ExchangeCanvasLaunch(c *gin.Context) {
 		response.Unauthorized(c, "Canvas launch code is invalid or expired")
 		return
 	}
-	payload, err := h.canvasRedis.GetDel(c.Request.Context(), canvasLaunchCodePrefix+code).Bytes()
-	if err == redis.Nil {
+	payload, err := h.canvasLaunchStore.GetDel(c.Request.Context(), code)
+	if errors.Is(err, service.ErrCanvasLaunchNotFound) {
 		response.Unauthorized(c, "Canvas launch code is invalid or expired")
 		return
 	}
@@ -166,7 +164,7 @@ func (h *AuthHandler) ExchangeCanvasLaunch(c *gin.Context) {
 		return
 	}
 	var record canvasLaunchRecord
-	if err := json.Unmarshal(payload, &record); err != nil || !constantTimeEqual(record.CanvasOrigin, origin) || strings.TrimSpace(record.AccessToken) == "" {
+	if err := json.Unmarshal([]byte(payload), &record); err != nil || !constantTimeEqual(record.CanvasOrigin, origin) || strings.TrimSpace(record.AccessToken) == "" {
 		response.Unauthorized(c, "Canvas launch code is invalid or expired")
 		return
 	}
@@ -174,7 +172,7 @@ func (h *AuthHandler) ExchangeCanvasLaunch(c *gin.Context) {
 }
 
 func (h *AuthHandler) canvasBridgeEnabled() bool {
-	return h != nil && h.canvasRedis != nil && h.cfg != nil && configuredCanvasOrigin(h.cfg) != "" && strings.TrimSpace(h.cfg.Canvas.BFFSharedSecret) != ""
+	return h != nil && h.canvasLaunchStore != nil && h.cfg != nil && configuredCanvasOrigin(h.cfg) != "" && strings.TrimSpace(h.cfg.Canvas.BFFSharedSecret) != ""
 }
 
 func dashboardAccessToken(c *gin.Context) (string, bool) {

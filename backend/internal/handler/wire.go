@@ -7,12 +7,11 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/google/wire"
-	"github.com/redis/go-redis/v9"
 )
 
-func ProvideAuthHandler(cfg *config.Config, authService *service.AuthService, userService *service.UserService, settingService *service.SettingService, promoService *service.PromoService, redeemService *service.RedeemService, totpService *service.TotpService, userAttributeService *service.UserAttributeService, redisClient *redis.Client) *AuthHandler {
+func ProvideAuthHandler(cfg *config.Config, authService *service.AuthService, userService *service.UserService, settingService *service.SettingService, promoService *service.PromoService, redeemService *service.RedeemService, totpService *service.TotpService, userAttributeService *service.UserAttributeService, launchStore service.CanvasLaunchStore) *AuthHandler {
 	h := NewAuthHandler(cfg, authService, userService, settingService, promoService, redeemService, totpService, userAttributeService)
-	h.SetCanvasLaunchRedis(redisClient)
+	h.SetCanvasLaunchStore(launchStore)
 	return h
 }
 
