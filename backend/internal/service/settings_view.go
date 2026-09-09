@@ -298,6 +298,8 @@ type SystemSettings struct {
 	OpenAIAutoProvisionCallbackSecretConfigured            bool
 	OpenAIAutoProvisionEmailSource                         string
 	OpenAIAutoProvisionWorkers                             int
+	OpenAIAutoProvisionRequestsPerAccount                  int
+	OpenAIAutoProvisionTokensPerAccount                    int
 	OpenAIReauthorizationEnabled                           bool
 	OpenAIAdvancedSchedulerEnabled                         bool
 	OpenAIAdvancedSchedulerStickyWeightedEnabled           bool
