@@ -842,6 +842,7 @@ export interface OpsSystemLog {
   platform?: string
   model?: string
   extra?: Record<string, any>
+  device_code?: string
 }
 
 export type OpsSystemLogListResponse = PaginatedResponse<OpsSystemLog>
@@ -937,6 +938,7 @@ export interface OpsErrorLog {
   request_type?: number | null
   user_agent?: string
 
+  device_code?: string
 }
 
 export interface OpsErrorDetail extends OpsErrorLog {
