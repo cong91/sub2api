@@ -382,6 +382,7 @@ type PublicSettings struct {
 	SiteName                            string
 	SiteLogo                            string
 	SiteSubtitle                        string
+	CanvasOrigin                        string
 	APIBaseURL                          string
 	ContactInfo                         string
 	DocURL                              string
