@@ -129,6 +129,7 @@ func provideCleanup(
 	openAIAutoReset *service.OpenAIQuotaAutoResetService,
 	promptAudit *securityaudit.PromptService,
 	pluginManager *service.PluginManager,
+	cfg *config.Config,
 ) func() {
 	return func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -387,9 +388,11 @@ func provideCleanup(
 				}
 				return nil
 			}},
-		}
+			}
 
-		infraSteps := []cleanupStep{
+			// Dataset collection cleanup is handled by main.go's deferred datasetCleanup()
+
+			infraSteps := []cleanupStep{
 			{"Redis", func() error {
 				if rdb == nil {
 					return nil
