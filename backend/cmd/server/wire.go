@@ -388,11 +388,11 @@ func provideCleanup(
 				}
 				return nil
 			}},
-			}
+		}
 
-			// Dataset collection cleanup is handled by main.go's deferred datasetCleanup()
+		// Dataset collection cleanup is handled by main.go's deferred datasetCleanup()
 
-			infraSteps := []cleanupStep{
+		infraSteps := []cleanupStep{
 			{"Redis", func() error {
 				if rdb == nil {
 					return nil
