@@ -9,7 +9,7 @@ import (
 // Worker periodically drains the collector and uploads batches to Google Drive.
 type Worker struct {
 	collector        *Collector
-	driveClient      *DriveClient
+	driveClient      DriveClientInterface
 	batchSize        int
 	batchMaxMB       int
 	batchIntervalSec int
@@ -20,7 +20,7 @@ type Worker struct {
 // NewWorker creates a new background worker.
 func NewWorker(
 	collector *Collector,
-	driveClient *DriveClient,
+	driveClient DriveClientInterface,
 	batchSize int,
 	batchMaxMB int,
 	batchIntervalSec int,
