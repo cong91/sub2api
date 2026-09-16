@@ -1,8 +1,8 @@
 # Dataset Production Capture — Implementation Contract
 
 ## Status: Implementation Ready
-**Branch:** `feat/dataset-production-capture`  
-**Base:** `eec13e7cb` (main)  
+**Branch:** `feat/dataset-production-capture`
+**Base:** `eec13e7cb` (main)
 **Approved scope:** 6 actions from audit report
 
 ---
@@ -128,7 +128,7 @@ func RedactSensitiveFields(entry *DatasetEntry) {
         delete(headers, "X-API-Key")
         delete(headers, "Cookie")
     }
-    
+
     // Response redaction
     if msg, ok := entry.Response["message"].(map[string]any); ok {
         content := msg["content"].(string)
@@ -140,15 +140,15 @@ func redactPII(text string) string {
     // Email regex
     text = regexp.MustCompile(`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`).
         ReplaceAllString(text, "[EMAIL_REDACTED]")
-    
+
     // Phone regex (common formats)
     text = regexp.MustCompile(`\b\d{3}[-.]?\d{3}[-.]?\d{4}\b`).
         ReplaceAllString(text, "[PHONE_REDACTED]")
-    
+
     // Credit card (simple pattern)
     text = regexp.MustCompile(`\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b`).
         ReplaceAllString(text, "[CARD_REDACTED]")
-    
+
     return text
 }
 ```
@@ -192,13 +192,13 @@ func (w *Worker) flushBatch(ctx context.Context) {
     if len(entries) == 0 {
         return
     }
-    
+
     // Size check (existing)
     if totalSize > maxBytes {
         mid := len(entries) / 2
         entries = entries[:mid]
     }
-    
+
     // Upload with retry
     var fileID string
     var err error
@@ -210,15 +210,15 @@ func (w *Worker) flushBatch(ctx context.Context) {
         log.Printf("[Dataset] Upload attempt %d/3 failed: %v", attempt, err)
         time.Sleep(time.Duration(attempt*2) * time.Second) // Exponential backoff
     }
-    
+
     if err != nil {
         log.Printf("[Dataset] Failed to upload after 3 attempts: %v", err)
         return // Entries stay in buffer for next tick
     }
-    
+
     // Clear only after confirmed success
     w.collector.Clear(len(entries)) // NEW: destructive removal
-    
+
     // Log (existing)
     total, dropped, buffered := w.collector.Stats()
     log.Printf("[Dataset] Batch uploaded: file_id=%s entries=%d total=%d dropped=%d buffered=%d",
@@ -326,7 +326,7 @@ if err != nil {
     if os.Getenv("APP_ENV") == "production" {
         return nil, fmt.Errorf("OAuth token not found (production requires pre-generated token): %w", err)
     }
-    
+
     // Dev: interactive flow
     token, err = getTokenFromWeb(config)
     if err != nil {
@@ -390,15 +390,15 @@ func InitializeDatasetCollection(ctx context.Context, cfg *config.Config) func()
         log.Println("[Dataset] Collection disabled in config")
         return func() {}
     }
-    
+
     currentConfig = &cfg.Dataset
-    
+
     // Start initial worker
     startWorker(ctx, cfg)
-    
+
     // Watch for config changes (via DB settings)
     stopWatch := watchConfigChanges(ctx, cfg)
-    
+
     return func() {
         stopWatch()
         stopWorker(context.Background())
@@ -408,38 +408,38 @@ func InitializeDatasetCollection(ctx context.Context, cfg *config.Config) func()
 func startWorker(ctx context.Context, cfg *config.Config) {
     workerMu.Lock()
     defer workerMu.Unlock()
-    
+
     // Stop existing worker
     if WorkerSingleton != nil {
         shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
         defer cancel()
         WorkerSingleton.Stop(shutdownCtx)
     }
-    
+
     // Create Drive client with new credentials
     driveClient, err := NewDriveClient(ctx, cfg.Dataset.GoogleDriveCredentials, cfg.Dataset.GoogleDriveFolderID)
     if err != nil {
         log.Printf("[Dataset] WARN: Failed to create Drive client: %v", err)
         return
     }
-    
+
     // Reuse collector (preserves buffered entries)
     if CollectorSingleton == nil {
         CollectorSingleton = NewCollector(cfg.Dataset.BufferMaxItems)
     }
-    
+
     // Create new worker
-    WorkerSingleton = NewWorker(CollectorSingleton, driveClient, 
+    WorkerSingleton = NewWorker(CollectorSingleton, driveClient,
         cfg.Dataset.BatchSize, cfg.Dataset.BatchMaxMB, cfg.Dataset.BatchIntervalSec)
     WorkerSingleton.Start()
-    
+
     log.Println("[Dataset] Worker (re)started with new config")
 }
 
 func watchConfigChanges(ctx context.Context, cfg *config.Config) func() {
     ticker := time.NewTicker(30 * time.Second)
     stopCh := make(chan struct{})
-    
+
     go func() {
         for {
             select {
@@ -458,7 +458,7 @@ func watchConfigChanges(ctx context.Context, cfg *config.Config) func() {
             }
         }
     }()
-    
+
     return func() { close(stopCh) }
 }
 
