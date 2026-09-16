@@ -86,6 +86,9 @@ func CaptureFromOpenAIRequest(
 		}
 	}
 
+	// Redact sensitive fields before collection
+	RedactSensitiveFields(&entry)
+
 	// Submit to bounded collector (fail-open)
 	CollectorSingleton.Collect(&entry)
 }
