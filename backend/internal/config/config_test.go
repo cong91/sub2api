@@ -1998,7 +1998,6 @@ func TestValidateConfigErrors(t *testing.T) {
 			name:    "gateway image stream data interval negative",
 			mutate:  func(c *Config) { c.Gateway.ImageStreamDataIntervalTimeout = -1 },
 			wantErr: "gateway.image_stream_data_interval_timeout must be non-negative",
-
 		},
 		{
 			name:    "gateway image concurrency max negative",
