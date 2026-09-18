@@ -1,6 +1,11 @@
 # Dataset Production Capture — Implementation Contract
 
-## Status: Implementation Ready
+## Status: Historical implementation contract
+
+The original contract below records the design that was approved before the
+capture/runtime-config implementation landed. It is retained for provenance;
+the current source code and `DATASET_DEPLOYMENT_STATUS.md` are authoritative for
+actual behavior and activation steps.
 **Branch:** `feat/dataset-production-capture`
 **Base:** `eec13e7cb` (main)
 **Approved scope:** 6 actions from audit report
@@ -519,3 +524,4 @@ func TestConfigWatch_PreservesCollectorBufferAcrossRestart(t *testing.T)
 ---
 
 **Next Action:** Implement Phase 1 (redaction + durability) with TDD approach.
+

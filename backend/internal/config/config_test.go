@@ -88,6 +88,15 @@ func TestLoadRedisUsernameFromEnvironment(t *testing.T) {
 	require.Equal(t, "app-user", cfg.Redis.Username)
 }
 
+func TestLoadDatasetTokenPathFromEnvironment(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("DATASET_GOOGLE_DRIVE_TOKEN_PATH", "/run/secrets/google-drive.token")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, "/run/secrets/google-drive.token", cfg.Dataset.GoogleDriveTokenPath)
+}
+
 func TestLoadHTTPIngressSafetyDefaults(t *testing.T) {
 	resetViperWithJWTSecret(t)
 	cfg, err := Load()
@@ -1989,6 +1998,7 @@ func TestValidateConfigErrors(t *testing.T) {
 			name:    "gateway image stream data interval negative",
 			mutate:  func(c *Config) { c.Gateway.ImageStreamDataIntervalTimeout = -1 },
 			wantErr: "gateway.image_stream_data_interval_timeout must be non-negative",
+
 		},
 		{
 			name:    "gateway image concurrency max negative",
@@ -2645,3 +2655,4 @@ func TestLoad_DefaultGatewayImageStreamConfig(t *testing.T) {
 		t.Fatalf("image stream timeout = %d, want greater than ordinary stream timeout %d", cfg.Gateway.ImageStreamDataIntervalTimeout, cfg.Gateway.StreamDataIntervalTimeout)
 	}
 }
+

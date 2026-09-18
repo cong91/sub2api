@@ -83,6 +83,53 @@ func TestNewDriveClient_WithValidToken(t *testing.T) {
 	require.NotNil(t, client)
 }
 
+func TestNewDriveClient_InlineCredentialsRequireExplicitTokenPath(t *testing.T) {
+	ctx := context.Background()
+	credJSON := validCredentialsJSON(t)
+
+	_, err := NewDriveClient(ctx, string(credJSON), "test-folder-id")
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "OAuth token path is required")
+	require.Contains(t, err.Error(), "DATASET_GOOGLE_DRIVE_TOKEN_PATH")
+	require.NotContains(t, err.Error(), "test-secret")
+}
+
+func TestNewDriveClientWithTokenPath_AcceptsInlineCredentials(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "dataset.token")
+
+	tokenJSON, err := json.Marshal(&oauth2.Token{
+		AccessToken:  "test-access-token",
+		RefreshToken: "test-refresh-token",
+		TokenType:    "Bearer",
+	})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(tokenPath, tokenJSON, 0600))
+
+	client, err := NewDriveClientWithTokenPath(ctx, string(validCredentialsJSON(t)), tokenPath, "test-folder-id")
+
+	require.NoError(t, err)
+	require.NotNil(t, client)
+}
+
+func validCredentialsJSON(t *testing.T) []byte {
+	t.Helper()
+	cred := map[string]any{
+		"installed": map[string]any{
+			"client_id":     "test-client-id",
+			"client_secret": "test-secret",
+			"auth_uri":      "https://accounts.google.com/o/oauth2/auth",
+			"token_uri":     "https://oauth2.googleapis.com/token",
+			"redirect_uris": []string{"urn:ietf:wg:oauth:2.0:oob"},
+		},
+	}
+	encoded, err := json.Marshal(cred)
+	require.NoError(t, err)
+	return encoded
+}
+
 func TestTokenFromFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
@@ -106,3 +153,4 @@ func TestTokenFromFile(t *testing.T) {
 	require.Equal(t, "test-access", loaded.AccessToken)
 	require.Equal(t, "test-refresh", loaded.RefreshToken)
 }
+
