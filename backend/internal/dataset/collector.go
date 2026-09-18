@@ -89,12 +89,13 @@ func (c *Collector) Peek(limit int) []DatasetEntry {
 	}
 
 	entries := make([]DatasetEntry, 0, limit)
+peekLoop:
 	for i := 0; i < limit; i++ {
 		select {
 		case entry := <-c.buffer:
 			entries = append(entries, entry)
 		default:
-			break
+			break peekLoop
 		}
 	}
 

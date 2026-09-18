@@ -41,8 +41,12 @@ func TestCaptureFromOpenAIRequest_CapturesNonStreamingSuccess(t *testing.T) {
 	entries := collector.Drain(1)
 	require.Len(t, entries, 1)
 	require.Equal(t, "gpt-test", entries[0].Request["model"])
-	require.Equal(t, "world", entries[0].Response["message"].(map[string]any)["content"])
-	require.Equal(t, int64(5), entries[0].Response["usage"].(map[string]any)["total_tokens"])
+	message, ok := entries[0].Response["message"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "world", message["content"])
+	usage, ok := entries[0].Response["usage"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, int64(5), usage["total_tokens"])
 }
 
 func TestCaptureFromOpenAIRequest_SkipsCaptureOnErrorStatus(t *testing.T) {
@@ -70,7 +74,9 @@ func TestCaptureFromOpenAIStream_CapturesCompletedStream(t *testing.T) {
 
 	entries := collector.Drain(1)
 	require.Len(t, entries, 1)
-	require.Equal(t, "hello", entries[0].Response["message"].(map[string]any)["content"])
+	message, ok := entries[0].Response["message"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "hello", message["content"])
 	require.Equal(t, "stop", entries[0].Response["finish_reason"])
 }
 

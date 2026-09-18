@@ -22,7 +22,8 @@ func TestRedactSensitiveFields_RemovesAuthHeaders(t *testing.T) {
 
 	RedactSensitiveFields(entry)
 
-	headers := entry.Request["headers"].(map[string]any)
+	headers, ok := entry.Request["headers"].(map[string]any)
+	require.True(t, ok)
 	require.NotContains(t, headers, "authorization")
 	require.NotContains(t, headers, "x-api-key")
 	require.Contains(t, headers, "content-type", "non-sensitive headers should remain")
@@ -97,14 +98,18 @@ func TestRedactSensitiveFields_HandlesMessageContent(t *testing.T) {
 	RedactSensitiveFields(entry)
 
 	// Check request message redaction
-	messages := entry.Request["messages"].([]map[string]any)
-	reqContent := messages[0]["content"].(string)
+	messages, ok := entry.Request["messages"].([]map[string]any)
+	require.True(t, ok)
+	reqContent, ok := messages[0]["content"].(string)
+	require.True(t, ok)
 	require.Contains(t, reqContent, "[EMAIL_REDACTED]")
 	require.Contains(t, reqContent, "[PHONE_REDACTED]")
 
 	// Check response message redaction
-	respMsg := entry.Response["message"].(map[string]any)
-	respContent := respMsg["content"].(string)
+	respMsg, ok := entry.Response["message"].(map[string]any)
+	require.True(t, ok)
+	respContent, ok := respMsg["content"].(string)
+	require.True(t, ok)
 	require.Contains(t, respContent, "[EMAIL_REDACTED]")
 }
 

@@ -117,22 +117,4 @@ func tokenFromFile(file string) (tok *oauth2.Token, err error) {
 	return tok, err
 }
 
-// saveToken saves a token to a file path.
-func saveToken(path string, token *oauth2.Token) (err error) {
-	f, err := os.Create(path)
-	if err != nil {
-		log.Printf("[Dataset] Unable to cache oauth token: %v", err)
-		return err
-	}
-	defer func() {
-		if closeErr := f.Close(); err == nil {
-			err = closeErr
-		}
-	}()
-	if err = json.NewEncoder(f).Encode(token); err != nil {
-		log.Printf("[Dataset] Unable to cache oauth token: %v", err)
-	}
-	return err
-}
-
 // getTokenFromWeb is removed. Use scripts/dataset-oauth-init.sh to generate token offline.

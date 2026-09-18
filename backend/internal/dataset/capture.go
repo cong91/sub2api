@@ -173,7 +173,9 @@ func reassembleOpenAIChatStream(streamBody []byte) ([]byte, bool) {
 				role = value.String()
 			}
 			if value := choice.Get("delta.content"); value.Exists() && value.Type == gjson.String {
-				content.WriteString(value.String())
+				if _, err := content.WriteString(value.String()); err != nil {
+					return false
+				}
 			}
 			if value := choice.Get("finish_reason"); value.Exists() && value.Type != gjson.Null {
 				reason := value.String()

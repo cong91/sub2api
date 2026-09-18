@@ -106,21 +106,3 @@ func TestTokenFromFile(t *testing.T) {
 	require.Equal(t, "test-access", loaded.AccessToken)
 	require.Equal(t, "test-refresh", loaded.RefreshToken)
 }
-
-func TestSaveToken(t *testing.T) {
-	tmpDir := t.TempDir()
-	tokenPath := filepath.Join(tmpDir, "token.json")
-
-	token := &oauth2.Token{
-		AccessToken:  "test-access",
-		RefreshToken: "test-refresh",
-		TokenType:    "Bearer",
-	}
-
-	require.NoError(t, saveToken(tokenPath, token))
-
-	loaded, err := tokenFromFile(tokenPath)
-	require.NoError(t, err)
-	require.Equal(t, token.AccessToken, loaded.AccessToken)
-	require.Equal(t, token.RefreshToken, loaded.RefreshToken)
-}
