@@ -175,4 +175,3 @@ func configChanged(old, new *config.DatasetConfig) bool {
 		old.BatchMaxMB != new.BatchMaxMB ||
 		old.BatchIntervalSec != new.BatchIntervalSec
 }
-

@@ -51,7 +51,7 @@ docker logs -f sub2api
 
 ### 3. Offline OAuth Setup (before DATASET_ENABLED=true)
 ```bash
-# Run scripts/dataset-oauth-init.sh outside the server request process.
+# Provision the OAuth token through an approved offline operator procedure.
 # Mount the resulting token read-only at the configured token path.
 # The server fails fast/degrades if the token is missing; it never prompts on stdin.
 ```
@@ -98,4 +98,3 @@ docker-compose -f docker-compose.prod.yml restart sub2api
 - Example config: `.env.dataset.example`
 
 **Status:** Capture/runtime code implemented; waiting for CI, token-mount, and approved upload-probe gates.
-

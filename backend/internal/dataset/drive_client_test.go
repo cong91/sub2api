@@ -38,7 +38,7 @@ func TestNewDriveClient_RequiresToken(t *testing.T) {
 	_, err = NewDriveClient(ctx, credPath, "test-folder-id")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "OAuth token not found")
-	require.Contains(t, err.Error(), "scripts/dataset-oauth-init.sh")
+	require.Contains(t, err.Error(), "provision an offline OAuth token")
 	require.Contains(t, err.Error(), tokenPath)
 }
 
@@ -153,4 +153,3 @@ func TestTokenFromFile(t *testing.T) {
 	require.Equal(t, "test-access", loaded.AccessToken)
 	require.Equal(t, "test-refresh", loaded.RefreshToken)
 }
-

@@ -75,4 +75,3 @@ func TestPreserveDeploymentConfigKeepsExplicitPersistedTokenPath(t *testing.T) {
 
 	require.Equal(t, "/run/secrets/db-specific.token", persisted.GoogleDriveTokenPath)
 }
-

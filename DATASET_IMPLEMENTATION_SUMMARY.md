@@ -47,7 +47,7 @@ services:
 
 ### 3. Offline OAuth setup:
 ```bash
-# Run scripts/dataset-oauth-init.sh outside the server request process.
+# Provision the OAuth token through an approved offline operator procedure.
 # Mount the generated token read-only at DATASET_GOOGLE_DRIVE_TOKEN_PATH.
 # Missing tokens disable/degrade Dataset startup instead of blocking the server.
 ```
@@ -83,4 +83,3 @@ Request → Handler (bounded capture hook)
 2. Verify the token mount and Drive folder access without logging secrets.
 3. Enable Dataset only through the approved runtime path.
 4. Run an approved probe and verify the resulting Drive file ID/content metadata.
-

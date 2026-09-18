@@ -40,4 +40,3 @@ func preserveDeploymentConfig(base, persisted *config.DatasetConfig) {
 		persisted.GoogleDriveTokenPath = strings.TrimSpace(base.GoogleDriveTokenPath)
 	}
 }
-

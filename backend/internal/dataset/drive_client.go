@@ -51,7 +51,7 @@ func NewDriveClientWithTokenPath(ctx context.Context, credentialsSource, tokenPa
 	// Use token from file; fail fast if missing (production-safe)
 	token, err := tokenFromFile(resolvedTokenPath)
 	if err != nil {
-		return nil, fmt.Errorf("OAuth token not found at %s (generate token with scripts/dataset-oauth-init.sh before starting server): %w", resolvedTokenPath, err)
+		return nil, fmt.Errorf("OAuth token not found at %s (provision an offline OAuth token before starting the server): %w", resolvedTokenPath, err)
 	}
 
 	client := config.Client(ctx, token)
@@ -167,5 +167,4 @@ func tokenFromFile(file string) (tok *oauth2.Token, err error) {
 	return tok, err
 }
 
-// getTokenFromWeb is removed. Use scripts/dataset-oauth-init.sh to generate token offline.
-
+// getTokenFromWeb is removed. Provision OAuth tokens through an offline operator procedure.
