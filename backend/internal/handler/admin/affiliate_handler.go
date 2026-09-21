@@ -277,13 +277,19 @@ func (h *AffiliateHandler) ListRebateRecords(c *gin.Context) {
 	}
 	// Enrich invitee device codes
 	if h.entClient != nil && len(items) > 0 {
-		userIDs := make([]int64, len(items))
-		for i, r := range items {
-			userIDs[i] = r.InviteeID
+		userIDs := make([]int64, 0, len(items))
+		for _, r := range items {
+			if r.InviteeID != nil {
+				userIDs = append(userIDs, *r.InviteeID)
+			}
 		}
-		dcMap := service.LookupDeviceCodesByUserIDs(c.Request.Context(), h.entClient, userIDs)
-		for i := range items {
-			items[i].InviteeDeviceCode = dcMap[items[i].InviteeID]
+		if len(userIDs) > 0 {
+			dcMap := service.LookupDeviceCodesByUserIDs(c.Request.Context(), h.entClient, userIDs)
+			for i := range items {
+				if items[i].InviteeID != nil {
+					items[i].InviteeDeviceCode = dcMap[*items[i].InviteeID]
+				}
+			}
 		}
 	}
 	response.Paginated(c, items, total, filter.Page, filter.PageSize)
