@@ -11520,7 +11520,6 @@ async function handleDatasetCredentialFileChange(event: Event): Promise<void> {
     }
   }
 }
->>>>>>> 63c27ab32 (feat(admin): add Dataset Settings to Admin Settings UI (#185))
 
 async function loadSettings() {
   loading.value = true;
