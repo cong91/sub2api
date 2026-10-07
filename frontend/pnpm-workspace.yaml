@@ -4,3 +4,6 @@ packages:
 allowBuilds:
   esbuild: true
   vue-demi: true
+
+overrides:
+  source-map-js: 1.2.2
