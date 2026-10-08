@@ -523,6 +523,7 @@ func buildProviderCreatePaymentRequest(req CreateOrderRequest, sel *payment.Inst
 	return payment.CreatePaymentRequest{
 		OrderID:            orderID,
 		Amount:             amount,
+		PaymentCurrency:    selectedInstanceCurrency(sel),
 		PaymentType:        req.PaymentType,
 		Subject:            subject,
 		ReturnURL:          req.ReturnURL,
@@ -531,6 +532,13 @@ func buildProviderCreatePaymentRequest(req CreateOrderRequest, sel *payment.Inst
 		IsMobile:           req.IsMobile,
 		InstanceSubMethods: selectedInstanceSupportedTypes(sel),
 	}
+}
+
+func selectedInstanceCurrency(sel *payment.InstanceSelection) string {
+	if sel == nil {
+		return payment.DefaultPaymentCurrency
+	}
+	return paymentProviderConfigCurrency(sel.ProviderKey, sel.Config)
 }
 
 func selectedInstanceSupportedTypes(sel *payment.InstanceSelection) string {
