@@ -86,6 +86,7 @@ func RegisterPaymentRoutes(
 		webhook.POST("/wxpay", webhookHandler.WxpayNotify)
 		webhook.POST("/stripe", webhookHandler.StripeWebhook)
 		webhook.POST("/airwallex", webhookHandler.AirwallexWebhook)
+		webhook.POST("/sepay", webhookHandler.SepayWebhook)
 	}
 
 	// --- Admin payment endpoints (admin auth) ---
@@ -126,6 +127,7 @@ func RegisterPaymentRoutes(
 		{
 			providers.GET("", adminPaymentHandler.ListProviders)
 			providers.POST("", adminPaymentHandler.CreateProvider)
+			providers.POST("/sepay/bank-accounts", adminPaymentHandler.ListSepayBankAccounts)
 			providers.PUT("/:id", adminPaymentHandler.UpdateProvider)
 			providers.DELETE("/:id", adminPaymentHandler.DeleteProvider)
 		}
