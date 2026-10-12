@@ -15,6 +15,12 @@ func ProvideAuthHandler(cfg *config.Config, authService *service.AuthService, us
 	return h
 }
 
+func ProvideAPIKeyHandler(apiKeyService *service.APIKeyService, capabilities *service.APIKeyCapabilitiesService) *APIKeyHandler {
+	h := NewAPIKeyHandler(apiKeyService)
+	h.SetCapabilitiesService(capabilities)
+	return h
+}
+
 // ProvideAdminHandlers creates the AdminHandlers struct
 func ProvideAdminHandlers(
 	dashboardHandler *admin.DashboardHandler,
@@ -257,7 +263,7 @@ var ProviderSet = wire.NewSet(
 	NewVClawHandler,
 	NewBotSalesHandler,
 	NewUserHandler,
-	NewAPIKeyHandler,
+	ProvideAPIKeyHandler,
 	NewUsageHandler,
 	NewRedeemHandler,
 	NewSubscriptionHandler,
