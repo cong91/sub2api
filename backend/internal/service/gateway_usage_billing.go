@@ -376,6 +376,12 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 	}
 
 	if result == nil || !result.Applied {
+		// The billing dedup key prevents a second charge, but a replay must still
+		// revisit customer notification delivery when its earlier Telegram send
+		// was marked failed_retryable by the idempotency coordinator.
+		if deps.balanceNotifyService != nil {
+			deps.balanceNotifyService.RetryCustomerTelegramBalanceNotification(context.Background(), p.User, requestID)
+		}
 		deps.deferredService.ScheduleLastUsedUpdate(p.Account.ID)
 		return false, nil
 	}
@@ -386,11 +392,11 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 		}
 	}
 
-	finalizePostUsageBilling(billingCtx, p, deps, result)
+	finalizePostUsageBilling(billingCtx, requestID, p, deps, result)
 	return true, nil
 }
 
-func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *billingDeps, result *UsageBillingApplyResult) {
+func finalizePostUsageBilling(ctx context.Context, requestID string, p *postUsageBillingParams, deps *billingDeps, result *UsageBillingApplyResult) {
 	if p == nil || p.Cost == nil || deps == nil {
 		return
 	}
@@ -459,7 +465,7 @@ func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, de
 
 	// Notification checks run async — all parameters are already captured,
 	// no dependency on the request context or upstream connection.
-	go notifyBalanceLow(p, deps, result)
+	go notifyBalanceLow(requestID, p, deps, result)
 	go notifyAccountQuota(p, deps, result)
 }
 
@@ -494,7 +500,7 @@ func syncBalanceCacheAfterDeduction(ctx context.Context, p *postUsageBillingPara
 // notifyBalanceLow sends balance low notification after deduction.
 // When result.NewBalance is available (from DB transaction RETURNING), it is used directly
 // to reconstruct oldBalance, avoiding stale Redis reads and concurrent-deduction races.
-func notifyBalanceLow(p *postUsageBillingParams, deps *billingDeps, result *UsageBillingApplyResult) {
+func notifyBalanceLow(eventID string, p *postUsageBillingParams, deps *billingDeps, result *UsageBillingApplyResult) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("panic in notifyBalanceLow", "recover", r)
@@ -519,7 +525,10 @@ func notifyBalanceLow(p *postUsageBillingParams, deps *billingDeps, result *Usag
 		"threshold", p.User.BalanceNotifyThreshold,
 		"result_has_new_balance", result != nil && result.NewBalance != nil,
 	)
-	deps.balanceNotifyService.CheckBalanceAfterDeduction(context.Background(), p.User, oldBalance, p.Cost.ActualCost)
+	// CheckBalanceAfterDeduction is invoked only after the usage-billing
+	// transaction has returned successfully. The notification service owns
+	// durable deduplication and keeps Telegram delivery best-effort.
+	deps.balanceNotifyService.CheckBalanceAfterDeductionWithEvent(context.Background(), p.User, oldBalance, p.Cost.ActualCost, eventID)
 }
 
 // resolveOldBalance returns the pre-deduction balance.
