@@ -333,13 +333,15 @@ func ProvideCNProviderBalanceCheckService(
 	accountRepo AccountRepository,
 	balanceService *CNProviderBalanceService,
 	quotaService *CNProviderQuotaService,
+	telegramNotifySvc *TelegramNotifyService,
 	cfg *config.Config,
+	idempotencySvc *IdempotencyCoordinator,
 ) *CNProviderBalanceCheckService {
 	minutes := 10
 	if cfg != nil && cfg.Gateway.CNProviders.BalanceCheckIntervalMinutes > 0 {
 		minutes = cfg.Gateway.CNProviders.BalanceCheckIntervalMinutes
 	}
-	svc := NewCNProviderBalanceCheckService(accountRepo, balanceService, quotaService, cfg, time.Duration(minutes)*time.Minute)
+	svc := NewCNProviderBalanceCheckService(accountRepo, balanceService, quotaService, telegramNotifySvc, cfg, time.Duration(minutes)*time.Minute, idempotencySvc)
 	svc.Start()
 	return svc
 }
@@ -1037,10 +1039,12 @@ func ProvidePaymentConfigService(entClient *dbent.Client, settingRepo SettingRep
 }
 
 // ProvideBalanceNotifyService creates BalanceNotifyService
-func ProvideBalanceNotifyService(emailService *EmailService, settingRepo SettingRepository, accountRepo AccountRepository, notificationEmailService *NotificationEmailService, telegramNotifySvc *TelegramNotifyService) *BalanceNotifyService {
+func ProvideBalanceNotifyService(emailService *EmailService, settingRepo SettingRepository, accountRepo AccountRepository, notificationEmailService *NotificationEmailService, telegramNotifySvc *TelegramNotifyService, userAttributeSvc *UserAttributeService, idempotencySvc *IdempotencyCoordinator) *BalanceNotifyService {
 	svc := NewBalanceNotifyService(emailService, settingRepo, accountRepo)
 	svc.SetNotificationEmailService(notificationEmailService)
 	svc.SetTelegramNotifyService(telegramNotifySvc)
+	svc.SetUserAttributeService(userAttributeSvc)
+	svc.SetIdempotencyService(idempotencySvc)
 	return svc
 }
 
