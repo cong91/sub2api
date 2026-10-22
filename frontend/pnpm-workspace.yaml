@@ -7,3 +7,4 @@ allowBuilds:
 
 overrides:
   source-map-js: 1.2.2
+  follow-redirects: 1.16.1
