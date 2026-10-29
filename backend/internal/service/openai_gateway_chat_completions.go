@@ -1189,6 +1189,13 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 			if clientDisconnected || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", err)
 			}
+			if !openAIStreamClientOutputStarted(c, clientOutputStarted) {
+				msg := "OpenAI stream disconnected before completion"
+				if errText := strings.TrimSpace(err.Error()); errText != "" {
+					msg += ": " + errText
+				}
+				return resultWithUsage(), s.newOpenAIStreamFailoverError(c, account, false, requestID, nil, msg)
+			}
 			return resultWithUsage(), newOpenAIUpstreamStreamReadError(err)
 		}
 		if frame, ok := parser.Finish(); ok {
@@ -1263,6 +1270,13 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 				handleScanErr(ev.err)
 				if clientDisconnected || errors.Is(ev.err, context.Canceled) || errors.Is(ev.err, context.DeadlineExceeded) {
 					return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", ev.err)
+				}
+				if !openAIStreamClientOutputStarted(c, clientOutputStarted) {
+					msg := "OpenAI stream disconnected before completion"
+					if errText := strings.TrimSpace(ev.err.Error()); errText != "" {
+						msg += ": " + errText
+					}
+					return resultWithUsage(), s.newOpenAIStreamFailoverError(c, account, false, requestID, nil, msg)
 				}
 				return resultWithUsage(), newOpenAIUpstreamStreamReadError(ev.err)
 			}
