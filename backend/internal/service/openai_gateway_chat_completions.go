@@ -1190,11 +1190,8 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 				return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", err)
 			}
 			if !openAIStreamClientOutputStarted(c, clientOutputStarted) {
-				msg := "OpenAI stream disconnected before completion"
-				if errText := strings.TrimSpace(err.Error()); errText != "" {
-					msg += ": " + errText
-				}
-				return resultWithUsage(), s.newOpenAIStreamFailoverError(c, account, false, requestID, nil, msg)
+				_, message := classifyOpenAIUpstreamStreamReadError(err)
+				return resultWithUsage(), s.newOpenAIStreamFailoverError(c, account, false, requestID, nil, message)
 			}
 			return resultWithUsage(), newOpenAIUpstreamStreamReadError(err)
 		}
@@ -1272,11 +1269,8 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 					return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", ev.err)
 				}
 				if !openAIStreamClientOutputStarted(c, clientOutputStarted) {
-					msg := "OpenAI stream disconnected before completion"
-					if errText := strings.TrimSpace(ev.err.Error()); errText != "" {
-						msg += ": " + errText
-					}
-					return resultWithUsage(), s.newOpenAIStreamFailoverError(c, account, false, requestID, nil, msg)
+					_, message := classifyOpenAIUpstreamStreamReadError(ev.err)
+					return resultWithUsage(), s.newOpenAIStreamFailoverError(c, account, false, requestID, nil, message)
 				}
 				return resultWithUsage(), newOpenAIUpstreamStreamReadError(ev.err)
 			}
