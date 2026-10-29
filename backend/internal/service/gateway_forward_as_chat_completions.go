@@ -308,7 +308,7 @@ func (s *GatewayService) handleCCBufferedFromAnthropic(
 				zap.String("request_id", requestID),
 			)
 		}
-		if failoverErr, ok := newAnthropicUpstreamReadFailoverError(nil, c, resp, err); ok {
+		if failoverErr, ok := newAnthropicUpstreamReadFailoverError(c.Request.Context(), c, resp, err); ok {
 			return nil, failoverErr
 		}
 		// A partial upstream body cannot be converted to a successful response.
@@ -517,7 +517,7 @@ func (s *GatewayService) handleCCStreamingFromAnthropic(
 	if failure := stream.failure(); failure != nil {
 		if stream.readErr != nil && !errors.Is(stream.readErr, errAnthropicNativeStreamIdle) &&
 			c.Writer.Size() == writerSizeBeforeStream {
-			if failoverErr, ok := newAnthropicUpstreamReadFailoverError(nil, c, resp, stream.readErr); ok {
+			if failoverErr, ok := newAnthropicUpstreamReadFailoverError(c.Request.Context(), c, resp, stream.readErr); ok {
 				return nil, failoverErr
 			}
 		}
