@@ -250,7 +250,7 @@ func TestAnthropicCompatStreaming_ReadErrorBeforeTerminalEventFails(t *testing.T
 		}{
 			{name: "after_text", stream: anthropicStreamTruncatedBeforeMessageDelta(), readErr: io.ErrUnexpectedEOF, wantErr: true, wantResult: true},
 			{name: "after_message_start", stream: messageStartOnly, readErr: io.ErrUnexpectedEOF, wantErr: true, wantResult: true},
-			{name: "before_any_event", readErr: errors.New("read tcp 10.0.0.1:1234->52.1.2.3:443: stream ID 17; INTERNAL_ERROR"), wantErr: true, wantFailover: name == "responses"},
+			{name: "before_any_event", readErr: errors.New("read tcp 10.0.0.1:1234->52.1.2.3:443: stream ID 17; INTERNAL_ERROR"), wantErr: true, wantFailover: true},
 			{name: "after_stop_reason", stream: anthropicStreamWithoutMessageStop(), readErr: io.ErrUnexpectedEOF, wantResult: true},
 			{name: "after_message_stop_without_stop_reason", stream: strings.Replace(anthropicStreamWithMidStreamText(), `"delta":{"stop_reason":"end_turn"}`, `"delta":{}`, 1), readErr: io.ErrUnexpectedEOF, wantResult: true},
 		} {
