@@ -529,6 +529,10 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 					logger.LegacyPrintf("service.gateway", "[Anthropic passthrough] SSE line too long: account=%d max_size=%d error=%v", account.ID, maxLineSize, ev.err)
 					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs}, ev.err
 				}
+				if failoverErr, ok := newAnthropicUpstreamReadFailoverError(ctx, c, resp, ev.err); ok {
+					logger.LegacyPrintf("service.gateway", "[Anthropic passthrough] Upstream stream read error before client output (account=%d), failing over: %v", account.ID, ev.err)
+					return nil, failoverErr
+				}
 				return &streamingResult{usage: usage, firstTokenMs: firstTokenMs}, fmt.Errorf("stream read error: %w", ev.err)
 			}
 
@@ -857,6 +861,9 @@ func (s *GatewayService) handleNonStreamingResponseAnthropicAPIKeyPassthrough(
 
 	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, anthropicTooLargeError)
 	if err != nil {
+		if failoverErr, ok := newAnthropicUpstreamReadFailoverError(ctx, c, resp, err); ok {
+			return nil, failoverErr
+		}
 		return nil, err
 	}
 	observer := upstreamResponseModelObserverFromContext(c)
