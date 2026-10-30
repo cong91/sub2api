@@ -1322,6 +1322,11 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 		}
 		if err := scanner.Err(); err != nil {
 			handleScanErr(err)
+			if !clientOutputStarted && !clientDisconnected {
+				if failoverErr := s.newOpenAIUpstreamReadFailoverError(c, account, err, resp.Header); failoverErr != nil {
+					return resultWithUsage(), failoverErr
+				}
+			}
 			releaseHeld()
 			return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", err)
 		}
@@ -1404,6 +1409,11 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 			}
 			if ev.err != nil {
 				handleScanErr(ev.err)
+				if !clientOutputStarted && !clientDisconnected {
+					if failoverErr := s.newOpenAIUpstreamReadFailoverError(c, account, ev.err, resp.Header); failoverErr != nil {
+						return resultWithUsage(), failoverErr
+					}
+				}
 				releaseHeld()
 				return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", ev.err)
 			}
