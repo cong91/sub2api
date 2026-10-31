@@ -9,7 +9,7 @@ overrides:
   decode-uri-component: 0.5.1
   decode-uri-component@<0.5.1: '>=0.5.1'
   source-map-js: 1.2.2
-  follow-redirects: 1.16.1
+  follow-redirects: 1.16.2
 
 allowBuilds:
   esbuild: true
