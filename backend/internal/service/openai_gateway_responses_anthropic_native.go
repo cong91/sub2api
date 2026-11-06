@@ -154,6 +154,24 @@ func nativeAnthropicOptionalAccount(accounts []*Account) *Account {
 	return accounts[0]
 }
 
+func nativeAnthropicStreamFailure(stream *anthropicCompatStream) *anthropicCompatStreamFailure {
+	if failure := stream.failure(); failure != nil {
+		return failure
+	}
+	// The shared compatibility stream intentionally preserves upstream behavior:
+	// a clean EOF before message_start is not a failure there. Native Anthropic
+	// conversion must not turn empty or ping-only EOF into a billable success,
+	// so classify that case only on this extension path.
+	if !stream.clientDisconnected && !stream.sawTerminal && errors.Is(stream.readErr, io.EOF) {
+		return &anthropicCompatStreamFailure{
+			err:     ErrOpenAIUpstreamStreamTruncated,
+			errType: "stream_incomplete",
+			message: "upstream stream ended without a terminal event",
+		}
+	}
+	return nil
+}
+
 // classifyNativeAnthropicReadFailure preserves the upstream failure frame while
 // retaining the stable error classification expected by OpenAI handlers.
 func classifyNativeAnthropicReadFailure(c *gin.Context, stream *anthropicCompatStream, failure *anthropicCompatStreamFailure) error {
@@ -262,6 +280,10 @@ func (s *OpenAIGatewayService) handleResponsesBufferedFromNativeAnthropic(
 		line, rerr := pump.next()
 		if rerr != nil {
 			if errors.Is(rerr, errAnthropicNativeStreamIdle) {
+				if streamStatus.sawTerminal {
+					streamStatus.readErr = rerr
+					break
+				}
 				return onIdle()
 			}
 			logReadErr(rerr)
@@ -279,6 +301,10 @@ func (s *OpenAIGatewayService) handleResponsesBufferedFromNativeAnthropic(
 		dataLine, rerr := pump.next()
 		if rerr != nil {
 			if errors.Is(rerr, errAnthropicNativeStreamIdle) {
+				if streamStatus.sawTerminal {
+					streamStatus.readErr = rerr
+					break
+				}
 				return onIdle()
 			}
 			logReadErr(rerr)
@@ -335,7 +361,7 @@ func (s *OpenAIGatewayService) handleResponsesBufferedFromNativeAnthropic(
 		}
 	}
 
-	if failure := streamStatus.failure(); failure != nil {
+	if failure := nativeAnthropicStreamFailure(streamStatus); failure != nil {
 		_ = resp.Body.Close()
 		writeResponsesError(c, http.StatusBadGateway, "server_error", failure.message)
 		return &OpenAIForwardResult{
@@ -551,6 +577,10 @@ func (s *OpenAIGatewayService) handleResponsesStreamingFromNativeAnthropic(
 		line, rerr := pump.next()
 		if rerr != nil {
 			if errors.Is(rerr, errAnthropicNativeStreamIdle) {
+				if streamStatus.sawTerminal {
+					streamStatus.readErr = rerr
+					break
+				}
 				return onIdle()
 			}
 			logReadErr(rerr)
@@ -567,6 +597,10 @@ func (s *OpenAIGatewayService) handleResponsesStreamingFromNativeAnthropic(
 		dataLine, rerr := pump.next()
 		if rerr != nil {
 			if errors.Is(rerr, errAnthropicNativeStreamIdle) {
+				if streamStatus.sawTerminal {
+					streamStatus.readErr = rerr
+					break
+				}
 				return onIdle()
 			}
 			logReadErr(rerr)
@@ -594,7 +628,7 @@ func (s *OpenAIGatewayService) handleResponsesStreamingFromNativeAnthropic(
 		processAnthropicEvent(&event)
 	}
 
-	if failure := streamStatus.failure(); failure != nil {
+	if failure := nativeAnthropicStreamFailure(streamStatus); failure != nil {
 		_ = resp.Body.Close()
 		if !clientDisconnected {
 			writeStreamHeaders()
