@@ -70,8 +70,8 @@ describe('PlazaModelPricingTable', () => {
     }
     const wrapper = mountTable([model], 0.5)
     try {
-      expect(wrapper.text()).toContain('(12h $1.00)')
-      expect(wrapper.text()).toContain('(12h $4.00)')
+      expect(wrapper.text()).toContain('(12h 1.000₫)')
+      expect(wrapper.text()).toContain('(12h 4.000₫)')
       expect(wrapper.text()).not.toContain('(1h')
     } finally {
       wrapper.unmount()
