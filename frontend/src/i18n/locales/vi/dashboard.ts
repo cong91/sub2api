@@ -526,6 +526,7 @@ availableChannels: {
     inputPrice: 'Đầu vào',
     outputPrice: 'Đầu ra',
     cacheWritePrice: 'Ghi cache',
+    cacheWrite12hPrice: 'Ghi cache (12 giờ)',
     cacheReadPrice: 'Đọc cache',
     imageOutputPrice: 'Đầu ra hình ảnh',
     perRequestPrice: 'Mỗi yêu cầu',
