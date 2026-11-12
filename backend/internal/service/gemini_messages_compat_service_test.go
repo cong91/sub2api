@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -23,6 +24,18 @@ type geminiCompatHTTPUpstreamStub struct {
 	err      error
 	calls    int
 	lastReq  *http.Request
+}
+
+type geminiCompatErrAfterReader struct {
+	data *strings.Reader
+	err  error
+}
+
+func (r *geminiCompatErrAfterReader) Read(p []byte) (int, error) {
+	if r.data.Len() > 0 {
+		return r.data.Read(p)
+	}
+	return 0, r.err
 }
 
 func (s *geminiCompatHTTPUpstreamStub) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
@@ -115,6 +128,49 @@ func TestGeminiForwardAsChatCompletions_OAuthRoutesToGeminiAndReturnsChatFormat(
 	require.Equal(t, float64(7), usage["prompt_tokens"])
 	require.Equal(t, float64(3), usage["completion_tokens"])
 	require.Equal(t, float64(10), usage["total_tokens"])
+}
+
+func TestGeminiForwardNative_BufferedStreamReadFailureWritesBadGateway(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	readErr := fmt.Errorf("upstream SSE line too long: %w", bufio.ErrTooLong)
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+			Body: io.NopCloser(&geminiCompatErrAfterReader{
+				data: strings.NewReader("data: {\"response\":{}}\n\n"),
+				err:  readErr,
+			}),
+		},
+	}
+	svc := &GeminiMessagesCompatService{
+		tokenProvider: &GeminiTokenProvider{},
+		httpUpstream:  httpStub,
+		cfg:           &config.Config{},
+	}
+	account := &Account{
+		ID:       103,
+		Platform: PlatformGemini,
+		Type:     AccountTypeOAuth,
+		Credentials: map[string]any{
+			"access_token": "ya29.test-token",
+			"project_id":   "project-1",
+		},
+		Concurrency: 1,
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-flash:generateContent", strings.NewReader(`{}`))
+
+	result, err := svc.ForwardNative(context.Background(), c, account, "gemini-2.5-flash", "generateContent", false, []byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`))
+
+	require.Nil(t, result)
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.NotErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusBadGateway, rec.Code)
+	require.Contains(t, rec.Body.String(), "Failed to read upstream stream")
 }
 
 func TestGeminiForwardAsChatCompletions_StreamsOpenAIChunksFromGeminiSSE(t *testing.T) {
