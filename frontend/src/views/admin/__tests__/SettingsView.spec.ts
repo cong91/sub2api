@@ -768,6 +768,75 @@ describe("admin SettingsView payment visible method controls", () => {
     wrapper.unmount();
   });
 
+  it("loads, saves and reloads every Telegram notification switch using its API field", async () => {
+    const initial = {
+      telegram_notify_new_user: true,
+      telegram_notify_account_error: false,
+      telegram_notify_account_expired: true,
+      telegram_notify_payment_success: false,
+      telegram_notify_payment_failed: true,
+      telegram_notify_refund: false,
+      telegram_notify_sub_expired: true,
+      telegram_notify_ops_alert: false,
+      telegram_notify_customer_balance: true,
+      telegram_notify_provider_balance: false,
+      telegram_notify_proxy_expired: true,
+    };
+    const expected = {
+      telegram_notify_new_user: false,
+      telegram_notify_account_error: true,
+      telegram_notify_account_expired: false,
+      telegram_notify_payment_success: true,
+      telegram_notify_payment_failed: false,
+      telegram_notify_refund: true,
+      telegram_notify_sub_expired: false,
+      telegram_notify_ops_alert: true,
+      telegram_notify_customer_balance: false,
+      telegram_notify_provider_balance: true,
+      telegram_notify_proxy_expired: false,
+    };
+    const options = [
+      ["NewUser", true], ["AccountError", false], ["AccountExpired", true],
+      ["PaymentSuccess", false], ["PaymentFailed", true], ["Refund", false],
+      ["SubExpired", true], ["OpsAlert", false], ["CustomerBalance", true],
+      ["ProviderBalance", false], ["ProxyExpired", true],
+    ] as const;
+    let savedSettings = { ...baseSettingsResponse, ...initial };
+    getSettings.mockImplementation(async () => savedSettings);
+    updateSettings.mockImplementation(async (payload) => {
+      savedSettings = { ...savedSettings, ...payload };
+      return savedSettings;
+    });
+    const wrapper = mountView();
+    await flushPromises();
+
+    for (const [label, wasEnabled] of options) {
+      const row = wrapper.findAll("label").find((node) =>
+        node.text() === `admin.settings.telegramNotifications.notify${label}`,
+      )?.element.parentElement?.parentElement;
+      expect(row, label).toBeDefined();
+      const input = row!.querySelector("input[type=checkbox]") as HTMLInputElement;
+      expect(input.checked, label).toBe(wasEnabled);
+      input.checked = !wasEnabled;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining(expected));
+    wrapper.unmount();
+
+    const reloaded = mountView();
+    await flushPromises();
+    for (const [label, wasEnabled] of options) {
+      const row = reloaded.findAll("label").find((node) =>
+        node.text() === `admin.settings.telegramNotifications.notify${label}`,
+      )?.element.parentElement?.parentElement;
+      const input = row!.querySelector("input[type=checkbox]") as HTMLInputElement;
+      expect(input.checked, label).toBe(!wasEnabled);
+    }
+    reloaded.unmount();
+  });
+
   it("submits the compact home page toggle", async () => {
     const wrapper = mountView();
     await flushPromises();
