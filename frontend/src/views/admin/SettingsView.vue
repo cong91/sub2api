@@ -10468,24 +10468,22 @@ type TelegramNotificationKey =
   | "telegram_notify_provider_balance"
   | "telegram_notify_proxy_expired";
 
-const telegramNotificationOptions: Array<{
-  key: TelegramNotificationKey;
-  label: string;
-  hint: string;
-}> = [
-  ["newUser", "NewUser"],
-  ["accountError", "AccountError"],
-  ["accountExpired", "AccountExpired"],
-  ["paymentSuccess", "PaymentSuccess"],
-  ["paymentFailed", "PaymentFailed"],
-  ["refund", "Refund"],
-  ["subExpired", "SubExpired"],
-  ["opsAlert", "OpsAlert"],
-  ["customerBalance", "CustomerBalance"],
-  ["providerBalance", "ProviderBalance"],
-  ["proxyExpired", "ProxyExpired"],
-].map(([name, suffix]) => ({
-  key: `telegram_notify_${name}` as TelegramNotificationKey,
+const telegramNotificationEntries: Array<[TelegramNotificationKey, string]> = [
+  ["telegram_notify_new_user", "NewUser"],
+  ["telegram_notify_account_error", "AccountError"],
+  ["telegram_notify_account_expired", "AccountExpired"],
+  ["telegram_notify_payment_success", "PaymentSuccess"],
+  ["telegram_notify_payment_failed", "PaymentFailed"],
+  ["telegram_notify_refund", "Refund"],
+  ["telegram_notify_sub_expired", "SubExpired"],
+  ["telegram_notify_ops_alert", "OpsAlert"],
+  ["telegram_notify_customer_balance", "CustomerBalance"],
+  ["telegram_notify_provider_balance", "ProviderBalance"],
+  ["telegram_notify_proxy_expired", "ProxyExpired"],
+];
+
+const telegramNotificationOptions = telegramNotificationEntries.map(([key, suffix]) => ({
+  key,
   label: `admin.settings.telegramNotifications.notify${suffix}`,
   hint: `admin.settings.telegramNotifications.notify${suffix}Hint`,
 }));
