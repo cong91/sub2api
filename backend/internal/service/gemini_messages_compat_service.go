@@ -1096,6 +1096,7 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 	beginUpstreamResponseModelObservation(c)
 	beginGeminiImageOutputObservation(c)
 	startTime := time.Now()
+	originalHeaders := c.Writer.Header().Clone()
 
 	if strings.TrimSpace(originalModel) == "" {
 		return nil, s.writeGoogleError(c, http.StatusBadRequest, "Missing model in URL")
@@ -1554,7 +1555,7 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 	streamFinished := false
 
 	if stream {
-		streamRes, err := s.handleNativeStreamingResponse(c, resp, startTime, isOAuth, account, requestID)
+		streamRes, err := s.handleNativeStreamingResponse(c, resp, startTime, isOAuth, account, requestID, originalHeaders)
 		if err != nil {
 			return nil, err
 		}
@@ -1572,7 +1573,11 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 			})
 			if err != nil {
 				if failoverErr, ok := newGeminiNativeReadFailoverError(ctx, c, resp, err); ok {
+					restoreGeminiNativeResponseHeaders(c, originalHeaders)
 					return nil, failoverErr
+				}
+				if geminiNativeRequestCanceled(ctx, c) {
+					return nil, err
 				}
 				return nil, s.writeGoogleError(c, http.StatusBadGateway, "Failed to read upstream stream")
 			}
@@ -1585,6 +1590,10 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 		} else {
 			usageResp, err := s.handleNativeNonStreamingResponse(c, resp, isOAuth, account, requestID)
 			if err != nil {
+				var failoverErr *UpstreamFailoverError
+				if errors.As(err, &failoverErr) {
+					restoreGeminiNativeResponseHeaders(c, originalHeaders)
+				}
 				return nil, err
 			}
 			usage = usageResp
@@ -2868,6 +2877,9 @@ func (s *GeminiMessagesCompatService) handleNativeNonStreamingResponse(c *gin.Co
 	}
 
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
+	if upstreamRequestID != "" {
+		c.Writer.Header().Set("X-Request-Id", upstreamRequestID)
+	}
 
 	contentType := resp.Header.Get("Content-Type")
 	if contentType == "" {
@@ -2881,9 +2893,12 @@ func (s *GeminiMessagesCompatService) handleNativeNonStreamingResponse(c *gin.Co
 	return &ClaudeUsage{}, nil
 }
 
-func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Context, resp *http.Response, startTime time.Time, isOAuth bool, account *Account, upstreamRequestID string) (*geminiNativeStreamResult, error) {
+func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Context, resp *http.Response, startTime time.Time, isOAuth bool, account *Account, upstreamRequestID string, originalHeaders http.Header) (*geminiNativeStreamResult, error) {
 	writerSizeBeforeStream := c.Writer.Size()
 	responseCommittedBeforeStream := IsResponseCommitted(c)
+	if originalHeaders == nil {
+		originalHeaders = c.Writer.Header().Clone()
+	}
 	if s.cfg != nil && s.cfg.Gateway.GeminiDebugResponseHeaders {
 		logger.LegacyPrintf("service.gemini_messages_compat", "[GeminiAPI] ========== Streaming Response Headers ==========")
 		for key, values := range resp.Header {
@@ -2896,6 +2911,9 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 
 	if s.responseHeaderFilter != nil {
 		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
+	}
+	if upstreamRequestID != "" {
+		c.Writer.Header().Set("X-Request-Id", upstreamRequestID)
 	}
 
 	c.Status(resp.StatusCode)
@@ -2995,6 +3013,7 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 		}
 		if err != nil {
 			if failoverErr, ok := newGeminiNativeReadFailoverError(c.Request.Context(), c, resp, err); ok && !responseCommittedBeforeStream && c.Writer.Size() == writerSizeBeforeStream {
+				restoreGeminiNativeResponseHeaders(c, originalHeaders)
 				return nil, failoverErr
 			}
 			if !geminiStreamAbortedWithBillableOutput(c, err, usage) {

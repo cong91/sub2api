@@ -15,6 +15,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
+	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -77,7 +78,7 @@ func TestGeminiForwardAsChatCompletions_OAuthRoutesToGeminiAndReturnsChatFormat(
 		Platform: PlatformGemini,
 		Type:     AccountTypeOAuth,
 		Credentials: map[string]any{
-			"access_token": "ya29.test-token",
+			"access_token": "[REDACTED]",
 			"project_id":   "project-1",
 		},
 		Concurrency: 1,
@@ -98,7 +99,7 @@ func TestGeminiForwardAsChatCompletions_OAuthRoutesToGeminiAndReturnsChatFormat(
 
 	require.NotNil(t, httpStub.lastReq)
 	require.Contains(t, httpStub.lastReq.URL.String(), "/v1internal:streamGenerateContent?alt=sse")
-	require.Equal(t, "Bearer ya29.test-token", httpStub.lastReq.Header.Get("Authorization"))
+	require.Equal(t, "Bearer [REDACTED]", httpStub.lastReq.Header.Get("Authorization"))
 	require.Empty(t, httpStub.lastReq.Header.Get("x-api-key"))
 	require.Empty(t, httpStub.lastReq.Header.Get("anthropic-version"))
 
@@ -153,7 +154,7 @@ func TestGeminiForwardNative_BufferedStreamReadFailureWritesBadGateway(t *testin
 		Platform: PlatformGemini,
 		Type:     AccountTypeOAuth,
 		Credentials: map[string]any{
-			"access_token": "ya29.test-token",
+			"access_token": "[REDACTED]",
 			"project_id":   "project-1",
 		},
 		Concurrency: 1,
@@ -171,6 +172,217 @@ func TestGeminiForwardNative_BufferedStreamReadFailureWritesBadGateway(t *testin
 	require.NotErrorAs(t, err, &failoverErr)
 	require.Equal(t, http.StatusBadGateway, rec.Code)
 	require.Contains(t, rec.Body.String(), "Failed to read upstream stream")
+}
+
+func TestGeminiForwardNative_BufferedStreamReadFailureDoesNotWriteAfterClientCancellation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	readErr := fmt.Errorf("upstream connection reset")
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+			Body: io.NopCloser(&geminiCompatErrAfterReader{
+				data: strings.NewReader("data: {\"response\":{}}\n\n"),
+				err:  readErr,
+			}),
+		},
+	}
+	svc := &GeminiMessagesCompatService{
+		tokenProvider: &GeminiTokenProvider{},
+		httpUpstream:  httpStub,
+		cfg:           &config.Config{},
+	}
+	account := &Account{
+		ID:       104,
+		Platform: PlatformGemini,
+		Type:     AccountTypeOAuth,
+		Credentials: map[string]any{
+			"access_token": "[REDACTED]",
+			"project_id":   "project-1",
+		},
+		Concurrency: 1,
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	requestCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-flash:generateContent", strings.NewReader(`{}`)).WithContext(requestCtx)
+
+	result, err := svc.ForwardNative(context.Background(), c, account, "gemini-2.5-flash", "generateContent", false, []byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`))
+
+	require.Nil(t, result)
+	require.ErrorIs(t, err, readErr)
+	require.Empty(t, rec.Body.Bytes())
+	require.False(t, serviceResponseWasCommitted(c))
+}
+
+func TestGeminiForwardNative_BufferedUpstreamDeadlineWritesBadGatewayWhileClientIsAlive(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+			Body: io.NopCloser(&geminiCompatErrAfterReader{
+				data: strings.NewReader(""),
+				err:  context.DeadlineExceeded,
+			}),
+		},
+	}
+	svc := &GeminiMessagesCompatService{
+		tokenProvider: &GeminiTokenProvider{},
+		httpUpstream:  httpStub,
+		cfg:           &config.Config{},
+	}
+	account := &Account{
+		ID:          108,
+		Platform:    PlatformGemini,
+		Type:        AccountTypeOAuth,
+		Credentials: map[string]any{"access_token": "[REDACTED]", "project_id": "project-1"},
+		Concurrency: 1,
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-flash:generateContent", strings.NewReader(`{}`))
+
+	result, err := svc.ForwardNative(context.Background(), c, account, "gemini-2.5-flash", "generateContent", false, []byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`))
+
+	require.Nil(t, result)
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.NotErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusBadGateway, rec.Code)
+	require.Contains(t, rec.Body.String(), "Failed to read upstream stream")
+}
+
+func TestGeminiForwardNative_PreOutputFailoverRestoresResponseHeaders(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Header: http.Header{
+				"Content-Type": []string{"text/event-stream"},
+				"X-Request-Id": []string{"failed-attempt"},
+			},
+			Body: io.NopCloser(&geminiCompatErrAfterReader{
+				data: strings.NewReader(""),
+				err:  fmt.Errorf("upstream connection reset"),
+			}),
+		},
+	}
+	svc := &GeminiMessagesCompatService{
+		tokenProvider: &GeminiTokenProvider{},
+		httpUpstream:  httpStub,
+		cfg:           &config.Config{},
+	}
+	account := &Account{
+		ID:          105,
+		Platform:    PlatformGemini,
+		Type:        AccountTypeOAuth,
+		Credentials: map[string]any{"access_token": "[REDACTED]", "project_id": "project-1"},
+		Concurrency: 1,
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Header("X-Middleware", "preserved")
+	c.Header("Content-Type", "application/json")
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-flash:streamGenerateContent", strings.NewReader(`{}`))
+
+	result, err := svc.ForwardNative(context.Background(), c, account, "gemini-2.5-flash", "streamGenerateContent", true, []byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`))
+
+	require.Nil(t, result)
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, "preserved", c.Writer.Header().Get("X-Middleware"))
+	require.Empty(t, c.Writer.Header().Get("X-Request-Id"))
+	require.Equal(t, "application/json", c.Writer.Header().Get("Content-Type"))
+}
+
+func serviceResponseWasCommitted(c *gin.Context) bool {
+	return c.Writer.Written() || IsResponseCommitted(c)
+}
+
+func TestGeminiForwardNative_BufferedPreOutputFailoverRestoresResponseHeaders(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Header: http.Header{
+				"Content-Type": []string{"text/event-stream"},
+				"X-Request-Id": []string{"failed-attempt"},
+			},
+			Body: io.NopCloser(&geminiCompatErrAfterReader{
+				data: strings.NewReader(""),
+				err:  fmt.Errorf("upstream connection reset"),
+			}),
+		},
+	}
+	svc := &GeminiMessagesCompatService{
+		tokenProvider: &GeminiTokenProvider{},
+		httpUpstream:  httpStub,
+		cfg:           &config.Config{},
+	}
+	account := &Account{
+		ID:          106,
+		Platform:    PlatformGemini,
+		Type:        AccountTypeOAuth,
+		Credentials: map[string]any{"access_token": "[REDACTED]", "project_id": "project-1"},
+		Concurrency: 1,
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Header("X-Middleware", "preserved")
+	c.Header("Content-Type", "application/json")
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-flash:generateContent", strings.NewReader(`{}`))
+
+	result, err := svc.ForwardNative(context.Background(), c, account, "gemini-2.5-flash", "generateContent", false, []byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`))
+
+	require.Nil(t, result)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, "preserved", c.Writer.Header().Get("X-Middleware"))
+	require.Equal(t, "application/json", c.Writer.Header().Get("Content-Type"))
+	require.Empty(t, c.Writer.Header().Get("X-Request-Id"))
+}
+
+func TestGeminiForwardNative_StreamingRequestIDIsNotDuplicated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Header: http.Header{
+				"Content-Type": []string{"text/event-stream"},
+				"X-Request-Id": []string{"gemini-stream-request"},
+			},
+			Body: io.NopCloser(strings.NewReader("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hello\"}]}}]}\n\ndata: [DONE]\n\n")),
+		},
+	}
+	svc := &GeminiMessagesCompatService{
+		httpUpstream:         httpStub,
+		cfg:                  &config.Config{},
+		responseHeaderFilter: responseheaders.CompileHeaderFilter(config.ResponseHeaderConfig{}),
+	}
+	account := &Account{
+		ID:          107,
+		Platform:    PlatformGemini,
+		Type:        AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "[REDACTED]"},
+		Concurrency: 1,
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-flash:streamGenerateContent", strings.NewReader(`{}`))
+
+	result, err := svc.ForwardNative(context.Background(), c, account, "gemini-2.5-flash", "streamGenerateContent", true, []byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`))
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, []string{"gemini-stream-request"}, rec.Header().Values("X-Request-Id"))
 }
 
 func TestGeminiForwardAsChatCompletions_StreamsOpenAIChunksFromGeminiSSE(t *testing.T) {
@@ -195,7 +407,7 @@ func TestGeminiForwardAsChatCompletions_StreamsOpenAIChunksFromGeminiSSE(t *test
 		Platform: PlatformGemini,
 		Type:     AccountTypeAPIKey,
 		Credentials: map[string]any{
-			"api_key": "gemini-api-key",
+			"api_key": "[REDACTED]",
 		},
 		Concurrency: 1,
 	}
@@ -215,7 +427,7 @@ func TestGeminiForwardAsChatCompletions_StreamsOpenAIChunksFromGeminiSSE(t *test
 
 	require.NotNil(t, httpStub.lastReq)
 	require.Contains(t, httpStub.lastReq.URL.String(), "/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse")
-	require.Equal(t, "gemini-api-key", httpStub.lastReq.Header.Get("x-goog-api-key"))
+	require.Equal(t, "[REDACTED]", httpStub.lastReq.Header.Get("x-goog-api-key"))
 
 	out := rec.Body.String()
 	require.Contains(t, out, `"object":"chat.completion.chunk"`)
@@ -247,7 +459,7 @@ func TestGeminiForwardAsChatCompletions_FunctionNamedWebSearchStaysClientSide(t 
 		Platform: PlatformGemini,
 		Type:     AccountTypeAPIKey,
 		Credentials: map[string]any{
-			"api_key": "gemini-api-key",
+			"api_key": "[REDACTED]",
 		},
 		Concurrency: 1,
 	}
