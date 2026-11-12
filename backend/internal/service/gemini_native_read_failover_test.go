@@ -53,7 +53,7 @@ func TestGeminiNativeReadFailoverBoundary(t *testing.T) {
 			svc := &GeminiMessagesCompatService{}
 			var err error
 			if tc.stream {
-				_, err = svc.handleNativeStreamingResponse(c, resp, time.Now(), false, &Account{ID: 1}, "gemini-read-boundary")
+				_, err = svc.handleNativeStreamingResponse(c, resp, time.Now(), false, &Account{ID: 1}, "gemini-read-boundary", nil)
 			} else {
 				_, err = svc.handleNativeNonStreamingResponse(c, resp, false, &Account{ID: 1}, "gemini-read-boundary")
 			}
