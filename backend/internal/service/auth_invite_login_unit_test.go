@@ -38,6 +38,15 @@ func (s *inviteLoginRefreshTokenCacheStub) DeleteRefreshToken(_ context.Context,
 	return nil
 }
 
+func (s *inviteLoginRefreshTokenCacheStub) ConsumeRefreshToken(ctx context.Context, tokenHash string) (*RefreshTokenData, error) {
+	data, err := s.GetRefreshToken(ctx, tokenHash)
+	if err != nil {
+		return nil, err
+	}
+	delete(s.tokens, tokenHash)
+	return data, nil
+}
+
 func (s *inviteLoginRefreshTokenCacheStub) DeleteUserRefreshTokens(context.Context, int64) error {
 	return nil
 }
@@ -64,6 +73,20 @@ func (s *inviteLoginRefreshTokenCacheStub) GetFamilyTokenHashes(context.Context,
 
 func (s *inviteLoginRefreshTokenCacheStub) IsTokenInFamily(context.Context, string, string) (bool, error) {
 	return false, nil
+}
+
+func TestInviteLoginRefreshTokenCacheStubConsumesTokenOnce(t *testing.T) {
+	ctx := context.Background()
+	cache := newInviteLoginRefreshTokenCacheStub()
+	if err := cache.StoreRefreshToken(ctx, "token", &RefreshTokenData{}, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := cache.ConsumeRefreshToken(ctx, "token"); err != nil || data == nil {
+		t.Fatalf("first ConsumeRefreshToken() = %v, %v; want token and no error", data, err)
+	}
+	if data, err := cache.ConsumeRefreshToken(ctx, "token"); data != nil || err != ErrRefreshTokenNotFound {
+		t.Fatalf("second ConsumeRefreshToken() = %v, %v; want nil and ErrRefreshTokenNotFound", data, err)
+	}
 }
 
 func TestInviteLoginDirectDeviceCodeSuccessIssuesTokensAndUpdatesLastLogin(t *testing.T) {
