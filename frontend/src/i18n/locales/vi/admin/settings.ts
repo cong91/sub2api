@@ -669,6 +669,8 @@ export default mergeLocaleMessages(
       field_cid: 'ID kênh thanh toán',
       field_cidAlipay: 'ID kênh Alipay',
       field_cidWxpay: 'ID kênh WeChat Pay',
+      field_refundSuccessCode: 'Mã hoàn tiền thành công',
+      field_refundSuccessCodeHint: 'Dùng mã thành công được quy định trong tài liệu API hoàn tiền của cổng này. Mặc định: 1 (ví dụ: ZPAY). Chỉ chọn 0 nếu tài liệu của cổng quy định như vậy. Tạo thanh toán và tra cứu đơn hàng vẫn yêu cầu mã 1.',
       stripeWebhookApiVersionHint: 'Đặt API version của webhook endpoint này khớp với Stripe SDK tích hợp. Khuyến nghị: {version}. Sai version có thể làm lỗi parse webhook.',
       airwallexWebhookHint: 'Cấu hình URL sau làm Webhook endpoint trong Airwallex. Chọn ít nhất Payment Intent -> Succeeded (payment_intent.succeeded), tốt nhất thêm Payment Intent -> Cancelled (payment_intent.cancelled). Dùng API version mặc định của account hoặc bản ổn định mới nhất.',
       airwallexGuideSummary: 'Khi tạo scoped API key Airwallex, hãy chọn Read và Write cho Payment Acceptance trong quyền cấp account.',
