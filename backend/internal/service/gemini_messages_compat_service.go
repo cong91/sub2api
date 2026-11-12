@@ -1574,7 +1574,7 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 				if failoverErr, ok := newGeminiNativeReadFailoverError(ctx, c, resp, err); ok {
 					return nil, failoverErr
 				}
-				return nil, fmt.Errorf("read upstream Gemini stream: %w", err)
+				return nil, s.writeGoogleError(c, http.StatusBadGateway, "Failed to read upstream stream")
 			}
 			s.finalizeGeminiSSESignal(c, account, false, requestID, best, stats.dataEvents > 0, stats.fallback)
 			b, _ := json.Marshal(collected)
