@@ -923,6 +923,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesErrorResponse(
 	requestedModel ...string,
 ) (*OpenAIForwardResult, error) {
 	body := s.readUpstreamErrorBody(resp)
+	if s.rateLimitService != nil {
+		s.rateLimitService.observeProviderBalanceError(ctx, account, resp.StatusCode, body)
+	}
 
 	upstreamMsg := sanitizeUpstreamErrorMessage(strings.TrimSpace(extractUpstreamErrorMessage(body)))
 	upstreamDetail := ""
