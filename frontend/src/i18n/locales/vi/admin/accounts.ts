@@ -198,6 +198,8 @@ export default mergeLocaleMessages(
     testConnection: 'Kiểm tra kết nối',
     reAuthorize: 'Ủy quyền lại',
     refreshToken: 'Làm mới token',
+    refreshTokenHint: 'Token được tự động làm mới trong nền. Làm mới thủ công thường xuyên có thể xung đột với quá trình tự động, khiến token mất hiệu lực và tài khoản bị tạm dừng.',
+    refreshTokenFrequentWarning: 'Chưa đầy một phút kể từ lần làm mới thủ công trước: làm mới thường xuyên có thể xung đột với quá trình tự động và khiến token mất hiệu lực. Chỉ thử lại khi cần thiết.',
     noAccountsYet: 'Chưa có tài khoản nào',
     createFirstAccount: 'Thêm tài khoản nền tảng AI để bắt đầu dùng cổng API.',
     tokenRefreshed: 'Làm mới token thành công',

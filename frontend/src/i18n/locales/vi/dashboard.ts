@@ -1118,6 +1118,7 @@ const additionsA = {
   },
   table: {
     model: 'Model',
+    copyModelId: 'Sao chép ID model {model}',
     input: 'đầu vào',
     output: 'đầu ra',
     cache: 'Bộ nhớ đệm',
