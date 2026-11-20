@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -94,6 +95,71 @@ func (r *providerBalanceAlertClaimRepo) MarkFailedRetryable(_ context.Context, i
 		}
 	}
 	return errors.New("claim not found")
+}
+
+func TestProviderBalanceAlertZzshuClassifier(t *testing.T) {
+	account := &Account{ID: 3750, Name: "zzshu-Claude", Platform: PlatformAnthropic, Type: AccountTypeAPIKey}
+	precharge := `{"error":{"type":"new_api_error","message":"預扣費額度失敗，使用者剩餘額度：＄0.000534，需要預扣費額度：＄0.005002 (request id: example)"},"type":"error"}`
+	exhausted := `{"error":{"type":"new_api_error","message":"使用者額度不足，剩餘額度：＄-0.000168 (request id: example)"},"type":"error"}`
+	for _, tc := range []struct {
+		name    string
+		account *Account
+		status  int
+		body    string
+		want    bool
+	}{
+		{"precharge", account, http.StatusForbidden, precharge, true},
+		{"exhausted", account, http.StatusForbidden, exhausted, true},
+		{"bad status", account, http.StatusBadRequest, precharge, false},
+		{"unrelated type", account, http.StatusForbidden, `{"error":{"type":"other_error","message":"使用者額度不足，剩餘額度：＄-0.000168"}}`, false},
+		{"mismatched nested error type", account, http.StatusForbidden, `{"type":"error","error":{"type":"new_api_error","message":"{\"error\":{\"type\":\"other_error\",\"message\":\"使用者額度不足，剩餘額度：＄-0.000168\"}}"}}`, false},
+		{"wrong top-level error type", account, http.StatusForbidden, `{"type":"other_error","error":{"type":"new_api_error","message":"使用者額度不足，剩餘額度：＄-0.000168"}}`, false},
+		{"partial message", account, http.StatusForbidden, `{"error":{"type":"new_api_error","message":"使用者額度不足"}}`, false},
+		{"non-numeric amount", account, http.StatusForbidden, `{"error":{"type":"new_api_error","message":"使用者額度不足，剩餘額度：＄unavailable"}}`, false},
+		{"suffix injection", account, http.StatusForbidden, `{"error":{"type":"new_api_error","message":"使用者額度不足，剩餘額度：＄0.01 other error"}}`, false},
+		{"embedded message", account, http.StatusForbidden, `{"error":{"type":"new_api_error","message":"客戶說使用者額度不足，剩餘額度：＄-0.000168"}}`, false},
+		{"oauth", &Account{Platform: PlatformAnthropic, Type: AccountTypeOAuth}, http.StatusForbidden, exhausted, false},
+		{"invalid json", account, http.StatusForbidden, `使用者額度不足，剩餘額度：＄-0.000168`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := providerInsufficientBalance(tc.account, tc.status, []byte(tc.body)); got != tc.want {
+				t.Errorf("providerInsufficientBalance() = %t; want %t", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestProviderBalanceAlertZzshuDelivery(t *testing.T) {
+	var mu sync.Mutex
+	var messages []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Errorf("form: %v", err)
+		}
+		mu.Lock()
+		messages = append(messages, r.Form.Get("text"))
+		mu.Unlock()
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer srv.Close()
+	settings := &providerBalanceAlertSettingRepo{values: map[string]string{
+		SettingTelegramAdminBotToken: "admin-token", SettingTelegramAdminChatID: "admin-chat",
+		SettingTelegramNotifyProviderBalance: "true",
+	}}
+	telegram := NewTelegramNotifyService(settings)
+	telegram.apiBaseURL = srv.URL + "/bot"
+	alerts := NewProviderBalanceAlerts(telegram, NewIdempotencyCoordinator(&providerBalanceAlertClaimRepo{}, IdempotencyConfig{
+		DefaultTTL: time.Hour, ProcessingTimeout: time.Minute, FailedRetryBackoff: time.Millisecond, MaxStoredResponseLen: 1024,
+	}))
+	account := &Account{ID: 3750, Name: "zzshu-Claude", Platform: PlatformAnthropic, Type: AccountTypeAPIKey}
+	body := []byte(`{"error":{"type":"new_api_error","message":"預扣費額度失敗，使用者剩餘額度：＄0.000534，需要預扣費額度：＄0.005002 (request id: example)"},"type":"error"}`)
+	alerts.Observe(context.Background(), account, http.StatusForbidden, body)
+	alerts.Observe(context.Background(), account, http.StatusForbidden, body)
+	mu.Lock()
+	defer mu.Unlock()
+	if len(messages) != 1 || !strings.Contains(messages[0], "3750") {
+		t.Fatalf("messages = %q; want one deduplicated admin alert for account 3750", messages)
+	}
 }
 
 func TestProviderBalanceAlertDeliveryAndDedup(t *testing.T) {
@@ -381,5 +447,44 @@ func TestProviderBalanceAlertNotSuppressedByErrorPolicy(t *testing.T) {
 		case <-time.After(3 * time.Second):
 			t.Fatal("admin notification was suppressed by error policy")
 		}
+	}
+}
+
+func TestProviderBalanceAlertOnRetryExhaustedAPIKeyWithCustomErrorPolicy(t *testing.T) {
+	sent := make(chan struct{}, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"ok":true}`))
+		sent <- struct{}{}
+	}))
+	defer srv.Close()
+	settings := &providerBalanceAlertSettingRepo{values: map[string]string{
+		SettingTelegramAdminBotToken: "admin-token", SettingTelegramAdminChatID: "admin-chat",
+		SettingTelegramNotifyProviderBalance: "true",
+	}}
+	telegram := NewTelegramNotifyService(settings)
+	telegram.apiBaseURL = srv.URL + "/bot"
+	alerts := NewProviderBalanceAlerts(telegram, NewIdempotencyCoordinator(&providerBalanceAlertClaimRepo{}, IdempotencyConfig{
+		DefaultTTL: time.Hour, ProcessingTimeout: time.Minute, FailedRetryBackoff: time.Millisecond, MaxStoredResponseLen: 1024,
+	}))
+	rate := &RateLimitService{}
+	rate.SetProviderBalanceAlerts(alerts)
+	account := &Account{
+		ID: 683, Name: "zzshu-Claude", Platform: PlatformAnthropic, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"custom_error_codes_enabled": true,
+			"custom_error_codes":         []any{float64(http.StatusTooManyRequests)},
+		},
+	}
+	body := `{"type":"error","error":{"type":"new_api_error","message":"使用者額度不足，剩餘額度：＄-0.000168"}}`
+	gateway := &GatewayService{rateLimitService: rate}
+	gateway.handleRetryExhaustedSideEffects(context.Background(), &http.Response{
+		StatusCode: http.StatusForbidden,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(strings.NewReader(body)),
+	}, account)
+	select {
+	case <-sent:
+	case <-time.After(3 * time.Second):
+		t.Fatal("retry-exhausted API-key error with custom policy did not send admin alert")
 	}
 }

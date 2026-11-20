@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -23,6 +24,10 @@ func NewProviderBalanceAlerts(telegram *TelegramNotifyService, claims *Idempoten
 	return &ProviderBalanceAlerts{telegram: telegram, claims: claims}
 }
 
+// newAPIQuotaError matches the observed structured new-api account quota errors.
+// Require the complete numeric message shape to avoid classifying generic 403s.
+var newAPIQuotaError = regexp.MustCompile(`^(?:預扣費額度失敗，使用者剩餘額度：＄-?[0-9]+(?:\.[0-9]+)?，需要預扣費額度：＄[0-9]+(?:\.[0-9]+)?|使用者額度不足，剩餘額度：＄-?[0-9]+(?:\.[0-9]+)?)(?: \(request id: [a-zA-Z0-9_-]+\))?$`)
+
 // providerInsufficientBalance matches only structured account-level
 // balance signals, never generic 403/HTML/CDN failures or a customer's wallet.
 func providerInsufficientBalance(account *Account, statusCode int, body []byte) bool {
@@ -34,7 +39,21 @@ func providerInsufficientBalance(account *Account, statusCode int, body []byte) 
 		return true
 	}
 	message := strings.ToLower(strings.TrimSpace(extractUpstreamErrorMessage(body)))
-	return message == "insufficient balance" || strings.HasPrefix(message, "insufficient account balance")
+	if message == "insufficient balance" || strings.HasPrefix(message, "insufficient account balance") {
+		return true
+	}
+	if statusCode != http.StatusForbidden {
+		return false
+	}
+	var response struct {
+		Type  string `json:"type"`
+		Error struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	return json.Unmarshal(body, &response) == nil && response.Type == "error" &&
+		response.Error.Type == "new_api_error" && newAPIQuotaError.MatchString(strings.TrimSpace(response.Error.Message))
 }
 
 // Observe does not change the upstream error policy. One durable claim per
