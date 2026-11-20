@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -23,18 +24,114 @@ func NewProviderBalanceAlerts(telegram *TelegramNotifyService, claims *Idempoten
 	return &ProviderBalanceAlerts{telegram: telegram, claims: claims}
 }
 
+// newAPIQuotaError matches the observed structured new-api account quota errors.
+// Require the complete numeric message shape to avoid classifying generic 403s.
+var newAPIQuotaError = regexp.MustCompile(`^(?:預扣費額度失敗，使用者剩餘額度：＄-?[0-9]+(?:\.[0-9]+)?，需要預扣費額度：＄[0-9]+(?:\.[0-9]+)?|使用者額度不足，剩餘額度：＄-?[0-9]+(?:\.[0-9]+)?)(?: \(request id: [a-zA-Z0-9_-]+\))?$`)
+
+const providerInsufficientBalanceCode = "insufficient_balance"
+
+// hasStructuredProviderBalanceCode recognizes explicit balance codes only
+// within structured upstream response fields, not echoed request data or arbitrary text.
+func hasStructuredProviderBalanceCode(body []byte) bool {
+	var value any
+	if len(body) == 0 || json.Unmarshal(body, &value) != nil {
+		return false
+	}
+	return containsStructuredProviderBalanceCode(value, 0)
+}
+
+func containsStructuredProviderBalanceCode(value any, depth int) bool {
+	if depth > 6 {
+		return false
+	}
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, child := range typed {
+			normalizedKey := strings.ToLower(strings.TrimSpace(key))
+			if text, ok := child.(string); ok {
+				normalizedValue := strings.ToLower(strings.Trim(strings.TrimSpace(text), "."))
+				switch normalizedKey {
+				case "errorkey", "error_key", "code":
+					if normalizedValue == providerInsufficientBalanceCode {
+						return true
+					}
+				}
+			}
+			if isUpstreamErrorContainer(normalizedKey) && containsStructuredProviderBalanceCode(child, depth+1) {
+				return true
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			if containsStructuredProviderBalanceCode(child, depth+1) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isUpstreamErrorContainer(key string) bool {
+	switch key {
+	case "error", "errors", "cause", "detail", "details", "inner", "innererror", "inner_error", "response":
+		return true
+	default:
+		return false
+	}
+}
+
 // providerInsufficientBalance matches only structured account-level
 // balance signals, never generic 403/HTML/CDN failures or a customer's wallet.
 func providerInsufficientBalance(account *Account, statusCode int, body []byte) bool {
-	if account == nil || !domain.IsConcretePlatform(account.Platform) || account.Type != AccountTypeAPIKey ||
-		(statusCode != http.StatusForbidden && statusCode != http.StatusPaymentRequired) || !json.Valid(body) {
+	if account == nil || !domain.IsConcretePlatform(account.Platform) || account.Type != AccountTypeAPIKey || !json.Valid(body) {
 		return false
 	}
-	if strings.EqualFold(strings.TrimSpace(extractUpstreamErrorCode(body)), "INSUFFICIENT_BALANCE") {
+	if statusCode < http.StatusBadRequest || statusCode > 599 {
+		return false
+	}
+	code := strings.ToLower(strings.TrimSpace(extractUpstreamErrorCode(body)))
+	// A specific outer code wins over a contradictory nested value or message.
+	// Generic wrapper codes can legitimately contain a more specific cause.
+	switch code {
+	case "", "insufficient_balance", "upstream_error", "api_error", "server_error", "internal_error":
+	default:
+		return false
+	}
+	// Reuse the existing structured-error parser, which only traverses error
+	// containers and does not classify echoed requests or arbitrary messages.
+	// Explicit codes can survive a provider's 5xx wrapper (e.g. images).
+	if hasStructuredProviderBalanceCode(body) {
 		return true
 	}
+	// Preserve the previous direct-code handling for 402/403 responses.
+	if (statusCode == http.StatusForbidden || statusCode == http.StatusPaymentRequired) && code == "insufficient_balance" {
+		return true
+	}
+	// Never override an explicit code with a less reliable message match.
+	if code != "" {
+		return false
+	}
 	message := strings.ToLower(strings.TrimSpace(extractUpstreamErrorMessage(body)))
-	return message == "insufficient balance" || strings.HasPrefix(message, "insufficient account balance")
+	if statusCode == http.StatusBadRequest && account.Platform == PlatformAnthropic &&
+		strings.HasPrefix(message, "your credit balance is too low to access the anthropic api") {
+		return true
+	}
+	if (statusCode == http.StatusForbidden || statusCode == http.StatusPaymentRequired) &&
+		(message == "insufficient balance" || strings.HasPrefix(message, "insufficient account balance")) {
+		return true
+	}
+	if statusCode != http.StatusForbidden {
+		return false
+	}
+	var response struct {
+		Type  string `json:"type"`
+		Error struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	return json.Unmarshal(body, &response) == nil && response.Type == "error" &&
+		response.Error.Type == "new_api_error" && newAPIQuotaError.MatchString(strings.TrimSpace(response.Error.Message))
 }
 
 // Observe does not change the upstream error policy. One durable claim per

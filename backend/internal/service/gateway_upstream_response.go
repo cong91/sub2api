@@ -574,6 +574,12 @@ func (s *GatewayService) handleRetryExhaustedSideEffects(ctx context.Context, re
 	body, _ := s.readUpstreamErrorBody(resp)
 	statusCode := resp.StatusCode
 
+	// API-key alerts must survive the retry-exhausted custom-policy path without
+	// applying any account-state change that the policy intentionally skipped.
+	if account.Type == AccountTypeAPIKey && s.rateLimitService != nil {
+		s.rateLimitService.observeProviderBalanceError(ctx, account, statusCode, body)
+	}
+
 	// OAuth/Setup Token 账号的 403：标记账号异常
 	if account.IsOAuth() && statusCode == 403 {
 		if len(requestedModel) > 0 {

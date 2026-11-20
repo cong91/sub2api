@@ -88,6 +88,44 @@ func TestForwardOpenAIImagesAPIKey_ClassifiesWrappedBalanceBeforeTransientFailov
 	}
 }
 
+func TestForwardOpenAIImagesAPIKey_NotifiesBalanceOnWrappedError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	sent := make(chan struct{}, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"ok":true}`))
+		sent <- struct{}{}
+	}))
+	defer srv.Close()
+	settings := &providerBalanceAlertSettingRepo{values: map[string]string{
+		SettingTelegramAdminBotToken: "admin-token", SettingTelegramAdminChatID: "admin-chat",
+		SettingTelegramNotifyProviderBalance: "true",
+	}}
+	telegram := NewTelegramNotifyService(settings)
+	telegram.apiBaseURL = srv.URL + "/bot"
+	alerts := NewProviderBalanceAlerts(telegram, NewIdempotencyCoordinator(&providerBalanceAlertClaimRepo{}, IdempotencyConfig{
+		DefaultTTL: time.Hour, ProcessingTimeout: time.Minute, FailedRetryBackoff: time.Millisecond, MaxStoredResponseLen: 1024,
+	}))
+	rate := &RateLimitService{}
+	rate.SetProviderBalanceAlerts(alerts)
+	svc := &OpenAIGatewayService{accountRepo: &openAIImagesBalanceRepo{}, httpUpstream: openAIImagesBalanceUpstream{}, rateLimitService: rate, cfg: &config.Config{}}
+	account := &Account{ID: 7, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true,
+		Credentials: map[string]any{"api_key": "test-key", "base_url": "https://images.example.test"}}
+	body := []byte(`{"model":"gpt-image-1","prompt":"cat"}`)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+	_, err := svc.ForwardImages(context.Background(), c, account, body, &OpenAIImagesRequest{
+		Model: "gpt-image-1", Endpoint: openAIImagesGenerationsEndpoint, ContentType: "application/json", N: 1,
+	}, "")
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, OpenAIImagesInsufficientBalanceReason, failoverErr.Reason)
+	select {
+	case <-sent:
+	case <-time.After(2 * time.Second):
+		t.Fatal("no alert for wrapped upstream balance error")
+	}
+}
+
 func TestOpenAIImagesInsufficientBalanceDetectionRejectsUnstructuredAndEchoedText(t *testing.T) {
 	require.True(t, isOpenAIImagesInsufficientBalance([]byte(`{"errorKey":"insufficient_balance"}`)))
 	require.True(t, isOpenAIImagesInsufficientBalance([]byte(`{"error":{"cause":{"errorKey":"insufficient_balance"}}}`)))
