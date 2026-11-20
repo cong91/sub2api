@@ -481,6 +481,9 @@ export default mergeLocaleMessages(
       oauthPassthrough: 'Tự động passthrough (chỉ thay xác thực)',
       oauthPassthroughDesc:
         'Sau khi bật, tài khoản OpenAI này sẽ tự động passthrough request và response, chỉ thay phần xác thực, đồng thời giữ lại billing/concurrency/audit và các bộ lọc an toàn cần thiết; nếu gặp vấn đề tương thích có thể tắt để rollback bất cứ lúc nào.',
+      passthroughModelFilter: 'Lọc tài khoản passthrough theo model',
+      passthroughModelFilterDesc:
+        'Dùng danh sách trắng model của tài khoản và tên model nguồn trong ánh xạ để chọn tài khoản này. Tên model đích trong ánh xạ không làm thay đổi tên model của request passthrough. Danh sách trống cho phép mọi model. Mặc định tắt.',
       responsesWebsocketsV2: 'Responses WebSocket v2',
       responsesWebsocketsV2Desc:
         'Mặc định tắt. Sau khi bật, có thể sử dụng khả năng giao thức responses_websockets_v2 (chịu ràng buộc bởi công tắc toàn cục của gateway và công tắc theo loại tài khoản).',
@@ -592,6 +595,7 @@ export default mergeLocaleMessages(
     enterCustomModelName: 'Nhập tên model tùy chỉnh',
     addModel: 'Thêm vào',
     modelExists: 'Model này đã tồn tại',
+    modelWildcardNotSupported: 'Danh sách trắng model không hỗ trợ ký tự đại diện. Hãy nhập chính xác tên model.',
     modelCount: '{count} model',
     poolMode: 'Chế độ pool',
     poolModeHint: 'Bật khi upstream là pool tài khoản; lỗi sẽ không đánh dấu trạng thái tài khoản cục bộ',

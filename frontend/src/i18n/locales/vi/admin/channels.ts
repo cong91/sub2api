@@ -720,6 +720,7 @@ export default mergeLocaleMessages(
       imageInputPrice: 'Nhập hình ảnh',
       fastMultiplier: 'Hệ số nhân nhanh',
       flexMultiplier: 'Hệ số linh hoạt',
+      ultrafastMultiplier: 'Hệ số Ultra Fast',
       multiplierPlaceholder: 'Chưa đặt',
       multiplierPositive: 'Hệ số nhân Fast/Flex phải lớn hơn 0',
       inputMultiplier: 'Hệ số nhân đầu vào',

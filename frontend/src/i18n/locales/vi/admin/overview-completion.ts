@@ -77,6 +77,8 @@ export default {
       "title": "Chế độ OpenAI Fast",
       "force": "Bắt buộc Fast (ưu tiên)",
       "hint": "Buộc service_tier=priority cho các yêu cầu OpenAI trong nhóm này. Chính sách Fast/Flex toàn cục vẫn có thể lọc hoặc chặn tùy chọn này. Yêu cầu mới cập nhật ngay sau khi lưu; các phiên WebSocket hiện tại phải kết nối lại.",
+      "forceUltrafast": "Bắt buộc Ultra Fast (ultrafast)",
+      "ultrafastHint": "Buộc sử dụng Ultra Fast trên các model được hỗ trợ. Gói Pro 200 bao gồm GPT-6.2 Sol Ultra Fast. Gói Pro 500 bao gồm cả Sol và Astra Ultra Fast. Các gói khác sử dụng những tier được tài khoản công bố. Nếu không khả dụng, Force Fast được ưu tiên hơn tier từ client. GPT-6.2 Sol và Astra có giá bằng 3× Standard đến hết ngày 28 tháng 2 năm 2027 (giờ Thái Bình Dương), sau đó là 6×. GPT-6 Astra và GPT-6.1 Sol có giá bằng 6×. Fast miễn phí không bao gồm Ultra Fast.",
       "free": "Fast miễn phí",
       "freeHint": "Các yêu cầu Fast trong nhóm này vẫn dùng tier priority, nhưng khách hàng chỉ bị tính mức giá tương đương Standard."
     }

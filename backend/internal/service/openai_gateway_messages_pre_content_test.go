@@ -68,14 +68,20 @@ func TestForwardAsAnthropic_PreContentMissingTerminalFailsOver(t *testing.T) {
 	require.False(t, c.Writer.Written())
 }
 
-func TestForwardAsAnthropic_PreContentReadErrorDoesNotFailOver(t *testing.T) {
-	reader := &errAfterReader{data: strings.NewReader(preContentCreatedFrame), err: io.ErrUnexpectedEOF}
-	rec, _, err := forwardPreContent(t, rawChatCompletionsTestConfig(), nil, io.NopCloser(reader))
+func TestForwardAsAnthropic_PreContentReadErrorFailsOver(t *testing.T) {
+	for _, keepalive := range []int{0, 1} {
+		t.Run(map[bool]string{true: "asynchronous", false: "synchronous"}[keepalive > 0], func(t *testing.T) {
+			cfg := rawChatCompletionsTestConfig()
+			cfg.Gateway.StreamKeepaliveInterval = keepalive
+			reader := &errAfterReader{data: strings.NewReader(preContentCreatedFrame), err: io.ErrUnexpectedEOF}
+			rec, c, err := forwardPreContent(t, cfg, nil, io.NopCloser(reader))
 
-	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
-	var failoverErr *UpstreamFailoverError
-	require.False(t, errors.As(err, &failoverErr), "a read error never fails over: %v", err)
-	require.Contains(t, rec.Body.String(), "message_start")
+			var failoverErr *UpstreamFailoverError
+			require.ErrorAs(t, err, &failoverErr, "a read error before semantic output must allow failover")
+			require.Empty(t, rec.Body.String())
+			require.False(t, c.Writer.Written())
+		})
+	}
 }
 
 func TestForwardAsAnthropic_PreContentPingKeepsFailover(t *testing.T) {
