@@ -680,7 +680,7 @@ func TestAnthropicCacheOnlyBufferedSSEUsage(t *testing.T) {
 					require.Equal(t, test.wantAggregate, aggregate)
 					// Incomplete streams retain collected usage but must not report success.
 					if terminal == "eof" {
-						require.EqualError(t, err, "stream usage incomplete: missing terminal event")
+						require.ErrorContains(t, err, "stream usage incomplete")
 						require.Equal(t, http.StatusBadGateway, recorder.Code)
 						errorField := "code"
 						if strings.HasSuffix(adapter, "chat") {

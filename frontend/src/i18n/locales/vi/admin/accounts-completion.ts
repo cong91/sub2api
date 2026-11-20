@@ -193,6 +193,10 @@ export default {
     },
     "expiresAtTimezoneHint": "Giá trị được hiểu theo múi giờ trình duyệt của bạn ({timezone}).",
     "usageWindow": {
+      "quotaRefreshFailedCached": "Không thể làm mới. Đang hiển thị dữ liệu quan sát trước đó; chưa xác nhận quota còn lại.",
+      "quotaRefreshFailedUnknown": "Không thể làm mới. Quota hiện tại chưa xác định.",
+      "quotaObservedAt": "Quota được ghi nhận lúc: ",
+      "quotaObservationUnknown": "Không rõ (từ bộ nhớ đệm)",
       "estimatedTotalCost": "Tổng ước tính ${cost}",
       "estimatedTotalCostTooltip": "Chi phí ước tính ở mức sử dụng 100%, dựa trên chi phí và mức sử dụng của cửa sổ hiện tại"
     }
