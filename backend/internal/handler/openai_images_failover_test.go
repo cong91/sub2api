@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -63,12 +64,31 @@ type openAIImagesFailoverHTTPUpstream struct {
 	service.HTTPUpstream
 	mu         sync.Mutex
 	accountIDs []int64
+	responses  map[int64]openAIImagesFailoverResponse
+}
+
+type openAIImagesFailoverResponse struct {
+	status      int
+	body        string
+	contentType string
 }
 
 func (u *openAIImagesFailoverHTTPUpstream) Do(_ *http.Request, _ string, accountID int64, _ int) (*http.Response, error) {
 	u.mu.Lock()
 	u.accountIDs = append(u.accountIDs, accountID)
+	fixture, hasFixture := u.responses[accountID]
 	u.mu.Unlock()
+	if hasFixture {
+		contentType := fixture.contentType
+		if contentType == "" {
+			contentType = "application/json"
+		}
+		return &http.Response{
+			StatusCode: fixture.status,
+			Header:     http.Header{"Content-Type": []string{contentType}},
+			Body:       io.NopCloser(bytes.NewBufferString(fixture.body)),
+		}, nil
+	}
 	return &http.Response{
 		StatusCode: http.StatusOK,
 		Header: http.Header{
@@ -85,6 +105,53 @@ func (u *openAIImagesFailoverHTTPUpstream) calls() []int64 {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	return append([]int64(nil), u.accountIDs...)
+}
+
+func TestOpenAIGatewayHandlerImages_UnsupportedItemSwitchesProvider(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	groupID := int64(3130)
+	accounts := []service.Account{
+		{ID: 1, Name: "relay-a-1", Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey, Status: service.StatusActive, Schedulable: true, Credentials: map[string]any{"api_key": "fixture-1", "base_url": "https://relay-a.example/v1"}},
+		{ID: 2, Name: "relay-a-2", Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey, Status: service.StatusActive, Schedulable: true, Credentials: map[string]any{"api_key": "fixture-2", "base_url": "https://relay-a.example"}},
+		{ID: 3, Name: "relay-b", Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey, Status: service.StatusActive, Schedulable: true, Credentials: map[string]any{"api_key": "fixture-3", "base_url": "https://relay-b.example/v1"}},
+	}
+	accounts[0].Priority = 0
+	accounts[1].Priority = 1
+	accounts[2].Priority = 2
+	accountRepo := openAIImagesFailoverAccountRepo{accounts: accounts}
+	upstream := &openAIImagesFailoverHTTPUpstream{responses: map[int64]openAIImagesFailoverResponse{
+		1: {status: http.StatusBadRequest, body: `{"error":{"message":"images contains an unsupported item","type":"invalid_request_error"}}`},
+		3: {status: http.StatusOK, body: `{"created":1710000000,"data":[{"b64_json":"aW1hZ2U="}]}`},
+	}}
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	gatewayService := service.NewOpenAIGatewayService(accountRepo, nil, nil, nil, nil, nil, nil, cfg, nil, nil, nil, nil, nil, upstream, nil, nil, nil, nil, nil, nil, nil, nil)
+	billingService := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
+	t.Cleanup(billingService.Stop)
+	handler := NewOpenAIGatewayHandler(gatewayService, service.NewConcurrencyService(nil), billingService, service.NewAPIKeyService(nil, nil, nil, nil, nil, nil, cfg), nil, nil, nil, nil, cfg)
+	handler.maxAccountSwitches = 10
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	require.NoError(t, writer.WriteField("model", "gpt-image-2"))
+	require.NoError(t, writer.WriteField("prompt", "edit fixture"))
+	image, err := writer.CreateFormFile("image", "input.png")
+	require.NoError(t, err)
+	_, err = image.Write([]byte("fixture-image"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/edits", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = req
+	c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{ID: 99, GroupID: &groupID, Group: &service.Group{ID: groupID, AllowImageGeneration: true}, User: &service.User{ID: 100}})
+	c.Set(string(middleware2.ContextKeyUser), middleware2.AuthSubject{UserID: 100})
+
+	handler.Images(c)
+
+	require.Equal(t, []int64{1, 3}, upstream.calls(), "same-origin account 2 must be skipped")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, "aW1hZ2U=", gjson.GetBytes(rec.Body.Bytes(), "data.0.b64_json").String())
 }
 
 func TestOpenAIGatewayHandlerImages_ServerErrorFailsOverAndReturnsClearErrorWhenExhausted(t *testing.T) {

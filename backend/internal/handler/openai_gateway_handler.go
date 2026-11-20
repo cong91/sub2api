@@ -3726,6 +3726,15 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 		h.handleStreamingAwareError(c, http.StatusBadRequest, "invalid_request_error", message, streamStarted)
 		return
 	}
+	if failoverErr.Reason == service.OpenAIImagesUnsupportedItemReason {
+		service.SetOpsUpstreamError(c, failoverErr.StatusCode, service.OpenAIImagesUnsupportedItemMessage, "")
+		if !streamStarted {
+			service.WriteOpenAIUpstreamClientError(c, http.StatusBadRequest, failoverErr.ResponseBody, service.OpenAIImagesUnsupportedItemMessage)
+		} else {
+			h.handleStreamingAwareError(c, http.StatusBadRequest, "invalid_request_error", service.OpenAIImagesUnsupportedItemMessage, true)
+		}
+		return
+	}
 	if failoverErr.Reason == service.OpenAIImagesInsufficientBalanceReason {
 		status := failoverErr.ClientStatusCode
 		if status <= 0 {

@@ -308,7 +308,23 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 				}
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
-					h.gatewayService.ReportOpenAIAccountScheduleResult(account, openAIAccountScheduleModel(c, account, requestModel, false, result), false, nil, err)
+					if failoverErr.Reason == service.OpenAIImagesUnsupportedItemReason {
+						// A provider-compatibility 400 is not evidence that the account is unhealthy.
+						h.gatewayService.ReportOpenAIAccountScheduleResult(account, openAIAccountScheduleModel(c, account, requestModel, false, result), false, nil)
+					} else {
+						h.gatewayService.ReportOpenAIAccountScheduleResult(account, openAIAccountScheduleModel(c, account, requestModel, false, result), false, nil, err)
+					}
+					if failoverErr.Reason == service.OpenAIImagesUnsupportedItemReason {
+						// The keepalive can commit bytes asynchronously; stop it before
+						// deciding whether this request can safely be replayed.
+						stopJSONKeepalive()
+						if c.Writer.Written() {
+							if !parsed.Stream && service.OpenAIImagesJSONKeepaliveAdjustedWrittenSize(c) < 0 {
+								h.handleFailoverExhausted(c, failoverErr, false)
+							}
+							return
+						}
+					}
 					if service.OpenAIImagesJSONKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward {
 						reqLog.Warn("openai.images.upstream_failover_skipped_after_flush",
 							zap.Int64("account_id", account.ID),
@@ -345,7 +361,17 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 						}
 					}
 					h.gatewayService.RecordOpenAIAccountSwitch()
-					failedAccountIDs[account.ID] = struct{}{}
+					if failoverErr.Reason == service.OpenAIImagesUnsupportedItemReason {
+						providerExcludedIDs, excludeErr := h.gatewayService.OpenAIImagesUnsupportedItemFailoverAccountIDs(requestCtx, apiKey.GroupID, account, failedAccountIDs)
+						if excludeErr != nil {
+							reqLog.Warn("openai.images.provider_failover_candidates_unavailable", zap.Int64("account_id", account.ID), zap.Error(excludeErr))
+							h.handleFailoverExhausted(c, failoverErr, streamStarted)
+							return
+						}
+						failedAccountIDs = providerExcludedIDs
+					} else {
+						failedAccountIDs[account.ID] = struct{}{}
+					}
 					lastFailoverErr = failoverErr
 					if switchCount >= maxAccountSwitches {
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
